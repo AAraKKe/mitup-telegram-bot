@@ -519,7 +519,9 @@ async def set_time_message_handler(
                     meeting, current_user.lang, error=CommonMessages.TIME_INVALID_VALUE.get(lang=current_user.lang)
                 ),
             )
-            context.emit_metric(MetricKey.ERROR.with_prefix("InvalidTime"), 1)
+            context.put_feature_metric(
+                Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "invalid_time"}
+            )
             return ConversationMeetingState.EDIT_TIME
 
         user_time = dt.time(int(time_info["hour"]), int(time_info["minutes"]), tzinfo=current_user.settings.tz)
@@ -568,7 +570,9 @@ async def fallback_answer(
                 meeting, current_user.lang, error=CommonMessages.TIME_INVALID_FORMAT.get(lang=current_user.lang)
             ),
         )
-        context.emit_metric(MetricKey.ERROR.with_prefix("WrongTimeFormat"), 1)
+        context.put_feature_metric(
+            Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "wrong_time_format"}
+        )
         return ConversationMeetingState.EDIT_TIME
 
 
@@ -608,7 +612,9 @@ async def datetime_state_fallback_answer(
         await context.api.send_message(
             update=update, view=build_edit_datetime_entry_view(meeting, current_user.lang, today, error=error)
         )
-        context.emit_metric(MetricKey.ERROR.with_prefix("WrongDatetimeFormat"), 1)
+        context.put_feature_metric(
+            Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "wrong_datetime_format"}
+        )
         return ConversationMeetingState.EDIT_DATETIME
 
 

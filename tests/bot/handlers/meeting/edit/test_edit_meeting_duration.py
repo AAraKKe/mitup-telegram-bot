@@ -17,7 +17,7 @@ from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, Edit
 from mitup_bot.handlers.meeting.edit.utils import safe_anchor_date
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, Settings, User
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import build_datetime_link
@@ -610,7 +610,12 @@ async def test_duration_end_wrong_input_shows_error_and_stays_in_state(
             error=CommonMessages.DATETIME_INVALID.get(lang=user.lang, datetime_link=build_datetime_link()),
         ),
     )
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongEndDatetimeFormat"), value=1)
+    metrics.assert_emitted(
+        name=MetricKey.ERROR,
+        dimensions={"Feature": str(Feature.EDIT_MEETING)},
+        properties={"reason": "wrong_end_datetime_format"},
+        value=1,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -843,7 +848,12 @@ async def test_duration_end_set_time_invalid_time_shows_error(
         update,
         build_end_time_prompt_view(meeting, user.lang, error=CommonMessages.TIME_INVALID_VALUE.get(lang=user.lang)),
     )
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("InvalidTime"), value=1)
+    metrics.assert_emitted(
+        name=MetricKey.ERROR,
+        dimensions={"Feature": str(Feature.EDIT_MEETING)},
+        properties={"reason": "invalid_time"},
+        value=1,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -881,7 +891,12 @@ async def test_duration_end_time_wrong_input_shows_error_and_stays_in_state(
         update,
         build_end_time_prompt_view(meeting, user.lang, error=CommonMessages.TIME_INVALID_FORMAT.get(lang=user.lang)),
     )
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongTimeFormat"), value=1)
+    metrics.assert_emitted(
+        name=MetricKey.ERROR,
+        dimensions={"Feature": str(Feature.EDIT_MEETING)},
+        properties={"reason": "wrong_time_format"},
+        value=1,
+    )
 
 
 # ---------------------------------------------------------------------------

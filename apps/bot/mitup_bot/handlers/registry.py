@@ -35,6 +35,7 @@ from mitup_bot.mitup_types import HandlerCallback, TMitupContext
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.units import MetricUnit
 
+from .error_handler import FaultOutcome, fault_error_type
 from .error_handler import handler as error_handler
 
 # Remove the warning that is sent when using the per_message option in the registry.
@@ -67,27 +68,50 @@ def callback_with_metrics(
         with structlog.contextvars.bound_contextvars(**handler_log_context(handler_id, handler_type, update)):
             start = perf_counter()
             return_value = None
+            outcome = FaultOutcome(0)
             try:
                 return_value = await callback(update, context)
             except ApplicationHandlerStop:
                 # Not a fault: the handler is claiming the update (it carries the next
-                # conversation state). Re-raise so PTB stops the remaining handler groups.
-                context.emit_metric(MetricKey.FAULT, 0)
+                # conversation state). Re-raise so PTB stops the remaining handler groups; the
+                # `finally` below still closes the invocation on Fault=0.
                 raise
             except Exception as e:
                 # Relying on error handlers by the application will result in the creation of a
                 # separate context. Lets handle errors here where we still have the context
                 # of the handler that was executed including metrics context.
-                await error_handler(context, e, env)
+                try:
+                    outcome = await error_handler(context, e, env)
+                except Exception:
+                    # The error handler answers every failure best-effort and is written never to
+                    # raise. If it does, the invocation is still a fault, and `e` — what the
+                    # callback raised — is what names it: an error handler that broke while
+                    # answering does not rename the fault after itself. The `finally` closes the
+                    # invocation on that value before this exception leaves for `process_update`.
+                    error_type = fault_error_type(e)
+                    outcome = FaultOutcome(1, {"error_type": error_type})
+                    # The only correlated record of this failure. The exception escapes to PTB,
+                    # which logs it after `bound_contextvars` has unwound, so that line carries no
+                    # flow/handler/update_id and cannot be joined to the fault it belongs to.
+                    log.error(
+                        "Error handler failed while answering a fault",
+                        exc_info=True,
+                        original_error_type=error_type,
+                    )
+                    raise
                 # No flow survives a handled error: the error handler leaves the user on a screen
                 # that navigates elsewhere, so no conversation state may stay live behind it.
                 # `None` would mean "keep the current state" to PTB and strand the user in a state
                 # whose context data is already gone. PTB ignores the value outside conversations.
                 return_value = ConversationHandler.END
-            else:
-                # Dimensionless FAULT=0; the handler identity rides as an EMF property, not a dimension.
-                context.emit_metric(MetricKey.FAULT, 0)
             finally:
+                # Exactly one dimensionless FAULT per invocation, whichever way the callback left —
+                # the handler identity rides as an EMF property, not a dimension. The fault-rate
+                # alarm reads this series' SampleCount as its request denominator, so an exit path
+                # that emitted nothing would shrink the denominator rather than count a completed
+                # interaction. The error handler classifies; this is the only writer.
+                context.emit_metric(MetricKey.FAULT, outcome.value, properties=outcome.properties)
+
                 latency = (perf_counter() - start) * 1000
                 # Dimensionless latency; the handler identity rides as an EMF property, not a dimension.
                 context.emit_metric(MetricKey.TIME, latency, MetricUnit.MILLISECONDS)

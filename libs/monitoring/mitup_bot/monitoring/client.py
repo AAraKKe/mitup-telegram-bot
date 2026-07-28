@@ -88,9 +88,6 @@ class MetricsClient:
     def set_global_property(self, key: str, value: Any):
         self._backend.set_global_property(key, value)
 
-    def add_stack_trace(self, key: str = "exception"):
-        self._backend.add_stack_trace(key)
-
     async def flush(self):
         await self._backend.flush()
 

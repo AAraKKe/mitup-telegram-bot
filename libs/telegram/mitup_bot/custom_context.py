@@ -120,13 +120,6 @@ TB = TypeVar("TB", bound=ExtBot)
 TAPI = TypeVar("TAPI", bound=TelegramApiWrapper)
 
 
-def properties_from_update(update: Update) -> dict[str, Any]:
-    """Create a dictionary with the properties from the provided Update."""
-    return {
-        "Update": update_fields_from_update(update),
-    }
-
-
 def fault_fields_from_update(update: Update) -> dict[str, Any]:
     """The trigger and its context for failure-path logs: what the user did (message text,
     location, callback data, inline query) plus who/where (user, chat, message ids).
@@ -160,23 +153,6 @@ def fault_fields_from_update(update: Update) -> dict[str, Any]:
         fields["inline_query"] = query.query
 
     return fields
-
-
-def update_fields_from_update(update: Update) -> dict[str, Any]:
-    """Only identifiers and callback data ride the metrics stream: message text, usernames,
-    reply markup, and inline-query text are PII and must stay out of the EMF log lines."""
-    values: dict[str, Any] = {}
-
-    if cb := update.callback_query:
-        values["callback"] = {"data": cb.data}
-
-    if user := update.effective_user:
-        values["user"] = {"tg_user_id": user.id}
-
-    if message := update.effective_message:
-        values["message"] = {"message_id": message.message_id}
-
-    return values
 
 
 class MitupContext(
@@ -355,7 +331,6 @@ class MitupContext(
         include_handler_properties: bool = True,
         # Property control
         properties: dict[str, Any] | None = None,
-        include_update_properties: bool = True,
     ):
         """Emit a metric with flexible dimension and property configuration.
 
@@ -366,6 +341,10 @@ class MitupContext(
         (`filter Fault = 1 | stats sum(Fault) by Handler`). Only the dimensionless series is
         emitted per metric name. See https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues/205.
 
+        The interaction that triggered the metric is described by the structlog lines bound to the
+        same `update_id`, never by the record: a snapshot of the update tells an alarm nothing and
+        rides on every emission of the flush window.
+
         Metrics with identical dimensions are batched into a single EMF log line — a CloudWatch
         cost optimization since charges are per log line, not per metric within a line.
         """
@@ -374,8 +353,6 @@ class MitupContext(
         props = dict(properties or {})
         if include_handler_properties:
             props |= self._handler_properties
-        if include_update_properties:
-            props |= properties_from_update(self.telegram_update)
 
         self.metrics.emit(name, value, unit, dimensions=dims, properties=props)
 
@@ -388,7 +365,6 @@ class MitupContext(
         dimensions: dict[str, str] | None = None,
         properties: dict[str, Any] | None = None,
         with_handler_properties: bool = False,
-        with_update_properties: bool = True,
     ):
         """Convenience wrapper around emit_metric that adds a Feature dimension automatically."""
         feature_dimensions = (dimensions or {}) | {"Feature": str(feature)}
@@ -399,7 +375,6 @@ class MitupContext(
             dimensions=feature_dimensions,
             properties=properties,
             include_handler_properties=with_handler_properties,
-            include_update_properties=with_update_properties,
         )
 
     @contextmanager

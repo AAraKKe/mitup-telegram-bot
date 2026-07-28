@@ -101,7 +101,6 @@ UNIT_MAPPING: dict[MetricUnit, Unit] = {
 class MetricsBackend(Protocol):
     def emit(self, record: MetricRecord): ...
     def set_global_property(self, key: str, value: Any): ...
-    def add_stack_trace(self, key: str): ...
     async def flush(self): ...
 
 
@@ -174,10 +173,6 @@ class EmfBackend:
         for logger in self._loggers.values():
             logger.set_property(key, value)
 
-    def add_stack_trace(self, key: str):
-        for logger in self._loggers.values():
-            logger.add_stack_trace(key)
-
     async def flush(self):
         for logger in self._loggers.values():
             await logger.flush()
@@ -189,8 +184,6 @@ class NullBackend:
     def emit(self, record: MetricRecord): ...
 
     def set_global_property(self, key: str, value: Any): ...
-
-    def add_stack_trace(self, key: str): ...
 
     async def flush(self): ...
 

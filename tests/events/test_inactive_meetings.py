@@ -1,5 +1,4 @@
 import datetime as dt
-from unittest.mock import ANY
 
 import pytest
 from sqlalchemy.dialects import postgresql
@@ -254,11 +253,14 @@ async def test_api_failure_raises_runtime_error(
         value=1,
         dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
     )
+    # The failure counter is a number, not a report: the per-meeting id and error are on the
+    # `Failed to deactivate meeting` log line, so nothing rides the record.
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
         value=1,
         dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-        properties={"failed_details": ANY},
+        properties={},
+        properties_exact=True,
     )
 
 

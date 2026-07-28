@@ -342,9 +342,9 @@ async def test_edit_meeting_time_callback(
         context.api.assert_edit_message_called(update, expected_view)
 
     if expected_response == ConversationHandler.END:
-        metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=1)
+        metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     else:
-        metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=0)
+        metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=0)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
@@ -402,7 +402,7 @@ async def test_set_time_message_with_valid_time(
 
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=0)
+    metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=0)
     metrics.assert_emitted(
         name=MetricKey.COUNT,
         dimensions={"Feature": str(Feature.EDIT_MEETING)},
@@ -462,7 +462,12 @@ async def test_set_time_message_with_invalid_time(
         ),
     )
 
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("InvalidTime"), value=1)
+    metrics.assert_emitted(
+        name=MetricKey.ERROR,
+        dimensions={"Feature": str(Feature.EDIT_MEETING)},
+        properties={"reason": "invalid_time"},
+        value=1,
+    )
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
@@ -532,7 +537,12 @@ async def test_conversation_fallback_with_wrong_message_format(
         times=1,
     )
 
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongDatetimeFormat"), value=1)
+    metrics.assert_emitted(
+        name=MetricKey.ERROR,
+        dimensions={"Feature": str(Feature.EDIT_MEETING)},
+        properties={"reason": "wrong_datetime_format"},
+        value=1,
+    )
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
@@ -761,7 +771,12 @@ async def test_datetime_state_fallbacks(
             ),
         ),
     )
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongDatetimeFormat"), value=1)
+    metrics.assert_emitted(
+        name=MetricKey.ERROR,
+        dimensions={"Feature": str(Feature.EDIT_MEETING)},
+        properties={"reason": "wrong_datetime_format"},
+        value=1,
+    )
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
@@ -1034,7 +1049,12 @@ async def test_wrong_time_format_fallback_sends_error_and_stays_in_edit_time(
             meeting, user_with_settings.lang, error=CommonMessages.TIME_INVALID_FORMAT.get(lang=user_with_settings.lang)
         ),
     )
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongTimeFormat"), value=1)
+    metrics.assert_emitted(
+        name=MetricKey.ERROR,
+        dimensions={"Feature": str(Feature.EDIT_MEETING)},
+        properties={"reason": "wrong_time_format"},
+        value=1,
+    )
 
 
 @pytest.mark.parametrize(
@@ -1069,7 +1089,12 @@ async def test_wrong_time_message_type_fallback_sends_error_and_stays_in_edit_ti
             meeting, user_with_settings.lang, error=CommonMessages.TIME_INVALID_FORMAT.get(lang=user_with_settings.lang)
         ),
     )
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("WrongTimeFormat"), value=1)
+    metrics.assert_emitted(
+        name=MetricKey.ERROR,
+        dimensions={"Feature": str(Feature.EDIT_MEETING)},
+        properties={"reason": "wrong_time_format"},
+        value=1,
+    )
 
 
 @pytest.mark.parametrize("update", [DATE_TIME_ENTITY_REQUEST_FUTURE], indirect=True)

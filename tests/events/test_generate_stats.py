@@ -7,6 +7,7 @@ from mitup_bot.models import JoinedUsers, Meetup, Settings, SupporterSubscriptio
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.supporter import SupporterLevel
+from mitup_bot.translations import SUPPORTED_LANGUAGES
 from tests.helpers import MockDbSession
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
@@ -179,6 +180,33 @@ async def test_users_stats_language_gauges_count_members_only(
 
     metrics.assert_emitted(name=MetricKey.ACTIVE_USERS.with_prefix("en"), value=3, unit=MetricUnit.COUNT)
     metrics.assert_emitted(name=MetricKey.ACTIVE_USERS.with_prefix("es_ES"), value=2, unit=MetricUnit.COUNT)
+
+
+async def test_users_stats_language_gauges_cannot_mint_a_series_from_the_database(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    """A `settings.language` value the bot does not ship — a row predating a locale change, or one
+    written by a future migration — must not become a CloudWatch series of its own: a metric name is
+    billed forever. It lands in the bounded `Other` bucket instead, keeping the per-language sum
+    equal to ActiveUsers."""
+    mock_session.add_objects_with_statement(users_stats_statement(), ((6, 0, 0, 0, 6, 0, 0),))
+    mock_session.add_objects_with_statement(language_stats_statement(), (("en", 3), ("sv_SE", 2), ("klingon", 1)))
+
+    await generate_stats.users_stats(mock_session, metrics_client)
+    await metrics_client.flush()
+
+    metrics.assert_not_emitted(name=MetricKey.ACTIVE_USERS.with_prefix("sv_SE"))
+    metrics.assert_not_emitted(name=MetricKey.ACTIVE_USERS.with_prefix("klingon"))
+    metrics.assert_emitted(
+        name=MetricKey.ACTIVE_USERS.with_prefix(generate_stats.OTHER_LANGUAGE_BUCKET), value=3, unit=MetricUnit.COUNT
+    )
+
+    emitted_names = {record.name for record in metrics_client.records if record.name.endswith("/ActiveUsers")}
+    allowed_names = {
+        MetricKey.ACTIVE_USERS.with_prefix(language)
+        for language in [*SUPPORTED_LANGUAGES, generate_stats.OTHER_LANGUAGE_BUCKET]
+    }
+    assert emitted_names == allowed_names
 
 
 async def test_meetings_stats_buckets_every_meeting(

@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
@@ -11,7 +12,7 @@ from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup, User
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring.metric_keys import MetricKey
+from mitup_bot.monitoring.metric_keys import Feature, MetricKey
 from mitup_bot.utils import MeetingInviteMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import meeting as meeting_views
@@ -19,6 +20,8 @@ from mitup_bot.views.factory import confirmation_view, main_menu_view
 from mitup_bot.views.meeting_text import rich_title
 
 from .enums import ConversationInviteState, MeetingHandlerId
+
+log = structlog.get_logger(__name__)
 
 
 async def handle_invite_from_external_chat(
@@ -174,7 +177,8 @@ async def invite_users_name_message_handler(
     invited_user_name = guards.message(update).text
     if invited_user_name is None:  # pragma: no cover
         # This should not happen due to the filter applied to the handler
-        context.emit_metric(MetricKey.FAULT.with_prefix("EmptyInvitedUserName"))
+        log.warning("Abandoned the invite flow", reason="empty_invited_user_name")
+        context.put_feature_metric(Feature.INVITE_USERS, name=MetricKey.ERROR)
         return ConversationHandler.END
 
     with context.meeting_id(ContextId.INVITE_USERS, ensure_clean=False) as meeting_id:
@@ -305,7 +309,8 @@ async def callback_query_fallback_invite_user(session: AsyncSession, update: Upd
 
     await context.api.send_message_to_user(user, view)
 
-    context.emit_metric(MetricKey.FAULT.with_prefix("FallbackInviteUserConversation"))
+    log.warning("Abandoned the invite flow", reason="fallback_invite_user_conversation")
+    context.put_feature_metric(Feature.INVITE_USERS, name=MetricKey.ERROR)
 
     return ConversationHandler.END
 

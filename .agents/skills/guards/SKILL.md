@@ -115,7 +115,7 @@ Every rejection subclasses `MeetingAccessError` (itself a `GuardError`) and carr
 
 `action` is a short free-text description of what the user was doing. It is not user-facing: it names the attempt in the exception message and in the warning line the error handler logs.
 
-A non-owner is logged and counted on the `MeetingNotOwned` error metric; the deleted-meeting and reactivation screens emit no such metric, and the reactivation prompt is not logged at all. A caller who gets through an ownership check emits the same metric with value `0`, so the series carries both outcomes.
+A non-owner is logged and counted on the `MeetingNotOwned` metric with value `1`; the deleted-meeting and reactivation screens emit no such metric, and the reactivation prompt is not logged at all. A caller who gets through an ownership check emits the same metric with value `0`, so the series carries both outcomes.
 
 Pass `lock=True` when the handler goes on to mutate participants or capacity: the guard then loads the meeting via `Meetup.by_id(..., for_update=True)`, acquiring the per-meeting row lock (`SELECT … FOR UPDATE` with `populate_existing`) before any capacity/waiting-list read. Read-only handlers must leave it `False`. The locked load resets the acting user's `meetups`/`joined_links` to unloaded, so a handler that both locks and opted into the collections must re-load them itself. See the `database` skill's "Per-meeting row locks" section for the full convention.
 

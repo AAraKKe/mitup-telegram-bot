@@ -17,7 +17,7 @@ from mitup_bot.exceptions import (
     TimezoneClientAlreadyInitializedError,
     TimezoneClientNotConfiguredError,
 )
-from mitup_bot.monitoring import MetricKey, MetricUnit
+from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
 from tests.helpers import AnyFloat
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.types import StubMitupContext
@@ -149,7 +149,11 @@ def test_get_timezone_by_address_returns_none_when_geocode_finds_nothing(
     timezone_client.timezone.assert_not_called()
     asyncio.run(context.metrics.flush())
     metrics.assert_emitted(
-        name=MetricKey.ERROR.with_prefix("InvalidGoogleGeocodeResponse"), value=1, unit=MetricUnit.COUNT
+        name=MetricKey.ERROR,
+        dimensions={"Feature": str(Feature.SET_TIMEZONE)},
+        properties={"reason": "invalid_google_geocode_response"},
+        value=1,
+        unit=MetricUnit.COUNT,
     )
 
 
@@ -207,7 +211,11 @@ def test_get_timezone_by_location_returns_none_when_coordinates_map_to_no_zone(
 
     asyncio.run(context.metrics.flush())
     metrics.assert_emitted(
-        name=MetricKey.ERROR.with_prefix("InvalidGoogleTimezoneResponse"), value=1, unit=MetricUnit.COUNT
+        name=MetricKey.ERROR,
+        dimensions={"Feature": str(Feature.SET_TIMEZONE)},
+        properties={"reason": "invalid_google_timezone_response"},
+        value=1,
+        unit=MetricUnit.COUNT,
     )
 
 
@@ -225,7 +233,11 @@ def test_get_coordinates_returns_none_when_no_results(
 
     asyncio.run(context.metrics.flush())
     metrics.assert_emitted(
-        name=MetricKey.ERROR.with_prefix("InvalidGoogleGeocodeResponse"), value=1, unit=MetricUnit.COUNT
+        name=MetricKey.ERROR,
+        dimensions={"Feature": str(Feature.SET_TIMEZONE)},
+        properties={"reason": "invalid_google_geocode_response"},
+        value=1,
+        unit=MetricUnit.COUNT,
     )
 
 
@@ -238,7 +250,11 @@ def test_get_coordinates_returns_none_when_response_shape_is_unparseable(
 
     asyncio.run(context.metrics.flush())
     metrics.assert_emitted(
-        name=MetricKey.ERROR.with_prefix("InvalidGoogleGeocodeResponse"), value=1, unit=MetricUnit.COUNT
+        name=MetricKey.ERROR,
+        dimensions={"Feature": str(Feature.SET_TIMEZONE)},
+        properties={"reason": "invalid_google_geocode_response"},
+        value=1,
+        unit=MetricUnit.COUNT,
     )
 
 

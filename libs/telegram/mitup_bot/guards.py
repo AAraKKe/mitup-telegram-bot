@@ -341,7 +341,7 @@ async def meeting(
                 lang=lang,
                 flow_context=flow_context,
             )
-        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
+        context.emit_metric(MetricKey.MEETING_NOT_OWNED, 0, unit=MetricUnit.COUNT)
         return found_meeting
 
     if found_meeting is None:
@@ -369,7 +369,7 @@ async def meeting(
         )
 
     if user is not None and found_meeting.is_owned_by(user):
-        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 0, unit=MetricUnit.COUNT)
+        context.emit_metric(MetricKey.MEETING_NOT_OWNED, 0, unit=MetricUnit.COUNT)
         return found_meeting
 
     # The not-owned counter tracks ownership decisions, so a caller reaching a meeting they do not

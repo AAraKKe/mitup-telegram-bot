@@ -5,6 +5,8 @@ from unittest import mock
 
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
+from structlog.contextvars import merge_contextvars
+from structlog.testing import capture_logs
 from telegram import Update
 from telegram.error import TimedOut
 from telegram.ext import ApplicationBuilder, ApplicationHandlerStop, CommandHandler, ConversationHandler
@@ -15,7 +17,7 @@ from mitup_bot.api_wrapper import build_api
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import Env
 from mitup_bot.custom_context import BOT_CONFIG_KEY
-from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError
+from mitup_bot.exceptions import ContextPropertyNotSetError, HandlerNotRegistered, HandlerRegisteredError
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
@@ -248,16 +250,14 @@ async def test_all_handlers_emit_handler_metrics(app: StubMitupApp, update: Upda
         with suppress(ApplicationHandlerStop):
             await wrapper.handler.handle_update(update, app, check_state, handler_context)
 
-    # Every handler emits exactly one dimensionless TIME record and one dimensionless outcome record
-    # (handler identity rides as an EMF property, so there is no separate per-handler-dimensioned
-    # copy — issue #205). The outcome is FAULT, except handlers whose in-memory conversation state
-    # was missing: the error handler reclassifies those to CONTEXT_LOST and the fault series stays
-    # silent. FAULT and CONTEXT_LOST together account for every handler exactly once.
+    # Every handler emits exactly one dimensionless TIME record and exactly one dimensionless FAULT
+    # record (handler identity rides as an EMF property, so there is no separate
+    # per-handler-dimensioned copy — issue #205). The FAULT sample lands on every exit path,
+    # including the handlers whose in-memory conversation state was missing: those are reclassified
+    # to CONTEXT_LOST for alarming but still close the invocation on FAULT=0.
     metrics = MetricAssertions(shared_client)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=valid_handlers)
-    outcome_names = {str(MetricKey.FAULT), str(MetricKey.CONTEXT_LOST)}
-    outcome_records = [record for record in shared_client.records if record.name in outcome_names]
-    assert len(outcome_records) == valid_handlers
+    metrics.assert_emitted(name=MetricKey.FAULT, times=valid_handlers)
 
 
 # ---------------------------------------------------------------------------
@@ -285,10 +285,10 @@ async def test_handled_error_ends_the_conversation(
 
 
 async def test_claimed_update_keeps_carrying_its_state(
-    update: Update, app: StubMitupApp, metrics_client: MetricsClient
+    update: Update, app: StubMitupApp, metrics_client: MetricsClient, metrics: MetricAssertions
 ):
     """ApplicationHandlerStop is a success path: the wrapper re-raises it untouched so the state it
-    carries still reaches PTB."""
+    carries still reaches PTB, and the invocation still closes on its one FAULT=0 sample."""
 
     @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND, command="claiming")
     async def command_claiming(update: Update, context: StubMitupContext):
@@ -298,6 +298,75 @@ async def test_claimed_update_keeps_carrying_its_state(
         await invoke(HandlerTestId.SOME_COMMAND, update, build_context(update, app, metrics=metrics_client))
 
     assert raised.value.state == ConversationStates.STATE_ONE
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    ClearableRegistry.clear()
+
+
+# The three shapes the wrapper has to tell apart. Which value each individual exception maps to is
+# the error handler's business and is asserted per branch in test_error_handler.py; here the
+# emission is one shared line, so a fourth exception would exercise identical code. `ty` rejects a
+# branch that exits without an outcome, so a silently-added exit cannot regress past the checker.
+FAULT_CLASSIFICATIONS = [
+    pytest.param(RuntimeError("boom"), 1, False, id="genuine_fault"),
+    pytest.param(
+        ContextPropertyNotSetError("User data 'meeting_id' requested but not set"), 0, False, id="handled_error"
+    ),
+    pytest.param(RuntimeError("boom"), 1, True, id="error_handler_itself_raises"),
+]
+
+
+@pytest.mark.parametrize("error, expected_fault, error_handler_raises", FAULT_CLASSIFICATIONS)
+async def test_every_classified_exit_lands_exactly_one_fault_sample(
+    update: Update,
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    error: Exception,
+    expected_fault: float,
+    error_handler_raises: bool,
+):
+    """The fault-rate alarm reads FAULT's SampleCount as its request denominator, so an invocation
+    the error handler answers without a fault must still land a 0 sample rather than nothing. A
+    rolling deploy produces a burst of exactly this context loss by design, at the moment the ECS
+    rollback bake is reading that alarm. An error handler that breaks mid-answer is the one case
+    where the wrapper has to classify the fault itself."""
+
+    @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND, command="classify")
+    async def command_classify(update: Update, context: StubMitupContext):
+        raise error
+
+    context = build_context(update, app, metrics=metrics_client)
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        if error_handler_raises:
+            broken = mock.patch(
+                "mitup_bot.handlers.registry.error_handler",
+                new_callable=mock.AsyncMock,
+                side_effect=ValueError("the error handler blew up"),
+            )
+            # The error handler's own exception still leaves for process_update, unhandled.
+            with broken, pytest.raises(ValueError, match="the error handler blew up"):
+                await invoke(HandlerTestId.SOME_COMMAND, update, context)
+        else:
+            await invoke(HandlerTestId.SOME_COMMAND, update, context)
+
+    metrics.assert_emitted(name=MetricKey.FAULT, value=expected_fault, times=1)
+    if expected_fault:
+        # Both fault shapes name the exception the *callback* raised. An error handler that broke
+        # while answering it does not rename the fault after itself.
+        metrics.assert_emitted(name=MetricKey.FAULT, value=1, properties={"error_type": "builtins.RuntimeError"})
+
+    if error_handler_raises:
+        # The escaping exception reaches PTB only after the contextvars have unwound, so this line
+        # is the sole record of the failure that can be joined to the invocation it broke.
+        failures = [entry for entry in logs if entry["event"] == "Error handler failed while answering a fault"]
+        assert len(failures) == 1
+        entry = failures[0]
+        assert entry["log_level"] == "error"
+        assert entry["exc_info"] is True
+        assert entry["original_error_type"] == "builtins.RuntimeError"
+        assert entry["handler"] == HandlerTestId.SOME_COMMAND.dimension
+        assert entry["update_id"] == update.update_id
     ClearableRegistry.clear()
 
 

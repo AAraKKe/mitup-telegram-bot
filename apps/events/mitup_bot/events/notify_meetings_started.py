@@ -79,7 +79,6 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
 
     sent = 0
     failed = 0
-    failed_details: list[str] = []
 
     for meetup_id in meeting_ids:
         try:
@@ -87,15 +86,9 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         except Exception as error:
             failed += 1
             log.exception("Failed to process started notification for meeting", meeting=meetup_id, exc_info=error)
-            failed_details.append(f"Failed to process meeting (meeting: {meetup_id}): {error}")
 
     metrics.emit(MetricKey.STARTED_NOTIFICATIONS_SENT, sent, MetricUnit.COUNT)
-    metrics.emit(
-        MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        failed,
-        MetricUnit.COUNT,
-        properties={"failed_details": failed_details} if failed_details else None,
-    )
+    metrics.emit(MetricKey.STARTED_NOTIFICATIONS_FAILED, failed, MetricUnit.COUNT)
 
     if failed:
         raise RuntimeError(f"Failed to process started notifications for {failed} meetings. Check logs for details.")

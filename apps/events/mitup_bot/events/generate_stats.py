@@ -8,6 +8,7 @@ from mitup_bot.models import JoinedUsers, Meetup, Message, Settings, SupporterSu
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.supporter import SupporterLevel
+from mitup_bot.translations import SUPPORTED_LANGUAGES
 
 # Pinned literal names: MetricKey's CamelCase folding would render the trailing "24h" as "24H",
 # and the dashboard widgets match these exact names.
@@ -21,6 +22,14 @@ UPCOMING_MEETINGS_24H_METRIC = "UpcomingMeetings24h"
 # Per-tier supporter gauges follow the same name-prefix pattern as the per-language user gauges
 # ("Supporters/host_1", ...), so a dashboard SEARCH widget auto-discovers any future tier.
 SUPPORTERS_METRIC_PREFIX = "Supporters"
+
+# `Settings.language` is a plain string column with no database constraint, so what the write path
+# accepts today does not bound what the table holds tomorrow: dropping or renaming a locale in
+# SUPPORTED_LANGUAGES turns every row still carrying it unsupported at once, with no migration
+# needed to make it happen. Those rows are counted here rather than under their own name, because a
+# metric name is a billed CloudWatch series forever and this job reads its prefixes from the
+# database.
+OTHER_LANGUAGE_BUCKET = "Other"
 
 PAST_24H = func.now() - func.cast(literal("24 hours"), INTERVAL)
 NEXT_24H = func.now() + func.cast(literal("24 hours"), INTERVAL)
@@ -60,7 +69,8 @@ async def users_stats(session: AsyncSession, metrics: MetricsClient):
     metrics.emit(MetricKey.INVITED_USERS, counts[5], MetricUnit.COUNT)
     metrics.emit(NEW_USERS_24H_METRIC, counts[6], MetricUnit.COUNT)
 
-    # Per-language gauges count MEMBER users only, so the language series sum to ActiveUsers.
+    # Per-language gauges count MEMBER users only, so the language series sum to ActiveUsers. Every
+    # supported language reports every run, zero included, so each series is gap-free.
     user_languages = (
         await session.exec(
             select(Settings.language, func.count())
@@ -70,7 +80,11 @@ async def users_stats(session: AsyncSession, metrics: MetricsClient):
         )
     ).all()
 
+    counts_by_language = dict.fromkeys([*SUPPORTED_LANGUAGES, OTHER_LANGUAGE_BUCKET], 0)
     for language, count in user_languages:
+        counts_by_language[language if language in SUPPORTED_LANGUAGES else OTHER_LANGUAGE_BUCKET] += count
+
+    for language, count in counts_by_language.items():
         metrics.emit(MetricKey.ACTIVE_USERS.with_prefix(language), count, MetricUnit.COUNT)
 
 

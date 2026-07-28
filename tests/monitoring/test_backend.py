@@ -305,32 +305,6 @@ def test_set_global_property_updates_all_loggers():
     assert backend._properties["request_id"] == "abc-123"
 
 
-# --- EmfBackend.add_stack_trace ---
-
-
-def test_add_stack_trace_calls_all_loggers():
-    mock_logger_a = MagicMock(spec=MitupMetricsLogger)
-    mock_logger_a.context = MagicMock()
-    mock_logger_b = MagicMock(spec=MitupMetricsLogger)
-    mock_logger_b.context = MagicMock()
-
-    call_count = 0
-
-    def provider_factory(resolver):
-        nonlocal call_count
-        call_count += 1
-        return mock_logger_a if call_count == 1 else mock_logger_b
-
-    backend = EmfBackend(logger_provider=provider_factory)
-    backend._get_logger(Dimensionality(env="a"))
-    backend._get_logger(Dimensionality(env="b"))
-
-    backend.add_stack_trace("exception")
-
-    mock_logger_a.add_stack_trace.assert_called_once_with("exception")
-    mock_logger_b.add_stack_trace.assert_called_once_with("exception")
-
-
 # --- EmfBackend.flush ---
 
 

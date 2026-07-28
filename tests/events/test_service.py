@@ -481,10 +481,10 @@ async def test_handle_maintainance_serializes_dimensioned_and_global_emf(
     assert dimensioned["run_id"] == dimensionless["run_id"]
 
 
-async def test_handle_maintainance_fault_trace_reaches_both_emf_records():
-    """A run that fails before emitting any metric still serializes the stack trace onto BOTH the
-    EventType-dimensioned Fault record and the dimensionless global copy — the record the
-    Mitup/Events alarm and `Fault = 1` Logs Insights queries surface."""
+async def test_handle_maintainance_fault_records_carry_no_traceback():
+    """Neither the EventType-dimensioned Fault record nor its dimensionless global copy carries the
+    traceback: the run's `Recurrent event run failed` log line renders it once, while a copy on the
+    records is repeated per serialized batch and joins the log line by run_id anyway."""
     event_type = EventType.USER_CLEANUP
     backend, sink = build_capturing_backend()
     client = MetricsClient(backend, base_dimensions={"EventType": event_type.value})
@@ -506,8 +506,8 @@ async def test_handle_maintainance_fault_trace_reaches_both_emf_records():
 
     for payload in payloads:
         assert payload["Fault"] == 1
-        assert "RuntimeError" in str(payload["exception"])
-        assert "boom" in str(payload["exception"])
+        assert "exception" not in payload
+        assert "boom" not in json.dumps(payload)
 
 
 async def test_run_periodic_runs_event():

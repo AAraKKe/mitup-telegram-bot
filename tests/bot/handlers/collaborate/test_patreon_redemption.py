@@ -13,6 +13,7 @@ from typing import NamedTuple
 
 import pytest
 from sqlmodel import select
+from structlog.testing import capture_logs
 from telegram import Chat, Message, Update
 from telegram.ext import CommandHandler
 
@@ -710,15 +711,19 @@ async def test_a_forged_confirm_around_the_claim_step_is_metered_as_unclaimed(
         classification_statement(PAIRING_CODE), ((stored_pending_row(claimed_tg_user_id=None), False),)
     )
 
-    context, _ = await call_handler(CollaborateHandlerId.PATREON_LINK_CONFIRM, handler_context=handler_context)
+    with capture_logs() as logs:
+        context, _ = await call_handler(CollaborateHandlerId.PATREON_LINK_CONFIRM, handler_context=handler_context)
 
     context.api.assert_edit_message_called(update, patreon_link_code_not_valid_view(user_with_settings.lang))
     assert not added_subscriptions(mock_session)
-    metrics.assert_emitted(
-        name=MetricKey.PATREON_LINK_REFUSED,
-        dimensions={"Feature": str(Feature.PATREON_LINK)},
-        properties={"outcome": "code_not_usable:consume:unclaimed"},
-    )
+    metrics.assert_emitted(name=MetricKey.PATREON_LINK_REFUSED, dimensions={"Feature": str(Feature.PATREON_LINK)})
+
+    # Which branch refused is what tells a forged confirm apart from an expired code, and it varies
+    # per refusal — so it is read off the log line, never off the counter.
+    refusals = [entry for entry in logs if entry["event"] == "Patreon link attempt refused"]
+    assert len(refusals) == 1
+    assert refusals[0]["outcome"] == "code_not_usable"
+    assert refusals[0]["reason"] == "consume:unclaimed"
 
 
 @pytest.mark.parametrize("update", [CONFIRM_UPDATE], indirect=True)

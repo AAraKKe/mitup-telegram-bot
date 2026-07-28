@@ -27,7 +27,7 @@ from mitup_bot.exceptions import (
     UserPendingDeletion,
 )
 from mitup_bot.handlers import error_handler
-from mitup_bot.handlers.error_handler import SUPPRESSED_EXCEPTIONS
+from mitup_bot.handlers.error_handler import SUPPRESSED_EXCEPTIONS, FaultOutcome
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.registry import callback_with_metrics
 from mitup_bot.keyboards import ButtonConfig, Keyboard
@@ -337,12 +337,13 @@ async def test_meeting_rejection_closes_the_interaction_without_a_fault(
     error: MeetingAccessError,
     expected_view: MitupView,
 ):
-    """A stale button is an expected outcome: the interaction ends on FAULT=0, like a completed handler."""
-    await error_handler.handler(context, error, Env.PROD)
+    """A stale button is an expected outcome: the interaction closes on FAULT=0, like a completed
+    handler. The classification travels back to `callback_with_metrics`, which owns the emission."""
+    outcome = await error_handler.handler(context, error, Env.PROD)
     await context.metrics.flush()
 
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
-    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+    assert outcome == FaultOutcome(0)
+    metrics.assert_not_emitted(name=MetricKey.FAULT)
 
 
 async def test_meeting_not_owned_is_counted_and_logged(
@@ -355,7 +356,7 @@ async def test_meeting_not_owned_is_counted_and_logged(
         await error_handler.handler(context, error, Env.PROD)
     await context.metrics.flush()
 
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=1)
+    metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     warnings = [entry for entry in logs if entry["log_level"] == "warning"]
     assert [entry["event"] for entry in warnings] == [str(error)]
 
@@ -369,7 +370,7 @@ async def test_meeting_gone_is_logged_without_touching_the_ownership_counter(
         await error_handler.handler(context, error, Env.PROD)
     await context.metrics.flush()
 
-    metrics.assert_not_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=1)
+    metrics.assert_not_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     warnings = [entry for entry in logs if entry["log_level"] == "warning"]
     assert [entry["event"] for entry in warnings] == [str(error)]
 
@@ -473,7 +474,7 @@ async def test_meeting_inactive_owner_is_a_plain_screen(
         await error_handler.handler(context, error, Env.PROD)
     await context.metrics.flush()
 
-    metrics.assert_not_emitted(name=MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), value=1)
+    metrics.assert_not_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     assert [entry for entry in logs if entry["log_level"] == "warning"] == []
 
 
@@ -488,7 +489,7 @@ async def test_shared_meeting_gone_replaces_the_card_and_counts_it_stale(
     error = SharedMeetingGoneError(meeting_id=7, action="join or leave a meeting", user_db_id=1, lang="en")
 
     with capture_logs() as logs:
-        await error_handler.handler(context, error, Env.PROD)
+        outcome = await error_handler.handler(context, error, Env.PROD)
     await context.metrics.flush()
 
     context.api.assert_edit_message_called(
@@ -499,7 +500,7 @@ async def test_shared_meeting_gone_replaces_the_card_and_counts_it_stale(
         ),
     )
     metrics.assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    assert outcome == FaultOutcome(0)
     warnings = [entry for entry in logs if entry["log_level"] == "warning"]
     assert [entry["event"] for entry in warnings] == []
 
@@ -611,7 +612,7 @@ async def test_shared_meeting_denied_alerts_over_the_card_without_touching_it(
     error = SharedMeetingDeniedError(meeting_id=7, action="join or leave a meeting", user_db_id=1, lang="en")
 
     with capture_logs() as logs:
-        await error_handler.handler(context, error, Env.PROD)
+        outcome = await error_handler.handler(context, error, Env.PROD)
     await context.metrics.flush()
 
     context.api.assert_answer_callback_query_called(
@@ -619,7 +620,7 @@ async def test_shared_meeting_denied_alerts_over_the_card_without_touching_it(
     )
     context.api.assert_edit_message_not_called()
     metrics.assert_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    assert outcome == FaultOutcome(0)
     warnings = [entry for entry in logs if entry["log_level"] == "warning"]
     assert [entry["event"] for entry in warnings] == [str(error)]
 
@@ -658,26 +659,15 @@ async def test_handle_error_for_uncaght_exception(context: StubMitupContext, met
         # We need to raise the exception to have exec_info available when the error is handled
         raise RuntimeError()
     except RuntimeError:
-        await error_handler.handler(context, RuntimeError(), Env.DEV)
+        outcome = await error_handler.handler(context, RuntimeError(), Env.DEV)
         await context.metrics.flush()
 
-    # The dimensionless aggregate FAULT is emitted exactly once (the infra alarms read it),
-    # carrying the trigger context and the exception class so the CloudWatch fault record is
-    # self-contained. The class is a property: a metric name minted per exception class would be a
-    # new billed series nothing charts.
-    metrics.assert_emitted(
-        name=MetricKey.FAULT,
-        value=1,
-        times=1,
-        dimensions={},
-        dimensions_exact=True,
-        properties={
-            "UpdatePayload": fault_fields_from_update(context.telegram_update),
-            "error_type": "builtins.RuntimeError",
-            "Handler": "SomeHandler",
-            "HandlerType": "Callback",
-        },
-    )
+    # A genuine fault classifies the invocation as 1 and names the exception class for the record
+    # the infra alarms read. The class is a property: a metric name minted per exception class would
+    # be a new billed series nothing charts. What the user did stays on the log line — see
+    # test_handle_error_logs_the_exception. The wrapper that owns the invocation writes the sample.
+    assert outcome == FaultOutcome(1, {"error_type": "builtins.RuntimeError"})
+    metrics.assert_not_emitted(name=MetricKey.FAULT)
     metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix("RuntimeError"))
 
 
@@ -760,15 +750,10 @@ async def test_guard_error_emits_fault_metrics_and_notifies_user(
     # No user registered -> resolve_lang falls back to the project default language.
     error = EffectiveMessageNotSet(context.telegram_update)
 
-    await error_handler.handler(context, error, Env.PROD)
+    outcome = await error_handler.handler(context, error, Env.PROD)
     await context.metrics.flush()
 
-    metrics.assert_emitted(
-        name=MetricKey.FAULT,
-        value=1,
-        times=1,
-        properties={"error_type": f"{EffectiveMessageNotSet.__module__}.EffectiveMessageNotSet"},
-    )
+    assert outcome == FaultOutcome(1, {"error_type": f"{EffectiveMessageNotSet.__module__}.EffectiveMessageNotSet"})
     metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix("EffectiveMessageNotSet"))
 
     fallback = TranslationEngine.FALLBACK_LANG
@@ -801,10 +786,10 @@ async def test_non_guard_error_emits_fault_and_notifies(
     """A plain (non-guard) error still emits the full fault metrics AND redirects the user to the
     main menu with the generic notice, since any fault otherwise strands them mid-action."""
     # No user registered -> resolve_lang falls back to the project default language.
-    await error_handler.handler(context, ValueError("boom"), Env.PROD)
+    outcome = await error_handler.handler(context, ValueError("boom"), Env.PROD)
     await context.metrics.flush()
 
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, properties={"error_type": "builtins.ValueError"})
+    assert outcome == FaultOutcome(1, {"error_type": "builtins.ValueError"})
     metrics.assert_not_emitted(name=MetricKey.FAULT.with_prefix("ValueError"))
 
     fallback = TranslationEngine.FALLBACK_LANG
@@ -818,14 +803,14 @@ async def test_fault_notification_failure_does_not_raise(
     context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
 ):
     """The post-fault user notification is best-effort: a delivery failure is swallowed, not re-raised
-    as a second fault, while the original fault metrics still land."""
+    as a second fault, and the invocation is still classified as one."""
     context.api.mock_method("send_message").side_effect = TelegramError("send failed")
 
     # Must not raise despite the failing delivery.
-    await error_handler.handler(context, ValueError("boom"), Env.PROD)
+    outcome = await error_handler.handler(context, ValueError("boom"), Env.PROD)
     await context.metrics.flush()
 
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, properties={"error_type": "builtins.ValueError"})
+    assert outcome == FaultOutcome(1, {"error_type": "builtins.ValueError"})
 
 
 # --- Context loss handling ---

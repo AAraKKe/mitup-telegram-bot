@@ -203,7 +203,8 @@ class MetricKey(CamelCaseStrEnum):
     PATREON_LINK_STAGED = auto()
     """A pairing code reached the confirmation prompt in Telegram (emitted under the Feature dimension)"""
     PATREON_LINK_PROMPTED = auto()
-    """A Patreon link attempt ended without linking; the `outcome` property says which branch"""
+    """A Patreon link attempt ended without linking; the `Patreon link attempt refused` log line
+    says which branch"""
     PATREON_LINK_REFUSED = auto()
     """Pending Patreon links erased by the cleanup run (expired, spent, or purged with their user)"""
     PATREON_PENDING_LINKS_DELETED = auto()

@@ -146,7 +146,6 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
 
     deactivated = 0
     failed = 0
-    failed_details: list[str] = []
 
     for meetup_id in meeting_ids:
         try:
@@ -155,20 +154,12 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         except Exception as e:
             failed += 1
             log.exception("Failed to deactivate meeting", meeting=meetup_id, exc_info=e)
-            failed_details.append(f"Failed to deactivate meeting (meeting: {meetup_id}). Error: {e}.")
 
     joined_only_deleted = await delete_joined_only_users()
 
     metrics.emit(MetricKey.MEETINGS_DEACTIVATED, deactivated, MetricUnit.COUNT)
-    metrics.emit(
-        MetricKey.MEETINGS_DEACTIVATION_FAILED,
-        failed,
-        MetricUnit.COUNT,
-        properties={"failed_details": failed_details} if failed_details else None,
-    )
+    metrics.emit(MetricKey.MEETINGS_DEACTIVATION_FAILED, failed, MetricUnit.COUNT)
     metrics.emit(MetricKey.JOINED_ONLY_USERS_DELETED, joined_only_deleted, MetricUnit.COUNT)
 
     if failed:
-        raise RuntimeError(
-            f"Failed to deactivate {failed} meetings. Check individual failed_details for more information."
-        )
+        raise RuntimeError(f"Failed to deactivate {failed} meetings. Check logs for details.")

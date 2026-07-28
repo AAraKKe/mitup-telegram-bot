@@ -80,6 +80,21 @@ Note how wide a flush window can be: the bot flushes once per handler invocation
 recurrent-events service flushes once per **run**, so a sweep touching hundreds of users produces
 hundreds of samples under a single property set.
 
+## Narrative belongs to structlog, never to a record
+
+<critical_rules>
+An EMF record is an index entry: the metric, its dimensions, and the few short keys needed to find
+the matching log lines (`update_id`, `run_id`, `Handler`, `error_type`). Everything that *reads as
+prose* stays on the log plane — a snapshot of the triggering update, a rendered sentence per failed
+item, a stack trace. All three are written once per emission or once per logger, so they are
+repeated across the whole flush window, and none of them can be alarmed on.
+
+The traceback in particular has a single renderer: structlog's `format_exc_info`. A `log.exception`
+/ `log.error(exc_info=...)` line beside the fault emission puts it in the log plane once; nothing
+copies it onto the record. The bot fault path (`error_handler.handler`) and the events run wrapper
+(`handle_maintainance`) are the reference implementations.
+</critical_rules>
+
 ## Emitting metrics from handlers
 
 <critical_rules>
@@ -100,7 +115,6 @@ context.emit_metric("ApiCallCount", 1, dimensions={"Service": "Google"}, include
 
 Key parameters:
 - `include_handler_properties` (default `True`) — attaches `Handler` and `HandlerType` as EMF **properties** (not dimensions).
-- `include_update_properties` (default `True`) — attaches Telegram update metadata (user ID, callback data, message text) as EMF properties (searchable but not dimensioned).
 
 <critical_rules>
 The canonical application of the [Dimensions vs. properties](#dimensions-vs-properties) rule above: handler identity (`Handler`/`HandlerType`) rides as EMF **properties**, never as dimensions, so only the dimensionless series is emitted per metric name. Do **not** reintroduce a `Handler`/`HandlerType` dimension or a duplicate "global" emission of a handler metric. See [issue #205](https://gitlab.com/meetupbot/mitup-telegram-bot/-/issues/205).
@@ -112,7 +126,7 @@ Convenience wrapper that adds a `Feature` dimension. Use it to track feature-lev
 
 ```python
 context.put_feature_metric(Feature.JOIN_MEETING)
-context.put_feature_metric(Feature.TIMEZONE_WITH_LOCATION, name=MetricKey.ERROR)
+context.put_feature_metric(Feature.SET_TIMEZONE, name=MetricKey.ERROR, properties={"reason": "invalid_google_geocode_response"})
 ```
 
 ### `context.with_time_metric()`
@@ -139,11 +153,19 @@ All Telegram API calls in `TelegramApi` already use this — do not add redundan
 Each is emitted as a single **dimensionless** series. The handler identity (`Handler`, `HandlerType`) is attached as EMF **properties** — set automatically via `context.prepare_handler_metrics()` — so per-handler drill-down happens in CloudWatch Logs Insights, not via a billed dimension.
 
 <critical_rules>
-`Fault` has a single writer. It is the outcome of one invocation, emitted exactly once per logger per flush window — by the wrapper that owns the invocation (`callback_with_metrics`, `handle_maintainance`), or by the global error handler that wrapper hands the failing path to. Nothing else may emit it — not a handler, not a helper, not the post-commit outbox drain. EMF **appends** repeated values under one metric name, so a second writer serialises `"Fault": [1, 0]`: Logs Insights flattens the array to `Fault.0`/`Fault.1`, which the `filter Fault = 1` triage queries stop matching, and the fault-rate alarm (Average + SampleCount, wired into the ECS rollback bakes) reads half the value on twice the samples. A fact that is not the invocation outcome gets its own metric name — `PostCommitApiFault` is the one for a queued delivery that failed after commit.
+`Fault` has a single writer, and writes **exactly once — not at most once**. It is the outcome of one invocation, emitted once per logger per flush window by the wrapper that owns the invocation (`callback_with_metrics`, `handle_maintainance`) and by nothing else — not a handler, not a helper, not the global error handler, not the post-commit outbox drain.
+
+*Single* writer, because EMF **appends** repeated values under one metric name: a second writer serialises `"Fault": [1, 0]`, Logs Insights flattens the array to `Fault.0`/`Fault.1` so the `filter Fault = 1` triage queries stop matching, and the fault-rate alarm (Average + SampleCount, wired into the ECS rollback bakes) reads half the value on twice the samples.
+
+*Exactly* once, because that same alarm uses `Fault`'s **SampleCount as its request denominator**. An exit path that returns without emitting does not report "no fault" — it removes the invocation from the denominator, inflating the fault rate. The classifications that end an interaction benignly (a suppressed Telegram error, an inactive user, a pending deletion, a meeting-guard rejection, a lost conversation context) are the ones most likely to arrive in a burst during a rolling deploy, which is exactly when a bake is reading the alarm. So the error handler **returns** its classification (`FaultOutcome`) to `callback_with_metrics`, which emits the one sample from its `finally`.
+
+A fact that is not the invocation outcome gets its own metric name — `PostCommitApiFault` is the one for a queued delivery that failed after commit.
 </critical_rules>
 
 <critical_rules>
-Metric **names** are static constants. Never mint one from a runtime value (`MetricKey.FAULT.with_prefix(type(exc).__name__)`): every distinct class creates its own separately-billed CloudWatch series, forever, and none of them is on a widget or in an alarm. Put the varying facet in an EMF property instead — the fault path names the exception class in `error_type`. `with_prefix` is for a literal, bounded prefix known at author time (`TelegramApiTime`, `MeetingNotOwned/Error`).
+Metric **names** are static constants. Never mint one from a runtime value (`MetricKey.FAULT.with_prefix(type(exc).__name__)`): every distinct class creates its own separately-billed CloudWatch series, forever, and none of them is on a widget or in an alarm. `with_prefix` is for a **bounded** prefix — a literal known at author time (`TelegramApiTime`), or a value the code constrains to a closed set before using it (`<lang>/ActiveUsers`, filtered against `SUPPORTED_LANGUAGES`). A DB column is not a closed set on its own.
+
+A name being bounded is necessary, not sufficient: a series still needs a **named consumer** — a widget or an alarm — before it is worth minting. A varying facet with no consumer belongs on an existing series instead. The pattern for a user-input error is the `Feature`-dimensioned `ERROR` series (`context.put_feature_metric(Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "wrong_time_format"})`): `Feature` is bounded and already auto-discovered by the dashboard, and `reason` names the branch without opening a series. The fault path applies the same rule with `error_type`.
 </critical_rules>
 
 ## Adding a new `MetricKey`

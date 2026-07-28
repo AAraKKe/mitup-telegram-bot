@@ -1520,7 +1520,7 @@ async def test_handler_rejects_meeting_not_owned(
     # so no flow survives the update: the handler ends any conversation it was part of.
     assert result == ConversationHandler.END
     # MeetingNotOwned error metric is emitted
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     assert_handler_metrics(metrics, fault_value=0, extra_metrics=test_context.extra_metrics)
     # The user is sent to the main menu
     assert_rejection_screen(
@@ -1802,7 +1802,7 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
         if not isinstance(test_context.extra_metrics_non_owner_inactive, _Unset)
         else test_context.extra_metrics
     )
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     assert_handler_metrics(metrics, fault_value=0, extra_metrics=extra)
     assert_rejection_screen(
         context,

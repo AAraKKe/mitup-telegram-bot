@@ -12,8 +12,8 @@ The bot uses a structured exception hierarchy combined with a centralized error 
 
 1. A handler raises an exception (usually via a guard).
 2. `callback_with_metrics()` in the registry catches it and calls `error_handler.handler()`.
-3. The error handler decides whether to suppress, handle specially, or emit fault metrics.
-4. Metrics are flushed regardless of outcome (in the `finally` block of `callback_with_metrics()`).
+3. The error handler decides whether to suppress, handle specially, or classify the invocation as a genuine fault, and returns that classification as a `FaultOutcome`.
+4. `callback_with_metrics()` emits the invocation's one `FAULT` sample from that outcome and flushes, in its `finally` — see the exactly-once rule in the `monitoring` skill.
 
 Errors are **not** routed through PTB's built-in error handler — they are caught directly in the registry wrapper so that the handler's metrics context (dimensions, properties) is preserved.
 
@@ -120,18 +120,18 @@ The `SharedMeetingError` subclasses come from a tap on a meeting card that may s
 
 The two banner edits take their keyboard from `shared_banner_keyboard()`: in the bot's own chat the banner is the whole screen the user is left on, so it carries the main-menu row; in a group, a supergroup, a channel, or an inline message (which carries no chat at all) the banner replaces the card in place with no keyboard. The denial is unaffected — the card is never touched.
 
-Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces, not a code fault, so the branch emits `FAULT=0` — the interaction is counted as a completed one, exactly like a handler that ran to the end. `MeetingNotOwnedError` additionally logs a warning and emits `ERROR/MeetingNotOwned`; `MeetingGoneError` and `SharedMeetingDeniedError` log the warning only; `MeetingInactiveOwnerError`, `SharedMeetingGoneError` and `SharedMeetingFinishedError` do neither, since a stale card and the reactivation prompt say nothing about the caller's intent.
+Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces, not a code fault, so the branch classifies the invocation as `FAULT=0` — the interaction is counted as a completed one, exactly like a handler that ran to the end. `MeetingNotOwnedError` additionally logs a warning and emits `MeetingNotOwned` with value `1`; `MeetingGoneError` and `SharedMeetingDeniedError` log the warning only; `MeetingInactiveOwnerError`, `SharedMeetingGoneError` and `SharedMeetingFinishedError` do neither, since a stale card and the reactivation prompt say nothing about the caller's intent.
 
 Delivery is best-effort, like every other render in this module: an exception raised while answering has no handler left above it and would reach `process_update` as a second, unhandled fault.
 
 ### Fault metrics
 
 For all other (unexpected) errors:
-1. One dimensionless `FAULT` metric is emitted for aggregate monitoring, carrying the exception's qualified class name in an `error_type` EMF property and the trigger in `UpdatePayload`
-2. Stack traces are attached to all loggers via `add_stack_trace()`
+1. One dimensionless `FAULT` metric is emitted for aggregate monitoring, carrying the exception's qualified class name in an `error_type` EMF property
+2. One `log.error` line carries the traceback and the trigger that produced it (`fault_fields_from_update`), under the handler's bound contextvars
 3. In `DEV` mode, the exception is logged with Rich formatting
 
-The exception class is a property, never part of the metric name: a name minted from a runtime value opens a separately-billed CloudWatch series per class that nothing charts or alarms on. `FAULT` itself is written exactly once per logger per flush window — see the single-writer rule in the `monitoring` skill.
+The exception class is a property, never part of the metric name: a name minted from a runtime value opens a separately-billed CloudWatch series per class that nothing charts or alarms on. It travels to the caller on the returned `FaultOutcome` rather than on an emission of this module's own — see the exactly-once rule in the `monitoring` skill.
 
 ## The `handle_edit_errors` context manager
 

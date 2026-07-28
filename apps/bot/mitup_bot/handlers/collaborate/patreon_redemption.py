@@ -64,15 +64,22 @@ def claim_update[**P](
     return wrapper
 
 
-def refuse(context: TMitupContext, refusal: RedemptionRefusal, detail: str | None = None) -> None:
-    """Meter a link attempt that ended without linking, so the funnel shows where people fall out.
+def refuse(context: TMitupContext, refusal: RedemptionRefusal, detail: str | None = None, **fields: object) -> None:
+    """Meter and log a link attempt that ended without linking, so the funnel shows where people
+    fall out and every branch says which one it was.
 
-    ``detail`` narrows a refusal whose user-facing message is deliberately vague, and rides as a
-    metric property so the classification is something to alert on rather than something to grep.
+    ``detail`` narrows a refusal whose user-facing message is deliberately vague. Which branch fired
+    varies per refusal, so it rides the log line rather than the record: EMF properties are
+    last-writer-wins across a flush window, and the counter itself is what alarms read. ``fields``
+    carries whatever else the caller can correlate the refusal with.
     """
-    outcome = refusal.name.lower() if detail is None else f"{refusal.name.lower()}:{detail}"
-    context.put_feature_metric(
-        Feature.PATREON_LINK, name=MetricKey.PATREON_LINK_REFUSED, properties={"outcome": outcome}
+    context.put_feature_metric(Feature.PATREON_LINK, name=MetricKey.PATREON_LINK_REFUSED)
+    log.info(
+        "Patreon link attempt refused",
+        flow=patreon_link.LINK_FLOW,
+        outcome=refusal.name.lower(),
+        reason=detail,
+        **fields,
     )
 
 
@@ -97,13 +104,11 @@ async def refuse_unusable_code(
     # it is a forged confirm button. Both are near-zero-baseline and therefore alarmable, unlike an
     # expired code, which has an honest rate.
     detail = f"{stage}:{failure.name.lower() if failure is not None else 'no_code'}"
-    refuse(context, RedemptionRefusal.CODE_NOT_USABLE, detail)
-    log.info(
-        "Patreon pairing code could not be used",
-        flow=patreon_link.LINK_FLOW,
+    refuse(
+        context,
+        RedemptionRefusal.CODE_NOT_USABLE,
+        detail,
         stage=stage,
-        outcome=RedemptionRefusal.CODE_NOT_USABLE.name.lower(),
-        reason=detail,
         # Enough to correlate a support question with a row without storing anything reversible.
         code_hash_prefix=pairing.hash_pairing_code(code)[:8] if code else None,
         tg_user_id=tg_user_id,

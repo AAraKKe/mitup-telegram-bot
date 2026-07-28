@@ -771,9 +771,10 @@ async def test_fallback_invite_user_clears_context_and_sends_main_menu(
     )
     context.api.assert_send_message_to_user_called(user_with_settings, expected_view)
 
-    # The FAULT metric should have been emitted with the expected prefix,
-    # batched together with the other standard handler metrics in a single log line.
-    metrics.assert_emitted(name=MetricKey.FAULT.with_prefix("FallbackInviteUserConversation"), value=1.0)
+    # An abandoned flow counts on the Feature-dimensioned Error series, never on a series named
+    # after the branch that produced it — the handler ran to completion, so the invocation outcome
+    # stays Fault=0.
+    metrics.assert_emitted(name=MetricKey.ERROR, value=1.0, dimensions={"Feature": str(Feature.INVITE_USERS)}, times=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)

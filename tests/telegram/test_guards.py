@@ -229,7 +229,7 @@ async def test_meeting_returns_meeting_owned_by_user(
 
     assert user_with_settings.meetups[0] == result
     # The owner passing the guard is the zero datapoint of the rejection series.
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=0)
+    metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=0)
     assert_renders_nothing(context)
 
 
@@ -307,7 +307,7 @@ async def test_meeting_raises_not_owned_when_meeting_belongs_to_somebody_else(
     )
     assert (error.meeting_id, error.action, error.lang) == (999, "Test method", user_with_settings.lang)
     # Counting the rejection belongs to the error handler; a raising guard leaves the series alone.
-    metrics.assert_not_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_not_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     assert_renders_nothing(context)
 
 
@@ -334,7 +334,7 @@ async def test_meeting_returns_joined_meeting_not_owned_by_user(
 
     assert result == joined_meeting
     # The series tracks ownership decisions, so a participant getting through leaves it untouched.
-    metrics.assert_not_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=0)
+    metrics.assert_not_emitted(name=MetricKey.MEETING_NOT_OWNED, value=0)
     assert_renders_nothing(context)
 
 
@@ -440,7 +440,7 @@ async def test_meeting_any_state_returns_inactive_meeting_owned_by_user(
     await context.flush_metrics()
 
     assert result == inactive_meeting
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=0)
+    metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=0)
     assert_renders_nothing(context)
 
 
@@ -537,7 +537,7 @@ async def test_meeting_or_public_returns_public_meeting_for_caller_without_accou
 
     assert result == public_meeting
     # No account means no ownership decision, so the series stays untouched.
-    metrics.assert_not_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"))
+    metrics.assert_not_emitted(name=MetricKey.MEETING_NOT_OWNED)
     assert_renders_nothing(context)
 
 

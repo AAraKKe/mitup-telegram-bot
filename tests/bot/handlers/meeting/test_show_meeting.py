@@ -130,7 +130,7 @@ async def test_show_meeting_renders_external_view_for_joined_but_not_owned_meeti
 
         # The ownership bounce is fully gone: no warning log and no MeetingNotOwned error emitted.
         assert caplog.text == ""
-        metrics.assert_not_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+        metrics.assert_not_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
 
     # The handler builds the back button in the viewer's language (no origin in the callback, so it
     # targets the main menu), unlike external_view's owner-language default back button.

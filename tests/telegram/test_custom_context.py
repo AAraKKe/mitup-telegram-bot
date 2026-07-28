@@ -2,14 +2,13 @@ import datetime as dt
 from typing import Any
 
 import pytest
-from telegram import Chat, InlineQuery, Location, Message, Update
+from telegram import Chat, Location, Message, Update
 from telegram import User as TgUser
 
 from mitup_bot.custom_context import (
     ContextData,
     ContextId,
     fault_fields_from_update,
-    update_fields_from_update,
 )
 from mitup_bot.exceptions import ContextPropertyConversionError, ContextPropertyNotSetError
 from mitup_bot.monitoring import Feature, MetricUnit
@@ -128,9 +127,6 @@ def test_context_has_meeting_id(context: StubMitupContext):
     "dimensions", [None, {"DimName1": "DimValue1", "DimName2": "DimValue2"}], ids=["no_dimensions", "with_dimensions"]
 )
 @pytest.mark.parametrize(
-    "with_update_properties", [True, False], ids=["with_context_properties", "without_context_properties"]
-)
-@pytest.mark.parametrize(
     "with_handler_properties", [True, False], ids=["with_handler_properties", "without_handler_properties"]
 )
 async def test_metrics_emitted(
@@ -138,7 +134,6 @@ async def test_metrics_emitted(
     metrics: MetricAssertions,
     dimensions: None | dict[str, str],
     properties: None | dict[str, Any],
-    with_update_properties: bool,
     with_handler_properties: bool,
 ):
     context.emit_metric(
@@ -147,19 +142,29 @@ async def test_metrics_emitted(
         dimensions=dimensions,
         properties=properties,
         include_handler_properties=with_handler_properties,
-        include_update_properties=with_update_properties,
     )
 
     await context.flush_metrics()
 
-    # Subset match on dimensions/properties: the record includes extra auto-added properties
-    # (update properties like user_id, chat_id). We check only the explicitly-passed ones.
+    # Subset match on dimensions/properties: the record may carry the handler identity on top of
+    # the explicitly-passed ones, which are all this asserts.
     metrics.assert_emitted(
         name="test_metric",
         value=123,
         dimensions=dimensions,
         properties=properties,
     )
+
+
+async def test_emit_metric_carries_no_update_snapshot(context: StubMitupContext, metrics: MetricAssertions):
+    # What the user did is described by the structlog lines bound to the same update_id. A snapshot
+    # of the update on the record tells an alarm nothing and rides every emission of the flush
+    # window, so nothing but what the caller passed may reach the record.
+    context.emit_metric("snapshot_free_metric")
+
+    await context.flush_metrics()
+
+    metrics.assert_emitted(name="snapshot_free_metric", properties={}, properties_exact=True)
 
 
 async def test_feature_metric_emitted_with_proper_dimension(context: StubMitupContext, metrics: MetricAssertions):
@@ -230,11 +235,7 @@ async def test_emit_metric_attaches_handler_identity_as_properties_not_dimension
     # distinct dimension set is a separately billed CloudWatch series (issue #205).
     context.prepare_handler_metrics({"Handler": "SomeHandler", "HandlerType": "Callback"})
 
-    context.emit_metric(
-        "handler_metric",
-        value=5.0,
-        include_update_properties=False,
-    )
+    context.emit_metric("handler_metric", value=5.0)
 
     await context.flush_metrics()
 
@@ -249,13 +250,6 @@ async def test_emit_metric_attaches_handler_identity_as_properties_not_dimension
     )
     # And no record ever carries the handler identity as a dimension.
     metrics.assert_not_emitted(name="handler_metric", dimensions={"Handler": "SomeHandler"})
-
-
-def test_update_fields_from_update_no_effective_user():
-    """An Update with no user omits the 'user' key."""
-    result = update_fields_from_update(Update(update_id=1))
-
-    assert "user" not in result
 
 
 async def test_timing_metrics_success_emits_fault_zero(context: StubMitupContext, metrics: MetricAssertions):
@@ -320,27 +314,6 @@ async def test_user_data_mutations_emit_no_metrics(context: StubMitupContext, me
     metrics.assert_not_emitted(name="StoredMeetingId")
     metrics.assert_not_emitted(name="StoredContextText")
     metrics.assert_not_emitted(name="CleanUserData")
-
-
-def test_update_fields_from_update_carries_ids_but_no_text_username_or_markup():
-    user = TgUser(id=42, first_name="Ada", is_bot=False, username="ada_l")
-    chat = Chat(id=7, type=Chat.PRIVATE)
-    message = Message(message_id=99, date=dt.datetime.now(dt.UTC), chat=chat, from_user=user, text="secret user text")
-
-    result = update_fields_from_update(Update(update_id=1, message=message))
-
-    assert result["user"] == {"tg_user_id": 42}
-    assert result["message"] == {"message_id": 99}
-
-
-def test_update_fields_from_update_drops_inline_query_text():
-    user = TgUser(id=42, first_name="Ada", is_bot=False)
-    inline_query = InlineQuery(id="iq1", from_user=user, query="secret search", offset="")
-
-    result = update_fields_from_update(Update(update_id=1, inline_query=inline_query))
-
-    assert "inline_query" not in result
-    assert result["user"] == {"tg_user_id": 42}
 
 
 def test_fault_fields_carry_the_trigger_and_its_context():

@@ -107,7 +107,7 @@ metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat())
 ## Exception matching
 
 Pass `exception=` to match the exception a metric names — the `error_type` property the fault path
-sets, or the one nested under the EMF stack trace's `exception` property:
+sets. The traceback itself is never on the record; assert it on the structlog line instead:
 
 ```python
 # By class — resolves to fully qualified name for matching
@@ -119,15 +119,18 @@ metrics.assert_emitted(name=MetricKey.FAULT, value=1, exception="RuntimeError")
 
 ## Metric name prefixes
 
-`with_prefix` builds a metric name from a **literal** prefix known at author time:
+`with_prefix` builds a metric name from a **bounded** prefix — a literal known at author time, or a
+value drawn from a closed set the code itself enumerates:
 
 ```python
-MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED)    # "MeetingNotOwned/Error"
 MetricKey.TIME.with_prefix("TelegramApi", separator="")     # "TelegramApiTime"
+MetricKey.ACTIVE_USERS.with_prefix(language)                # "es_ES/ActiveUsers", language ∈ SUPPORTED_LANGUAGES
 ```
 
-A prefix taken from a runtime value (an exception class, a user id) is a bug — each one becomes a
-separately-billed CloudWatch series. Assert on the property instead, via `exception=` above.
+A prefix taken from an open runtime value (an exception class, a user id, a DB column nothing
+constrains) is a bug — each distinct value becomes a separately-billed CloudWatch series. Assert on
+the dimension and the property instead: the varying facet belongs on the `Feature`-dimensioned
+`Error` series with a `reason` property, or on `exception=` above.
 
 ## Common handler metrics pattern
 

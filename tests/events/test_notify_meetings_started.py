@@ -1,5 +1,3 @@
-from unittest.mock import ANY
-
 import pytest
 
 from mitup_bot.events import notify_meetings_started
@@ -337,9 +335,12 @@ async def test_failed_meeting_increments_counter_and_raises(
         value=0,
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
     )
+    # The failure counter is a number, not a report: the per-meeting id and error are on the
+    # `Failed to process started notification for meeting` log line, so nothing rides the record.
     metrics.assert_emitted(
         name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
         value=1,
         dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-        properties={"failed_details": ANY},
+        properties={},
+        properties_exact=True,
     )

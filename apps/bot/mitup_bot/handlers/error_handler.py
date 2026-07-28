@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from typing import Any
+
 import structlog
 from rich.console import Console
 from sqlmodel import select
@@ -50,6 +53,34 @@ SHARED_MEETING_METRICS: dict[type, MetricKey] = {
     SharedMeetingGoneError: MetricKey.STALE_MEETING_MESSAGE,
     SharedMeetingDeniedError: MetricKey.UNAUTHORIZED_MEETING_CALLBACK,
 }
+
+
+@dataclass(frozen=True)
+class FaultOutcome:
+    """How the invocation ended, handed back to the wrapper that owns the `FAULT` emission.
+
+    `FAULT` has a single writer per invocation, so a classification made here travels back as a
+    value instead of a second write to the series. `properties` carries whatever only this module
+    knows about the failure — the exception class on a genuine fault.
+    """
+
+    value: float
+    properties: dict[str, Any] | None = None
+
+
+# Every classification this module makes short of a genuine fault closes the interaction as a
+# completed one, exactly like a handler that ran to the end.
+HANDLED_OUTCOME = FaultOutcome(0)
+
+
+def fault_error_type(error: Exception) -> str:
+    """Name `error`'s class the way a fault record carries it.
+
+    The class rides as a property rather than as part of the metric name: a name minted from a
+    runtime value opens a separately-billed CloudWatch series per class, and none of them is charted
+    or alarmed. Shared with the registry, which names the same fault when this module cannot.
+    """
+    return f"{type(error).__module__}.{type(error).__qualname__}"
 
 
 @db.with_session
@@ -176,13 +207,12 @@ async def deliver_meeting_access_screen(context: TMitupContext, update: Update, 
 
 
 async def handle_meeting_access_error(context: TMitupContext, error: MeetingAccessError):
-    """Answer a caller `guards.meeting` stopped, and close the interaction as a completed one.
+    """Answer a caller `guards.meeting` stopped.
 
     Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces,
-    not a code fault: the rejection is counted on its own series and the interaction ends on
-    `FAULT=0`, exactly like a handler that ran to completion. Only the rejections that say something
-    about the caller's intent are logged; the reactivation prompt and the finished-card banner are
-    normal screens.
+    not a code fault: the rejection is counted on its own series and the interaction closes as a
+    completed one. Only the rejections that say something about the caller's intent are logged; the
+    reactivation prompt and the finished-card banner are normal screens.
 
     Delivery is best-effort, like every other render in this module: an exception raised here has no
     handler left above it and would reach `process_update` as a second, unhandled fault.
@@ -192,15 +222,13 @@ async def handle_meeting_access_error(context: TMitupContext, error: MeetingAcce
 
     update = context.telegram_update
     if update is None:
-        # No update means no interaction: there is nothing to answer, and the metric properties are
-        # read off the update.
+        # No update means no interaction: there is nothing to answer.
         return
 
     if isinstance(error, MeetingNotOwnedError):
-        context.emit_metric(MetricKey.ERROR.with_prefix(MetricKey.MEETING_NOT_OWNED), 1, unit=MetricUnit.COUNT)
+        context.emit_metric(MetricKey.MEETING_NOT_OWNED, 1, unit=MetricUnit.COUNT)
     if (shared_metric := SHARED_MEETING_METRICS.get(type(error))) is not None:
         context.emit_metric(shared_metric, include_handler_properties=False)
-    context.emit_metric(MetricKey.FAULT, 0)
 
     try:
         await deliver_meeting_access_screen(context, update, error)
@@ -262,60 +290,56 @@ async def notify_guard_error(context: TMitupContext, message: CommonMessages = C
         log.debug("Failed to deliver the redirect notification to the user.", exc_info=True)
 
 
-async def handler(context: TMitupContext, error: Exception, env: Env):
-    # This is the error handler that will receive every exception that is raised
+async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOutcome:
+    """Answer every exception a handler raises, and classify the invocation for its `FAULT` sample.
+
+    The caller owns the emission, so each branch here returns the value that closes the invocation
+    rather than writing the series itself — see `FaultOutcome`.
+    """
 
     if should_ignore_error(error):
-        return
+        return HANDLED_OUTCOME
 
     if isinstance(error, InactiveUserInteraction) and error.private:
         await handle_inactive_user(context, error.tg_user_id)
-        return
+        return HANDLED_OUTCOME
 
     # An expected business state, not a fault: answer with the standardized alert and stop before
-    # the fault metrics below.
+    # the fault classification below.
     if isinstance(error, UserPendingDeletion):
         await handle_pending_deletion_user(context, error)
-        return
+        return HANDLED_OUTCOME
 
     # The meeting guard's rejections carry their own screen, so they are answered here and stop
-    # before the fault metrics below.
+    # before the fault classification below.
     if isinstance(error, MeetingAccessError):
         await handle_meeting_access_error(context, error)
-        return
+        return HANDLED_OUTCOME
 
     # Context loss is an expected consequence of holding conversation state in memory (a rolling
     # deploy wipes user_data mid-flow, or flow-shaped input arrives with no active flow), not a code
-    # fault. It gets its own metric and bypasses the fault alarms below; the user is redirected to the
+    # fault. It gets its own metric and bypasses the fault alarms; the user is redirected to the
     # main menu with a friendly note explaining their saved data is safe.
     if isinstance(error, ContextPropertyNotSetError):
         log.warning(CONTEXT_LOST_EVENT, exc_info=error, reason=RecoveryReason.CONVERSATION_CONTEXT_MISSING.value)
         context.emit_metric(MetricKey.CONTEXT_LOST, 1)
         await notify_guard_error(context, CommonMessages.CONTEXT_LOST)
-        return
+        return HANDLED_OUTCOME
 
-    # One dimensionless FAULT for the invocation — the handler identity rides as an EMF property —
-    # so the series the infra alarms read carries exactly one value per fault. The exception class
-    # is a property rather than a metric name: a name minted from a runtime value opens a
-    # separately-billed CloudWatch series per class, and none of them is charted or alarmed.
-    error_type = f"{type(error).__module__}.{type(error).__qualname__}"
-    # The failure path deliberately carries the trigger and its context (what the user did, plus
-    # who/where — see fault_fields_from_update): the lean happy-path properties are not enough to
-    # debug a real fault, and log retention owns the PII lifecycle. `UpdatePayload` is a distinct
-    # key so the lean `Update` property emitted by later metrics cannot overwrite it on the
-    # shared EMF logger before the flush.
+    error_type = fault_error_type(error)
+
+    # The log-side record of the fault, and the only plane that carries the trigger and its context
+    # (what the user did, plus who/where — see fault_fields_from_update): it is written once, on
+    # failure, while a metric property rides every record of the flush window. The line runs inside
+    # the handler's bound contextvars, so it carries flow/handler/update_id/tg_user_id — the
+    # correlation the EMF Fault record lacks. exc_info is passed explicitly rather than read from
+    # the ambient exception state, which the awaits above may have replaced.
     update_payload = fault_fields_from_update(context.telegram_update) if context.telegram_update else None
-    context.emit_metric(MetricKey.FAULT, 1, properties={"UpdatePayload": update_payload, "error_type": error_type})
-
-    context.metrics.add_stack_trace()
-
-    # The log-side record of the fault. It runs inside the handler's bound contextvars, so the line
-    # carries flow/handler/update_id/tg_user_id — the correlation the EMF Fault record lacks.
-    # exc_info is passed explicitly rather than read from the ambient exception state, which the
-    # awaits above may have replaced.
     log.error("An error occurred while handling the update", exc_info=error, update=update_payload)
 
     # Any fault leaves the user stranded mid-action with no feedback, so redirect them to the main
-    # menu with the generic notice. The fault metrics above already recorded the fault for alarming;
-    # this delivery is best-effort and never raises, so it cannot become a second fault.
+    # menu with the generic notice. This delivery is best-effort and never raises, so it cannot
+    # become a second fault.
     await notify_guard_error(context)
+
+    return FaultOutcome(1, {"error_type": error_type})

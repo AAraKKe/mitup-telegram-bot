@@ -165,12 +165,7 @@ async def handle_maintainance(
             await dispatch_event(event_type, api, client, admin_tg_ids)
         except Exception:
             fault = True
-            # Emit the fault before attaching the trace: add_stack_trace only reaches EMF loggers
-            # that already exist, and this emit is what creates the dimensionless global logger.
-            # The trace itself must be captured inside the except block — the EMF library reads
-            # sys.exc_info(), which Python clears once the block exits.
             client.emit(MetricKey.FAULT, 1, MetricUnit.COUNT, emit_global=True)
-            client.add_stack_trace("exception")
             log.exception("Recurrent event run failed")
         finally:
             # emit_global adds a dimensionless copy of Fault/Time so a single Mitup/Events alarm can

@@ -124,7 +124,7 @@ async def test_edit_location_meeting_not_owned(
             update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
         )
 
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
@@ -218,7 +218,7 @@ async def test_edit_location_name_not_owned(
 
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
 
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
@@ -316,7 +316,7 @@ async def test_edit_location_coordinates_not_owned(
     # Check that meeting id has not been set
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES)
 
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)

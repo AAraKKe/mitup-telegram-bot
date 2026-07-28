@@ -326,7 +326,9 @@ async def duration_end_wrong_input_message_handler(
         await context.api.send_message(
             update=update, view=build_end_datetime_entry_view(meeting, user.lang, error=error)
         )
-        context.emit_metric(MetricKey.ERROR.with_prefix("WrongEndDatetimeFormat"), 1)
+        context.put_feature_metric(
+            Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "wrong_end_datetime_format"}
+        )
         return ConversationMeetingState.EDIT_END_DATETIME
 
 
@@ -523,7 +525,9 @@ async def duration_end_set_time_handler(
                     meeting, user.lang, error=CommonMessages.TIME_INVALID_VALUE.get(lang=user.lang)
                 ),
             )
-            context.emit_metric(MetricKey.ERROR.with_prefix("InvalidTime"), 1)
+            context.put_feature_metric(
+                Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "invalid_time"}
+            )
             return ConversationMeetingState.EDIT_END_TIME
 
         user_time = dt.time(int(time_info["hour"]), int(time_info["minutes"]), tzinfo=user.settings.tz)
@@ -561,7 +565,9 @@ async def duration_end_time_wrong_input_message_handler(
                 meeting, user.lang, error=CommonMessages.TIME_INVALID_FORMAT.get(lang=user.lang)
             ),
         )
-        context.emit_metric(MetricKey.ERROR.with_prefix("WrongTimeFormat"), 1)
+        context.put_feature_metric(
+            Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "wrong_time_format"}
+        )
         return ConversationMeetingState.EDIT_END_TIME
 
 

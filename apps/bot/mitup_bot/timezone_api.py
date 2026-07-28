@@ -14,7 +14,7 @@ from mitup_bot.exceptions import (
     TimezoneClientNotConfiguredError,
 )
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import Feature, MetricKey
 
 log = structlog.get_logger(__name__)
 
@@ -96,8 +96,8 @@ def get_timezone_by_location(latitude: float, longitude: float, context: TMitupC
         raise IncorrectTimezoneKeyError() from e
 
     if timezone is None:
-        context.emit_metric(
-            MetricKey.ERROR.with_prefix("InvalidGoogleTimezoneResponse"), include_handler_properties=False
+        context.put_feature_metric(
+            Feature.SET_TIMEZONE, name=MetricKey.ERROR, properties={"reason": "invalid_google_timezone_response"}
         )
         return None
 
@@ -118,8 +118,8 @@ def get_coordinates(address: str, context: TMitupContext) -> GeocodingLocation |
         log.warning("Google geocode API call failed", exc_info=e)
         raise IncorrectGeocodeKeyError() from e
     except IndexError, ValidationError:
-        context.emit_metric(
-            MetricKey.ERROR.with_prefix("InvalidGoogleGeocodeResponse"), include_handler_properties=False
+        context.put_feature_metric(
+            Feature.SET_TIMEZONE, name=MetricKey.ERROR, properties={"reason": "invalid_google_geocode_response"}
         )
         return None
 

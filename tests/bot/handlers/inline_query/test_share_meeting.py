@@ -160,7 +160,7 @@ async def test_share_meeting_non_public_meeting_by_unregistered_user(
     metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.SHARE_MEETING)})
     # A stranger reaching a private meeting is a rejection, not a fault: it lands on the ownership
     # series and closes the interaction at zero faults.
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     mock_session.assert_not_added()
 
@@ -217,7 +217,7 @@ async def test_share_meeting_own_meeting_by_pending_deletion_user(
         update=update, results=[meeting_unavailable_view(TranslationEngine.FALLBACK_LANG)], cache_time=0
     )
     metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.SHARE_MEETING)})
-    metrics.assert_emitted(name=MetricKey.ERROR.with_prefix("MeetingNotOwned"), value=1)
+    metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
 
 
