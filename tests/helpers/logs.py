@@ -1,3 +1,6 @@
+import gc
+
+from structlog._config import BoundLoggerLazyProxy
 from structlog.typing import EventDict
 
 from mitup_bot.custom_context import ContextId
@@ -8,6 +11,20 @@ from mitup_bot.exceptions import ContextPropertyNotSetError
 # of silently travelling into it.
 CONTEXT_LOST_LOG_EVENT = "Conversation context was lost while handling the update"
 CONTEXT_LOST_LOG_REASON = "conversation_context_missing"
+
+
+def drop_cached_logger_binds():
+    """Reset every lazy structlog proxy so it re-binds against whatever pipeline is configured next.
+
+    The production `configure_logging` sets `cache_logger_on_first_use=True`, so the first line a
+    module-level `structlog.get_logger(__name__)` emits under it freezes that proxy onto the
+    `wrap_for_formatter` pipeline. That cache outlives a later `structlog.configure`, so a test
+    reusing the same module's logger would capture nothing and would ship a live, non-serializable
+    logger object across xdist's channel. Call this on teardown of any test that runs the production
+    logging setup.
+    """
+    for proxy in (obj for obj in gc.get_objects() if isinstance(obj, BoundLoggerLazyProxy)):
+        proxy.__dict__.pop("bind", None)
 
 
 def assert_context_lost_logged(logs: list[EventDict], context_id: ContextId):

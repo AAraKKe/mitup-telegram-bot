@@ -1,8 +1,11 @@
 import contextlib
 import dataclasses
 import gc
+import io
+import json
 import logging
 from collections.abc import Generator
+from typing import cast
 from unittest import mock
 
 import pytest
@@ -24,6 +27,7 @@ from mitup_bot.config import (
     RunModes,
     TomlConfigProvider,
 )
+from mitup_bot.logging_config import Component
 from mitup_bot.monitoring import MetricsClient
 from mitup_bot.update_processor import PerUserUpdateProcessor
 from tests.helpers import create_patreon_config
@@ -404,6 +408,28 @@ def test_ext_bot_logger_level_by_env(
     MitupRuntime(env)
 
     assert logger.level == expected_level
+
+
+def test_line_emitted_after_startup_reaches_the_configured_pipeline(
+    real_configure_logging: None,
+    patch_runtime_deps: RuntimeDeps,
+    restore_root_logging: None,
+):
+    """Startup wires several subsystems that each touch process-global logging state. Asserting the
+    installed handler exists is not the same as asserting it still renders, so emit through it once
+    everything is built and read the rendered line back."""
+    MitupRuntime(Env.PROD)
+
+    handler = cast("logging.StreamHandler[io.StringIO]", logging.getLogger().handlers[0])
+    buffer = io.StringIO()
+    handler.setStream(buffer)
+    structlog.get_logger("probe.after_startup").info("after startup", meeting_id=7)
+    handler.flush()
+
+    record = json.loads(buffer.getvalue())
+    assert record["event"] == "after startup"
+    assert record["meeting_id"] == 7
+    assert record["component"] == Component.BOT
 
 
 # --- Run ---

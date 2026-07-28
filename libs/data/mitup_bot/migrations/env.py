@@ -1,10 +1,9 @@
-from logging.config import fileConfig
-
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from mitup_bot.config import Config, EnvVariablesConfigProvider, TomlConfigProvider, env_from_environment
 from mitup_bot.db import build_db_url
+from mitup_bot.migrations.logging_setup import configure_migration_logging
 from mitup_bot.models import users
 
 # this is the Alembic Config object, which provides
@@ -15,10 +14,7 @@ config = context.config
 # deployment pipelines and the db-test harness inject the real connection through MITUPBOT__DB__*.
 db_config = Config.db_from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(env_from_environment()))
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+configure_migration_logging(config.config_file_name)
 
 # add your model's MetaData object here
 # for 'autogenerate' support

@@ -116,6 +116,8 @@ uv run mb db migrate validate   # Validate migration graph integrity
 
 When a model change needs a new migration, invoke the `new-migration` skill — it walks through scaffolding the revision file, writing `upgrade()` / `downgrade()` by hand (autogenerate is disallowed), and validating that both paths apply cleanly. Don't repeat the walkthrough here; that skill owns it.
 
+A migration that mutates data in bulk uses `helpers.execute_bulk(revision, "<short-tag>", statement)` rather than `op.execute`, so the run leaves one structured line carrying the revision and the row count it changed.
+
 ### Deploy ordering and the shared database
 
 Migrations run (`alembic upgrade head`, via the migrations Lambda) **before** the new app images roll, against the still-running previous code — and a rolled-back ECS deploy does **not** undo them, so it runs the *previous* image against the *new* schema. Every migration must therefore be backward-compatible with the currently-deployed image.

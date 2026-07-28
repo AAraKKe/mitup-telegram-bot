@@ -142,3 +142,86 @@ def test_component_stamped_on_foreign_stdlib_record():
     record = render_one_line(Component.EVENTS, lambda: logging.getLogger("foreign.probe").warning("probe"))
 
     assert record["component"] == "events"
+
+
+# --- Bot-token redaction ---
+
+BOT_TOKEN = "8100200300:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"
+BOT_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+
+def test_bot_token_redacted_from_a_url_in_the_event_string():
+    """The token is glued straight onto the `bot` path segment, so the surrounding URL must survive
+    while the credential itself does not."""
+    record = render_one_line(Component.BOT, lambda: structlog.get_logger("native.probe").info(BOT_API_URL))
+
+    assert record["event"] == "https://api.telegram.org/bot[redacted-bot-token]/sendMessage"
+
+
+def test_bot_token_redacted_from_a_bare_field_value():
+    record = render_one_line(
+        Component.BOT, lambda: structlog.get_logger("native.probe").info("configured", token=BOT_TOKEN)
+    )
+
+    assert record["token"] == "[redacted-bot-token]"
+
+
+def test_bot_token_redacted_on_foreign_stdlib_record():
+    """httpx and PTB log through stdlib, so the foreign_pre_chain needs the same scrubbing as the
+    structlog-native chain."""
+    record = render_one_line(Component.BOT, lambda: logging.getLogger("foreign.probe").warning(BOT_API_URL))
+
+    assert BOT_TOKEN not in json.dumps(record)
+
+
+def test_bot_token_redacted_inside_a_rendered_traceback():
+    """Redaction runs after format_exc_info, so a token carried in an exception message is scrubbed
+    out of the rendered traceback rather than only out of the event string."""
+
+    def emit():
+        try:
+            raise RuntimeError(f"request to {BOT_API_URL} failed")
+        except RuntimeError:
+            structlog.get_logger("native.probe").exception("Telegram call failed")
+
+    record = render_one_line(Component.BOT, emit)
+
+    assert BOT_TOKEN not in json.dumps(record)
+    assert "[redacted-bot-token]" in str(record["exception"])
+
+
+def test_value_without_a_token_shape_passes_through_untouched():
+    """A colon between digits is ordinary in timestamps and connection strings, so the pattern has
+    to be narrow enough to leave them alone."""
+    value = "postgresql://mitup_app@db.internal:5432/mitup at 2026-07-28T10:22:33.123456Z"
+
+    record = render_one_line(Component.BOT, lambda: structlog.get_logger("native.probe").info("probe", field=value))
+
+    assert record["field"] == value
+
+
+def test_non_string_values_pass_through_untouched():
+    """Scalars are left exactly as bound — the processor neither coerces nor drops them."""
+    record = render_one_line(
+        Component.BOT,
+        lambda: structlog.get_logger("native.probe").info("probe", meeting_id=7, ratio=1.5, missing=None),
+    )
+
+    assert record["meeting_id"] == 7
+    assert record["ratio"] == 1.5
+    assert record["missing"] is None
+
+
+def test_bot_token_redacted_inside_nested_containers():
+    """Fields are routinely bound as dicts and lists, and the renderer serializes them in full, so
+    scanning only top-level strings would leave the credential readable one level down."""
+    record = render_one_line(
+        Component.BOT,
+        lambda: structlog.get_logger("native.probe").info(
+            "probe", payload={"request": {"url": BOT_API_URL}}, tokens=[BOT_TOKEN]
+        ),
+    )
+
+    assert BOT_TOKEN not in json.dumps(record)
+    assert record["payload"] == {"request": {"url": "https://api.telegram.org/bot[redacted-bot-token]/sendMessage"}}
+    assert record["tokens"] == ["[redacted-bot-token]"]
