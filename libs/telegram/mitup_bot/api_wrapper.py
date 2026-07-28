@@ -1,11 +1,10 @@
 import re
 from asyncio import gather, sleep
-from collections.abc import Callable, Coroutine, Generator, Sequence
-from contextlib import asynccontextmanager, contextmanager
+from collections.abc import Callable, Coroutine, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import partial
-from time import perf_counter
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import httpx
@@ -48,7 +47,6 @@ from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.meeting_text import rich_title
 
-TELEMGRAM_API_TIME_PREFIX = "TelegramApi"
 MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
     re.compile(r"Message_id_invalid"),
     re.compile(r"Message to edit not found"),
@@ -226,30 +224,6 @@ class BotAdapter:
     @property
     def bot(self) -> ExtBot:
         return self._bot
-
-    @contextmanager
-    def with_time_metric(self, prefix: str) -> Generator[None]:
-        """Emit `<prefix>Time` plus a continuous 0/1 `<prefix>Fault` on exit, even when the timed
-        call raises, so latency series keep their failure samples and the fault series is alarmable.
-
-        The outcome rides on `<prefix>Fault` alone, never as a property: an EMF property may only
-        carry a fact that holds for the whole flush window, and within one window metric values
-        accumulate into an array while properties are last-writer-wins. Per-call detail beyond the
-        fault sample belongs on a structlog line.
-        """
-        start = perf_counter()
-        success = False
-        try:
-            yield
-            success = True
-        finally:
-            elapsed = 1000 * (perf_counter() - start)
-            self._metrics.emit(
-                MetricKey.TIME.with_prefix(prefix, separator=""),
-                elapsed,
-                MetricUnit.MILLISECONDS,
-            )
-            self._metrics.emit(MetricKey.FAULT.with_prefix(prefix, separator=""), 0 if success else 1)
 
     def emit_metric(
         self,
@@ -660,17 +634,16 @@ class TelegramApi:
         )
 
     async def _send_chat_message_now(self, chat_id: int, view: MitupView) -> Message | None:
-        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            return await retry_without_custom_emoji(
-                lambda entities: self.adapter.bot.send_message(
-                    chat_id=chat_id,
-                    text=view.description.text,
-                    entities=entities,
-                    reply_markup=view.markup,
-                    disable_web_page_preview=True,
-                ),
-                view.description.entities or None,
-            )
+        return await retry_without_custom_emoji(
+            lambda entities: self.adapter.bot.send_message(
+                chat_id=chat_id,
+                text=view.description.text,
+                entities=entities,
+                reply_markup=view.markup,
+                disable_web_page_preview=True,
+            ),
+            view.description.entities or None,
+        )
 
     async def send_document(self, update: Update, view: MitupView) -> Message | None:
         """Send the view's document to the chat from the update, with the view's description
@@ -703,15 +676,14 @@ class TelegramApi:
     ) -> Message | None:
         caption_text = caption.text if isinstance(caption, FormattedText) else caption
         caption_entities = (caption.entities or None) if isinstance(caption, FormattedText) else None
-        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            return await self.adapter.bot.send_document(
-                chat_id=chat_id,
-                document=document,
-                filename=filename,
-                caption=caption_text,
-                caption_entities=caption_entities,
-                reply_markup=reply_markup,
-            )
+        return await self.adapter.bot.send_document(
+            chat_id=chat_id,
+            document=document,
+            filename=filename,
+            caption=caption_text,
+            caption_entities=caption_entities,
+            reply_markup=reply_markup,
+        )
 
     async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None:
         resolved = resolve_view(view)
@@ -723,26 +695,25 @@ class TelegramApi:
         )
 
     async def _send_user_message_now(self, tg_user_id: int, view: MitupView) -> Message | None:
-        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            try:
-                return await retry_without_custom_emoji(
-                    lambda entities: self.adapter.bot.send_message(
-                        chat_id=tg_user_id,
-                        text=view.description.text,
-                        entities=entities,
-                        reply_markup=view.markup,
-                        disable_web_page_preview=True,
-                    ),
-                    view.description.entities or None,
-                )
-            except Forbidden as e:
-                log.warning("User has blocked the bot", tg_user_id=tg_user_id)
+        try:
+            return await retry_without_custom_emoji(
+                lambda entities: self.adapter.bot.send_message(
+                    chat_id=tg_user_id,
+                    text=view.description.text,
+                    entities=entities,
+                    reply_markup=view.markup,
+                    disable_web_page_preview=True,
+                ),
+                view.description.entities or None,
+            )
+        except Forbidden as e:
+            log.warning("User has blocked the bot", tg_user_id=tg_user_id)
+            raise InactiveUserInteraction(tg_user_id, private=True) from e
+        except BadRequest as e:
+            if "not found" in e.message:
+                log.warning("User is not in Telegram", tg_user_id=tg_user_id)
                 raise InactiveUserInteraction(tg_user_id, private=True) from e
-            except BadRequest as e:
-                if "not found" in e.message:
-                    log.warning("User is not in Telegram", tg_user_id=tg_user_id)
-                    raise InactiveUserInteraction(tg_user_id, private=True) from e
-                raise
+            raise
 
     async def send_messages_to_users(
         self,
@@ -839,20 +810,19 @@ class TelegramApi:
         self, target: tuple[int | None, int | None, str | None], view: MitupView
     ) -> Message | bool:
         chat_id, message_id, inline_message_id = target
-        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            async with handle_edit_errors(adapter=self.adapter):
-                return await retry_without_custom_emoji(
-                    lambda entities: self.adapter.bot.edit_message_text(
-                        text=view.description.text,
-                        entities=entities,
-                        chat_id=chat_id,
-                        message_id=message_id,
-                        inline_message_id=inline_message_id,
-                        reply_markup=view.markup,
-                        disable_web_page_preview=True,
-                    ),
-                    view.description.entities or None,
-                )
+        async with handle_edit_errors(adapter=self.adapter):
+            return await retry_without_custom_emoji(
+                lambda entities: self.adapter.bot.edit_message_text(
+                    text=view.description.text,
+                    entities=entities,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    inline_message_id=inline_message_id,
+                    reply_markup=view.markup,
+                    disable_web_page_preview=True,
+                ),
+                view.description.entities or None,
+            )
         return False
 
     async def edit_message_for_user(
@@ -887,14 +857,13 @@ class TelegramApi:
 
     async def _clear_reply_markup_now(self, target: tuple[int | None, int | None, str | None]):
         chat_id, message_id, inline_message_id = target
-        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            async with handle_edit_errors(adapter=self.adapter):
-                await self.adapter.bot.edit_message_reply_markup(
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    inline_message_id=inline_message_id,
-                    reply_markup=None,
-                )
+        async with handle_edit_errors(adapter=self.adapter):
+            await self.adapter.bot.edit_message_reply_markup(
+                chat_id=chat_id,
+                message_id=message_id,
+                inline_message_id=inline_message_id,
+                reply_markup=None,
+            )
 
     async def answer_inline_query(
         self,
@@ -1028,36 +997,35 @@ class TelegramApi:
         """Execute a rendered meeting-message edit. Returns True when Telegram reports the
         message unreachable (deleted by the user, or its chat gone), leaving the DB cleanup
         to the caller."""
-        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            try:
-                await retry_without_custom_emoji(
-                    lambda entities: self.adapter.bot.edit_message_text(
-                        text=edit.text,
-                        entities=entities,
-                        chat_id=edit.chat_id,
-                        message_id=edit.message_id,
-                        inline_message_id=edit.inline_message_id,
-                        reply_markup=edit.reply_markup,
-                        disable_web_page_preview=True,
-                    ),
-                    edit.entities,
-                )
-            except BadRequest as e:
-                # Sometimes the message does not need to be updated but we don't know that in
-                # advance — ignore the error when it happens
-                if any(pattern.findall(e.message) for pattern in EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS):
-                    return False
-                if any(pattern.findall(e.message) for pattern in MESSAGE_NOT_FOUND_ERROR_PATTERNS):
-                    self.adapter.emit_metric(MetricKey.MESSAGE_DELETED)
-                    return True
-                raise
-            except Forbidden as e:
-                # The chat can no longer be written to (the user blocked the bot, deactivated
-                # their account, or the bot lost access to the group): the stored message can
-                # never be edited again, so it gets the same dead-message treatment.
-                log.warning("Meeting message unreachable, dropping it", chat_id=edit.chat_id, error=str(e))
+        try:
+            await retry_without_custom_emoji(
+                lambda entities: self.adapter.bot.edit_message_text(
+                    text=edit.text,
+                    entities=entities,
+                    chat_id=edit.chat_id,
+                    message_id=edit.message_id,
+                    inline_message_id=edit.inline_message_id,
+                    reply_markup=edit.reply_markup,
+                    disable_web_page_preview=True,
+                ),
+                edit.entities,
+            )
+        except BadRequest as e:
+            # Sometimes the message does not need to be updated but we don't know that in
+            # advance — ignore the error when it happens
+            if any(pattern.findall(e.message) for pattern in EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS):
+                return False
+            if any(pattern.findall(e.message) for pattern in MESSAGE_NOT_FOUND_ERROR_PATTERNS):
                 self.adapter.emit_metric(MetricKey.MESSAGE_DELETED)
                 return True
+            raise
+        except Forbidden as e:
+            # The chat can no longer be written to (the user blocked the bot, deactivated
+            # their account, or the bot lost access to the group): the stored message can
+            # never be edited again, so it gets the same dead-message treatment.
+            log.warning("Meeting message unreachable, dropping it", chat_id=edit.chat_id, error=str(e))
+            self.adapter.emit_metric(MetricKey.MESSAGE_DELETED)
+            return True
         return False
 
     async def _queued_meeting_message_edit(self, edit: MeetingMessageEdit, outbox: ApiOutbox):
@@ -1131,42 +1099,35 @@ class TelegramApi:
     # join-request handler, the daily supporter-check job, or the Collaborate screen render).
 
     async def approve_chat_join_request(self, chat_id: int, tg_user_id: int):
-        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            try:
-                await self.adapter.bot.approve_chat_join_request(chat_id=chat_id, user_id=tg_user_id)
-            except (Forbidden, BadRequest) as e:
-                log.warning("Failed to approve chat join request", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+        try:
+            await self.adapter.bot.approve_chat_join_request(chat_id=chat_id, user_id=tg_user_id)
+        except (Forbidden, BadRequest) as e:
+            log.warning("Failed to approve chat join request", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
 
     async def decline_chat_join_request(self, chat_id: int, tg_user_id: int):
-        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            try:
-                await self.adapter.bot.decline_chat_join_request(chat_id=chat_id, user_id=tg_user_id)
-            except (Forbidden, BadRequest) as e:
-                log.warning("Failed to decline chat join request", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+        try:
+            await self.adapter.bot.decline_chat_join_request(chat_id=chat_id, user_id=tg_user_id)
+        except (Forbidden, BadRequest) as e:
+            log.warning("Failed to decline chat join request", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
 
     async def ban_chat_member(self, chat_id: int, tg_user_id: int):
-        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            try:
-                await self.adapter.bot.ban_chat_member(chat_id=chat_id, user_id=tg_user_id)
-            except (Forbidden, BadRequest) as e:
-                log.warning("Failed to ban chat member", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+        try:
+            await self.adapter.bot.ban_chat_member(chat_id=chat_id, user_id=tg_user_id)
+        except (Forbidden, BadRequest) as e:
+            log.warning("Failed to ban chat member", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
 
     async def unban_chat_member(self, chat_id: int, tg_user_id: int, only_if_banned: bool = True):
-        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            try:
-                await self.adapter.bot.unban_chat_member(
-                    chat_id=chat_id, user_id=tg_user_id, only_if_banned=only_if_banned
-                )
-            except (Forbidden, BadRequest) as e:
-                log.warning("Failed to unban chat member", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+        try:
+            await self.adapter.bot.unban_chat_member(chat_id=chat_id, user_id=tg_user_id, only_if_banned=only_if_banned)
+        except (Forbidden, BadRequest) as e:
+            log.warning("Failed to unban chat member", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
 
     async def _fetch_chat_member(self, chat_id: int, tg_user_id: int) -> ChatMember | None:
-        with self.adapter.with_time_metric(prefix=TELEMGRAM_API_TIME_PREFIX):
-            try:
-                return await self.adapter.bot.get_chat_member(chat_id=chat_id, user_id=tg_user_id)
-            except (Forbidden, BadRequest) as e:
-                log.warning("Failed to fetch chat member", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
-                return None
+        try:
+            return await self.adapter.bot.get_chat_member(chat_id=chat_id, user_id=tg_user_id)
+        except (Forbidden, BadRequest) as e:
+            log.warning("Failed to fetch chat member", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+            return None
 
     async def is_chat_member(self, chat_id: int, tg_user_id: int) -> bool:
         member = await self._fetch_chat_member(chat_id, tg_user_id)

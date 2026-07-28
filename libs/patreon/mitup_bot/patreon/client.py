@@ -19,6 +19,7 @@ from pydantic import BaseModel, ValidationError
 
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonApiError, PatreonTokenRevoked
+from mitup_bot.monitoring.outbound import PATREON_EDGE, outbound_call
 from mitup_bot.patreon.models import (
     IdentityResponse,
     MemberResource,
@@ -42,6 +43,14 @@ MEMBER_WEBHOOK_TRIGGERS: tuple[str, ...] = (MEMBER_CREATE_TRIGGER, MEMBER_UPDATE
 # The webhook fields Patreon omits unless explicitly requested — notably ``secret``, without which a
 # read-back webhook could not be used to verify delivery signatures.
 WEBHOOK_FIELDS = "triggers,uri,paused,secret,last_attempted_at,num_consecutive_times_failed"
+# What each round-trip is recorded as. The label is passed in rather than derived from the URL:
+# no instrumentation on any outbound edge records a request target or a header.
+TOKEN_API_METHOD = "token"
+IDENTITY_API_METHOD = "identity"
+CAMPAIGN_MEMBERS_API_METHOD = "campaign_members"
+WEBHOOKS_API_METHOD = "webhooks"
+CREATE_WEBHOOK_API_METHOD = "create_webhook"
+UPDATE_WEBHOOK_API_METHOD = "update_webhook"
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +131,7 @@ class PatreonClient:
         response = await self._get(
             "/identity",
             access_token,
+            IDENTITY_API_METHOD,
             params={
                 "include": "memberships.campaign",
                 "fields[user]": "full_name",
@@ -146,7 +156,12 @@ class PatreonClient:
             }
             if cursor is not None:
                 params["page[cursor]"] = cursor
-            response = await self._get(f"/campaigns/{self._config.campaign_id}/members", access_token, params=params)
+            response = await self._get(
+                f"/campaigns/{self._config.campaign_id}/members",
+                access_token,
+                CAMPAIGN_MEMBERS_API_METHOD,
+                params=params,
+            )
             page = self._parse(MembersResponse, response, "campaign members")
             for member in page.data:
                 yield member
@@ -157,7 +172,9 @@ class PatreonClient:
     async def list_webhooks(self, access_token: str) -> list[WebhookResource]:
         """List the campaign's webhooks with the creator token, requesting ``secret`` explicitly so
         each returned webhook carries the HMAC key needed to verify its deliveries."""
-        response = await self._get("/webhooks", access_token, params={"fields[webhook]": WEBHOOK_FIELDS})
+        response = await self._get(
+            "/webhooks", access_token, WEBHOOKS_API_METHOD, params={"fields[webhook]": WEBHOOK_FIELDS}
+        )
         return self._parse(WebhooksResponse, response, "webhooks").data
 
     async def create_webhook(self, access_token: str, *, uri: str, triggers: Sequence[str]) -> WebhookResource:
@@ -169,7 +186,7 @@ class PatreonClient:
                 "relationships": {"campaign": {"data": {"type": "campaign", "id": self._config.campaign_id}}},
             }
         }
-        response = await self._post("/webhooks", access_token, json=body)
+        response = await self._post("/webhooks", access_token, CREATE_WEBHOOK_API_METHOD, json=body)
         return self._parse(WebhookResponse, response, "create webhook").data
 
     async def update_webhook(
@@ -190,11 +207,11 @@ class PatreonClient:
         if paused is not None:
             attributes["paused"] = paused
         body = {"data": {"type": "webhook", "id": webhook_id, "attributes": attributes}}
-        response = await self._patch(f"/webhooks/{webhook_id}", access_token, json=body)
+        response = await self._patch(f"/webhooks/{webhook_id}", access_token, UPDATE_WEBHOOK_API_METHOD, json=body)
         return self._parse(WebhookResponse, response, "update webhook").data
 
     async def _request_token(self, data: dict[str, str], *, revoke_on_invalid_grant: bool = False) -> TokenPair:
-        response = await self._client.post(TOKEN_URL, data=data)
+        response = await self._send(TOKEN_API_METHOD, "POST", TOKEN_URL, data=data)
         is_bad_request = response.status_code == httpx.codes.BAD_REQUEST
         if revoke_on_invalid_grant and is_bad_request and self._is_invalid_grant(response):
             raise PatreonTokenRevoked
@@ -204,8 +221,12 @@ class PatreonClient:
         expires_at = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=token.expires_in)
         return TokenPair(access_token=token.access_token, refresh_token=token.refresh_token, expires_at=expires_at)
 
-    async def _get(self, path: str, access_token: str, *, params: dict[str, str] | None = None) -> httpx.Response:
-        response = await self._client.get(
+    async def _get(
+        self, path: str, access_token: str, api_method: str, *, params: dict[str, str] | None = None
+    ) -> httpx.Response:
+        response = await self._send(
+            api_method,
+            "GET",
             f"{API_BASE_URL}{path}",
             params=params,
             headers={"Authorization": f"Bearer {access_token}"},
@@ -214,8 +235,10 @@ class PatreonClient:
             raise PatreonApiError(f"GET {path} returned {response.status_code}")
         return response
 
-    async def _post(self, path: str, access_token: str, *, json: dict[str, Any]) -> httpx.Response:
-        response = await self._client.post(
+    async def _post(self, path: str, access_token: str, api_method: str, *, json: dict[str, Any]) -> httpx.Response:
+        response = await self._send(
+            api_method,
+            "POST",
             f"{API_BASE_URL}{path}",
             json=json,
             headers={"Authorization": f"Bearer {access_token}"},
@@ -224,14 +247,24 @@ class PatreonClient:
             raise PatreonApiError(f"POST {path} returned {response.status_code}")
         return response
 
-    async def _patch(self, path: str, access_token: str, *, json: dict[str, Any]) -> httpx.Response:
-        response = await self._client.patch(
+    async def _patch(self, path: str, access_token: str, api_method: str, *, json: dict[str, Any]) -> httpx.Response:
+        response = await self._send(
+            api_method,
+            "PATCH",
             f"{API_BASE_URL}{path}",
             json=json,
             headers={"Authorization": f"Bearer {access_token}"},
         )
         if not response.is_success:
             raise PatreonApiError(f"PATCH {path} returned {response.status_code}")
+        return response
+
+    async def _send(self, api_method: str, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        """Every Patreon round-trip goes through here, so each one lands on a line and on the
+        PatreonApi timing pair."""
+        with outbound_call(PATREON_EDGE, api_method, timeout_errors=(httpx.TimeoutException,)) as call:
+            response = await self._client.request(method, url, **kwargs)
+            call.status_code = response.status_code
         return response
 
     @staticmethod

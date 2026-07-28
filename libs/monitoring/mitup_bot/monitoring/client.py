@@ -1,3 +1,6 @@
+from collections.abc import Generator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 from mitup_bot.monitoring.backend import MetricsBackend
@@ -94,3 +97,29 @@ class MetricsClient:
     @property
     def records(self) -> list[MetricRecord]:
         return self._records
+
+
+ambient_client: ContextVar[MetricsClient | None] = ContextVar("ambient_metrics_client", default=None)
+
+
+@contextmanager
+def bound_metrics_client(client: MetricsClient) -> Generator[None]:
+    """Publish `client` as the ambient one for the duration of the block.
+
+    Code far below the entry point — the instrumented Telegram request class, the Patreon client —
+    emits into whichever invocation is on the stack without a client being threaded through PTB or
+    httpx. Context variables propagate down the await chain and into tasks the block spawns, and
+    the previous value is restored on exit so nothing leaks into the next invocation handled by a
+    reused worker task.
+    """
+    token = ambient_client.set(client)
+    try:
+        yield
+    finally:
+        ambient_client.reset(token)
+
+
+def current_metrics_client() -> MetricsClient | None:
+    """The ambient client, or None outside any instrumented invocation (a process's own startup
+    calls run there, and they have no flush window to join)."""
+    return ambient_client.get()

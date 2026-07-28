@@ -14,7 +14,6 @@ from telegram.ext import ExtBot
 from mitup_bot.api_wrapper import (
     CALLBACK_QUERY_TEXT_LIMIT,
     QUEUED_CALL_ATTEMPTS,
-    TELEMGRAM_API_TIME_PREFIX,
     ApiOutbox,
     BotAdapter,
     QueuedApiCall,
@@ -36,11 +35,11 @@ from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView, ViewDocument
-from tests.helpers import AnyFloat, make_test_metrics_client
+from tests.helpers import make_test_metrics_client
 from tests.helpers.fixtures import create_joined_link, create_meetup, create_message, create_user
 from tests.helpers.monitoring import MetricAssertions
 
@@ -732,28 +731,6 @@ async def test_bot_adapter_flush_metrics(bot: AsyncMock):
 
     adapter = BotAdapter(bot=bot, metrics=make_test_metrics_client())
     await adapter.flush_metrics()
-
-
-# ---------------------------------------------------------------------------
-# _with_time_metrics_context — CallbackContext adapter path (lines 195-196)
-# ---------------------------------------------------------------------------
-
-
-async def test_send_message_to_user_with_context_adapter_uses_time_metric(bot: AsyncMock):
-    from mitup_bot.custom_context import MitupContext
-
-    mock_context = MagicMock(spec=MitupContext)
-    mock_context.__class__ = MitupContext
-    mock_context.bot = bot
-    bot.send_message.return_value = MagicMock(spec=Message)
-
-    api = TelegramApi()
-    api.adapter = cast(ContextOrBotAdapter, mock_context)
-    user = create_user(id=1, tg_user_id=456)
-
-    await api.send_message_to_user(user, "test")
-
-    mock_context.with_time_metric.assert_called_once_with(prefix=TELEMGRAM_API_TIME_PREFIX)
 
 
 # ---------------------------------------------------------------------------
@@ -1649,73 +1626,6 @@ async def test_is_chat_banned_degrades_to_false_on_error(telegram_api: TelegramA
     bot.get_chat_member.side_effect = error
 
     assert await telegram_api.is_chat_banned(chat_id=-100, tg_user_id=555) is False
-
-
-# ---------------------------------------------------------------------------
-# BotAdapter.with_time_metric
-# ---------------------------------------------------------------------------
-
-
-async def test_bot_adapter_time_metric_success_emits_time_and_fault_zero(
-    adapter: BotAdapter, api_metrics: MetricAssertions, api_metrics_client: MetricsClient
-):
-    with adapter.with_time_metric(TELEMGRAM_API_TIME_PREFIX):
-        pass
-
-    await api_metrics_client.flush()
-
-    api_metrics.assert_emitted(
-        name="TelegramApiTime",
-        value=AnyFloat(),
-        unit=MetricUnit.MILLISECONDS,
-        properties={},
-        properties_exact=True,
-    )
-    api_metrics.assert_emitted(name="TelegramApiFault", value=0)
-
-
-async def test_bot_adapter_time_metric_emits_even_when_the_call_raises(
-    adapter: BotAdapter, api_metrics: MetricAssertions, api_metrics_client: MetricsClient
-):
-    with pytest.raises(TimedOut):
-        with adapter.with_time_metric(TELEMGRAM_API_TIME_PREFIX):
-            raise TimedOut()
-
-    await api_metrics_client.flush()
-
-    api_metrics.assert_emitted(
-        name="TelegramApiTime",
-        value=AnyFloat(),
-        unit=MetricUnit.MILLISECONDS,
-        properties={},
-        properties_exact=True,
-    )
-    api_metrics.assert_emitted(name="TelegramApiFault", value=1)
-
-
-async def test_bot_adapter_time_metric_keeps_each_call_outcome_on_its_own_fault_sample(
-    adapter: BotAdapter, api_metrics: MetricAssertions, api_metrics_client: MetricsClient
-):
-    # A flush window batches every dimensionless emission into one EMF document, where values
-    # accumulate into an array but properties overwrite. The per-call outcome must therefore live
-    # on the fault series — one 0/1 sample per call — and never on a property of the timing metric.
-    with adapter.with_time_metric(TELEMGRAM_API_TIME_PREFIX):
-        pass
-    with pytest.raises(TimedOut):
-        with adapter.with_time_metric(TELEMGRAM_API_TIME_PREFIX):
-            raise TimedOut()
-
-    await api_metrics_client.flush()
-
-    api_metrics.assert_emitted(name="TelegramApiFault", value=0, times=1)
-    api_metrics.assert_emitted(name="TelegramApiFault", value=1, times=1)
-    api_metrics.assert_emitted(
-        name="TelegramApiTime",
-        unit=MetricUnit.MILLISECONDS,
-        properties={},
-        properties_exact=True,
-        times=2,
-    )
 
 
 # ---------------------------------------------------------------------------

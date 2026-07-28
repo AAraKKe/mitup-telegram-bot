@@ -18,7 +18,7 @@ from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
-from tests.helpers import AnyFloat, StubMitupContext, create_meetup
+from tests.helpers import StubMitupContext, create_meetup
 from tests.helpers.context import build_context
 from tests.helpers.monitoring import MetricAssertions
 
@@ -32,17 +32,6 @@ def context(app, update, metrics_client: MetricsClient):
     api.adapter = cast(ContextOrBotAdapter, context)
     context.api = api  # ty: ignore[invalid-assignment]  # nolink: intentional — test fixture assigns real TelegramApi to a MockApi-typed field
     return context
-
-
-async def assert_time_metric_emitted(context: StubMitupContext, metrics: MetricAssertions, times: int = 1):
-    await context.metrics.flush()
-
-    metrics.assert_emitted(
-        name="TelegramApiTime",
-        value=AnyFloat(),
-        unit=MetricUnit.MILLISECONDS,
-        times=times,
-    )
 
 
 async def test_edit_message_without_message_available(context: StubMitupContext):
@@ -96,8 +85,6 @@ async def test_send_message_with_a_view(
         disable_web_page_preview=True,
     )
 
-    await assert_time_metric_emitted(context, metrics)
-
 
 async def test_send_message_without_view(context: StubMitupContext, update: Update, metrics: MetricAssertions):
     assert context.telegram_update.effective_chat is not None
@@ -111,8 +98,6 @@ async def test_send_message_without_view(context: StubMitupContext, update: Upda
         reply_markup=None,
         disable_web_page_preview=True,
     )
-
-    await assert_time_metric_emitted(context, metrics)
 
 
 async def test_send_message_with_entities(
@@ -129,8 +114,6 @@ async def test_send_message_with_entities(
         reply_markup=view_with_entities.markup,
         disable_web_page_preview=True,
     )
-
-    await assert_time_metric_emitted(context, metrics)
 
 
 async def test_edit_message_with_entities(
@@ -150,8 +133,6 @@ async def test_edit_message_with_entities(
         disable_web_page_preview=True,
     )
 
-    await assert_time_metric_emitted(context, metrics)
-
 
 async def test_edit_message_with_a_view(
     default_view: MitupView, update: Update, context: StubMitupContext, metrics: MetricAssertions
@@ -170,8 +151,6 @@ async def test_edit_message_with_a_view(
         disable_web_page_preview=True,
     )
 
-    await assert_time_metric_emitted(context, metrics)
-
 
 async def test_edit_message_without_view(update: Update, context: StubMitupContext, metrics: MetricAssertions):
     await context.api.edit_message(update=update, view="Hello, World")
@@ -185,8 +164,6 @@ async def test_edit_message_without_view(update: Update, context: StubMitupConte
         reply_markup=None,
         disable_web_page_preview=True,
     )
-
-    await assert_time_metric_emitted(context, metrics)
 
 
 async def test_edit_meetup_messages(user_with_settings: User, context: StubMitupContext, metrics: MetricAssertions):
@@ -252,8 +229,6 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
         ]
     )
 
-    await assert_time_metric_emitted(context, metrics, times=3)  # one metric per edit call
-
 
 @pytest.mark.parametrize("bad_request_message", [pat.pattern for pat in MESSAGE_NOT_FOUND_ERROR_PATTERNS])
 async def test_edit_meetup_messages_counts_dead_message_and_continues(
@@ -289,9 +264,6 @@ async def test_edit_meetup_messages_counts_dead_message_and_continues(
     assert edit.call_count == 2
 
     metrics.assert_emitted(name=MetricKey.MESSAGE_DELETED, value=1, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(
-        name="TelegramApiTime", value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=2
-    )  # one per edit attempt
 
 
 @pytest.mark.parametrize("bad_request_message", [pat.pattern for pat in EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS])
@@ -319,8 +291,6 @@ async def test_edit_meetup_messages_ignore_unchanged_message(
     await context.api.update_meeting_messages(meeting=meeting)
 
     assert edit.call_count == 2
-
-    await assert_time_metric_emitted(context, metrics, times=2)  # one metric per edit call
 
 
 CUSTOM_EMOJI_ENTITY = MessageEntity(type=MessageEntity.CUSTOM_EMOJI, offset=0, length=2, custom_emoji_id="123456")

@@ -20,7 +20,7 @@ The concrete implementation. Requires an `adapter` (conforming to `ContextOrBotA
 
 ### `ContextOrBotAdapter` (Protocol)
 
-Defined in `protocols.py`. Requires `bot`, `with_time_metric()`, `emit_metric()`, and `flush_metrics()`. Two conforming types exist:
+Defined in `protocols.py`. Requires `bot`, `emit_metric()`, and `flush_metrics()`. Two conforming types exist:
 
 | Adapter | Context | Metrics |
 |---------|---------|---------|
@@ -148,4 +148,9 @@ The suppressed patterns are compiled regexes defined inside `libs/telegram/mitup
 
 ## Timing metrics
 
-All Telegram API calls are wrapped with `context.with_time_metric("TelegramApi")`, emitting `TelegramApiTime` metrics in milliseconds. This is handled automatically by the API methods — do not add redundant timing around `context.api.*` calls.
+The wrapper emits none. `TelegramApiTime`/`TelegramApiFault` are emitted per HTTP round-trip by
+`InstrumentedHTTPXRequest` in `libs/telegram/mitup_bot/request.py`, which sits below the rate
+limiter, the custom-emoji retry and the post-commit drain — so a rate-limiter retry, a
+custom-emoji retry and a drain attempt each get their own sample and their own log line, and the
+calls that bypass the wrapper entirely are covered too. One wrapper operation is 0..N round-trips;
+never time one. See the `monitoring` skill for the token rule the instrumentation enforces.

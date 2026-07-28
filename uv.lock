@@ -1090,6 +1090,7 @@ dependencies = [
     { name = "aws-embedded-metrics" },
     { name = "mitup-core" },
     { name = "rich" },
+    { name = "structlog" },
 ]
 
 [package.metadata]
@@ -1097,6 +1098,7 @@ requires-dist = [
     { name = "aws-embedded-metrics", specifier = "==3.5.0" },
     { name = "mitup-core", editable = "libs/core" },
     { name = "rich", specifier = "==15.0.0" },
+    { name = "structlog", specifier = "==26.1.0" },
 ]
 
 [[package]]

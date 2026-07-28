@@ -5,6 +5,7 @@ from urllib.parse import parse_qs
 import httpx
 import pytest
 from freezegun import freeze_time
+from structlog.testing import capture_logs
 
 from mitup_bot.exceptions import PatreonApiError, PatreonTokenRevoked
 from mitup_bot.patreon import PatreonClient, TokenPair
@@ -360,3 +361,20 @@ async def test_create_webhook_maps_non_2xx_to_api_error():
             await client.create_webhook(
                 "creator-access", uri="https://bot.example/hook", triggers=MEMBER_WEBHOOK_TRIGGERS
             )
+
+
+async def test_every_round_trip_lands_a_line_naming_its_api_method():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": {"id": "u1", "type": "user", "attributes": {}}, "included": []})
+
+    config = create_patreon_config()
+    with capture_logs() as logs:
+        async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
+            await client.fetch_identity("access-token")
+
+    (line,) = [entry for entry in logs if entry["event"] == "Patreon API call"]
+    assert line["api_method"] == "identity"
+    assert line["status_code"] == 200
+    assert line["outcome"] == "ok"
+    # The access token travels in a header; no part of the request target or its headers is recorded.
+    assert "access-token" not in repr(logs)

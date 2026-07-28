@@ -1,5 +1,3 @@
-from collections.abc import Generator
-from contextlib import contextmanager
 from typing import Any, Protocol
 
 from telegram.ext import ExtBot
@@ -14,9 +12,6 @@ class ContextOrBotAdapter(Protocol):
 
     This is used to support both MitupContext and ExtBot for flexibility.
     """
-
-    @contextmanager
-    def with_time_metric(self, prefix: str) -> Generator[None]: ...
 
     def emit_metric(
         self,

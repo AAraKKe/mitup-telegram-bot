@@ -2,7 +2,6 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import auto
-from time import perf_counter
 from typing import Any, Generic, TypeVar
 
 import structlog
@@ -376,37 +375,6 @@ class MitupContext(
             properties=properties,
             include_handler_properties=with_handler_properties,
         )
-
-    @contextmanager
-    def with_time_metric(self, prefix: str) -> Generator[None]:
-        """Measure elapsed time and emit `<prefix>Time` plus a continuous 0/1 `<prefix>Fault` on exit.
-
-        Both emit even when the timed call raises, so latency series keep their failure samples
-        (no survivorship bias during incidents) and the fault series is gap-free and alarmable.
-
-        The outcome belongs to `<prefix>Fault` alone and never to a property: properties are
-        last-writer-wins across a flush window while metric values accumulate into an array, so
-        only facts constant for the whole window may ride as properties.
-        """
-        start_time = perf_counter()
-        success = False
-        try:
-            yield
-            success = True
-        finally:
-            elapsed_time = 1000 * (perf_counter() - start_time)
-
-            self.emit_metric(
-                MetricKey.TIME.with_prefix(prefix, separator=""),
-                elapsed_time,
-                MetricUnit.MILLISECONDS,
-                include_handler_properties=False,
-            )
-            self.emit_metric(
-                MetricKey.FAULT.with_prefix(prefix, separator=""),
-                0 if success else 1,
-                include_handler_properties=False,
-            )
 
     async def flush_metrics(self):
         await self.metrics.flush()

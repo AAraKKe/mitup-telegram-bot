@@ -15,6 +15,7 @@ from pydantic import SecretStr
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
+from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.config import BotConfig
 from mitup_bot.events.service import (
     EventType,
@@ -29,7 +30,15 @@ from mitup_bot.events.service import (
 )
 from mitup_bot.events_cli import recurrent_events as cli
 from mitup_bot.models.subscriptions import TokenCipher
-from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, NullBackend
+from mitup_bot.monitoring import (
+    EmfBackend,
+    MetricKey,
+    MetricsBackend,
+    MetricsClient,
+    MetricUnit,
+    NullBackend,
+    current_metrics_client,
+)
 from mitup_bot.patreon.runtime import PatreonRuntime
 from tests.helpers import MockApi, create_patreon_config
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
@@ -349,43 +358,36 @@ async def test_handle_maintainance(
         )
 
 
-async def test_handle_maintainance_emits_telegram_api_time_metrics():
-    """Verify TelegramApiTime metrics flow through the real MetricsClient via BotAdapter."""
+async def test_handle_maintainance_publishes_the_run_client_to_the_outbound_instrumentation():
+    """The outbound instrumentation lives inside PTB's request object and the Patreon client,
+    neither of which is reachable from the runner: it finds the run's client through the ambient
+    binding, so its samples land in this run's flush window with its run_id."""
     captured_client: list[MetricsClient] = []
+    ambient_seen: list[MetricsClient | None] = []
 
-    def make_client(backend, base_dimensions=None):
+    def make_client(backend: MetricsBackend, base_dimensions: dict[str, str] | None = None) -> MetricsClient:
         assert not isinstance(backend, NullBackend), "Expected a real backend, not NullBackend"
         client = make_test_metrics_client(base_dimensions=base_dimensions)
         captured_client.append(client)
         return client
 
-    bot = AsyncMock()
-
-    async def trigger_api_call(event_type, api, client, admin_tg_ids):
-        """Simulate a Telegram API call inside an event to exercise with_time_metric."""
-        await api.send_message_to_user(MagicMock(tg_user_id=123, lang="en"), "test")
+    async def record_ambient_client(
+        event_type: EventType, api: TelegramApiWrapper, client: MetricsClient, admin_tg_ids: list[int]
+    ):
+        ambient_seen.append(current_metrics_client())
 
     with (
-        patch(
-            "mitup_bot.events.service.dispatch_event",
-            side_effect=trigger_api_call,
-        ),
+        patch("mitup_bot.events.service.dispatch_event", side_effect=record_ambient_client),
         patch("mitup_bot.events.service.db") as mock_db,
         patch("mitup_bot.events.service.MetricsClient", side_effect=make_client),
     ):
         mock_db.get_open_connections.return_value = 0
 
-        await handle_maintainance(EventType.USER_CLEANUP, bot, [])
+        await handle_maintainance(EventType.USER_CLEANUP, bot=AsyncMock(), admin_tg_ids=[])
 
-        assert len(captured_client) == 1
-        client = captured_client[0]
-        assertions = MetricAssertions(client)
-
-        # TelegramApiTime is emitted by BotAdapter.with_time_metric inside TelegramApi methods
-        assertions.assert_emitted(
-            name="TelegramApiTime",
-            unit=MetricUnit.MILLISECONDS,
-        )
+    assert ambient_seen == captured_client
+    # The binding is scoped to the run, so nothing leaks into the next one on this task.
+    assert current_metrics_client() is None
 
 
 class CapturingSink(Sink):

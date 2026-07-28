@@ -1,3 +1,5 @@
+import asyncio
+
 import googlemaps
 import structlog
 from googlemaps import Client
@@ -15,8 +17,13 @@ from mitup_bot.exceptions import (
 )
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.monitoring.outbound import GOOGLE_EDGE, outbound_call
 
 log = structlog.get_logger(__name__)
+
+TIMEZONE_API_METHOD = "timezone"
+GEOCODE_API_METHOD = "geocode"
+GOOGLE_TIMEOUT_ERRORS = (googlemaps.exceptions.Timeout,)
 
 __geocode_client: googlemaps.Client | None = None
 __timezone_client: googlemaps.Client | None = None
@@ -69,26 +76,37 @@ def configure(config: GoogleApiConfig):
         raise IncorrectKeyError() from e
 
 
-def get_timezone_by_address(address: str, context: TMitupContext) -> str | None:
+async def get_timezone_by_address(address: str, context: TMitupContext) -> str | None:
     """Return the timezone ID for an address, or None when the address cannot be resolved.
 
     None means the user's input is unusable and they should be asked to try again; a Google-side
     failure (quota, auth, upstream) raises instead, because that is an operator problem.
     """
 
-    location = get_coordinates(address, context)
+    location = await get_coordinates(address, context)
     if location is None:
         return None
 
-    return get_timezone_by_location(location.lat, location.lng, context)
+    return await get_timezone_by_location(location.lat, location.lng, context)
 
 
-def get_timezone_by_location(latitude: float, longitude: float, context: TMitupContext) -> str | None:
+async def get_timezone_by_location(latitude: float, longitude: float, context: TMitupContext) -> str | None:
     """Return the timezone ID for a coordinate pair, or None when Google maps it to no zone."""
 
+    client = timezone_client()
     try:
-        with context.with_time_metric("GoogleTimeZoneApi"):
-            timezone = timezone_client().timezone((latitude, longitude))  # type: ignore
+        with outbound_call(
+            GOOGLE_EDGE,
+            TIMEZONE_API_METHOD,
+            timeout_errors=GOOGLE_TIMEOUT_ERRORS,
+            client=context.metrics,
+            latitude=round(latitude, 2),
+            longitude=round(longitude, 2),
+        ):
+            # The Google client is requests-based and blocking, so the call runs off the event
+            # loop: on the default single-update cap it would otherwise stall every other update
+            # for two round-trips to Google while someone types an address.
+            timezone = await asyncio.to_thread(client.timezone, (latitude, longitude))  # type: ignore
     except googlemaps.exceptions.ApiError as e:
         # Covers any Google-side rejection — quota, auth, upstream 5xx — not only a bad key; the
         # log line preserves what Google actually answered.
@@ -104,19 +122,28 @@ def get_timezone_by_location(latitude: float, longitude: float, context: TMitupC
     return timezone["timeZoneId"]
 
 
-def get_coordinates(address: str, context: TMitupContext) -> GeocodingLocation | None:
+async def get_coordinates(address: str, context: TMitupContext) -> GeocodingLocation | None:
     """Return the coordinates of an address, or None when Google returns no or unparseable results."""
 
+    client = geocode_client()
     try:
-        with context.with_time_metric("GoogleGeocodeApi"):
-            geocode_result = GeocodingResponse.model_validate(
-                geocode_client().geocode(address)[0]  # type: ignore
-            )
+        with outbound_call(
+            GOOGLE_EDGE,
+            GEOCODE_API_METHOD,
+            timeout_errors=GOOGLE_TIMEOUT_ERRORS,
+            client=context.metrics,
+            address_len=len(address),
+        ):
+            # Blocking client, moved off the event loop for the same reason as the timezone call.
+            results = await asyncio.to_thread(client.geocode, address)  # type: ignore
     except googlemaps.exceptions.ApiError as e:
         # Covers any Google-side rejection — quota, auth, upstream 5xx — not only a bad key; the
         # log line preserves what Google actually answered.
         log.warning("Google geocode API call failed", exc_info=e)
         raise IncorrectGeocodeKeyError() from e
+
+    try:
+        geocode_result = GeocodingResponse.model_validate(results[0])
     except IndexError, ValidationError:
         context.put_feature_metric(
             Feature.SET_TIMEZONE, name=MetricKey.ERROR, properties={"reason": "invalid_google_geocode_response"}

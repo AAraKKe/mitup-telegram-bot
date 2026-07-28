@@ -6,6 +6,7 @@ requires-python = ">=3.14"
 dependencies = [
     "aws-embedded-metrics==3.5.0",
     "rich==15.0.0",
+    "structlog==26.1.0",
     "mitup-core",
 ]
 

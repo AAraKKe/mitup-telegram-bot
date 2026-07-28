@@ -53,7 +53,7 @@ async def settings_timezone_text_message_handler(session: AsyncSession, update: 
     user = await guards.current_user(update, session)
     address = cast(str, guards.message(update).text)
 
-    if (new_timezone := timezone_api.get_timezone_by_address(address, context)) is None:
+    if (new_timezone := await timezone_api.get_timezone_by_address(address, context)) is None:
         log.warning("User provided an invalid timezone, retrying", user_id=user.db_id)
 
         view = MitupView(
@@ -91,7 +91,9 @@ async def settings_timezone_location_message_handler(session: AsyncSession, upda
     user = await guards.current_user(update, session)
     location = cast(Location, guards.message(update).location)
 
-    if (new_timezone := timezone_api.get_timezone_by_location(location.latitude, location.longitude, context)) is None:
+    if (
+        new_timezone := await timezone_api.get_timezone_by_location(location.latitude, location.longitude, context)
+    ) is None:
         log.warning("User provided an invalid location, retrying", user_id=user.db_id)
 
         view = MitupView(

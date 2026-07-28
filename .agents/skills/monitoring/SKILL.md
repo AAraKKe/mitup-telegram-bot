@@ -14,7 +14,7 @@ The bot uses [AWS Embedded Metrics Format (EMF)](https://docs.aws.amazon.com/Ama
 
 `MetricsClient` is the central metrics API. It accepts a `MetricsBackend` and optional `base_dimensions`, accumulates `MetricRecord` instances internally, and delegates emission to the backend.
 
-In handler contexts, `MitupContext` wraps `MetricsClient` and provides convenience methods (`emit_metric`, `put_feature_metric`, `with_time_metric`). The client is created per-request in `MitupContext.from_update()` and flushed after every handler invocation by `callback_with_metrics()` in the registry.
+In handler contexts, `MitupContext` wraps `MetricsClient` and provides convenience methods (`emit_metric`, `put_feature_metric`). The client is created per-request in `MitupContext.from_update()` and flushed after every handler invocation by `callback_with_metrics()` in the registry.
 
 ### MetricsBackend
 
@@ -129,16 +129,39 @@ context.put_feature_metric(Feature.JOIN_MEETING)
 context.put_feature_metric(Feature.SET_TIMEZONE, name=MetricKey.ERROR, properties={"reason": "invalid_google_geocode_response"})
 ```
 
-### `context.with_time_metric()`
+## Outbound calls
 
-Context manager that measures elapsed time and emits a `<prefix>Time` metric in milliseconds:
+Every outbound HTTP round-trip — Telegram, Patreon, Google Maps — is recorded once by
+`outbound_call` in `libs/monitoring/mitup_bot/monitoring/outbound.py`: one structlog line plus a
+`<Edge>Time`/`<Edge>Fault` pair, at the layer that makes one HTTP request. Do not add timing around
+`context.api.*`, around a `PatreonClient` method, or around a `googlemaps` call — a wrapper
+operation is zero or many round-trips, and timing it produces an unlabelled array nothing can
+attribute.
 
 ```python
-with context.with_time_metric("TelegramApi"):
-    await context.bot.send_message(...)
+with outbound_call(PATREON_EDGE, api_method, timeout_errors=(httpx.TimeoutException,)) as call:
+    response = await self._client.request(method, url, **kwargs)
+    call.status_code = response.status_code
 ```
 
-All Telegram API calls in `TelegramApi` already use this — do not add redundant timing around `context.api.*` calls.
+Three rules bind every edge:
+
+- **Never a URL, never a header, never a request body.** The Telegram Bot API embeds the token in
+  every URL, and a URL published as a metric dimension once put the production token into
+  CloudWatch for a week, unredactable for 15 months. `api_method` is derived by matching the
+  `bot<token>/` prefix (`libs/telegram/mitup_bot/request.py`) or passed in as a literal label; a
+  test asserts the token substring reaches neither plane.
+- **The method is a log field, never a dimension.** Per-method breakdown is
+  `stats avg(duration_ms), pct(duration_ms, 99) by api_method, outcome` over the line. An
+  `ApiMethod` dimension would mint one billed series per method and empty the dimensionless widget.
+- **`<Edge>Fault` counts what the peer failed to answer** — a raised call, or a 5xx. A 4xx is the
+  peer answering (a throttle, a rejected edit, a blocked user) and rides on the line's
+  `status_code`.
+
+The samples ride on whichever `MetricsClient` the invocation published via `bound_metrics_client`
+(the registry for the bot, `handle_maintainance` for events), so they join that flush window and
+inherit its correlation key instead of carrying properties of their own. A caller holding the
+client — `timezone_api`, which has the context in hand — passes it explicitly instead.
 
 ## Automatic handler metrics
 

@@ -11,8 +11,8 @@ from mitup_bot.custom_context import (
     fault_fields_from_update,
 )
 from mitup_bot.exceptions import ContextPropertyConversionError, ContextPropertyNotSetError
-from mitup_bot.monitoring import Feature, MetricUnit
-from tests.helpers import AnyFloat, StubMitupContext
+from mitup_bot.monitoring import Feature
+from tests.helpers import StubMitupContext
 from tests.helpers.monitoring import MetricAssertions
 
 
@@ -186,40 +186,6 @@ async def test_feature_metric_emitted_with_proper_dimension(context: StubMitupCo
     )
 
 
-async def test_timing_metrics(context: StubMitupContext, metrics: MetricAssertions):
-    with context.with_time_metric("MyMetric"):
-        pass
-
-    await context.flush_metrics()
-
-    metrics.assert_emitted(
-        name="MyMetricTime",
-        value=AnyFloat(),
-        unit=MetricUnit.MILLISECONDS,
-    )
-
-
-async def test_timing_metrics_omit_the_handler_identity(context: StubMitupContext, metrics: MetricAssertions):
-    context.prepare_handler_metrics({"HandlerProp": "HandlerValue"})
-
-    with context.with_time_metric("MyMetric"):
-        pass
-
-    await context.flush_metrics()
-
-    # A timed call is not the handler invocation: the timing series stays dimensionless and free of
-    # the handler identity, which the handler's own metrics carry.
-    metrics.assert_emitted(
-        name="MyMetricTime",
-        value=AnyFloat(),
-        unit=MetricUnit.MILLISECONDS,
-        dimensions={},
-        dimensions_exact=True,
-    )
-    metrics.assert_not_emitted(name="MyMetricTime", properties={"HandlerProp": "HandlerValue"})
-    metrics.assert_not_emitted(name="MyMetricFault", properties={"HandlerProp": "HandlerValue"})
-
-
 def test_prepare_handler_metrics_empty_dict_is_noop(context: StubMitupContext):
     # Passing an empty dict must not alter _handler_properties
     context.prepare_handler_metrics({})
@@ -250,58 +216,6 @@ async def test_emit_metric_attaches_handler_identity_as_properties_not_dimension
     )
     # And no record ever carries the handler identity as a dimension.
     metrics.assert_not_emitted(name="handler_metric", dimensions={"Handler": "SomeHandler"})
-
-
-async def test_timing_metrics_success_emits_fault_zero(context: StubMitupContext, metrics: MetricAssertions):
-    with context.with_time_metric("MyMetric"):
-        pass
-
-    await context.flush_metrics()
-
-    metrics.assert_emitted(
-        name="MyMetricTime",
-        value=AnyFloat(),
-        unit=MetricUnit.MILLISECONDS,
-    )
-    metrics.assert_emitted(name="MyMetricFault", value=0)
-
-
-async def test_timing_metrics_emit_even_when_the_timed_call_raises(
-    context: StubMitupContext, metrics: MetricAssertions
-):
-    with pytest.raises(ValueError, match="boom"):
-        with context.with_time_metric("MyMetric"):
-            raise ValueError("boom")
-
-    await context.flush_metrics()
-
-    metrics.assert_emitted(
-        name="MyMetricTime",
-        value=AnyFloat(),
-        unit=MetricUnit.MILLISECONDS,
-    )
-    metrics.assert_emitted(name="MyMetricFault", value=1)
-
-
-async def test_timing_metrics_keep_each_call_outcome_on_its_own_fault_sample(
-    context: StubMitupContext, metrics: MetricAssertions
-):
-    # A flush window batches every dimensionless emission into one EMF document, where values
-    # accumulate into an array but properties overwrite. The per-call outcome must therefore live
-    # on the fault series — one 0/1 sample per call — and never on a property of the timing metric.
-    with context.with_time_metric("MyMetric"):
-        pass
-    with pytest.raises(ValueError, match="boom"):
-        with context.with_time_metric("MyMetric"):
-            raise ValueError("boom")
-
-    await context.flush_metrics()
-
-    metrics.assert_emitted(name="MyMetricFault", value=0, times=1)
-    metrics.assert_emitted(name="MyMetricFault", value=1, times=1)
-    metrics.assert_emitted(name="MyMetricTime", unit=MetricUnit.MILLISECONDS, times=2)
-    for outcome in (True, False):
-        metrics.assert_not_emitted(name="MyMetricTime", properties={"Success": outcome})
 
 
 async def test_user_data_mutations_emit_no_metrics(context: StubMitupContext, metrics: MetricAssertions):

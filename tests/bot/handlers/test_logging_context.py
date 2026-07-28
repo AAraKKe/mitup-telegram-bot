@@ -11,7 +11,10 @@ from mitup_bot.handlers.command_enums import CommandsId
 from mitup_bot.handlers.inline_query.enums import InlineQueryId
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.handlers.registry import callback_with_metrics, handler_log_context
-from tests.helpers import StubMitupApp, StubMitupContext, build_context
+from mitup_bot.monitoring import MetricsClient, MetricUnit, current_metrics_client
+from mitup_bot.monitoring.outbound import TELEGRAM_EDGE, outbound_call
+from tests.helpers import AnyFloat, StubMitupApp, StubMitupContext, build_context
+from tests.helpers.monitoring import MetricAssertions
 
 # The default `update`/`tg_*` fixtures resolve effective_user.id, effective_chat.id and
 # update_id all to 123 (DEFAULT_USER_ID / DEFAULT_CHAT_ID / DEFAULT_MESSAGE_ID).
@@ -133,3 +136,35 @@ def test_context_log_returns_usable_logger(update: Update, app: StubMitupApp):
     matches = [log for log in logs if log["event"] == "from context.log"]
     assert len(matches) == 1
     assert matches[0]["custom_field"] == "value"
+
+
+async def test_outbound_samples_join_the_invocation_flush_window(
+    update: Update,
+    app: StubMitupApp,
+    mock_session: object,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+):
+    """The outbound instrumentation lives inside PTB's request object, which no handler can hand a
+    context to. It finds the invocation's client through the ambient binding, so its samples land
+    on the same records as the handler's own — carrying the update_id already set on them."""
+    context = build_context(update, app, metrics=metrics_client)
+
+    async def callback(_update: Update, _context: StubMitupContext):
+        with outbound_call(TELEGRAM_EDGE, "sendMessage", log_call=False) as call:
+            call.status_code = 200
+
+    wrapped = callback_with_metrics(LoggingTestId.SOME_HANDLER, "Command", callback, Env.PROD)
+
+    await wrapped(update, context)
+
+    metrics.assert_emitted(name="TelegramApiTime", value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+    metrics.assert_emitted(name="TelegramApiFault", value=0, times=1)
+
+    # The binding is restored on exit, exactly as bound_contextvars is, because PTB reuses the
+    # worker task across updates: a call made after the invocation returned must not be attributed
+    # to the client it already flushed.
+    assert current_metrics_client() is None
+    with outbound_call(TELEGRAM_EDGE, "getMe", log_call=False) as call:
+        call.status_code = 200
+    metrics.assert_emitted(name="TelegramApiTime", value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)

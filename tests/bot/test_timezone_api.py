@@ -1,4 +1,3 @@
-import asyncio
 from unittest import mock
 
 import googlemaps
@@ -59,11 +58,11 @@ def reset_clients():
     timezone_api.__timezone_client = None
 
 
-def assert_time_metrics_emitted(context: StubMitupContext, metrics: MetricAssertions, *metric_names: str):
-    asyncio.run(context.metrics.flush())
+async def assert_google_calls_timed(context: StubMitupContext, metrics: MetricAssertions, times: int):
+    await context.metrics.flush()
 
-    for name in metric_names:
-        metrics.assert_emitted(name=name, value=AnyFloat(), unit=MetricUnit.MILLISECONDS)
+    metrics.assert_emitted(name="GoogleApiTime", value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=times)
+    metrics.assert_emitted(name="GoogleApiFault", value=0, times=times)
 
 
 def test_configure_fails_with_incorrect_keys(gmaps_client):
@@ -95,7 +94,7 @@ def test_configure_success(gmaps_client):
     gmaps_client.call_args_list[1].assert_called_with(key="timezone_key")
 
 
-def test_get_timezone_by_address_success(
+async def test_get_timezone_by_address_success(
     geocode_client,
     timezone_client,
     caplog: pytest.LogCaptureFixture,
@@ -105,7 +104,7 @@ def test_get_timezone_by_address_success(
     geocode_client.geocode.return_value = COORDIDATES_FROM_LOCATION
     timezone_client.timezone.return_value = {"timeZoneId": "America/New_York"}
 
-    timezone = timezone_api.get_timezone_by_address("New York", context)
+    timezone = await timezone_api.get_timezone_by_address("New York", context)
 
     geocode_client.geocode.assert_called_once_with("New York")
     timezone_client.timezone.assert_called_once_with(
@@ -115,39 +114,40 @@ def test_get_timezone_by_address_success(
         )
     )
     assert timezone == "America/New_York"
-    assert not caplog.text
+    # The two round-trips log at INFO; a resolved address must produce no warning.
+    assert [record for record in caplog.records if record.levelname == "WARNING"] == []
 
-    assert_time_metrics_emitted(context, metrics, "GoogleGeocodeApiTime", "GoogleTimeZoneApiTime")
+    await assert_google_calls_timed(context, metrics, times=2)
 
 
-def test_get_timezone_by_address_raises_with_missing_geocode_client(context: StubMitupContext):
+async def test_get_timezone_by_address_raises_with_missing_geocode_client(context: StubMitupContext):
     with pytest.raises(GeocodeClientNotConfiguredError):
-        timezone_api.get_timezone_by_address("New York", context)
+        await timezone_api.get_timezone_by_address("New York", context)
 
 
-def test_get_timezone_by_address_raises_with_missing_timezone_client(
+async def test_get_timezone_by_address_raises_with_missing_timezone_client(
     geocode_client, context: StubMitupContext, metrics: MetricAssertions
 ):
     geocode_client.geocode.return_value = COORDIDATES_FROM_LOCATION
 
     with pytest.raises(TimezoneClientNotConfiguredError):
-        timezone_api.get_timezone_by_address("New York", context)
+        await timezone_api.get_timezone_by_address("New York", context)
 
     geocode_client.geocode.assert_called_once_with("New York")
 
-    assert_time_metrics_emitted(context, metrics, "GoogleGeocodeApiTime")
+    await assert_google_calls_timed(context, metrics, times=1)
 
 
-def test_get_timezone_by_address_returns_none_when_geocode_finds_nothing(
+async def test_get_timezone_by_address_returns_none_when_geocode_finds_nothing(
     timezone_client, geocode_client, context: StubMitupContext, metrics: MetricAssertions
 ):
     """Text that Google cannot geocode is a user-input problem: None, so callers can re-prompt."""
     geocode_client.geocode.return_value = []
 
-    assert timezone_api.get_timezone_by_address("Hii", context) is None
+    assert await timezone_api.get_timezone_by_address("Hii", context) is None
 
     timezone_client.timezone.assert_not_called()
-    asyncio.run(context.metrics.flush())
+    await context.metrics.flush()
     metrics.assert_emitted(
         name=MetricKey.ERROR,
         dimensions={"Feature": str(Feature.SET_TIMEZONE)},
@@ -157,28 +157,28 @@ def test_get_timezone_by_address_returns_none_when_geocode_finds_nothing(
     )
 
 
-def test_get_timezone_by_location_success(timezone_client, context: StubMitupContext, metrics: MetricAssertions):
+async def test_get_timezone_by_location_success(timezone_client, context: StubMitupContext, metrics: MetricAssertions):
     timezone_client.timezone.return_value = {"timeZoneId": "America/Los_Angeles"}
 
-    timezone = timezone_api.get_timezone_by_location(34.0522, -118.2437, context)
+    timezone = await timezone_api.get_timezone_by_location(34.0522, -118.2437, context)
 
     assert timezone == "America/Los_Angeles"
 
-    assert_time_metrics_emitted(context, metrics, "GoogleTimeZoneApiTime")
+    await assert_google_calls_timed(context, metrics, times=1)
 
 
-def test_get_timezone_by_location_raises_with_missing_timezone_client(context: StubMitupContext):
+async def test_get_timezone_by_location_raises_with_missing_timezone_client(context: StubMitupContext):
     with pytest.raises(TimezoneClientNotConfiguredError):
-        timezone_api.get_timezone_by_location(34.0522, -118.2437, context)
+        await timezone_api.get_timezone_by_location(34.0522, -118.2437, context)
 
 
-def test_get_timezone_by_location_raise_incorrect_timezone_key_error(timezone_client, context: StubMitupContext):
+async def test_get_timezone_by_location_raise_incorrect_timezone_key_error(timezone_client, context: StubMitupContext):
     error = googlemaps.exceptions.ApiError(404)
     timezone_client.timezone.side_effect = error
 
     with capture_logs() as logs:
         with pytest.raises(IncorrectTimezoneKeyError):
-            timezone_api.get_timezone_by_location(34.0522, -118.2437, context)
+            await timezone_api.get_timezone_by_location(34.0522, -118.2437, context)
 
     # The Google response detail is preserved in a log line — the raised error alone reads as a
     # key problem even when the cause is quota/auth/upstream.
@@ -188,13 +188,13 @@ def test_get_timezone_by_location_raise_incorrect_timezone_key_error(timezone_cl
     assert warnings[0]["exc_info"] is error
 
 
-def test_get_coordinates_raise_incorrect_geocode_key_error(geocode_client, context: StubMitupContext):
+async def test_get_coordinates_raise_incorrect_geocode_key_error(geocode_client, context: StubMitupContext):
     error = googlemaps.exceptions.ApiError(404)
     geocode_client.geocode.side_effect = error
 
     with capture_logs() as logs:
         with pytest.raises(IncorrectGeocodeKeyError):
-            timezone_api.get_coordinates("New York", context)
+            await timezone_api.get_coordinates("New York", context)
 
     warnings = [entry for entry in logs if entry["event"] == "Google geocode API call failed"]
     assert len(warnings) == 1
@@ -202,14 +202,14 @@ def test_get_coordinates_raise_incorrect_geocode_key_error(geocode_client, conte
     assert warnings[0]["exc_info"] is error
 
 
-def test_get_timezone_by_location_returns_none_when_coordinates_map_to_no_zone(
+async def test_get_timezone_by_location_returns_none_when_coordinates_map_to_no_zone(
     timezone_client, context: StubMitupContext, metrics: MetricAssertions
 ):
     timezone_client.timezone.return_value = None
 
-    assert timezone_api.get_timezone_by_location(34.0522, -118.2437, context) is None
+    assert await timezone_api.get_timezone_by_location(34.0522, -118.2437, context) is None
 
-    asyncio.run(context.metrics.flush())
+    await context.metrics.flush()
     metrics.assert_emitted(
         name=MetricKey.ERROR,
         dimensions={"Feature": str(Feature.SET_TIMEZONE)},
@@ -219,19 +219,19 @@ def test_get_timezone_by_location_returns_none_when_coordinates_map_to_no_zone(
     )
 
 
-def test_get_coordinates_raises_with_missing_geocode_client(context: StubMitupContext):
+async def test_get_coordinates_raises_with_missing_geocode_client(context: StubMitupContext):
     with pytest.raises(GeocodeClientNotConfiguredError):
-        timezone_api.get_coordinates("New York", context)
+        await timezone_api.get_coordinates("New York", context)
 
 
-def test_get_coordinates_returns_none_when_no_results(
+async def test_get_coordinates_returns_none_when_no_results(
     geocode_client, context: StubMitupContext, metrics: MetricAssertions
 ):
     geocode_client.geocode.return_value = []
 
-    assert timezone_api.get_coordinates("Invalid address", context) is None
+    assert await timezone_api.get_coordinates("Invalid address", context) is None
 
-    asyncio.run(context.metrics.flush())
+    await context.metrics.flush()
     metrics.assert_emitted(
         name=MetricKey.ERROR,
         dimensions={"Feature": str(Feature.SET_TIMEZONE)},
@@ -241,14 +241,14 @@ def test_get_coordinates_returns_none_when_no_results(
     )
 
 
-def test_get_coordinates_returns_none_when_response_shape_is_unparseable(
+async def test_get_coordinates_returns_none_when_response_shape_is_unparseable(
     geocode_client, context: StubMitupContext, metrics: MetricAssertions
 ):
     geocode_client.geocode.return_value = [{"geometry": {"location": {"lat": "not-a-number"}}}]
 
-    assert timezone_api.get_coordinates("New York", context) is None
+    assert await timezone_api.get_coordinates("New York", context) is None
 
-    asyncio.run(context.metrics.flush())
+    await context.metrics.flush()
     metrics.assert_emitted(
         name=MetricKey.ERROR,
         dimensions={"Feature": str(Feature.SET_TIMEZONE)},

@@ -24,7 +24,14 @@ from mitup_bot.events import (
 )
 from mitup_bot.logging_config import Component, configure_logging
 from mitup_bot.models import configure_token_encryption
-from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, configure_emf_backend
+from mitup_bot.monitoring import (
+    EmfBackend,
+    MetricKey,
+    MetricsClient,
+    MetricUnit,
+    bound_metrics_client,
+    configure_emf_backend,
+)
 from mitup_bot.request import build_telegram_request
 
 log = structlog.get_logger(__name__)
@@ -159,7 +166,13 @@ async def handle_maintainance(
 
     start_time = perf_counter()
     fault = False
-    with structlog.contextvars.bound_contextvars(flow=event_type.value, event_type=event_type.value, run_id=run_id):
+    # Publishing the run's client makes the outbound-call instrumentation — inside PTB's request
+    # object and inside the Patreon client, neither of which is reachable from here — emit into
+    # this run's flush window, so its samples inherit the run_id already on these records.
+    with (
+        structlog.contextvars.bound_contextvars(flow=event_type.value, event_type=event_type.value, run_id=run_id),
+        bound_metrics_client(client),
+    ):
         try:
             db.set_connection_context(event_type.value)
             await dispatch_event(event_type, api, client, admin_tg_ids)

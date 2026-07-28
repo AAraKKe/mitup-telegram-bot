@@ -32,7 +32,7 @@ from mitup_bot.custom_context import MitupContext
 from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.mitup_types import HandlerCallback, TMitupContext
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, bound_metrics_client
 from mitup_bot.monitoring.units import MetricUnit
 
 from .error_handler import FaultOutcome, fault_error_type
@@ -65,7 +65,13 @@ def callback_with_metrics(
         # exit so fields never leak into the next update handled by PTB's reused worker task.
         # merge_contextvars then injects them into every log line emitted downstream — including
         # the metrics and error-handler logs below, which is why they run inside this block.
-        with structlog.contextvars.bound_contextvars(**handler_log_context(handler_id, handler_type, update)):
+        # Publishing the invocation's client makes the outbound-call instrumentation — which sits
+        # inside PTB's request object, far below anything that could be handed a context — emit
+        # into this flush window, so its samples inherit the update_id already on these records.
+        with (
+            structlog.contextvars.bound_contextvars(**handler_log_context(handler_id, handler_type, update)),
+            bound_metrics_client(context.metrics),
+        ):
             start = perf_counter()
             return_value = None
             outcome = FaultOutcome(0)

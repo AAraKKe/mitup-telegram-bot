@@ -221,6 +221,12 @@ class BotConfig(BaseModel):
     api_write_timeout: float = Field(default=2.0, gt=0)
     api_media_write_timeout: float = Field(default=20.0, gt=0)
     api_connection_pool_size: int = Field(default=256, ge=1)
+    # Whether every outbound Telegram round-trip writes its own log line. On by default and read
+    # once when the request object is built. It is the only emitter in the bot whose rate is set
+    # by a third party's fan-out rather than by our own traffic — a widely-shared meeting turns one
+    # update into an unbounded number of edits — so it is the one that gets a switch. The timing
+    # and fault samples are never gated: a series with holes in it cannot be alarmed on.
+    api_call_log_enabled: bool = True
     # Proactive per-second send cap for the dedicated broadcast bot instance. Broadcasts are the
     # highest-rate, least time-sensitive traffic; a low cap keeps their fan-out from competing with
     # time-sensitive events (e.g. meeting reminders) for the shared limiter budget and makes a
