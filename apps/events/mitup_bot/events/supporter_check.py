@@ -30,7 +30,13 @@ from mitup_bot.models import SupporterSubscription, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricsClient, MetricUnit
 from mitup_bot.patreon import PatreonClient
-from mitup_bot.patreon.creator_token import TokenRefresher, load_creator_state, seed_fingerprint, store_creator_token
+from mitup_bot.patreon.creator_token import (
+    REFRESH_REMEDIATION,
+    TokenRefresher,
+    load_creator_state,
+    seed_fingerprint,
+    store_creator_token,
+)
 from mitup_bot.patreon.models import MemberResource
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.messages import SupporterNotificationMessages
@@ -185,8 +191,10 @@ async def refresh_creator_token(
         log.error(
             "Patreon creator token refresh rejected, re-seed required",
             reason="invalid_grant",
+            source=str(state.source),
             fallback_expiration=fallback,
             ttl_days=stored_ttl_days,
+            remediation=REFRESH_REMEDIATION,
         )
         metrics.emit(CREATOR_TOKEN_TTL_METRIC, stored_ttl_days, MetricUnit.NONE)
         # This branch returns without raising, so the framework Fault never fires for it — this

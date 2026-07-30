@@ -26,7 +26,7 @@ import hmac
 import html
 import uuid
 from dataclasses import dataclass
-from enum import Enum, auto
+from enum import Enum, StrEnum, auto
 from pathlib import Path
 from string import Template
 from typing import Annotated
@@ -49,7 +49,7 @@ from mitup_bot.patreon import PatreonClient, oauth, pairing, webhooks
 from mitup_bot.patreon.client import MEMBER_DELETE_TRIGGER
 from mitup_bot.patreon.models import MemberResource, WebhookMemberPayload
 from mitup_bot.patreon.pending_links import stage_pending_link
-from mitup_bot.patreon_link import SUPPORT_GRACE_DAYS, readmit_to_hosts_group
+from mitup_bot.patreon_link import SUPPORT_GRACE_DAYS, HostsGroupTrigger, readmit_to_hosts_group
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.messages import SupporterNotificationMessages
 from mitup_bot.web.dependencies import get_metrics_client, get_ptb_application
@@ -466,30 +466,84 @@ class WebhookApplied(Enum):
     UNCHANGED = auto()
 
 
-def verify_signature(secret: str | None, raw_body: bytes, signature: str | None) -> bool:
+class SignatureVerdict(StrEnum):
+    """How a delivery's signature check ended. The three failures are one 403 to the caller and three
+    different operator answers: we never registered a webhook, somebody is probing us unsigned, or a
+    signed request did not match our key."""
+
+    VALID = "valid"
+    NO_SECRET_REGISTERED = "no_secret_registered"
+    MISSING_SIGNATURE_HEADER = "missing_signature_header"
+    DIGEST_MISMATCH = "digest_mismatch"
+
+
+class LevelReason(StrEnum):
+    """Which rule decided the tier a membership event maps to."""
+
+    DELETE_TRIGGER = "delete_trigger"
+    NOT_ACTIVE_PATRON = "not_active_patron"
+    ENTITLED_AMOUNT = "entitled_amount"
+
+
+class ChangeReason(StrEnum):
+    """Why the applied transition landed where it did."""
+
+    ALREADY_AT_TARGET_LEVEL = "already_at_target_level"
+    NOTHING_TO_LOSE = "nothing_to_lose"
+    TIER_UPGRADE = "tier_upgrade"
+    TIER_DOWNGRADE = "tier_downgrade"
+    MEMBERSHIP_LOST_GRACE_OPENED = "membership_lost_grace_opened"
+
+
+@dataclass(frozen=True)
+class TargetLevel:
+    """The tier an event maps to, carrying the rule that chose it."""
+
+    level: SupporterLevel
+    reason: LevelReason
+
+
+@dataclass(frozen=True)
+class MembershipTransition:
+    """What applying an event changed, and why. ``UNCHANGED`` covers two unrelated situations — an
+    event landing on the tier the user already holds, and a loss for somebody with nothing to lose —
+    so the outcome alone cannot answer a support question about it."""
+
+    applied: WebhookApplied
+    reason: ChangeReason
+
+
+def signature_verdict(secret: str | None, raw_body: bytes, signature: str | None) -> SignatureVerdict:
     """Constant-time check of Patreon's ``X-Patreon-Signature`` (HMAC-MD5 of the exact raw body bytes).
 
     A missing secret (no webhook registered yet) or a missing header fails closed. MD5 is not our
     choice — it is the algorithm Patreon signs deliveries with — so this is not a security downgrade.
     """
     if secret is None:
-        return False
+        return SignatureVerdict.NO_SECRET_REGISTERED
+    if signature is None:
+        return SignatureVerdict.MISSING_SIGNATURE_HEADER
     expected = hmac.new(secret.encode(), raw_body, hashlib.md5).hexdigest()
-    return secret_header_matches(signature, expected)
+    if not secret_header_matches(signature, expected):
+        return SignatureVerdict.DIGEST_MISMATCH
+    return SignatureVerdict.VALID
 
 
-def target_level(trigger: str | None, member: MemberResource, config: PatreonConfig) -> SupporterLevel:
+def target_level(trigger: str | None, member: MemberResource, config: PatreonConfig) -> TargetLevel:
     """The tier a membership event maps to: NONE for a delete or any non-active member (a loss, which
     starts cancellation grace — see ``apply_membership_transition``), otherwise the tier their entitled
     amount reaches via the central policy."""
-    if trigger == MEMBER_DELETE_TRIGGER or not member.is_active_patron:
-        return SupporterLevel.NONE
-    return supporter.level_for_amount(member.attributes.currently_entitled_amount_cents, config)
+    if trigger == MEMBER_DELETE_TRIGGER:
+        return TargetLevel(SupporterLevel.NONE, LevelReason.DELETE_TRIGGER)
+    if not member.is_active_patron:
+        return TargetLevel(SupporterLevel.NONE, LevelReason.NOT_ACTIVE_PATRON)
+    level = supporter.level_for_amount(member.attributes.currently_entitled_amount_cents, config)
+    return TargetLevel(level, LevelReason.ENTITLED_AMOUNT)
 
 
 def apply_membership_transition(
     user: User, subscription: SupporterSubscription, target: SupporterLevel
-) -> WebhookApplied:
+) -> MembershipTransition:
     """Apply ``target`` to the user and reconcile the subscription runway. Returns what changed.
 
     A gain (``target`` is a paying tier) applies instantly: on a level change it refreshes the grace
@@ -502,24 +556,24 @@ def apply_membership_transition(
     if supporter.is_supporter(target):
         # Gain or between-tier change: apply the entitled tier instantly.
         if previous == target:
-            return WebhookApplied.UNCHANGED
+            return MembershipTransition(WebhookApplied.UNCHANGED, ChangeReason.ALREADY_AT_TARGET_LEVEL)
         user.supporter_level = target
         subscription.support_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=SUPPORT_GRACE_DAYS)
         subscription.expiration_notified = False
         if supporter.meets(previous, target):
             # A drop to a lower paying tier: adjust silently.
-            return WebhookApplied.DOWNGRADED
-        return WebhookApplied.UPGRADED
+            return MembershipTransition(WebhookApplied.DOWNGRADED, ChangeReason.TIER_DOWNGRADE)
+        return MembershipTransition(WebhookApplied.UPGRADED, ChangeReason.TIER_UPGRADE)
 
     # target is NONE: membership loss. Give our own grace rather than cutting perks now.
     if not supporter.is_supporter(previous):
         # Nothing to lose — the user is already at NONE.
-        return WebhookApplied.UNCHANGED
+        return MembershipTransition(WebhookApplied.UNCHANGED, ChangeReason.NOTHING_TO_LOSE)
     # Keep the current level (perks stay on) and let the daily job revoke when the window elapses.
     # expiration_notified=True so the daily due-flow revokes straight away rather than re-announcing grace.
     subscription.support_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=SUPPORT_GRACE_DAYS)
     subscription.expiration_notified = True
-    return WebhookApplied.GRACE_STARTED
+    return MembershipTransition(WebhookApplied.GRACE_STARTED, ChangeReason.MEMBERSHIP_LOST_GRACE_OPENED)
 
 
 async def notify_membership_change(api: TelegramApiWrapper, user: User, outcome: WebhookApplied):
@@ -555,7 +609,7 @@ async def apply_membership_event(
         return WebhookApplied.UNCHANGED
 
     config = patreon.current_config()
-    level = target_level(trigger, member, config)
+    target = target_level(trigger, member, config)
 
     async with db.begin_write(api) as session:
         subscription = (
@@ -583,25 +637,29 @@ async def apply_membership_event(
             return WebhookApplied.UNCHANGED
 
         previous_level = user.supporter_level
-        outcome = apply_membership_transition(user, subscription, level)
-        await notify_membership_change(api, user, outcome)
+        transition = apply_membership_transition(user, subscription, target.level)
+        await notify_membership_change(api, user, transition.applied)
         # Re-admit only on a genuine reactivation (was not a supporter, now is); tier-to-tier moves
         # between host levels leave any existing group membership untouched.
         if not supporter.is_supporter(previous_level) and supporter.is_supporter(user.supporter_level):
-            await readmit_to_hosts_group(api, user)
+            await readmit_to_hosts_group(api, user, trigger=HostsGroupTrigger.WEBHOOK)
         log.info(
             "Patreon webhook applied",
             stage="apply",
             trigger=trigger,
             patreon_user_id=patreon_user_id,
             tg_user_id=user.tg_user_id,
+            previous_level=previous_level.value,
             # The event's target tier and the user's actual level after applying it — these differ on a
             # loss, where we keep the level and open a grace window instead of dropping to the target.
-            target_level=level.value,
+            target_level=target.level.value,
             supporter_level=user.supporter_level.value,
-            outcome=outcome.name.lower(),
+            outcome=transition.applied.name.lower(),
+            level_reason=str(target.reason),
+            change_reason=str(transition.reason),
+            support_expiration=subscription.support_expiration,
         )
-        return outcome
+        return transition.applied
 
 
 @router.post("/patreon/webhook")
@@ -630,14 +688,17 @@ async def patreon_webhook(
         log.info("Patreon webhook received", stage="receive", trigger=trigger, signed=signature is not None)
 
         secret = await webhooks.load_webhook_secret()
-        if not verify_signature(secret, raw_body, signature):
+        verdict = signature_verdict(secret, raw_body, signature)
+        if verdict is not SignatureVerdict.VALID:
             metrics_client.emit(MetricKey.PATREON_WEBHOOK_FORBIDDEN)
             client_host = request.client.host if request.client is not None else "unknown"
             log.warning(
                 "Rejected Patreon webhook, invalid or missing signature",
                 stage="verify",
+                reason=str(verdict),
                 trigger=trigger,
                 client_host=client_host,
+                body_bytes=len(raw_body),
             )
             raise HTTPException(status_code=403)
         # Signature valid: emit the 0-baseline so FORBIDDEN is a continuous 0/1 series, not failure-only.

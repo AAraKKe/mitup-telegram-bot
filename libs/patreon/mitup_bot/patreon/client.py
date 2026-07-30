@@ -12,14 +12,16 @@ and it is also the shape persisted to / re-read from the DB and passed back into
 import datetime as dt
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any, Self
 
 import httpx
+import structlog
 from pydantic import BaseModel, ValidationError
 
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonApiError, PatreonTokenRevoked
-from mitup_bot.monitoring.outbound import PATREON_EDGE, outbound_call
+from mitup_bot.monitoring.outbound import PATREON_EDGE, outbound_call, qualified_type
 from mitup_bot.patreon.models import (
     IdentityResponse,
     MemberResource,
@@ -51,6 +53,49 @@ CAMPAIGN_MEMBERS_API_METHOD = "campaign_members"
 WEBHOOKS_API_METHOD = "webhooks"
 CREATE_WEBHOOK_API_METHOD = "create_webhook"
 UPDATE_WEBHOOK_API_METHOD = "update_webhook"
+# Endpoints whose response body *is* a credential. A pydantic ValidationError renders the input it
+# rejected, so chaining one from these would carry the access token into every traceback that prints
+# the cause; the failure is reported by its field paths instead.
+CREDENTIAL_API_METHODS = frozenset({TOKEN_API_METHOD})
+
+log = structlog.get_logger(__name__)
+
+
+class TokenGrantError(StrEnum):
+    """Why Patreon refused a token grant.
+
+    ``NON_JSON_ERROR_BODY`` is its own value because a revoked credential answers 400 and Patreon
+    does not always send a parseable body with it: folding it into ``UNEXPECTED_STATUS`` reports a
+    credential that needs re-seeding as a transient API failure.
+    """
+
+    INVALID_GRANT = "invalid_grant"
+    NON_JSON_ERROR_BODY = "non_json_error_body"
+    UNEXPECTED_STATUS = "unexpected_status"
+
+
+def classify_token_error(response: httpx.Response) -> TokenGrantError:
+    """Read the error body of a refused token grant to tell a revoked credential from anything else."""
+    if response.status_code != httpx.codes.BAD_REQUEST:
+        return TokenGrantError.UNEXPECTED_STATUS
+    try:
+        body = response.json()
+    except ValueError:
+        return TokenGrantError.NON_JSON_ERROR_BODY
+    if isinstance(body, dict) and body.get("error") == "invalid_grant":
+        return TokenGrantError.INVALID_GRANT
+    return TokenGrantError.UNEXPECTED_STATUS
+
+
+def validation_error_fields(error: Exception) -> list[str]:
+    """The dotted paths pydantic rejected, and only the paths.
+
+    A validation error also renders the input it saw, which for a token response is the access token,
+    so nothing derived from the values may reach a log line.
+    """
+    if not isinstance(error, ValidationError):
+        return []
+    return [".".join(str(part) for part in item["loc"]) for item in error.errors()]
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,7 +183,7 @@ class PatreonClient:
                 "fields[member]": "patron_status,currently_entitled_amount_cents",
             },
         )
-        return self._parse(IdentityResponse, response, "identity")
+        return self._parse(IdentityResponse, response, IDENTITY_API_METHOD)
 
     async def iter_campaign_members(self, access_token: str) -> AsyncIterator[MemberResource]:
         """Yield every member of the configured campaign, following Patreon's cursor pagination.
@@ -149,6 +194,8 @@ class PatreonClient:
         holding the whole list in memory.
         """
         cursor: str | None = None
+        pages = 0
+        members = 0
         while True:
             params = {
                 "include": "user",
@@ -162,11 +209,26 @@ class PatreonClient:
                 CAMPAIGN_MEMBERS_API_METHOD,
                 params=params,
             )
-            page = self._parse(MembersResponse, response, "campaign members")
+            page = self._parse(MembersResponse, response, CAMPAIGN_MEMBERS_API_METHOD)
+            pages += 1
+            members += len(page.data)
+            cursor = page.next_cursor
+            log.info(
+                "Fetched Patreon campaign member page",
+                page=pages,
+                members=len(page.data),
+                active=sum(member.is_active_patron for member in page.data),
+                has_next=cursor is not None,
+            )
             for member in page.data:
                 yield member
-            cursor = page.next_cursor
             if not cursor:
+                log.info(
+                    "Finished Patreon campaign member sweep",
+                    pages=pages,
+                    members=members,
+                    reason="cursor_exhausted",
+                )
                 return
 
     async def list_webhooks(self, access_token: str) -> list[WebhookResource]:
@@ -175,7 +237,7 @@ class PatreonClient:
         response = await self._get(
             "/webhooks", access_token, WEBHOOKS_API_METHOD, params={"fields[webhook]": WEBHOOK_FIELDS}
         )
-        return self._parse(WebhooksResponse, response, "webhooks").data
+        return self._parse(WebhooksResponse, response, WEBHOOKS_API_METHOD).data
 
     async def create_webhook(self, access_token: str, *, uri: str, triggers: Sequence[str]) -> WebhookResource:
         """Create a webhook on the configured campaign; the returned resource carries the secret."""
@@ -187,7 +249,7 @@ class PatreonClient:
             }
         }
         response = await self._post("/webhooks", access_token, CREATE_WEBHOOK_API_METHOD, json=body)
-        return self._parse(WebhookResponse, response, "create webhook").data
+        return self._parse(WebhookResponse, response, CREATE_WEBHOOK_API_METHOD).data
 
     async def update_webhook(
         self,
@@ -208,17 +270,33 @@ class PatreonClient:
             attributes["paused"] = paused
         body = {"data": {"type": "webhook", "id": webhook_id, "attributes": attributes}}
         response = await self._patch(f"/webhooks/{webhook_id}", access_token, UPDATE_WEBHOOK_API_METHOD, json=body)
-        return self._parse(WebhookResponse, response, "update webhook").data
+        return self._parse(WebhookResponse, response, UPDATE_WEBHOOK_API_METHOD).data
 
     async def _request_token(self, data: dict[str, str], *, revoke_on_invalid_grant: bool = False) -> TokenPair:
+        grant_type = data["grant_type"]
         response = await self._send(TOKEN_API_METHOD, "POST", TOKEN_URL, data=data)
-        is_bad_request = response.status_code == httpx.codes.BAD_REQUEST
-        if revoke_on_invalid_grant and is_bad_request and self._is_invalid_grant(response):
-            raise PatreonTokenRevoked
         if response.status_code != httpx.codes.OK:
+            reason = classify_token_error(response)
+            if revoke_on_invalid_grant and reason is TokenGrantError.INVALID_GRANT:
+                log.warning(
+                    "Patreon refused the token grant",
+                    grant_type=grant_type,
+                    status_code=response.status_code,
+                    reason=str(reason),
+                )
+                raise PatreonTokenRevoked
+            log.warning(
+                "Patreon token grant failed",
+                grant_type=grant_type,
+                status_code=response.status_code,
+                reason=str(reason),
+            )
             raise PatreonApiError(f"token endpoint returned {response.status_code}")
-        token = self._parse(TokenResponse, response, "token endpoint")
+        token = self._parse(TokenResponse, response, TOKEN_API_METHOD)
         expires_at = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=token.expires_in)
+        log.info(
+            "Patreon token grant succeeded", grant_type=grant_type, expires_in=token.expires_in, expires_at=expires_at
+        )
         return TokenPair(access_token=token.access_token, refresh_token=token.refresh_token, expires_at=expires_at)
 
     async def _get(
@@ -268,16 +346,17 @@ class PatreonClient:
         return response
 
     @staticmethod
-    def _parse[T: BaseModel](model: type[T], response: httpx.Response, context: str) -> T:
+    def _parse[T: BaseModel](model: type[T], response: httpx.Response, api_method: str) -> T:
         try:
             return model.model_validate(response.json())
         except (ValueError, ValidationError) as error:
-            raise PatreonApiError(f"{context} returned an unexpected body: {error}") from error
-
-    @staticmethod
-    def _is_invalid_grant(response: httpx.Response) -> bool:
-        try:
-            body = response.json()
-        except ValueError:
-            return False
-        return isinstance(body, dict) and body.get("error") == "invalid_grant"
+            log.error(
+                "Patreon response could not be parsed",
+                api_method=api_method,
+                reason="schema_mismatch",
+                error_type=qualified_type(error),
+                error_fields=validation_error_fields(error),
+                body_bytes=len(response.content),
+            )
+            cause = None if api_method in CREDENTIAL_API_METHODS else error
+            raise PatreonApiError(f"{api_method} returned an unexpected body") from cause

@@ -15,7 +15,8 @@ The pending-link row itself — staging, claiming, consuming, erasing — lives 
 """
 
 import datetime as dt
-from enum import Enum, auto
+from dataclasses import dataclass
+from enum import Enum, StrEnum, auto
 
 import structlog
 from sqlmodel import select
@@ -65,7 +66,35 @@ class RedemptionRefusal(Enum):
     PENDING_DELETION = auto()
 
 
-async def readmit_to_hosts_group(api: TelegramApiWrapper, user: User):
+class HostsGroupTrigger(StrEnum):
+    """Which path asked for a hosts-group readmission. Both reach the same two no-ops, and a
+    readmission that did not happen means something different depending on which one it was."""
+
+    LINK = "link"
+    WEBHOOK = "webhook"
+
+
+class LinkKind(StrEnum):
+    """Whether a confirmed link created this account's first subscription row or replaced one."""
+
+    FIRST_LINK = "first_link"
+    RELINK = "relink"
+
+
+@dataclass(frozen=True)
+class LinkedSubscription:
+    """The row a confirmed link wrote, with what it replaced.
+
+    ``previous_patreon_user_id`` is the identity the row carried before, which is the first thing a
+    duplicate-entitlement report needs and the only trace of it left after the update.
+    """
+
+    subscription: SupporterSubscription
+    kind: LinkKind
+    previous_patreon_user_id: str | None
+
+
+async def readmit_to_hosts_group(api: TelegramApiWrapper, user: User, *, trigger: HostsGroupTrigger):
     """Lift any hosts-only group ban so a re-activated host can request to join again.
 
     Idempotent: ``unban_chat_member(only_if_banned=True)`` is a no-op when the user was never banned.
@@ -75,12 +104,31 @@ async def readmit_to_hosts_group(api: TelegramApiWrapper, user: User):
     wrapper swallows Telegram failures."""
     chat_id = hosts_group.chat_id()
     if chat_id is None:
+        log.info(
+            "Skipping hosts-group readmission",
+            tg_user_id=user.tg_user_id,
+            reason="hosts_group_not_configured",
+            trigger=str(trigger),
+        )
         return
     was_banned = await api.is_chat_banned(chat_id, user.tg_user_id)
     await api.unban_chat_member(chat_id, user.tg_user_id, only_if_banned=True)
-    if was_banned:
-        await api.send_message_to_user(user, hosts_group_readmitted_view(user.lang, hosts_group.invite_url()))
-        log.info("Re-admitted host to the hosts-only group", tg_user_id=user.tg_user_id, chat_id=chat_id)
+    if not was_banned:
+        log.info(
+            "Skipping hosts-group readmission",
+            tg_user_id=user.tg_user_id,
+            chat_id=chat_id,
+            reason="user_was_not_banned",
+            trigger=str(trigger),
+        )
+        return
+    await api.send_message_to_user(user, hosts_group_readmitted_view(user.lang, hosts_group.invite_url()))
+    log.info(
+        "Re-admitted host to the hosts-only group",
+        tg_user_id=user.tg_user_id,
+        chat_id=chat_id,
+        trigger=str(trigger),
+    )
 
 
 async def withdraw_from_hosts_group(api: TelegramApiWrapper, user: User):
@@ -100,23 +148,38 @@ async def withdraw_from_hosts_group(api: TelegramApiWrapper, user: User):
     """
     chat_id = hosts_group.chat_id()
     if chat_id is None:
+        log.info("Skipping hosts-group withdrawal", tg_user_id=user.tg_user_id, reason="hosts_group_not_configured")
         return
     if await api.is_chat_admin(chat_id, user.tg_user_id):
-        log.info("Skipping hosts-group withdrawal for a group admin", tg_user_id=user.tg_user_id, chat_id=chat_id)
+        log.info(
+            "Skipping hosts-group withdrawal",
+            tg_user_id=user.tg_user_id,
+            chat_id=chat_id,
+            reason="user_is_group_admin",
+        )
         return
     was_member = await api.is_chat_member(chat_id, user.tg_user_id)
     if was_member:
         await api.ban_chat_member(chat_id, user.tg_user_id)
     await api.unban_chat_member(chat_id, user.tg_user_id, only_if_banned=True)
-    if was_member:
-        await api.send_message_to_user(user, hosts_group_removed_view(user.lang))
-        log.info("Removed unlinked user from the hosts-only group", tg_user_id=user.tg_user_id, chat_id=chat_id)
+    if not was_member:
+        log.info(
+            "Skipping hosts-group withdrawal",
+            tg_user_id=user.tg_user_id,
+            chat_id=chat_id,
+            reason="not_a_group_member",
+        )
+        return
+    await api.send_message_to_user(user, hosts_group_removed_view(user.lang))
+    log.info("Removed unlinked user from the hosts-only group", tg_user_id=user.tg_user_id, chat_id=chat_id)
 
 
-async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id: str) -> SupporterSubscription | None:
+async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id: str) -> LinkedSubscription | None:
     """Point ``user``'s subscription row at ``patreon_user_id``, or None if another account won it.
 
-    A re-link updates the existing row, so a returning user never has to unlink first.
+    A re-link updates the existing row, so a returning user never has to unlink first. Which of the
+    two happened, and what the row previously pointed at, is read before the write and returned:
+    the update overwrites the only copy of it.
 
     The read-side "already linked elsewhere" check upstream is a plain SELECT with no lock, so two
     confirmations for one Patreon account can both pass it. The unique index is the real arbiter, and
@@ -126,6 +189,8 @@ async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id
     existing = (
         await session.exec(select(SupporterSubscription).where(SupporterSubscription.user_id == user.db_id))
     ).first()
+    kind = LinkKind.FIRST_LINK if existing is None else LinkKind.RELINK
+    previous_patreon_user_id = existing.patreon_user_id if existing is not None else None
 
     def apply_link() -> SupporterSubscription:
         if existing is None:
@@ -133,7 +198,10 @@ async def upsert_subscription(session: AsyncSession, user: User, patreon_user_id
         existing.patreon_user_id = patreon_user_id
         return existing
 
-    return await racy_flush(session, apply_link, constraint=PATREON_USER_ID_UNIQUE_CONSTRAINT)
+    subscription = await racy_flush(session, apply_link, constraint=PATREON_USER_ID_UNIQUE_CONSTRAINT)
+    if subscription is None:
+        return None
+    return LinkedSubscription(subscription=subscription, kind=kind, previous_patreon_user_id=previous_patreon_user_id)
 
 
 async def link_patreon_account(
@@ -183,8 +251,8 @@ async def link_patreon_account(
         )
         return LinkOutcome.ALREADY_LINKED_ELSEWHERE
 
-    subscription = await upsert_subscription(session, user, patreon_user_id)
-    if subscription is None:
+    linked = await upsert_subscription(session, user, patreon_user_id)
+    if linked is None:
         # Lost the uniqueness race: another account committed this Patreon id first. Nothing on this
         # user has been touched yet, so there is nothing to undo.
         log.warning(
@@ -197,6 +265,7 @@ async def link_patreon_account(
         )
         return LinkOutcome.ALREADY_LINKED_ELSEWHERE
 
+    subscription = linked.subscription
     if supporter.is_supporter(granted_level):
         user.supporter_level = granted_level
         subscription.support_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=SUPPORT_GRACE_DAYS)
@@ -216,10 +285,12 @@ async def link_patreon_account(
         tg_user_id=user.tg_user_id,
         patreon_user_id=patreon_user_id,
         supporter_level=granted_level.value,
+        link_kind=str(linked.kind),
+        previous_patreon_user_id=linked.previous_patreon_user_id,
     )
     # The confirmation DM carries a Main-menu button so the user is never stranded on a
     # button-less message.
     await api.send_message_to_user(user, link_confirmation_view(message.get(lang=user.lang), user.lang))
     if outcome is LinkOutcome.LINKED_SUPPORTER:
-        await readmit_to_hosts_group(api, user)
+        await readmit_to_hosts_group(api, user, trigger=HostsGroupTrigger.LINK)
     return outcome

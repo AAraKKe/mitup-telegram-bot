@@ -8,6 +8,8 @@ import datetime as dt
 
 import pytest
 from sqlmodel import select
+from structlog.testing import capture_logs
+from structlog.typing import EventDict
 
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonTokenRevoked
@@ -77,3 +79,86 @@ async def test_acquire_returns_none_on_invalid_grant(mock_session: MockDbSession
     assert access_token is None
     # A rejected refresh must not persist anything.
     assert not any(isinstance(obj, PatreonCreatorToken) for obj in mock_session.objects_added)
+
+
+def one_log(logs: list[EventDict], event: str) -> EventDict:
+    """Return the single captured structlog entry whose event string matches ``event``."""
+    matching = [entry for entry in logs if entry["event"] == event]
+    assert len(matching) == 1, f"expected exactly one {event!r} log, got {len(matching)}"
+    return matching[0]
+
+
+async def test_source_selection_names_why_the_seed_won_on_a_fresh_boot(
+    mock_session: MockDbSession, config: PatreonConfig
+):
+    mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
+
+    with capture_logs() as logs:
+        await acquire_creator_access_token(FakeRefresher(), config)
+
+    selected = one_log(logs, "Selected Patreon creator token source")
+    assert (selected["source"], selected["reason"]) == ("config_seed", "no_stored_row")
+    # The fingerprint is a hash of a live credential, so only its head reaches the line.
+    assert selected["seed_fingerprint"] == seed_fingerprint(config)[:12]
+    assert one_log(logs, "Stored rotated Patreon creator token")["action"] == "insert"
+    assert one_log(logs, "Acquired Patreon creator access token")["source"] == "config_seed"
+
+
+async def test_source_selection_reports_an_operator_reseed(mock_session: MockDbSession, config: PatreonConfig):
+    # The one decision that says whether a re-seed took effect: a stored row whose fingerprint no
+    # longer matches config is abandoned in favour of the freshly seeded pair.
+    row = create_patreon_creator_token(access_token="db-access", refresh_token="db-refresh", seed_fingerprint="stale")
+    mock_session.add_objects_with_statement(select(PatreonCreatorToken), (row,))
+    # The row is rotated in place, so the expiry both lines report has to be read before the write.
+    superseded_expiration = row.token_expiration
+
+    with capture_logs() as logs:
+        await acquire_creator_access_token(FakeRefresher(), config)
+
+    selected = one_log(logs, "Selected Patreon creator token source")
+    assert (selected["source"], selected["reason"]) == ("config_seed", "seed_fingerprint_changed")
+    assert selected["stored_expires_at"] == superseded_expiration
+    stored = one_log(logs, "Stored rotated Patreon creator token")
+    assert (stored["action"], stored["previous_expires_at"]) == ("update", superseded_expiration)
+
+
+async def test_source_selection_keeps_the_stored_pair_when_the_fingerprint_matches(
+    mock_session: MockDbSession, config: PatreonConfig
+):
+    row = create_patreon_creator_token(
+        access_token="db-access", refresh_token="db-refresh", seed_fingerprint=seed_fingerprint(config)
+    )
+    mock_session.add_objects_with_statement(select(PatreonCreatorToken), (row,))
+
+    with capture_logs() as logs:
+        await acquire_creator_access_token(FakeRefresher(), config)
+
+    selected = one_log(logs, "Selected Patreon creator token source")
+    assert (selected["source"], selected["reason"]) == ("database", "stored_fingerprint_matches")
+
+
+async def test_a_rejected_refresh_names_the_source_and_the_recovery(mock_session: MockDbSession, config: PatreonConfig):
+    row = create_patreon_creator_token(
+        access_token="db-access", refresh_token="db-refresh", seed_fingerprint=seed_fingerprint(config)
+    )
+    mock_session.add_objects_with_statement(select(PatreonCreatorToken), (row,))
+
+    with capture_logs() as logs:
+        assert await acquire_creator_access_token(FakeRefresher(revoked=frozenset({"db-refresh"})), config) is None
+
+    rejected = one_log(logs, "Patreon creator token refresh rejected, re-seed required")
+    assert (rejected["reason"], rejected["source"]) == ("invalid_grant", "database")
+    assert rejected["remediation"] == "reseed_from_developer_portal"
+    assert rejected["stored_expires_at"] == row.token_expiration
+
+
+async def test_no_creator_token_material_reaches_the_log_plane(mock_session: MockDbSession, config: PatreonConfig):
+    mock_session.add_objects_with_statement(select(PatreonCreatorToken), ())
+
+    with capture_logs() as logs:
+        await acquire_creator_access_token(FakeRefresher(), config)
+
+    rendered = repr(logs)
+    assert config.creator_access_token.get_secret_value() not in rendered
+    assert config.creator_refresh_token.get_secret_value() not in rendered
+    assert seed_fingerprint(config) not in rendered

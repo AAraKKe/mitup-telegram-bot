@@ -70,15 +70,18 @@ def refuse(context: TMitupContext, refusal: RedemptionRefusal, detail: str | Non
 
     ``detail`` narrows a refusal whose user-facing message is deliberately vague. Which branch fired
     varies per refusal, so it rides the log line rather than the record: EMF properties are
-    last-writer-wins across a flush window, and the counter itself is what alarms read. ``fields``
-    carries whatever else the caller can correlate the refusal with.
+    last-writer-wins across a flush window, and the counter itself is what alarms read. It is left
+    off the line entirely when the outcome already is the whole answer, so ``reason`` never carries a
+    null a query has to filter around. ``fields`` carries whatever else the caller can correlate the
+    refusal with.
     """
     context.put_feature_metric(Feature.PATREON_LINK, name=MetricKey.PATREON_LINK_REFUSED)
+    narrowing = {"reason": detail} if detail is not None else {}
     log.info(
         "Patreon link attempt refused",
         flow=patreon_link.LINK_FLOW,
         outcome=refusal.name.lower(),
-        reason=detail,
+        **narrowing,
         **fields,
     )
 

@@ -18,7 +18,13 @@ from mitup_bot import patreon_link
 from mitup_bot.hosts_group import HostsGroupState
 from mitup_bot.models import SupporterSubscription
 from mitup_bot.models.users import UserStatus
-from mitup_bot.patreon_link import LinkOutcome, link_patreon_account, upsert_subscription, withdraw_from_hosts_group
+from mitup_bot.patreon_link import (
+    LinkKind,
+    LinkOutcome,
+    link_patreon_account,
+    upsert_subscription,
+    withdraw_from_hosts_group,
+)
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import CollaborateMessages, SupporterNotificationMessages
@@ -224,12 +230,14 @@ async def test_upsert_creates_subscription_when_absent():
     session = MockDbSession()
     user = create_user(id=1, tg_user_id=997_653)
 
-    subscription = await upsert_subscription(session, user, "p-653")
+    linked = await upsert_subscription(session, user, "p-653")
 
-    assert subscription is not None
-    assert subscription in session.objects_added
-    assert subscription.user_id == user.db_id
-    assert subscription.patreon_user_id == "p-653"
+    assert linked is not None
+    assert linked.subscription in session.objects_added
+    assert linked.subscription.user_id == user.db_id
+    assert linked.subscription.patreon_user_id == "p-653"
+    assert linked.kind is LinkKind.FIRST_LINK
+    assert linked.previous_patreon_user_id is None
 
 
 async def test_upsert_updates_in_place():
@@ -238,11 +246,15 @@ async def test_upsert_updates_in_place():
     existing = create_supporter_subscription(user_id=user.db_id, patreon_user_id="p-old")
     session.add_object(existing, "user_id")
 
-    result = await upsert_subscription(session, user, "p-654")
+    linked = await upsert_subscription(session, user, "p-654")
 
     # The same instance is mutated rather than replaced by a freshly constructed row.
-    assert result is existing
+    assert linked is not None
+    assert linked.subscription is existing
     assert existing.patreon_user_id == "p-654"
+    # The identity the row carried is captured before the update overwrites the only copy of it.
+    assert linked.kind is LinkKind.RELINK
+    assert linked.previous_patreon_user_id == "p-old"
 
 
 # --- Hosts-only group re-admit on (re)link ---
@@ -379,3 +391,48 @@ async def test_withdraw_noop_when_hosts_group_unconfigured(reset_hosts_group: No
     api.assert_method_just_called("ban_chat_member", times=0)
     api.assert_method_just_called("unban_chat_member", times=0)
     api.mock_method("is_chat_admin").assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "hosts_group_configured, banned, reason",
+    [
+        (False, False, "hosts_group_not_configured"),
+        (True, False, "user_was_not_banned"),
+    ],
+)
+async def test_a_readmission_that_did_not_happen_says_which_no_op_it_was(
+    reset_hosts_group: None, hosts_group_configured: bool, banned: bool, reason: str
+):
+    # Both no-ops are reached from the link flow and from the membership webhook, and only the
+    # positive case logged before — so "the host was never let back in" had no record either way.
+    if hosts_group_configured:
+        HostsGroupState.chat_id = HOSTS_GROUP_CHAT_ID
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_680)
+    api = MockApi()
+    api.register_on_method("is_chat_banned", return_value=banned)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await link_patreon_account(session, api, user, patreon_user_id="p-680", granted_level=SupporterLevel.HOST_2)
+
+    skipped = one_log(logs, "Skipping hosts-group readmission")
+    assert skipped["reason"] == reason
+    # Which path asked matters: the same no-op from the webhook is a different support answer.
+    assert skipped["trigger"] == "link"
+
+
+async def test_the_linked_line_says_whether_this_was_a_first_link_or_a_relink():
+    # A duplicate-entitlement report starts here: the update overwrites the only record of what the
+    # row previously pointed at.
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_681)
+    existing = create_supporter_subscription(user_id=user.db_id, patreon_user_id="p-previous")
+    session.add_object(existing, "user_id")
+    api = MockApi()
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await link_patreon_account(session, api, user, patreon_user_id="p-681", granted_level=SupporterLevel.HOST_2)
+
+    linked = one_log(logs, "Patreon account linked")
+    assert linked["link_kind"] == "relink"
+    assert linked["previous_patreon_user_id"] == "p-previous"

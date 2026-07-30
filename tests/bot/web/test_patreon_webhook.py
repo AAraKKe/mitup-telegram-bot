@@ -35,11 +35,14 @@ from mitup_bot.views.collaborate import hosts_group_readmitted_view
 from mitup_bot.web import patreon as web_patreon
 from mitup_bot.web.patreon import (
     SUPPORT_GRACE_DAYS,
+    ChangeReason,
+    LevelReason,
+    SignatureVerdict,
     WebhookApplied,
     apply_membership_event,
     apply_membership_transition,
+    signature_verdict,
     target_level,
-    verify_signature,
 )
 from tests.helpers import (
     MockApi,
@@ -108,27 +111,30 @@ def member_resource(patreon_user_id: str = "patreon-1", *, active: bool = True, 
 
 
 @pytest.mark.parametrize(
-    "secret, signature, ok",
+    "secret, signature, verdict",
     [
-        (SECRET, sign(SECRET, b"body"), True),
-        (SECRET, "deadbeef", False),
-        (SECRET, None, False),
-        (None, sign(SECRET, b"body"), False),
+        (SECRET, sign(SECRET, b"body"), SignatureVerdict.VALID),
+        (SECRET, "deadbeef", SignatureVerdict.DIGEST_MISMATCH),
+        (SECRET, None, SignatureVerdict.MISSING_SIGNATURE_HEADER),
+        (None, sign(SECRET, b"body"), SignatureVerdict.NO_SECRET_REGISTERED),
         # Header bytes >= 0x80 arrive latin-1-decoded; rejecting them must not raise.
-        (SECRET, "deadbee\xff", False),
+        (SECRET, "deadbee\xff", SignatureVerdict.DIGEST_MISMATCH),
     ],
 )
-def test_verify_signature(secret: str | None, signature: str | None, ok: bool):
-    assert verify_signature(secret, b"body", signature) is ok
+def test_signature_verdict(secret: str | None, signature: str | None, verdict: SignatureVerdict):
+    assert signature_verdict(secret, b"body", signature) is verdict
 
 
 def test_target_level_maps_amounts_and_cancellations(patreon_config: PatreonConfig):
-    assert target_level("members:update", member_resource(cents=100), patreon_config) is SupporterLevel.HOST_1
-    assert target_level("members:update", member_resource(cents=500), patreon_config) is SupporterLevel.HOST_2
-    assert target_level("members:update", member_resource(cents=1000), patreon_config) is SupporterLevel.HOST_3
-    # A delete or a non-active member is a cancellation regardless of amount.
-    assert target_level("members:delete", member_resource(cents=1000), patreon_config) is SupporterLevel.NONE
-    assert target_level("members:update", member_resource(active=False), patreon_config) is SupporterLevel.NONE
+    assert target_level("members:update", member_resource(cents=100), patreon_config).level is SupporterLevel.HOST_1
+    assert target_level("members:update", member_resource(cents=500), patreon_config).level is SupporterLevel.HOST_2
+    assert target_level("members:update", member_resource(cents=1000), patreon_config).level is SupporterLevel.HOST_3
+    # A delete or a non-active member is a cancellation regardless of amount, and the two are
+    # different operator answers: one is a cancellation, the other a pledge that stopped clearing.
+    deleted = target_level("members:delete", member_resource(cents=1000), patreon_config)
+    assert (deleted.level, deleted.reason) == (SupporterLevel.NONE, LevelReason.DELETE_TRIGGER)
+    lapsed = target_level("members:update", member_resource(active=False), patreon_config)
+    assert (lapsed.level, lapsed.reason) == (SupporterLevel.NONE, LevelReason.NOT_ACTIVE_PATRON)
 
 
 # --- Endpoint: signature + status-code contract (processing mocked) ---
@@ -501,9 +507,10 @@ def test_apply_transition_refreshes_grace_on_upgrade():
     user.supporter_level = SupporterLevel.NONE
     subscription = create_supporter_subscription(user_id=1, patreon_user_id="p-1", expiration_notified=True)
 
-    outcome = apply_membership_transition(user, subscription, SupporterLevel.HOST_2)
+    transition = apply_membership_transition(user, subscription, SupporterLevel.HOST_2)
 
-    assert outcome is WebhookApplied.UPGRADED
+    assert transition.applied is WebhookApplied.UPGRADED
+    assert transition.reason is ChangeReason.TIER_UPGRADE
     assert subscription.support_expiration is not None
     assert subscription.expiration_notified is False
 
@@ -515,13 +522,36 @@ def test_apply_transition_starts_grace_on_loss_and_keeps_level():
         user_id=1, patreon_user_id="p-1", support_expiration=dt.datetime.now(dt.UTC), expiration_notified=False
     )
 
-    outcome = apply_membership_transition(user, subscription, SupporterLevel.NONE)
+    transition = apply_membership_transition(user, subscription, SupporterLevel.NONE)
 
-    assert outcome is WebhookApplied.GRACE_STARTED
+    assert transition.applied is WebhookApplied.GRACE_STARTED
+    assert transition.reason is ChangeReason.MEMBERSHIP_LOST_GRACE_OPENED
     # The level is retained (perks stay on) and the runway is pushed out to the cancellation grace,
     # marked notified so the daily due-flow revokes rather than re-announcing grace.
     assert user.supporter_level is SupporterLevel.HOST_2
     assert_grace_window(subscription)
+
+
+@pytest.mark.parametrize(
+    "current, target, reason",
+    [
+        (SupporterLevel.HOST_2, SupporterLevel.HOST_2, ChangeReason.ALREADY_AT_TARGET_LEVEL),
+        (SupporterLevel.NONE, SupporterLevel.NONE, ChangeReason.NOTHING_TO_LOSE),
+    ],
+)
+def test_apply_transition_separates_the_two_unchanged_situations(
+    current: SupporterLevel, target: SupporterLevel, reason: ChangeReason
+):
+    # Both report UNCHANGED, but a repeated event for a patron already on their tier and a
+    # cancellation for somebody who never had one are different support answers.
+    user = create_user(id=1, tg_user_id=1)
+    user.supporter_level = current
+    subscription = create_supporter_subscription(user_id=1, patreon_user_id="p-1")
+
+    transition = apply_membership_transition(user, subscription, target)
+
+    assert transition.applied is WebhookApplied.UNCHANGED
+    assert transition.reason is reason
 
 
 # --- Hosts-only group re-admit on reactivation ---

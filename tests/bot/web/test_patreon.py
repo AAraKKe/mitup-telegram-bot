@@ -4,6 +4,7 @@ import re
 from collections.abc import AsyncIterator, Iterator
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
 from fastapi import FastAPI
 from freezegun import freeze_time
@@ -16,7 +17,7 @@ from mitup_bot.config import PatreonConfig, RunModes
 from mitup_bot.exceptions import PatreonApiError
 from mitup_bot.models import PatreonPendingLink
 from mitup_bot.monitoring import Feature, MetricKey
-from mitup_bot.patreon import PatreonRuntime, TokenPair, oauth, pairing
+from mitup_bot.patreon import PatreonClient, PatreonRuntime, TokenPair, oauth, pairing
 from mitup_bot.patreon.models import IdentityAttributes, IdentityData, IdentityResponse
 from mitup_bot.web import patreon as web_patreon
 from mitup_bot.web.patreon import (
@@ -621,3 +622,39 @@ async def test_callback_funnel_bare_hit_emits_nothing(ptb_app: MagicMock, patreo
 
     metrics.assert_not_emitted(name=MetricKey.FLOW_STARTED)
     metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
+
+
+async def test_an_endpoints_patreon_round_trips_land_on_the_requests_metrics_client(
+    ptb_app: MagicMock,
+    patreon_config: PatreonConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    staging_session: MockDbSession,
+):
+    # The web plane has no invocation wrapper of its own, so without the middleware publishing the
+    # client, every Patreon call behind an endpoint writes its line and drops its timing sample.
+    # Driving the real client through a mock transport is what makes the whole chain observable here.
+    metrics_client = make_test_metrics_client()
+    metrics = MetricAssertions(metrics_client)
+    web_app = build_test_web_app(ptb_app=ptb_app, run_mode=RunModes.WEBHOOK, metrics_client=metrics_client)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/token"):
+            return httpx.Response(
+                200, json={"access_token": "a", "refresh_token": "r", "expires_in": 3600, "token_type": "Bearer"}
+            )
+        return httpx.Response(200, json={"data": {"id": "patreon-1", "type": "user", "attributes": {}}})
+
+    monkeypatch.setattr(
+        web_patreon,
+        "PatreonClient",
+        lambda config: PatreonClient(config, transport=httpx.MockTransport(handler)),
+    )
+    state = oauth.encode_state(patreon_config)
+
+    async with build_web_client(web_app) as client:
+        response = await client.get("/patreon/callback", params={"code": "the-code", "state": state})
+
+    assert response.status_code == 200
+    # The code exchange and the identity read are two round-trips, each with its own sample.
+    metrics.assert_emitted(name="PatreonApiTime", times=2)
+    metrics.assert_emitted(name="PatreonApiFault", value=0, times=2)

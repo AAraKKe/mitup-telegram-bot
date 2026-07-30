@@ -378,3 +378,109 @@ async def test_every_round_trip_lands_a_line_naming_its_api_method():
     assert line["outcome"] == "ok"
     # The access token travels in a header; no part of the request target or its headers is recorded.
     assert "access-token" not in repr(logs)
+
+
+@pytest.mark.parametrize(
+    "status, body, reason",
+    [
+        (400, {"error": "invalid_grant"}, "invalid_grant"),
+        (400, None, "non_json_error_body"),
+        (400, {"error": "invalid_client"}, "unexpected_status"),
+        (502, None, "unexpected_status"),
+    ],
+)
+async def test_refused_token_grant_names_why_it_was_refused(status: int, body: dict | None, reason: str):
+    # A revoked credential answers 400 with a body Patreon does not always make parseable; reporting
+    # that as a generic API failure is what turns "re-seed the credential" into a mystery.
+    def handler(request: httpx.Request) -> httpx.Response:
+        if body is None:
+            return httpx.Response(status, text="<html>gateway</html>")
+        return httpx.Response(status, json=body)
+
+    config = create_patreon_config()
+    pair = TokenPair(access_token="a", refresh_token="r", expires_at=dt.datetime.now(dt.UTC))
+    with capture_logs() as logs:
+        async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises((PatreonApiError, PatreonTokenRevoked)):
+                await client.refresh(pair)
+
+    (line,) = [entry for entry in logs if entry["event"].startswith("Patreon token grant")] or [
+        entry for entry in logs if entry["event"] == "Patreon refused the token grant"
+    ]
+    assert line["reason"] == reason
+    assert line["grant_type"] == "refresh_token"
+
+
+async def test_a_malformed_token_response_never_carries_the_token_into_the_failure():
+    # The token endpoint's body *is* a credential, and a pydantic validation error renders the input
+    # it rejected. Neither the line nor the raised exception's cause chain may carry it.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"access_token": "super-secret-access", "expires_in": 3600})
+
+    config = create_patreon_config()
+    with capture_logs() as logs:
+        async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(PatreonApiError) as raised:
+                await client.exchange_code("the-code")
+
+    line = next(entry for entry in logs if entry["event"] == "Patreon response could not be parsed")
+    assert line["api_method"] == "token"
+    assert line["error_fields"] == ["refresh_token"]
+    assert "super-secret-access" not in repr(logs)
+    assert "super-secret-access" not in str(raised.value)
+    # `from None`: the ValidationError renders the whole body, so it must not survive as a cause.
+    assert raised.value.__cause__ is None
+
+
+async def test_a_malformed_non_credential_response_keeps_its_cause():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": "not-an-object"})
+
+    config = create_patreon_config()
+    async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(PatreonApiError) as raised:
+            await client.fetch_identity("access-token")
+
+    assert raised.value.__cause__ is not None
+
+
+def member_payload(member_id: str, patreon_user_id: str, *, active: bool) -> dict:
+    return {
+        "id": member_id,
+        "type": "member",
+        "attributes": {
+            "patron_status": "active_patron" if active else "former_patron",
+            "currently_entitled_amount_cents": 500 if active else 0,
+        },
+        "relationships": {"user": {"data": {"id": patreon_user_id, "type": "user"}}},
+    }
+
+
+async def test_campaign_sweep_reports_every_page_and_its_own_end():
+    # A sweep truncated mid-cursor silently under-counts active patrons and lapses real supporters,
+    # so the page tally and the terminating reason are the only way to tell a short sweep apart.
+    pages = [
+        {
+            "data": [member_payload("m1", "u1", active=True), member_payload("m2", "u2", active=False)],
+            "meta": {"pagination": {"cursors": {"next": "cursor-2"}}},
+        },
+        {"data": [member_payload("m3", "u3", active=True)], "meta": {"pagination": {"cursors": {"next": None}}}},
+    ]
+    served = iter(pages)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=next(served))
+
+    config = create_patreon_config()
+    with capture_logs() as logs:
+        async with PatreonClient(config, transport=httpx.MockTransport(handler)) as client:
+            collected = [member async for member in client.iter_campaign_members("creator-access")]
+
+    assert len(collected) == 3
+    page_lines = [entry for entry in logs if entry["event"] == "Fetched Patreon campaign member page"]
+    assert [(entry["page"], entry["members"], entry["active"], entry["has_next"]) for entry in page_lines] == [
+        (1, 2, 1, True),
+        (2, 1, 1, False),
+    ]
+    sweep = next(entry for entry in logs if entry["event"] == "Finished Patreon campaign member sweep")
+    assert (sweep["pages"], sweep["members"], sweep["reason"]) == (2, 3, "cursor_exhausted")

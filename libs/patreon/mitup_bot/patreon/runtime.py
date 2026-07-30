@@ -7,8 +7,12 @@ which have no direct config access of their own.
 
 from typing import ClassVar
 
+import structlog
+
 from mitup_bot.config import PatreonConfig
 from mitup_bot.exceptions import PatreonNotConfigured
+
+log = structlog.get_logger(__name__)
 
 
 class PatreonRuntime:
@@ -18,12 +22,17 @@ class PatreonRuntime:
 
 
 def configure(config: PatreonConfig):
-    """Inject the live Patreon config. Called once at startup."""
+    """Inject the live Patreon config. Called once at startup.
+
+    The entry points log the resolved Patreon facts as part of their startup narrative, so this
+    injection stays silent.
+    """
     PatreonRuntime.config = config
 
 
 def current_config() -> PatreonConfig:
     """Return the configured Patreon section, raising if the entry point never injected one."""
     if PatreonRuntime.config is None:
+        log.error("Patreon used before configuration", reason="patreon_not_configured")
         raise PatreonNotConfigured
     return PatreonRuntime.config

@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, Response
 from telegram.ext import Application
 
 from mitup_bot.config import RunModes
-from mitup_bot.monitoring.client import MetricsClient
+from mitup_bot.monitoring.client import MetricsClient, bound_metrics_client
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.patreon import webhooks as patreon_webhooks
 from mitup_bot.web import patreon, telegram
@@ -145,8 +145,13 @@ def create_app(
         # Endpoint emissions only buffer inside the client; without a per-request flush they
         # never reach CloudWatch and accumulate in memory for the process lifetime. The finally
         # covers error responses and unhandled endpoint exceptions alike.
+        #
+        # Publishing the client here is what lets an outbound call made deep inside an endpoint —
+        # the Patreon round-trips behind the OAuth callback and the membership webhook — land its
+        # timing sample in the window this request flushes, instead of finding no client at all.
         try:
-            return await call_next(request)
+            with bound_metrics_client(metrics_client):
+                return await call_next(request)
         finally:
             await metrics_client.flush()
 
