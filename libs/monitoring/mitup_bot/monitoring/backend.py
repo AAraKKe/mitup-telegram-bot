@@ -1,5 +1,6 @@
 import sys
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from typing import Any, Protocol, runtime_checkable
 
 from aws_embedded_metrics.config import get_config
@@ -27,6 +28,16 @@ class MitupMetricsLogger(MetricsLogger):
         super().__init__(resolve_environment, context)
 
     async def flush(self):
+        # An EMF document with an empty metrics array carries no datapoint, so a logger that
+        # received nothing since its last flush writes nothing: it would cost a CloudWatch
+        # ingestion and put a line in front of every Logs Insights query for no signal.
+        if not self.context.metrics:
+            # A context carries the timestamp it was built with, and only a serialized flush
+            # builds the next one. Refreshing it here bounds the timestamp of the next document
+            # that does carry metrics to one flush interval before its write, so an idle stretch
+            # cannot backdate a datapoint out of the window an alarm evaluates.
+            self.context.set_timestamp(datetime.now(UTC))
+            return
         await super().flush()
         # super().flush() swaps in a freshly-copied context whose __init__ re-enables default
         # dimensions and which inherits the LogGroup/ServiceName/ServiceType defaults that the

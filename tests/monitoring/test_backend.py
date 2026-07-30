@@ -1,6 +1,7 @@
 """Tests for the EmfBackend, MitupMetricsLogger, RichConsoleSink, and configure_emf_backend."""
 
 import json
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from aws_embedded_metrics.environment import Environment
@@ -37,6 +38,7 @@ def test_mitup_metrics_logger_init_disables_default_dimensions():
 async def test_mitup_metrics_logger_flush_calls_super_and_stdout():
     resolver = AsyncMock()
     logger = MitupMetricsLogger(resolver)
+    logger.put_metric("DbPoolConnectionsInUse", 1)
 
     with (
         patch.object(MetricsLogger, "flush", new_callable=AsyncMock) as mock_super_flush,
@@ -96,6 +98,107 @@ async def test_consecutive_flushes_never_leak_default_dimensions():
         payload = json.loads(line)
         leaked = default_dimension_keys & payload.keys()
         assert not leaked, f"default dimensions leaked into EMF payload: {sorted(leaked)}"
+
+
+def build_capturing_logger() -> tuple[MitupMetricsLogger, CapturingSink]:
+    """A logger wired exactly as `EmfBackend._prepare_logger` wires one, over a capturing sink."""
+    sink = CapturingSink()
+    environment = CapturingEnvironment(sink)
+
+    async def resolver() -> Environment:
+        return environment
+
+    logger = MitupMetricsLogger(resolver)
+    logger.set_dimensions(use_default=False)
+    logger.context.set_default_dimensions({})
+    logger.flush_preserve_dimensions = True
+    return logger, sink
+
+
+async def test_flush_serializes_the_whole_document_when_the_context_holds_metrics():
+    """The document a metric-bearing flush writes is what CloudWatch alarms and dashboard widgets
+    read, so it is pinned key by key: any change to the dimensions, namespace, properties or
+    values reaching the sink is a production incident and must fail here."""
+    logger, sink = build_capturing_logger()
+    logger.set_namespace("Mitup/Test")
+    logger.put_dimensions({"Feature": "DbPool"})
+    logger.set_property("run_id", "abc-123")
+    logger.put_metric("DbPoolConnectionsInUse", 3.0, "Count")
+
+    await logger.flush()
+
+    assert len(sink.serialized) == 1
+    payload = json.loads(sink.serialized[0])
+    timestamp = payload["_aws"].pop("Timestamp")
+    assert payload == {
+        "Feature": "DbPool",
+        "run_id": "abc-123",
+        "DbPoolConnectionsInUse": 3.0,
+        "_aws": {
+            "CloudWatchMetrics": [
+                {
+                    "Dimensions": [["Feature"]],
+                    "Metrics": [{"Name": "DbPoolConnectionsInUse", "Unit": "Count"}],
+                    "Namespace": "Mitup/Test",
+                }
+            ]
+        },
+    }
+    assert isinstance(timestamp, int)
+
+
+async def test_flush_writes_nothing_when_the_context_holds_no_metrics():
+    logger, sink = build_capturing_logger()
+    logger.put_dimensions({"Feature": "DbPool"})
+    logger.put_metric("DbPoolConnectionsInUse", 1)
+
+    await logger.flush()
+    await logger.flush()
+    await logger.flush()
+
+    assert len(sink.serialized) == 1
+
+
+async def test_default_dimensions_stay_off_across_a_skipped_flush():
+    """A flush that writes nothing leaves the context in place rather than replacing it with the
+    copy whose `__init__` re-enables the EMF defaults, so the re-assertion guarding issue #202
+    does not run. The next flush that does carry metrics must still serialize dimensionless."""
+    logger, sink = build_capturing_logger()
+    logger.put_dimensions({"Feature": "DbPool"})
+
+    logger.put_metric("DbPoolConnectionsInUse", 1)
+    await logger.flush()
+    await logger.flush()
+    await logger.flush()
+    logger.put_metric("DbPoolConnectionsInUse", 2)
+    await logger.flush()
+
+    assert len(sink.serialized) == 2
+    default_dimension_keys = {"LogGroup", "ServiceName", "ServiceType"}
+    for line in sink.serialized:
+        payload = json.loads(line)
+        leaked = default_dimension_keys & payload.keys()
+        assert not leaked, f"default dimensions leaked into EMF payload: {sorted(leaked)}"
+
+
+async def test_flush_that_writes_nothing_still_refreshes_the_document_timestamp():
+    """A context carries the timestamp it was built with and only a serialized flush builds the
+    next one, so an idle logger would otherwise backdate its next document by the whole idle
+    stretch — far enough to drop the datapoint out of the window an alarm evaluates."""
+    logger, sink = build_capturing_logger()
+    logger.put_dimensions({"Feature": "DbPool"})
+    logger.put_metric("DbPoolConnectionsInUse", 1)
+    await logger.flush()
+
+    logger.context.set_timestamp(datetime.now(UTC) - timedelta(hours=3))
+    await logger.flush()
+
+    logger.put_metric("DbPoolConnectionsInUse", 2)
+    await logger.flush()
+
+    payload = json.loads(sink.serialized[-1])
+    age_ms = int(round(datetime.now(UTC).timestamp() * 1000)) - payload["_aws"]["Timestamp"]
+    assert age_ms < 60_000
 
 
 # --- Dimensionality.__add__ ---
