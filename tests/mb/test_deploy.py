@@ -10,7 +10,7 @@ import pytest
 import typer
 from mb.main import app
 from mypy_boto3_ecs import ECSClient
-from mypy_boto3_ecs.type_defs import ServiceDeploymentTypeDef
+from mypy_boto3_ecs.type_defs import ContainerDefinitionOutputTypeDef, ServiceDeploymentTypeDef
 from mypy_boto3_lambda import LambdaClient
 from rich.text import Text
 from typer.testing import CliRunner
@@ -277,13 +277,18 @@ def test_register_task_definition_succeeds(capsys: pytest.CaptureFixture[str]):
 
     context.assert_ecs_called("describe_task_definition", taskDefinition=family)
     # The definition passes through wholesale — volumes, roles and network mode included, the
-    # response-only metadata stripped — with the new image only on the app container.
+    # response-only metadata stripped — with the new image and the release marker naming it only on
+    # the app container, never on a sidecar.
     context.assert_ecs_called(
         "register_task_definition",
         family=family,
         containerDefinitions=[
             {"name": "init", "image": "InitImage"},
-            {"name": family, "image": image},
+            {
+                "name": family,
+                "image": image,
+                "environment": [{"name": deploy_ops.RELEASE_ENV_VAR, "value": image}],
+            },
         ],
         executionRoleArn=role,
         taskRoleArn="SomeTaskRoleArn",
@@ -294,6 +299,31 @@ def test_register_task_definition_succeeds(capsys: pytest.CaptureFixture[str]):
     output = combined(capsys)
     assert f"ECR image: {image}" in output
     assert "✓ New task definition defined for family 'MyTask', revision: 20" in output
+
+
+def test_release_marker_is_the_image_tag():
+    """The tag alone: the repository URI in front of it names the registry and the AWS account, and
+    the app stamps this value on every line it writes."""
+    assert deploy_ops.release_marker("123456789012.dkr.ecr.eu-west-1.amazonaws.com/mitup:ci-9f3a1c2") == "ci-9f3a1c2"
+
+
+def test_release_marker_replaces_the_previous_one_and_keeps_the_other_variables():
+    """The definition is re-registered from the described revision, so the marker from the last
+    deploy is already on it — appending without dropping it would leave two entries for one name."""
+    container: ContainerDefinitionOutputTypeDef = {
+        "name": "mitup",
+        "environment": [
+            {"name": "MITUPBOT__DB__POOL_SIZE", "value": "10"},
+            {"name": deploy_ops.RELEASE_ENV_VAR, "value": "ci-previous"},
+        ],
+    }
+
+    deploy_ops.set_release_marker(container, "repo/mitup:ci-9f3a1c2")
+
+    assert container["environment"] == [
+        {"name": "MITUPBOT__DB__POOL_SIZE", "value": "10"},
+        {"name": deploy_ops.RELEASE_ENV_VAR, "value": "ci-9f3a1c2"},
+    ]
 
 
 def test_register_task_definition_when_failing(capsys: pytest.CaptureFixture[str]):

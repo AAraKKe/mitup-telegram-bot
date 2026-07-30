@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from mitup_bot.config import RunModes
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from tests.helpers import MetricAssertions, build_test_web_app, lifespan_runner
+from tests.helpers.logs import log_record
 from tests.helpers.monitoring import FlushCountingBackend
 
 WEBHOOK_URL = "https://example.com/telegram"
@@ -145,8 +147,9 @@ async def test_webhook_lifespan_registers_patreon_webhook_after_set_webhook(
 
 
 async def test_webhook_lifespan_skips_patreon_registration_when_url_absent(
-    metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch
+    metrics_client: MetricsClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ):
+    caplog.set_level(logging.INFO)
     from mitup_bot.web import app as web_app_module
 
     register_mock = AsyncMock()
@@ -167,6 +170,61 @@ async def test_webhook_lifespan_skips_patreon_registration_when_url_absent(
         ...
 
     register_mock.assert_not_awaited()
+    # A silent skip and a failed registration look the same in the log unless the skip says so.
+    assert log_record(caplog, "Skipping the Patreon webhook registration").__dict__["reason"] == (
+        "no_patreon_webhook_url"
+    )
+
+
+async def test_webhook_lifespan_records_the_url_it_registered(
+    metrics_client: MetricsClient, caplog: pytest.LogCaptureFixture
+):
+    """Nobody can confirm from the logs which URL Telegram was told to call, and a webhook pointed
+    at a stale host drops every update with every alarm green."""
+    caplog.set_level(logging.INFO)
+    ptb_app, _parent = build_tracked_ptb_app()
+    web_app = build_test_web_app(
+        ptb_app=ptb_app,
+        secret_token=SECRET,
+        metrics_client=metrics_client,
+        run_mode=RunModes.WEBHOOK,
+        webhook_url=WEBHOOK_URL,
+        max_connections=MAX_CONNECTIONS,
+    )
+
+    async with lifespan_runner(web_app):
+        ...
+
+    record = log_record(caplog, "Registered the Telegram webhook")
+    assert record.__dict__["webhook_url"] == WEBHOOK_URL
+    assert record.__dict__["max_connections"] == MAX_CONNECTIONS
+    assert record.__dict__["secret_configured"] is True
+    # The secret authenticates Telegram to us; its presence is the fact, never its value.
+    assert SECRET not in caplog.text
+
+
+async def test_webhook_lifespan_brackets_the_run(metrics_client: MetricsClient, caplog: pytest.LogCaptureFixture):
+    """A clean shutdown and a process killed mid-teardown are the same silence without both ends."""
+    caplog.set_level(logging.INFO)
+    ptb_app, _parent = build_tracked_ptb_app()
+    web_app = build_test_web_app(
+        ptb_app=ptb_app,
+        secret_token=SECRET,
+        metrics_client=metrics_client,
+        run_mode=RunModes.WEBHOOK,
+        webhook_url=WEBHOOK_URL,
+        max_connections=MAX_CONNECTIONS,
+    )
+
+    async with lifespan_runner(web_app):
+        ...
+
+    messages = [record.message for record in caplog.records]
+    assert messages.index("Starting the bot application") < messages.index("Bot application ready")
+    assert messages.index("Stopping the bot application") < messages.index("Bot application stopped")
+    # Each isolated step reports its own completion, so a partial teardown is legible as one.
+    completed = [record.__dict__["label"] for record in caplog.records if record.message == "Completed shutdown step"]
+    assert completed == ["ptb_app.stop", "ptb_app.shutdown"]
 
 
 # --- Polling lifespan ---

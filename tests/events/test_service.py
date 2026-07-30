@@ -687,7 +687,7 @@ def test_cli_invokes_with_defaults():
     runner = CliRunner()
 
     with (
-        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.load_config") as mock_load_config,
         patch("mitup_bot.events.service.db") as mock_db,
         patch("mitup_bot.events.service.configure_emf_backend") as mock_configure_emf,
         patch("mitup_bot.events.service.build_bot") as mock_build_bot,
@@ -698,12 +698,12 @@ def test_cli_invokes_with_defaults():
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = False
         mock_config.patreon = create_patreon_config()
-        mock_config_cls.return_value = mock_config
+        mock_load_config.return_value = mock_config
 
         result = runner.invoke(cli, [])
 
         assert result.exit_code == 0, result.output
-        mock_config_cls.assert_called_once()
+        mock_load_config.assert_called_once()
         # Flag off: the events pool stays uninstrumented — no metrics client passed to the db.
         mock_db.configure_db.assert_called_once_with(mock_config.db, metrics_client=None)
         mock_configure_emf.assert_called_once_with(mock_config.metrics)
@@ -716,7 +716,7 @@ def test_cli_registers_the_outbox_reconciler():
     runner = CliRunner()
 
     with (
-        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.load_config") as mock_load_config,
         patch("mitup_bot.events.service.db"),
         patch("mitup_bot.events.service.reconcile") as mock_reconcile,
         patch("mitup_bot.events.service.configure_emf_backend"),
@@ -728,7 +728,7 @@ def test_cli_registers_the_outbox_reconciler():
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = False
         mock_config.patreon = create_patreon_config()
-        mock_config_cls.return_value = mock_config
+        mock_load_config.return_value = mock_config
 
         result = runner.invoke(cli, [])
 
@@ -741,7 +741,7 @@ def test_cli_registers_the_update_guards():
     runner = CliRunner()
 
     with (
-        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.load_config") as mock_load_config,
         patch("mitup_bot.events.service.db"),
         patch("mitup_bot.events.service.api_guards") as mock_api_guards,
         patch("mitup_bot.events.service.configure_emf_backend"),
@@ -753,7 +753,7 @@ def test_cli_registers_the_update_guards():
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = False
         mock_config.patreon = create_patreon_config()
-        mock_config_cls.return_value = mock_config
+        mock_load_config.return_value = mock_config
 
         result = runner.invoke(cli, [])
 
@@ -766,7 +766,7 @@ def test_cli_instruments_pool_when_pool_metrics_enabled():
     runner = CliRunner()
 
     with (
-        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.load_config") as mock_load_config,
         patch("mitup_bot.events.service.db") as mock_db,
         patch("mitup_bot.events.service.configure_emf_backend"),
         patch("mitup_bot.events.service.build_bot"),
@@ -777,7 +777,7 @@ def test_cli_instruments_pool_when_pool_metrics_enabled():
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = True
         mock_config.patreon = create_patreon_config()
-        mock_config_cls.return_value = mock_config
+        mock_load_config.return_value = mock_config
 
         result = runner.invoke(cli, [])
 
@@ -794,6 +794,42 @@ def test_cli_instruments_pool_when_pool_metrics_enabled():
         assert pool_client._backend._properties == {"component": "events"}  # noqa: SLF001
 
 
+def test_cli_narrates_every_subsystem_it_wired():
+    """The events container degrades quietly when Patreon or the hosts group is unconfigured, so
+    what it wired — and with which resolved values — belongs at the top of its stream."""
+    runner = CliRunner()
+
+    with (
+        patch("mitup_bot.events.service.load_config") as mock_load_config,
+        patch("mitup_bot.events.service.configure_logging"),
+        # The module logger rather than capture_logs: the sibling CLI tests run the real
+        # configure_logging, which caches this module's bound logger past any later processor swap.
+        patch("mitup_bot.events.service.log") as mock_log,
+        patch("mitup_bot.events.service.db"),
+        patch("mitup_bot.events.service.configure_emf_backend"),
+        patch("mitup_bot.events.service.build_bot"),
+        patch("mitup_bot.events.service.build_broadcast_bot"),
+        patch("mitup_bot.events.service.build_api"),
+        patch("mitup_bot.events.service.asyncio.run"),
+    ):
+        mock_config = MagicMock()
+        mock_config.db.pool_metrics_enabled = False
+        mock_config.patreon = create_patreon_config()
+        mock_load_config.return_value = mock_config
+
+        result = runner.invoke(cli, [])
+
+    assert result.exit_code == 0, result.output
+    assert [call.args[0] for call in mock_log.info.call_args_list] == [
+        "Events service starting",
+        "Configured the database",
+        "Configured the metrics backend",
+        "Configured the Patreon integration",
+        "Configured the hosts-only group",
+        "Built the events bots",
+    ]
+
+
 def test_cli_configures_logging_before_wiring_subsystems():
     """`configure_logging` runs ahead of the DB, reconciler, EMF and Patreon wiring.
 
@@ -804,7 +840,7 @@ def test_cli_configures_logging_before_wiring_subsystems():
     call_order: list[str] = []
 
     with (
-        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.load_config") as mock_load_config,
         patch(
             "mitup_bot.events.service.configure_logging", side_effect=lambda *_a, **_kw: call_order.append("logging")
         ),
@@ -822,7 +858,7 @@ def test_cli_configures_logging_before_wiring_subsystems():
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = False
         mock_config.patreon = create_patreon_config()
-        mock_config_cls.return_value = mock_config
+        mock_load_config.return_value = mock_config
 
         result = runner.invoke(cli, [])
 
@@ -838,7 +874,7 @@ def test_cli_passes_custom_intervals():
     runner = CliRunner()
 
     with (
-        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.load_config") as mock_load_config,
         patch("mitup_bot.events.service.db"),
         patch("mitup_bot.events.service.configure_emf_backend"),
         patch("mitup_bot.events.service.build_bot"),
@@ -849,7 +885,7 @@ def test_cli_passes_custom_intervals():
     ):
         mock_config = MagicMock()
         mock_config.patreon = create_patreon_config()
-        mock_config_cls.return_value = mock_config
+        mock_load_config.return_value = mock_config
 
         result = runner.invoke(
             cli,
@@ -906,7 +942,7 @@ def test_cli_configures_patreon():
     patreon_config = create_patreon_config()
 
     with (
-        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.load_config") as mock_load_config,
         patch("mitup_bot.events.service.db"),
         patch("mitup_bot.events.service.configure_emf_backend"),
         patch("mitup_bot.events.service.build_bot"),
@@ -917,7 +953,7 @@ def test_cli_configures_patreon():
         mock_config = MagicMock()
         mock_config.db.pool_metrics_enabled = False
         mock_config.patreon = patreon_config
-        mock_config_cls.return_value = mock_config
+        mock_load_config.return_value = mock_config
 
         result = runner.invoke(cli, [])
 
@@ -930,7 +966,7 @@ def test_cli_env_option():
     runner = CliRunner()
 
     with (
-        patch("mitup_bot.events.service.Config.from_providers") as mock_config_cls,
+        patch("mitup_bot.events.service.load_config") as mock_load_config,
         patch("mitup_bot.events.service.db"),
         patch("mitup_bot.events.service.configure_emf_backend"),
         patch("mitup_bot.events.service.build_bot"),
@@ -940,9 +976,9 @@ def test_cli_env_option():
     ):
         mock_config = MagicMock()
         mock_config.patreon = create_patreon_config()
-        mock_config_cls.return_value = mock_config
+        mock_load_config.return_value = mock_config
 
         result = runner.invoke(cli, ["--env", "prod"])
 
         assert result.exit_code == 0, result.output
-        mock_config_cls.assert_called_once()
+        mock_load_config.assert_called_once()

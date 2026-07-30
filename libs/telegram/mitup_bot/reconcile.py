@@ -35,3 +35,6 @@ def register_outbox_reconciler():
     """Wire the reconcile behavior into the db write lifecycle; every process entry point
     that runs write-mode critical sections calls this once at startup."""
     db.set_outbox_reconciler(reconcile_outbox)
+    # `begin_write` asserts on this wiring at the first write-mode critical section; the breadcrumb
+    # turns that far-away assertion into a startup fact.
+    log.info("Registered the outbox reconciler")

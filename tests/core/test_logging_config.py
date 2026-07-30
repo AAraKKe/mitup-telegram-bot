@@ -8,7 +8,8 @@ import pytest
 import structlog
 
 from mitup_bot.config import Env
-from mitup_bot.logging_config import Component, configure_logging
+from mitup_bot.logging_config import UNKNOWN_RELEASE, Component, configure_logging
+from tests.helpers.logs import drop_cached_logger_binds
 
 
 @pytest.fixture(autouse=True)
@@ -117,17 +118,39 @@ def test_extbot_logger_level_depends_on_env(env: Env, expected_level: int):
     assert logging.getLogger("telegram.ext.ExtBot").level == expected_level
 
 
-def render_one_line(component: Component, emit: Callable[[], None]) -> dict[str, object]:
+def render_one_line(component: Component, emit: Callable[[], None], release: str | None = None) -> dict[str, object]:
     """Configure prod (JSON) logging with `component`, run `emit`, and return the single rendered
     line parsed back from JSON. Redirects the installed handler at a buffer so the assertion reads
-    exactly what the processor chain produced."""
-    configure_logging(Env.PROD, component)
+    exactly what the processor chain produced — and so the lines `configure_logging` writes about
+    itself, which precede the redirect, stay out of the buffer."""
+    configure_logging(Env.PROD, component, release=release)
     handler = cast("logging.StreamHandler[io.StringIO]", logging.getLogger().handlers[0])
     buffer = io.StringIO()
     handler.setStream(buffer)
     emit()
     handler.flush()
     return json.loads(buffer.getvalue())
+
+
+def probe_line(release: str | None = None) -> dict[str, object]:
+    return render_one_line(Component.BOT, lambda: structlog.get_logger("native.probe").info("probe"), release)
+
+
+def self_description(capsys: pytest.CaptureFixture[str], level: str = "INFO") -> dict[str, dict[str, object]]:
+    """Configure prod logging and return the lines the pipeline wrote about itself, by event name.
+
+    `configure_logging` emits through the handler it just installed, which bound the `sys.stderr`
+    pytest had already replaced — so its own lines are read back off the captured stream rather
+    than through a redirect that can only be installed after the call returns.
+    """
+    # The module logger those lines go through caches its bound chain on first use, and a sibling
+    # test in this module has usually already frozen it onto an earlier configuration. A process
+    # calls `configure_logging` once, so only a test needs this.
+    drop_cached_logger_binds()
+    configure_logging(Env.PROD, Component.BOT, level, release="ci-9f3a1c2")
+    logging.getLogger().handlers[0].flush()
+    lines = [json.loads(line) for line in capsys.readouterr().err.splitlines() if line]
+    return {str(line["event"]): line for line in lines}
 
 
 def test_component_stamped_on_structlog_native_record():
@@ -142,6 +165,57 @@ def test_component_stamped_on_foreign_stdlib_record():
     record = render_one_line(Component.EVENTS, lambda: logging.getLogger("foreign.probe").warning("probe"))
 
     assert record["component"] == "events"
+
+
+# --- Release marker ---
+
+
+def test_release_stamped_on_every_line():
+    """The release rides as a processor stamp rather than a field per call site: a rolling deploy
+    has two builds writing into one log group, and every line has to say which wrote it."""
+    assert probe_line(release="ci-9f3a1c2")["release"] == "ci-9f3a1c2"
+
+
+def test_release_falls_back_to_the_unknown_marker():
+    """A process started outside `mb deploy` carries no build identity. The marker keeps that
+    answerable, where an absent field would be indistinguishable from a dropped one."""
+    assert probe_line()["release"] == UNKNOWN_RELEASE
+
+
+# --- The pipeline's self-description ---
+
+
+def test_configured_logging_describes_the_installed_pipeline(capsys: pytest.CaptureFixture[str]):
+    """The head of every stream: what this deploy is, how it renders, and at what level."""
+    line = self_description(capsys, level="DEBUG")["Configured logging"]
+
+    assert line["level"] == "info"
+    assert line["component"] == Component.BOT.value
+    assert line["release"] == "ci-9f3a1c2"
+    assert line["env"] == Env.PROD.value
+    assert line["effective_level"] == "DEBUG"
+    assert line["renderer"] == "json"
+    assert "reason" not in line
+
+
+def test_an_unknown_level_says_so_instead_of_silently_running_at_info(capsys: pytest.CaptureFixture[str]):
+    """The fallback is deliberate and silent, which is how a debug session ends up reading a stream
+    that never had the lines in it."""
+    line = self_description(capsys, level="verbose")["Configured logging"]
+
+    assert line["level"] == "warning"
+    assert line["reason"] == "unknown_level_name"
+    assert line["requested_level"] == "VERBOSE"
+    assert line["effective_level"] == "INFO"
+
+
+def test_third_party_levels_are_recorded_with_the_pipeline(capsys: pytest.CaptureFixture[str]):
+    """Their silence is our configuration decision: without the line, "no httpx lines" reads as
+    "no outbound calls"."""
+    line = self_description(capsys)["Tuned third-party log levels"]
+
+    assert line["httpx"] == "WARNING"
+    assert line["ext_bot"] == "WARNING"  # prod; dev raises ExtBot to DEBUG
 
 
 # --- Bot-token redaction ---

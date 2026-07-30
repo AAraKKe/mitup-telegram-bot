@@ -188,6 +188,11 @@ class DbConfig(BaseModel):
 class AppConfig(BaseModel):
     run_mode: Annotated[RunModes, Sample("polling")]
     log_level: str = "INFO"
+    # Names the build this process is running. `mb deploy` sets it to the image tag it registers
+    # (`MITUPBOT__APP__RELEASE` on the ECS container definition), and the logging pipeline stamps it
+    # on every line beside `component`. A process started any other way — a local run, a
+    # terraform-registered task definition — reports the unknown-release marker instead.
+    release: str | None = None
 
     @field_validator("log_level")
     @classmethod
@@ -393,6 +398,31 @@ class PatreonConfig(BaseModel):
 # Connections kept free for work that runs outside update handlers: the job queue and the
 # post-fan-out reconcile transactions must never find the pool fully claimed by handlers.
 POOL_CONNECTION_HEADROOM = 2
+
+# The error type pydantic assigns to a failure raised by a validator in this module. Those messages
+# are written here — an invalid log level, an empty encryption key, a concurrency cap that overruns
+# the pool — and name settings and sizes, never a credential. Every other error type carries
+# pydantic's own message, which renders the rejected input verbatim.
+AUTHORED_ERROR_TYPE = "value_error"
+
+
+def setting_path(location: tuple[int | str, ...]) -> str:
+    """The dotted `section.field` path of a validation error, as an operator would set it."""
+    return ".".join(str(part) for part in location)
+
+
+def invalid_settings(error: ValidationError) -> list[str]:
+    """Name each setting a `Config` validation rejected, and how, without repeating its value.
+
+    A rejected value can be the credential itself: a digits-only bot token arrives from the env
+    provider as an int and fails `SecretStr` validation with pydantic echoing the token into the
+    message. So the settings a startup line reports carry the path plus pydantic's error type, and
+    the human message only where this module authored it.
+    """
+    return [
+        f"{setting_path(item['loc'])}: {item['msg'] if item['type'] == AUTHORED_ERROR_TYPE else item['type']}"
+        for item in error.errors()
+    ]
 
 
 class Config(BaseModel):

@@ -6,6 +6,14 @@ import structlog
 
 from mitup_bot.config import Env
 
+log = structlog.get_logger(__name__)
+
+# Stamped as the release when the process was started without one. A rolling deploy keeps two
+# builds serving at once, so "which build wrote this line" has to be answerable from the line; a
+# literal marker keeps that question answerable ("started outside `mb deploy`") where an absent
+# field would be indistinguishable from a field that was dropped.
+UNKNOWN_RELEASE = "unknown"
+
 # A Telegram bot token is a numeric bot id, a colon, and a 35-character secret. Matched without a
 # leading boundary because the value most likely to reach a log line is a Bot API URL, where the
 # token is glued straight onto the `bot` path segment.
@@ -27,9 +35,9 @@ class Component(StrEnum):
     CLI = "cli"
 
 
-def add_component(component: Component) -> structlog.typing.Processor:
-    """Stamp the process-level component onto every record. This is a processor, not a contextvar,
-    so it survives the asyncio task and thread boundaries that reset contextvars."""
+def add_process_identity(component: Component, release: str) -> structlog.typing.Processor:
+    """Stamp the process-level component and release onto every record. This is a processor, not a
+    contextvar, so it survives the asyncio task and thread boundaries that reset contextvars."""
 
     def processor(
         logger: structlog.typing.WrappedLogger,
@@ -37,6 +45,7 @@ def add_component(component: Component) -> structlog.typing.Processor:
         event_dict: structlog.typing.EventDict,
     ) -> structlog.typing.EventDict:
         event_dict.setdefault("component", component.value)
+        event_dict.setdefault("release", release)
         return event_dict
 
     return processor
@@ -81,7 +90,7 @@ def redact_bot_tokens(
     return event_dict
 
 
-def shared_processors(component: Component) -> list[structlog.typing.Processor]:
+def shared_processors(component: Component, release: str) -> list[structlog.typing.Processor]:
     """Processors shared by structlog-native loggers and foreign (stdlib) records routed through
     ProcessorFormatter. merge_contextvars pulls in the request/invocation fields bound once per
     entry point so every downstream log line carries them without threading a logger around.
@@ -89,7 +98,7 @@ def shared_processors(component: Component) -> list[structlog.typing.Processor]:
     inside a stack trace is covered too."""
     return [
         structlog.contextvars.merge_contextvars,
-        add_component(component),
+        add_process_identity(component, release),
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
@@ -107,13 +116,19 @@ def final_renderer(env: Env) -> structlog.typing.Processor:
     return structlog.processors.JSONRenderer()
 
 
-def build_root_handler(env: Env, component: Component) -> logging.Handler:
+def renderer_name(env: Env) -> str:
+    """Name the renderer `final_renderer` installs, so the startup line says how this stream is
+    formatted rather than leaving a reader to infer it from the line they are reading."""
+    return "console" if env is Env.DEV else "json"
+
+
+def build_root_handler(env: Env, component: Component, release: str) -> logging.Handler:
     """Build the root stdlib handler whose ProcessorFormatter renders both structlog-native and
     foreign (httpx, telegram, sqlalchemy, ...) records through the same env-selected renderer."""
     formatter = structlog.stdlib.ProcessorFormatter(
         # foreign_pre_chain runs on records from stdlib/3rd-party loggers so they pick up the same
         # context fields and render identically to structlog-native lines.
-        foreign_pre_chain=shared_processors(component),
+        foreign_pre_chain=shared_processors(component, release),
         processors=[
             structlog.stdlib.ProcessorFormatter.remove_processors_meta,
             final_renderer(env),
@@ -125,23 +140,40 @@ def build_root_handler(env: Env, component: Component) -> logging.Handler:
 
 
 def configure_library_levels(env: Env):
-    """Tune noisy third-party loggers."""
+    """Tune noisy third-party loggers, and record the levels they were tuned to.
+
+    Their silence is a configuration decision of ours, so it belongs in the stream: without the
+    line, "no httpx lines" reads as "no outbound calls" rather than "httpx is pinned at WARNING".
+    """
     # httpx logs every request at INFO, which floods our logs with HTTP noise.
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     # ExtBot is quiet by default; raise it to DEBUG in dev to surface bot API traffic.
-    logging.getLogger("telegram.ext.ExtBot").setLevel(logging.DEBUG if env is Env.DEV else logging.WARNING)
+    ext_bot_level = logging.DEBUG if env is Env.DEV else logging.WARNING
+    logging.getLogger("telegram.ext.ExtBot").setLevel(ext_bot_level)
+
+    log.info(
+        "Tuned third-party log levels",
+        httpx=logging.getLevelName(logging.WARNING),
+        ext_bot=logging.getLevelName(ext_bot_level),
+    )
 
 
-def configure_logging(env: Env, component: Component, level: str = "INFO"):
-    """Lenient on `level` so callers may pass a raw, unvalidated string (e.g. a Lambda
-    `LOG_LEVEL` env var); an unrecognized name falls back to INFO instead of raising.
+def configure_logging(env: Env, component: Component, level: str = "INFO", release: str | None = None):
+    """Install the process-wide logging pipeline and describe it in its own first line.
+
+    Lenient on `level` so callers may pass a raw, unvalidated string (e.g. a Lambda `LOG_LEVEL` env
+    var); an unrecognized name falls back to INFO instead of raising. `release` names the build and
+    is stamped on every line; a caller that has no build identity gets `UNKNOWN_RELEASE`.
     """
-    numeric_level = logging.getLevelNamesMapping().get(level.upper(), logging.INFO)
+    requested_level = level.upper()
+    level_names = logging.getLevelNamesMapping()
+    numeric_level = level_names.get(requested_level, logging.INFO)
+    resolved_release = release or UNKNOWN_RELEASE
 
     structlog.configure(
         processors=[
-            *shared_processors(component),
+            *shared_processors(component, resolved_release),
             # Hand off to ProcessorFormatter so structlog-native and stdlib records share one renderer.
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
@@ -152,6 +184,27 @@ def configure_logging(env: Env, component: Component, level: str = "INFO"):
 
     # force=True so our handler/level take effect even when a root handler already exists — the AWS
     # Lambda runtime pre-installs one, which otherwise makes basicConfig a no-op.
-    logging.basicConfig(level=numeric_level, handlers=[build_root_handler(env, component)], force=True)
+    logging.basicConfig(
+        level=numeric_level,
+        handlers=[build_root_handler(env, component, resolved_release)],
+        force=True,
+    )
+
+    # The head of every stream: the pipeline states what it is, which build is writing through it
+    # and at what level. `component` and `release` ride on the line from the processor above.
+    # `effective_level` rather than `level`: the pipeline's own `add_log_level` owns that key and
+    # would overwrite it with this line's severity.
+    pipeline = {
+        "env": env.value,
+        "effective_level": logging.getLevelName(numeric_level),
+        "requested_level": requested_level,
+        "renderer": renderer_name(env),
+    }
+    if requested_level in level_names:
+        log.info("Configured logging", **pipeline)
+    else:
+        # A typo'd level quietly resolving to INFO is how a debug session ends up staring at a
+        # stream that never had the lines it is looking for.
+        log.warning("Configured logging", reason="unknown_level_name", **pipeline)
 
     configure_library_levels(env)

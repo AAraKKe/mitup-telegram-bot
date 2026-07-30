@@ -83,6 +83,25 @@ def test_handlers_registered_when_bound_to_app():
     assert len(app.handlers) > 0
 
 
+def test_bind_reports_what_it_bound_rather_than_one_line_per_handler():
+    """~90 near-identical per-handler lines bury the rest of startup, and none of them is what an
+    operator checks: a missing registration shows up in the aggregate."""
+    app = ApplicationBuilder().token("AAA").build()
+
+    with capture_logs() as logs:
+        HandlersRegistry.bind(app)
+
+    assert all(entry["log_level"] == "debug" for entry in logs if entry["event"] == "Binding handler to application")
+    summary = next(entry for entry in logs if entry["event"] == "Bound handlers to the application")
+    bound_handlers = [handler for handler_list in app.handlers.values() for handler in handler_list]
+    # The fallback is appended after the summary, so the count is one short of what the app carries.
+    assert summary["handlers_bound"] == len(bound_handlers) - 1
+    assert summary["conversation_handlers"] == sum(
+        1 for handler in bound_handlers if isinstance(handler, ConversationHandler)
+    )
+    assert summary["groups"] == sorted(app.handlers)
+
+
 def test_only_bindable_handlers_are_registered():
     @ClearableRegistry.register_command(HandlerTestId.NOT_BINDABLE, bindable=False)
     async def command_not_bindable(update: Update, context: StubMitupContext):

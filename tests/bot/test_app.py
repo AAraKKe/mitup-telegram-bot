@@ -25,12 +25,13 @@ from mitup_bot.config import (
     MetricsEnv,
     PatreonConfig,
     RunModes,
-    TomlConfigProvider,
 )
+from mitup_bot.hosts_group import HostsGroupState
 from mitup_bot.logging_config import Component
 from mitup_bot.monitoring import MetricsClient
 from mitup_bot.update_processor import PerUserUpdateProcessor
 from tests.helpers import create_patreon_config
+from tests.helpers.logs import log_record
 
 
 def build_config(
@@ -98,7 +99,7 @@ def patch_runtime_deps(request: pytest.FixtureRequest) -> Generator[RuntimeDeps]
     """
     stub_logging = "real_configure_logging" not in request.fixturenames
     with (
-        mock.patch("mitup_bot.app.Config.from_providers", return_value=build_config()) as mock_config,
+        mock.patch("mitup_bot.app.load_config", return_value=build_config()) as mock_config,
         mock.patch("mitup_bot.app.Application.builder") as mock_builder,
         mock.patch("mitup_bot.app.db.configure_db") as mock_db,
         mock.patch("mitup_bot.app.timezone_api.configure") as mock_tz,
@@ -148,14 +149,12 @@ def test_init_sets_registry_env(patch_runtime_deps: RuntimeDeps):
 
 
 @pytest.mark.parametrize("env", [Env.DEV, Env.PROD], ids=["dev", "prod"])
-def test_init_calls_config_from_providers_with_toml_provider(env: Env, patch_runtime_deps: RuntimeDeps):
+def test_init_loads_the_config_for_its_env_as_the_bot_component(env: Env, patch_runtime_deps: RuntimeDeps):
+    """The component travels with the load so a config rejected before the pipeline exists is still
+    indexed as the bot's (`tests/core/test_bootstrap.py` covers what that failure writes)."""
     MitupRuntime(env)
 
-    call_args = patch_runtime_deps.config.call_args
-    providers = call_args.args
-    toml_providers = [p for p in providers if isinstance(p, TomlConfigProvider)]
-    assert len(toml_providers) == 1
-    assert toml_providers[0].env == env
+    patch_runtime_deps.config.assert_called_once_with(env, Component.BOT)
 
 
 def test_init_configures_db_without_metrics_when_pool_metrics_disabled(patch_runtime_deps: RuntimeDeps):
@@ -171,7 +170,7 @@ def test_init_configures_db_without_metrics_when_pool_metrics_disabled(patch_run
 def test_init_configures_db_with_metrics_when_pool_metrics_enabled(patch_runtime_deps: RuntimeDeps):
     config = build_config(pool_metrics_enabled=True)
 
-    with mock.patch("mitup_bot.app.Config.from_providers", return_value=config):
+    with mock.patch("mitup_bot.app.load_config", return_value=config):
         MitupRuntime(Env.DEV)
 
     configure_call = patch_runtime_deps.db.call_args
@@ -204,7 +203,7 @@ def test_init_configures_timezone_api(patch_runtime_deps: RuntimeDeps):
 def test_init_configures_docs_links_with_the_bot_domain(patch_runtime_deps: RuntimeDeps):
     config = build_config(domain="bot.staging.mitup.social")
 
-    with mock.patch("mitup_bot.app.Config.from_providers", return_value=config):
+    with mock.patch("mitup_bot.app.load_config", return_value=config):
         MitupRuntime(Env.DEV)
 
     patch_runtime_deps.docs.assert_called_once_with("bot.staging.mitup.social")
@@ -228,7 +227,7 @@ def test_init_configures_patreon(patch_runtime_deps: RuntimeDeps):
     config = build_config(patreon=patreon_config)
 
     with (
-        mock.patch("mitup_bot.app.Config.from_providers", return_value=config),
+        mock.patch("mitup_bot.app.load_config", return_value=config),
         mock.patch("mitup_bot.app.configure_token_encryption") as mock_encrypt,
         mock.patch("mitup_bot.app.patreon.configure") as mock_configure,
     ):
@@ -237,6 +236,76 @@ def test_init_configures_patreon(patch_runtime_deps: RuntimeDeps):
     # The token cipher is seeded with the encryption key and the runtime holder gets the section.
     mock_encrypt.assert_called_once_with(patreon_config.encryption_key.get_secret_value())
     mock_configure.assert_called_once_with(patreon_config)
+
+
+# --- Startup narrative ---
+
+
+def startup_events(caplog: pytest.LogCaptureFixture) -> list[str]:
+    """The ordered boot narrative: the lines that say which subsystems this process wired."""
+    return [
+        record.message
+        for record in caplog.records
+        if record.message.startswith(("Configured the", "Registered the", "Built the"))
+    ]
+
+
+def test_startup_names_every_subsystem_it_wired(patch_runtime_deps: RuntimeDeps, caplog: pytest.LogCaptureFixture):
+    """Several of these subsystems degrade to a silent no-op when unconfigured, so the deployed
+    feature set has to be readable from the top of the stream. The order is part of the contract:
+    metrics precede the db because the pool client emits through the EMF configuration.
+    """
+    caplog.set_level(logging.INFO)
+
+    MitupRuntime(Env.DEV)
+
+    # The registry, the timezone clients and the docs holder are stubbed by `patch_runtime_deps`,
+    # so their own lines belong to their own tests; everything the runtime wires itself is here.
+    assert startup_events(caplog) == [
+        "Configured the supporter limits",
+        "Configured the hosts-only group",
+        "Configured the docs links",
+        "Built the bot application",
+        "Registered the update guards",
+        "Configured the metrics backend",
+        "Registered the outbox reconciler",
+        "Configured the database",
+        "Configured the Patreon integration",
+    ]
+
+
+def test_hosts_only_group_says_why_it_is_disabled(patch_runtime_deps: RuntimeDeps, caplog: pytest.LogCaptureFixture):
+    """A deployment with no chat id runs every group operation as a no-op — a silence that reads
+    exactly like a broken feature unless boot says it was never switched on."""
+    caplog.set_level(logging.INFO)
+
+    MitupRuntime(Env.DEV)
+
+    record = log_record(caplog, "Configured the hosts-only group")
+    assert record.__dict__["enabled"] is False
+    assert record.__dict__["reason"] == "no_chat_id_configured"
+
+
+def test_hosts_only_group_names_the_group_it_was_pointed_at(
+    patch_runtime_deps: RuntimeDeps, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+):
+    """The invite URL admits its holder to the group, so presence is recorded and the value is not."""
+    caplog.set_level(logging.INFO)
+    # Snapshot the process-wide holder: `configure` writes to it and every later test reads it.
+    monkeypatch.setattr(HostsGroupState, "chat_id", None)
+    monkeypatch.setattr(HostsGroupState, "invite_url", None)
+    config = build_config()
+    config.bot.hosts_group_chat_id = -1002233445566
+    config.bot.hosts_group_invite_url = "https://t.me/+secret-invite-hash"
+
+    with mock.patch("mitup_bot.app.load_config", return_value=config):
+        MitupRuntime(Env.DEV)
+
+    record = log_record(caplog, "Configured the hosts-only group")
+    assert record.__dict__["enabled"] is True
+    assert record.__dict__["chat_id"] == -1002233445566
+    assert record.__dict__["invite_url_configured"] is True
+    assert "secret-invite-hash" not in caplog.text
 
 
 # --- Build application ---
@@ -272,7 +341,7 @@ def test_builder_sets_per_user_update_processor(patch_runtime_deps: RuntimeDeps)
 def test_concurrency_cap_flows_from_config_into_processor(patch_runtime_deps: RuntimeDeps):
     config = build_config(concurrent_updates=4)
 
-    with mock.patch("mitup_bot.app.Config.from_providers", return_value=config):
+    with mock.patch("mitup_bot.app.load_config", return_value=config):
         MitupRuntime(Env.DEV)
 
     (processor,) = patch_runtime_deps.builder_instance.concurrent_updates.call_args.args
@@ -291,7 +360,7 @@ def test_builder_sets_a_short_timeout_request(patch_runtime_deps: RuntimeDeps):
     config.bot.api_media_write_timeout = 30.0
     config.bot.api_connection_pool_size = 64
 
-    with mock.patch("mitup_bot.app.Config.from_providers", return_value=config):
+    with mock.patch("mitup_bot.app.load_config", return_value=config):
         MitupRuntime(Env.DEV)
 
     (request,) = patch_runtime_deps.builder_instance.request.call_args.args
@@ -446,7 +515,7 @@ def test_webhook_mode_builds_fastapi_and_runs_uvicorn(patch_runtime_deps: Runtim
     )
 
     with (
-        mock.patch("mitup_bot.app.Config.from_providers", return_value=config),
+        mock.patch("mitup_bot.app.load_config", return_value=config),
         mock.patch("mitup_bot.app.create_app") as mock_create_app,
         mock.patch("mitup_bot.app.uvicorn") as mock_uvicorn,
     ):
@@ -492,7 +561,7 @@ def test_polling_mode_builds_fastapi_and_runs_uvicorn(patch_runtime_deps: Runtim
     config = build_config(run_mode=RunModes.POLLING)
 
     with (
-        mock.patch("mitup_bot.app.Config.from_providers", return_value=config),
+        mock.patch("mitup_bot.app.load_config", return_value=config),
         mock.patch("mitup_bot.app.create_app") as mock_create_app,
         mock.patch("mitup_bot.app.uvicorn") as mock_uvicorn,
     ):
@@ -527,7 +596,8 @@ def test_polling_mode_builds_fastapi_and_runs_uvicorn(patch_runtime_deps: Runtim
     runtime.app.run_polling.assert_not_called()
 
 
-def test_webhook_mode_missing_domain_raises(runtime: MitupRuntime):
+def test_webhook_mode_missing_domain_raises(runtime: MitupRuntime, caplog: pytest.LogCaptureFixture):
+    caplog.set_level(logging.ERROR)
     runtime.config = build_config(
         run_mode=RunModes.WEBHOOK,
         secret_token=SecretStr("my-secret"),
@@ -536,8 +606,15 @@ def test_webhook_mode_missing_domain_raises(runtime: MitupRuntime):
     with pytest.raises(ValueError, match="Domain must be set"):
         runtime.run()
 
+    # Both settings are optional because polling needs neither, so the refusal has to say which one
+    # webhook mode was missing rather than leaving a bare traceback.
+    record = log_record(caplog, "Refusing to start in webhook mode")
+    assert record.__dict__["reason"] == "domain_not_set"
+    assert record.__dict__["setting"] == "bot.domain"
 
-def test_webhook_mode_missing_secret_token_raises(runtime: MitupRuntime):
+
+def test_webhook_mode_missing_secret_token_raises(runtime: MitupRuntime, caplog: pytest.LogCaptureFixture):
+    caplog.set_level(logging.ERROR)
     runtime.config = build_config(
         run_mode=RunModes.WEBHOOK,
         domain="example.com",
@@ -545,3 +622,7 @@ def test_webhook_mode_missing_secret_token_raises(runtime: MitupRuntime):
 
     with pytest.raises(ValueError, match="Secret token must be set"):
         runtime.run()
+
+    record = log_record(caplog, "Refusing to start in webhook mode")
+    assert record.__dict__["reason"] == "secret_token_not_set"
+    assert record.__dict__["setting"] == "bot.secret_token"

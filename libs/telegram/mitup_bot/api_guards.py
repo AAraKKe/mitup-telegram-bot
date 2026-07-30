@@ -7,7 +7,11 @@ concrete guards-backed validators and is registered at process startup, mirrorin
 reconciler wiring in mitup_bot.reconcile.
 """
 
+import structlog
+
 from mitup_bot import api_wrapper, guards
+
+log = structlog.get_logger(__name__)
 
 
 def register_update_guards():
@@ -20,3 +24,6 @@ def register_update_guards():
             valid_callback_query=guards.valid_callback_query,
         )
     )
+    # The api asserts on this wiring far from here, when the first update is rendered; the
+    # breadcrumb turns that assertion into a startup fact an operator can check for.
+    log.info("Registered the update guards")

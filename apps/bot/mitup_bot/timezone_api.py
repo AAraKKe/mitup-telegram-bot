@@ -91,11 +91,25 @@ def configure(config: GoogleApiConfig):
     if __timezone_client:
         raise TimezoneClientAlreadyInitializedError()
 
+    # Presence, never the keys themselves: the two flags are what distinguishes an unset key from a
+    # rejected one on the failure line below, and they say which Google features this deploy has.
+    keys_configured = {
+        "geocode_key_configured": bool(config.gmaps_geocode_key.get_secret_value()),
+        "timezone_key_configured": bool(config.gmaps_timezone_key.get_secret_value()),
+    }
+
     try:
         __geocode_client = googlemaps.Client(key=config.gmaps_geocode_key.get_secret_value())
         __timezone_client = googlemaps.Client(key=config.gmaps_timezone_key.get_secret_value())
     except ValueError as e:
+        # The client constructor rejects an unusable key, which aborts startup; without this the
+        # only evidence is a traceback naming googlemaps rather than the setting to fix.
+        log.error(
+            "Could not configure the Google api clients", reason="api_key_rejected", exc_info=e, **keys_configured
+        )
         raise IncorrectKeyError() from e
+
+    log.info("Configured the Google api clients", **keys_configured)
 
 
 async def get_timezone_by_address(address: str, context: TMitupContext) -> str | TimezoneLookupFailure:

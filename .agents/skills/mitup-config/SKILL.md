@@ -20,6 +20,20 @@ Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(env))
 
 This means **environment variables override TOML file values**.
 
+## Loading config in a service entry point
+
+Both services load through `load_config(env, component)` (`mitup_bot.bootstrap`) rather than calling
+`from_providers` directly. It wires the provider pair above and, when validation fails, installs the
+logging pipeline with its defaults and logs `Configuration is invalid` naming the rejected settings
+before re-raising — otherwise the misconfiguration dies as an unstructured traceback that matches no
+`component = "..."` query. The line carries setting paths and pydantic error types (`invalid_settings`
+in `config.py`), never the rejected values: a digits-only bot token arrives from the env provider as
+an int and pydantic echoes it into both the message and the `input` key.
+
+The caller then calls `configure_logging(env, component, config.app.log_level, config.app.release)`
+before wiring any subsystem, so the level and the release marker are in force for the whole boot
+narrative.
+
 ## Providers
 
 ### `TomlConfigProvider`
@@ -56,7 +70,7 @@ Values are auto-converted: `"true"`/`"false"` → `bool`, numeric strings → `i
 | `db` | `DbConfig` | Database connection (username, password, url, port, database) |
 | `bot` | `BotConfig` | Telegram bot token, webhook domain/port/secret, rate limits, update-concurrency cap |
 | `google_api` | `GoogleApiConfig` | Google Maps geocoding and timezone API keys |
-| `app` | `AppConfig` | Run mode (`POLLING` or `WEBHOOK`) |
+| `app` | `AppConfig` | Run mode (`POLLING` or `WEBHOOK`), log level, release marker |
 | `metrics` | `MetricsConfig` | CloudWatch namespace, metrics environment, flush behavior |
 
 ## Cross-section invariants

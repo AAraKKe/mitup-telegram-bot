@@ -462,10 +462,20 @@ class HandlersRegistry:
         # Sort them, setting conversation handlers first to be sure that any unexpected answer to a conversation is
         # handled by its fallbacks
         sorted_items = sorted(cls.handlers.items(), key=lambda v: v[1].is_conversation(), reverse=True)
+        bound = [wrapper for _, wrapper in sorted_items if wrapper.bindable]
         for key, wrapper in sorted_items:
             if wrapper.bindable:
-                log.info("Binding handler to application", handler=key)
+                # Per handler, so at debug: the registration that matters to an operator is the
+                # aggregate below, which is what a missing one shows up in.
+                log.debug("Binding handler to application", handler=key)
                 app.add_handler(handler=wrapper.handler, group=wrapper.group)
+        log.info(
+            "Bound handlers to the application",
+            handlers_bound=len(bound),
+            handlers_skipped=len(sorted_items) - len(bound),
+            conversation_handlers=sum(1 for wrapper in bound if wrapper.is_conversation()),
+            groups=sorted({wrapper.group for wrapper in bound}),
+        )
         # Add a fallback handler for any update that is not handled by any of the registered handlers
         # the intention is that the user gets a message saying that it is not implemented yet instead of
         # the bot not responding at all. It goes through callback_with_metrics like every registered
@@ -477,6 +487,7 @@ class HandlersRegistry:
                 )
             )
         )
+        log.info("Bound the unrouted-callback fallback handler")
         # Without an error handler registered, PTB logs whatever escapes a callback itself, as an
         # unstructured stdlib record carrying none of the update's correlation identity.
         app.add_error_handler(process_update_error)

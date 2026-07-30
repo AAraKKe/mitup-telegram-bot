@@ -69,8 +69,26 @@ async def assert_google_calls_timed(context: StubMitupContext, metrics: MetricAs
 def test_configure_fails_with_incorrect_keys(gmaps_client):
     gmaps_client.side_effect = ValueError
 
-    with pytest.raises(IncorrectKeyError):
+    with capture_logs() as logs, pytest.raises(IncorrectKeyError):
         timezone_api.configure(CONFIG_GMAPS_KEYS)
+
+    # The rejection aborts startup, and a traceback naming googlemaps does not name the setting.
+    refusal = next(entry for entry in logs if entry["event"] == "Could not configure the Google api clients")
+    assert refusal["log_level"] == "error"
+    assert refusal["reason"] == "api_key_rejected"
+    assert refusal["geocode_key_configured"] is True
+    assert refusal["timezone_key_configured"] is True
+
+
+def test_configure_records_which_google_features_have_keys(gmaps_client):
+    with capture_logs() as logs:
+        timezone_api.configure(CONFIG_GMAPS_KEYS)
+
+    configured = next(entry for entry in logs if entry["event"] == "Configured the Google api clients")
+    assert configured["geocode_key_configured"] is True
+    assert configured["timezone_key_configured"] is True
+    # Presence only: the keys are billed credentials.
+    assert "geo_key" not in str(logs)
 
 
 def test_configure_with_already_initializated_geocode_client(gmaps_client):

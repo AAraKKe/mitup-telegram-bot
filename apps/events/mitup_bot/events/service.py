@@ -11,7 +11,8 @@ from telegram.ext import AIORateLimiter, ExtBot
 
 from mitup_bot import api_guards, db, hosts_group, patreon, reconcile
 from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
-from mitup_bot.config import BotConfig, Config, Env, EnvVariablesConfigProvider, TomlConfigProvider
+from mitup_bot.bootstrap import load_config
+from mitup_bot.config import BotConfig, Config, Env
 from mitup_bot.events import (
     broadcast,
     generate_stats,
@@ -283,14 +284,11 @@ async def run_all_tasks(
 
 def run_events(env: Env, intervals: IntervalsConfiguration, start_time: float):
     """Bootstrap the events process and run every recurrent job on its interval until cancelled."""
-    config = Config.from_providers(
-        EnvVariablesConfigProvider(),
-        TomlConfigProvider(env=env),
-    )
+    config = load_config(env, Component.EVENTS)
 
     # Ahead of every subsystem below, so a failure while wiring the DB, the reconciler or Patreon is
     # emitted through the structured pipeline instead of unstructured to stderr.
-    configure_logging(env, Component.EVENTS, config.app.log_level)
+    configure_logging(env, Component.EVENTS, config.app.log_level, config.app.release)
     log.info(
         "Events service starting",
         env=env.value,
@@ -312,13 +310,50 @@ def run_events(env: Env, intervals: IntervalsConfiguration, start_time: float):
     db.configure_db(config.db, metrics_client=pool_metrics_client)
     reconcile.register_outbox_reconciler()
     api_guards.register_update_guards()
+    log.info(
+        "Configured the database",
+        pool_size=config.db.pool_size,
+        max_overflow=config.db.max_overflow,
+        pool_timeout=config.db.pool_timeout,
+        pool_metrics_enabled=config.db.pool_metrics_enabled,
+        engine_echo=config.db.engine_echo,
+    )
+
     configure_emf_backend(config.metrics)
+    log.info(
+        "Configured the metrics backend",
+        namespace=config.metrics.namespace,
+        environment=config.metrics.environment.value,
+    )
+
     configure_patreon(config)
+    log.info(
+        "Configured the Patreon integration",
+        campaign_id=config.patreon.campaign_id,
+        # The count is what an operator sets during a key rotation (`new,old`); the keys themselves
+        # decrypt every stored token.
+        encryption_keys=len(config.patreon.encryption_keys()),
+        request_timeout_seconds=config.patreon.request_timeout_seconds,
+        supporter_min_cents=config.patreon.supporter_min_cents,
+        patron_min_cents=config.patreon.patron_min_cents,
+        organizer_min_cents=config.patreon.organizer_min_cents,
+    )
+
     # Adopt the hosts-only group settings so the supporter-check job can remove lapsed hosts;
     # a no-op until a chat id is configured.
     hosts_group.configure(config.bot)
+    if hosts_group.is_configured():
+        log.info("Configured the hosts-only group", enabled=True, chat_id=hosts_group.chat_id())
+    else:
+        log.info("Configured the hosts-only group", enabled=False, reason="no_chat_id_configured")
 
     bot = build_bot(config.bot)
     broadcast_bot = build_broadcast_bot(config.bot)
+    log.info(
+        "Built the events bots",
+        broadcast_max_rate=config.bot.broadcast_max_rate,
+        retries_on_throttle=config.bot.retries_on_throttle,
+        api_call_log_enabled=config.bot.api_call_log_enabled,
+    )
 
     asyncio.run(run_all_tasks(intervals, bot, broadcast_bot, config.bot.admin_tg_ids, start_time))

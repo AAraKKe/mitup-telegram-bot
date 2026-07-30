@@ -8,7 +8,11 @@ from typing import cast
 import boto3
 import typer
 from mypy_boto3_ecs import ECSClient
-from mypy_boto3_ecs.type_defs import RegisterTaskDefinitionRequestTypeDef, ServiceDeploymentTypeDef
+from mypy_boto3_ecs.type_defs import (
+    ContainerDefinitionOutputTypeDef,
+    RegisterTaskDefinitionRequestTypeDef,
+    ServiceDeploymentTypeDef,
+)
 from mypy_boto3_lambda import LambdaClient
 from mypy_boto3_lambda.type_defs import FunctionConfigurationTypeDef
 
@@ -36,6 +40,11 @@ DEPLOYMENT_STATUS_STYLES = {
     "ROLLBACK_FAILED": "red",
 }
 LIFECYCLE_STAGE_STYLES = {"BAKE_TIME": "bold bright_blue"}
+
+# The container environment variable that names the build to the running app, read back as
+# `config.app.release` and stamped on every log line beside `component`. Set here because this is
+# the only step that knows which image the revision it registers will run.
+RELEASE_ENV_VAR = "MITUPBOT__APP__RELEASE"
 
 # DescribeTaskDefinition returns these read-only metadata keys about the stored revision;
 # RegisterTaskDefinition rejects them, so they are stripped before re-registering.
@@ -136,6 +145,23 @@ def invoke_lambda(lambda_client: LambdaClient, name: str):
     console.success(f"Lambda {name} finished successfully")
 
 
+def release_marker(image: str) -> str:
+    """The build identity the app reports, taken from the tag of the image it will run.
+
+    The tag only: the repository URI in front of it names the ECR registry and the AWS account,
+    which the app has no reason to publish on every log line it writes.
+    """
+    return image.rsplit(":", 1)[-1]
+
+
+def set_release_marker(container: ContainerDefinitionOutputTypeDef, image: str):
+    """Point the container's release variable at the image being registered, leaving every other
+    environment entry as terraform declared it."""
+    environment = [entry for entry in container.get("environment", []) if entry.get("name") != RELEASE_ENV_VAR]
+    environment.append({"name": RELEASE_ENV_VAR, "value": release_marker(image)})
+    container["environment"] = environment
+
+
 def register_task_definition(ecs_client: ECSClient, family: str, image: str) -> str:
     console.info(f"Registering task definition {family!r}...")
     console.info(f"ECR image: {image}")
@@ -152,6 +178,8 @@ def register_task_definition(ecs_client: ECSClient, family: str, image: str) -> 
         console.error(f"Task definition {family!r} does not have a container named {family!r}")
         raise typer.Abort()
     app_container["image"] = image
+    set_release_marker(app_container, image)
+    console.info(f"Release marker: {release_marker(image)}")
 
     if task_def.get("executionRoleArn") is None:
         console.error(f"Task definition {family!r} does not have an execution role")
