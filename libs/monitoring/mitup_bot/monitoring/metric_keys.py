@@ -218,6 +218,12 @@ class MetricKey(CamelCaseStrEnum):
     dimension and reported once per source each run, zeros included. Read by the new-members widget
     on the infra dashboard, which needs the dense series: a source that stops producing members is
     only visible as a run of real zeros."""
+    UNROUTED_REQUEST = auto()
+    """HTTP requests that matched no declared route, counted in memory and emitted as one
+    dimensionless sample per minute — a quiet minute emits nothing, because an EMF record is itself
+    a log line and the volume is the whole point. Read by the infra `Unrouted requests (scanning)`
+    widget and the `MitupUnroutedRequestSweep` alarm. The paths probed are caller-controlled and
+    unbounded, so none of them reaches this record or the stream. A spike is a scan, not a bug."""
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

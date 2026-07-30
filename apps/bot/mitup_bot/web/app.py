@@ -11,6 +11,7 @@ from mitup_bot.monitoring.client import MetricsClient, bound_metrics_client
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.patreon import webhooks as patreon_webhooks
 from mitup_bot.web import patreon, telegram
+from mitup_bot.web.access_log import UnroutedRequests, matched_a_route, unrouted_request_reporting
 
 log = structlog.get_logger(__name__)
 
@@ -37,6 +38,7 @@ def build_webhook_lifespan(
     webhook_url: str | None,
     max_connections: int | None,
     patreon_webhook_url: str | None,
+    unrouted: UnroutedRequests,
 ) -> Lifespan:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -78,7 +80,8 @@ def build_webhook_lifespan(
         log.info("Bot application ready", run_mode=RunModes.WEBHOOK.value)
 
         try:
-            yield
+            async with unrouted_request_reporting(unrouted, metrics_client):
+                yield
         finally:
             log.info("Stopping the bot application", run_mode=RunModes.WEBHOOK.value)
             await run_shutdown_step(ptb_app.stop, metrics_client, "ptb_app.stop")
@@ -93,6 +96,7 @@ def build_webhook_lifespan(
 def build_polling_lifespan(
     ptb_app: Application,
     metrics_client: MetricsClient,
+    unrouted: UnroutedRequests,
 ) -> Lifespan:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -114,7 +118,8 @@ def build_polling_lifespan(
         log.info("Bot application ready", run_mode=RunModes.POLLING.value)
 
         try:
-            yield
+            async with unrouted_request_reporting(unrouted, metrics_client):
+                yield
         finally:
             log.info("Stopping the bot application", run_mode=RunModes.POLLING.value)
             assert ptb_app.updater is not None
@@ -144,13 +149,15 @@ def create_app(
     it down on exit. Routers read the PTB app, secret token, and metrics client
     via FastAPI's DI from ``app.state``.
     """
+    unrouted = UnroutedRequests()
+
     match run_mode:
         case RunModes.WEBHOOK:
             lifespan = build_webhook_lifespan(
-                ptb_app, secret_token, metrics_client, webhook_url, max_connections, patreon_webhook_url
+                ptb_app, secret_token, metrics_client, webhook_url, max_connections, patreon_webhook_url, unrouted
             )
         case RunModes.POLLING:
-            lifespan = build_polling_lifespan(ptb_app, metrics_client)
+            lifespan = build_polling_lifespan(ptb_app, metrics_client, unrouted)
         case _ as unreachable:
             assert_never(unreachable)
 
@@ -160,12 +167,13 @@ def create_app(
     app.state.ptb_app = ptb_app
     app.state.secret_token = secret_token
     app.state.metrics_client = metrics_client
+    app.state.unrouted_requests = unrouted
 
     app.include_router(telegram.router)
     app.include_router(patreon.router)
 
     @app.middleware("http")
-    async def flush_metrics_after_request(
+    async def observe_and_flush_request(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         # Endpoint emissions only buffer inside the client; without a per-request flush they
@@ -175,10 +183,21 @@ def create_app(
         # Publishing the client here is what lets an outbound call made deep inside an endpoint —
         # the Patreon round-trips behind the OAuth callback and the membership webhook — land its
         # timing sample in the window this request flushes, instead of finding no client at all.
+        #
+        # A request no route matched is only counted — the lifespan's reporter publishes the total
+        # on an interval, so a scan costs one metric sample a minute rather than anything per
+        # request — and deliberately not flushed: the router answers 404 without reaching an
+        # endpoint, so nothing can have emitted, while a flush walks every logger the backend has
+        # cached and writes a document for each, putting the per-request cost straight back. Were
+        # something below to emit anyway it stays buffered until the next served request, not lost.
+        # A request a route did serve is narrated by the endpoint that served it.
         try:
             with bound_metrics_client(metrics_client):
                 return await call_next(request)
         finally:
-            await metrics_client.flush()
+            if matched_a_route(request):
+                await metrics_client.flush()
+            else:
+                unrouted.record()
 
     return app

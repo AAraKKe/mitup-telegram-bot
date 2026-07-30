@@ -546,6 +546,9 @@ def test_webhook_mode_builds_fastapi_and_runs_uvicorn(patch_runtime_deps: Runtim
     assert config_kwargs["port"] == 80  # BotConfig.listen_port default
     assert config_kwargs["workers"] == 1
     assert config_kwargs["log_config"] is None
+    # The webhook endpoint is swept by internet-wide scanners, so uvicorn's per-request access log
+    # stays off: endpoints narrate what they serve, and the rest is counted, not written.
+    assert config_kwargs["access_log"] is False
 
     # uvicorn.Server is constructed with the Config and run() is invoked.
     mock_uvicorn.Server.assert_called_once_with(mock_uvicorn.Config.return_value)

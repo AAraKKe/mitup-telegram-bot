@@ -227,6 +227,12 @@ class MitupRuntime:
 
         # workers=1: PTB Application owns in-memory state (user_data, conversation states) and
         # is not safe to run across multiple worker processes.
+        #
+        # access_log=False detaches the `uvicorn.access` logger from the root handler, so the
+        # protocol's `hasHandlers()` check is false and it never builds a record for a request.
+        # Endpoints narrate the requests they serve, and `web.access_log` counts the ones no route
+        # matched, so a scanner sweep costs one metric sample a minute rather than a line each.
+        # `uvicorn.error` keeps the root handler: real server errors must still reach the stream.
         server = uvicorn.Server(
             uvicorn.Config(
                 app=fastapi_app,
@@ -234,6 +240,7 @@ class MitupRuntime:
                 port=self.config.bot.listen_port,
                 workers=1,
                 log_config=None,
+                access_log=False,
                 lifespan="on",
             )
         )
