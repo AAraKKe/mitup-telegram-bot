@@ -29,3 +29,17 @@ def test_execute_bulk_reports_the_revision_and_row_count():
     assert entry["revision"] == REVISION
     assert entry["statement"] == "flip_tagged_titles"
     assert entry["rows"] == 4213
+
+
+def test_execute_bulk_reports_no_row_count_when_alembic_only_renders_the_statement():
+    """Offline mode writes the statement into a script and executes nothing, so `None` is the
+    truthful answer — reporting 0 would claim the statement ran and matched nothing."""
+    bind = mock.MagicMock(name="connection")
+    bind.execute.return_value = None
+
+    with capture_logs() as logs:
+        with mock.patch.object(helpers.op, "get_bind", return_value=bind):
+            rows = helpers.execute_bulk(REVISION, "flip_tagged_titles", UPDATE_SQL)
+
+    assert rows is None
+    assert [entry["rows"] for entry in logs if entry["event"] == "Migration data mutation"] == [None]

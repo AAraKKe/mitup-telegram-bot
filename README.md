@@ -9,7 +9,7 @@
 
 A Telegram bot that brings people together. Mitup lives in a private DM with you, never in your group chat. Create a meeting, share one message, and let Mitup handle RSVPs, reminders, and timezones for you.
 
-[Open @mitupbot on Telegram →](https://t.me/mitupbot)
+[Open @mitupbot on Telegram →](https://t.me/mitupbot?start=src_web)
 
 ## What it does
 

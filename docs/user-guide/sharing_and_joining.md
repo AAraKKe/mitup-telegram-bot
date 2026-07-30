@@ -206,7 +206,7 @@ After that, anyone in the chat can pull the meeting back up through [Mitup's inl
 
 ## Receiving a card with no account
 
-A shared card works for someone who has never opened Mitup. When they tap *✅ Join*{.button-like}, the bot signs them up from their Telegram profile and adds them to the meeting in one step. It can't send them a private message, because it has no way to reach someone who has never opened it. What they get instead is a popup on the card, confirming they're in and pointing them at [@mitupbot](https://t.me/mitupbot):
+A shared card works for someone who has never opened Mitup. When they tap *✅ Join*{.button-like}, the bot signs them up from their Telegram profile and adds them to the meeting in one step. It can't send them a private message, because it has no way to reach someone who has never opened it. What they get instead is a popup on the card, confirming they're in and pointing them at [@mitupbot](https://t.me/mitupbot?start=src_web):
 
 !!! quote "Welcome aboard"
 

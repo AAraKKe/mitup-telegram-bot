@@ -82,7 +82,9 @@ def user_section(user: User) -> dict[str, Any]:
         "username": user.username,
         "status": user.status.value,
         "supporter_level": user.supporter_level.value,
+        "acquisition_source": user.acquisition_source,
         "created_time": iso_utc(user.created_time),
+        "member_time": iso_utc(user.member_time),
     }
 
 

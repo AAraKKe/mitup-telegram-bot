@@ -1,6 +1,7 @@
 import pytest
 
-from mitup_bot.handlers.start_payload import INLINE_KIND, StartPayload, parse_start_payload
+from mitup_bot.acquisition import ACQUISITION_SOURCE_MAX_LENGTH, INLINE_KIND, SHARED_CARD_SOURCE
+from mitup_bot.handlers.start_payload import StartPayload, parse_start_payload, start_acquisition_source
 from mitup_bot.patreon.pairing import PAIRING_DEEP_LINK_PREFIX
 
 
@@ -40,3 +41,21 @@ def test_unknown_kind_parses_without_raising():
 def test_extra_arguments_are_ignored():
     # Telegram only ever sends one payload; anything after it is not part of the deep link.
     assert parse_start_payload(["inline", "junk"]) == StartPayload(kind=INLINE_KIND, token=None)
+
+
+@pytest.mark.parametrize(
+    ("args", "expected"),
+    [
+        (None, None),
+        ([], None),
+        (["src_web"], "src_web"),
+        (["I typed this myself"], None),
+        ([SHARED_CARD_SOURCE], None),
+        (["a" * (ACQUISITION_SOURCE_MAX_LENGTH + 1)], None),
+    ],
+    ids=["no-args", "empty-args", "deep-link", "hand-typed-text", "sentinel-forgery", "over-length"],
+)
+def test_only_a_well_formed_deep_link_payload_is_stamped(args: list[str] | None, expected: str | None):
+    """A `/start` argument is user text: anything that could not have come from a deep link is
+    dropped rather than stored, which is also what keeps the shared-card sentinel unclaimable."""
+    assert start_acquisition_source(args) == expected

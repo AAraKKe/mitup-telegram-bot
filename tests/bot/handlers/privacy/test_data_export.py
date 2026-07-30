@@ -37,6 +37,7 @@ def seed_exporter_with_social_graph(mock_session: MockDbSession) -> User:
     exporter = create_user(
         id=1, tg_user_id=EXPORTER_TG_USER_ID, username="exporter", last_name="Doe", owned_meetings=[own_meeting]
     )
+    exporter.acquisition_source = "src_web"
     friend = create_member(id=FRIEND_DB_ID, tg_user_id=FRIEND_TG_USER_ID)
     friend.first_name = "Friend Person"
     waiter = create_member(id=WAITER_DB_ID, tg_user_id=WAITER_TG_USER_ID)
@@ -71,6 +72,7 @@ async def test_export_contains_the_users_own_record_and_settings(mock_session: M
     assert export["user"]["last_name"] == "Doe"
     assert export["user"]["username"] == "exporter"
     assert export["user"]["status"] == "member"
+    assert export["user"]["acquisition_source"] == "src_web"
     assert export["settings"]["language"] == exporter.settings.language
     assert export["settings"]["timezone"] == exporter.settings.timezone
 

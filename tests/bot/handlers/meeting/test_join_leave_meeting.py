@@ -2,6 +2,7 @@ import pytest
 from telegram import Update
 
 import mitup_bot.utils.callbacks as cb
+from mitup_bot.acquisition import SHARED_CARD_SOURCE
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import JoinedUsers, User, utils
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
@@ -288,7 +289,9 @@ async def test_non_existent_user_joins_meeting(
     context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
     # Assert user has been registered
-    user = utils.user_from_update(handler_context.update, status=UserStatus.JOINED_ONLY)
+    user = utils.user_from_update(
+        handler_context.update, status=UserStatus.JOINED_ONLY, acquisition_source=SHARED_CARD_SOURCE
+    )
     mock_session.assert_object_added(user)
 
     # Message has been updated
@@ -297,6 +300,26 @@ async def test_non_existent_user_joins_meeting(
         text=MeetingJoinMessages.JOIN_UNREGISTERED.get(user=user.inline_name),
         show_alert=True,
     )
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.JOIN.with_id(1), from_bot_chat=False)], indirect=True
+)
+async def test_join_from_a_shared_card_stamps_the_new_row_with_that_surface(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    claim_shared_card: ClaimSharedCard,
+):
+    """Someone arriving through another user's shared card brings no deep-link payload, so the row
+    records the surface that created it instead."""
+    mock_session.add_object(user_with_settings.meetups[0])
+    claim_shared_card(user_with_settings.meetups[0])
+
+    await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
+
+    created_users = [obj for obj in mock_session.objects_added if isinstance(obj, User)]
+    assert [created.acquisition_source for created in created_users] == [SHARED_CARD_SOURCE]
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
@@ -406,7 +429,9 @@ async def test_non_existing_user_leaves_meeting(
     context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 
     # Assert user has been registered
-    user = utils.user_from_update(handler_context.update, status=UserStatus.JOINED_ONLY)
+    user = utils.user_from_update(
+        handler_context.update, status=UserStatus.JOINED_ONLY, acquisition_source=SHARED_CARD_SOURCE
+    )
     mock_session.assert_object_added(user)
 
     # Message has been updated

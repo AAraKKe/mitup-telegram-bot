@@ -8,6 +8,7 @@ from telegram import Update
 from telegram.ext import ApplicationHandlerStop, ConversationHandler
 
 from mitup_bot import docs_links, guards
+from mitup_bot.acquisition import normalize_acquisition_source
 from mitup_bot.exceptions import EffectiveUserNotSet
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Settings, User
@@ -49,7 +50,9 @@ def claim_update[**P](
     return wrapper
 
 
-async def get_or_create_onboarding_user(session: AsyncSession, update: Update) -> tuple[User, bool]:
+async def get_or_create_onboarding_user(
+    session: AsyncSession, update: Update, acquisition_source: str | None
+) -> tuple[User, bool]:
     """Return the `User` for the update and whether this call created it.
 
     The /start re-onboarding flow must serve three cases under one entry
@@ -58,6 +61,9 @@ async def get_or_create_onboarding_user(session: AsyncSession, update: Update) -
     attached Settings — the timezone conversation will then reset state and
     promote the user to MEMBER on success. The caller cannot tell the three
     apart afterwards, so the fork is named on the way out.
+
+    `acquisition_source` reaches only the created row: an existing one already records where its
+    owner first arrived, and this `/start` is a return visit rather than an arrival.
     """
     if update.effective_user is None:
         raise EffectiveUserNotSet(update)
@@ -77,6 +83,7 @@ async def get_or_create_onboarding_user(session: AsyncSession, update: Update) -
         tg_user_id=update.effective_user.id,
         last_name=update.effective_user.last_name,
         username=update.effective_user.username,
+        acquisition_source=acquisition_source,
         settings=Settings(language=locale_for_language_code(update.effective_user.language_code)),
     )
     session.add(new_user)
@@ -88,6 +95,7 @@ async def get_or_create_onboarding_user(session: AsyncSession, update: Update) -
         user_id=new_user.db_id,
         status=new_user.status.value,
         language=new_user.lang,
+        source=normalize_acquisition_source(acquisition_source).value,
         reason="no_existing_row",
     )
     return new_user, True
@@ -160,9 +168,9 @@ async def complete_onboarding(
         input_method=input_method.value,
         timezone=timezone,
         lang=user.lang,
+        source=normalize_acquisition_source(user.acquisition_source).value,
     )
 
-    context.put_feature_metric(Feature.NEW_USER_REGISTERED)
     context.put_feature_metric(
         Feature.SET_TIMEZONE, name=MetricKey.ERROR, value=0, properties={"InputMethod": input_method.value}
     )

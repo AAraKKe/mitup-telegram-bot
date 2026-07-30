@@ -3,6 +3,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from mitup_bot.acquisition import ACQUISITION_SOURCE_MAX_LENGTH
+
 pytestmark = pytest.mark.db_test
 
 
@@ -23,6 +25,24 @@ async def test_users_has_status_column(db_session: AsyncSession):
     # SQLAlchemy String(32) renders as character varying with length 32 on Postgres.
     assert data_type == "character varying"
     assert max_length == 32
+
+
+async def test_users_has_acquisition_source_column(db_session: AsyncSession):
+    """The `acquisition_source` column must exist on `users`, nullable, with a 64-char VARCHAR
+    backing — the width Telegram's deep-link payload cap gives it."""
+    result = (
+        await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+            text(
+                "SELECT is_nullable, data_type, character_maximum_length"
+                " FROM information_schema.columns"
+                " WHERE table_name='users' AND column_name='acquisition_source'"
+            )
+        )
+    ).one()
+    is_nullable, data_type, max_length = result
+    assert is_nullable == "YES"
+    assert data_type == "character varying"
+    assert max_length == ACQUISITION_SOURCE_MAX_LENGTH
 
 
 async def test_users_status_check_constraint_exists(db_session: AsyncSession):

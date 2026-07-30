@@ -9,11 +9,15 @@ Because ``_`` is also legal inside a token, the split takes the first separator 
 kind unambiguous no matter what the token contains.
 """
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-# Deep link that drops the user straight into meeting creation, used by the inline-query surface.
-INLINE_KIND = "inline"
+from mitup_bot.acquisition import ACQUISITION_SOURCE_MAX_LENGTH
+
+# An argument outside Telegram's payload character set cannot have been followed from a link, so it
+# was typed by hand.
+DEEP_LINK_PAYLOAD_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 
 @dataclass(frozen=True)
@@ -35,3 +39,18 @@ def parse_start_payload(args: Sequence[str] | None) -> StartPayload | None:
         return None
     kind, _, token = args[0].partition("_")
     return StartPayload(kind=kind, token=token or None)
+
+
+def start_acquisition_source(args: Sequence[str] | None) -> str | None:
+    """The value to stamp on a row a ``/start`` creates, or None when the command carries no link.
+
+    Only a well-formed deep-link payload is kept: a hand-typed argument attributes nothing and would
+    put arbitrary text in the column, so it is treated the same as a bare ``/start``.
+    """
+    if not args:
+        return None
+
+    payload = args[0]
+    if len(payload) > ACQUISITION_SOURCE_MAX_LENGTH or DEEP_LINK_PAYLOAD_RE.fullmatch(payload) is None:
+        return None
+    return payload

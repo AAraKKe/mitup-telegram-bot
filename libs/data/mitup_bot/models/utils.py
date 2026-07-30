@@ -9,8 +9,13 @@ if TYPE_CHECKING:  # pragma: no cover
     from telegram import Update
 
 
-def user_from_update(update: Update, status: UserStatus = UserStatus.MEMBER) -> User:
-    """Given an update with an effective user, return a new User instance with properties from the effective user."""
+def user_from_update(
+    update: Update, status: UserStatus = UserStatus.MEMBER, acquisition_source: str | None = None
+) -> User:
+    """Given an update with an effective user, return a new User instance with properties from the effective user.
+
+    `acquisition_source` is the arrival stamp, which only a row's creation may set.
+    """
     if update.effective_user is None:
         raise EffectiveUserNotSet(update)
 
@@ -20,6 +25,7 @@ def user_from_update(update: Update, status: UserStatus = UserStatus.MEMBER) -> 
         last_name=update.effective_user.last_name,
         username=update.effective_user.username,
         status=status,
+        acquisition_source=acquisition_source,
         settings=Settings(),
     )
 

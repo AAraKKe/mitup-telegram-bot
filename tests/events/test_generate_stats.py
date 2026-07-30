@@ -3,6 +3,7 @@ from sqlmodel import Integer, and_, cast, col, false, func, null, or_, select, t
 from sqlmodel.sql.expression import Select, SelectOfScalar
 from structlog.testing import capture_logs
 
+from mitup_bot.acquisition import ACQUISITION_SOURCE_DIMENSION, AcquisitionSource
 from mitup_bot.events import generate_stats
 from mitup_bot.models import JoinedUsers, Meetup, Settings, SupporterSubscription, User
 from mitup_bot.models.users import UserStatus
@@ -51,6 +52,15 @@ def language_stats_statement() -> Select:
         .join(User, col(Settings.user_id) == col(User.id))
         .where(User.status == UserStatus.MEMBER)
         .group_by(Settings.language)
+    )
+
+
+def new_members_statement() -> Select:
+    """Rebuild the per-source new-member count select `new_members_stats` issues."""
+    return (
+        select(User.acquisition_source, func.count())
+        .where(User.member_time > generate_stats.PAST_24H)
+        .group_by(User.acquisition_source)
     )
 
 
@@ -208,6 +218,63 @@ async def test_users_stats_language_gauges_cannot_mint_a_series_from_the_databas
         for language in [*SUPPORTED_LANGUAGES, generate_stats.OTHER_LANGUAGE_BUCKET]
     }
     assert emitted_names == allowed_names
+
+
+async def test_new_members_are_grouped_into_the_closed_vocabulary_with_zeros_for_the_rest(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    """Raw stored payloads collapse onto `AcquisitionSource` before they reach the dimension — two
+    campaign links to the same place are one series, an unrecognized one lands in `other`. Every
+    source reports every run, so a channel that stops producing members shows a run of real zeros
+    instead of a gap the dashboard cannot tell from a broken job."""
+    mock_session.add_objects_with_statement(
+        new_members_statement(),
+        (("src_web", 4), (None, 3), ("card:shared", 2), ("src_unheardof", 1), ("nonsense", 1)),
+    )
+
+    await generate_stats.new_members_stats(mock_session, metrics_client)
+    await metrics_client.flush()
+
+    def emitted_for(source: AcquisitionSource) -> list[float]:
+        dimension = (ACQUISITION_SOURCE_DIMENSION, source.value)
+        return [
+            record.value
+            for record in metrics_client.records
+            if record.name == str(MetricKey.NEW_MEMBERS) and dimension in record.dimensions
+        ]
+
+    assert emitted_for(AcquisitionSource.WEB) == [4]
+    assert emitted_for(AcquisitionSource.ORGANIC) == [3]
+    assert emitted_for(AcquisitionSource.SHARED_CARD) == [2]
+    # Both unrecognized values fall into the same bucket rather than minting dimension values.
+    assert emitted_for(AcquisitionSource.OTHER) == [2]
+    assert emitted_for(AcquisitionSource.INLINE) == [0]
+    assert emitted_for(AcquisitionSource.DIRECTORY) == [0]
+
+    emitted_sources = {
+        value
+        for record in metrics_client.records
+        if record.name == str(MetricKey.NEW_MEMBERS)
+        for key, value in record.dimensions
+        if key == ACQUISITION_SOURCE_DIMENSION
+    }
+    assert emitted_sources == {source.value for source in AcquisitionSource}
+
+
+async def test_new_members_reports_every_source_as_zero_when_nobody_joined(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    await generate_stats.new_members_stats(mock_session, metrics_client)
+    await metrics_client.flush()
+
+    for source in AcquisitionSource:
+        metrics.assert_emitted(
+            name=MetricKey.NEW_MEMBERS,
+            value=0,
+            unit=MetricUnit.COUNT,
+            dimensions={ACQUISITION_SOURCE_DIMENSION: source.value},
+        )
+    metrics.assert_not_emitted(name=MetricKey.FAULT)
 
 
 async def test_meetings_stats_buckets_every_meeting(
@@ -391,6 +458,7 @@ async def test_run_closes_with_one_line_carrying_every_collector(
     # Families that grow with the enum/catalogue ride as one structured field each.
     assert set(generated["member_users_by_language"]) >= set(SUPPORTED_LANGUAGES)
     assert set(generated["supporters_by_level"]) == {level.value for level in SupporterLevel}
+    assert set(generated["new_members_24h_by_source"]) == {source.value for source in AcquisitionSource}
 
     # Nothing registered a row, so every one of the five multi-column aggregates reports it.
     warned = {entry["query"] for entry in logs if entry["event"] == "Stats query returned no rows"}

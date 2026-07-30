@@ -94,7 +94,7 @@ scheme = "default"
 [[project.extra.social]]
 icon = "fontawesome/brands/telegram"
 name = "Bot"
-link = "https://t.me/mitupbot"
+link = "https://t.me/mitupbot?start=src_web"
 
 [project.markdown_extensions.abbr]
 [project.markdown_extensions.admonition]

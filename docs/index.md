@@ -25,7 +25,7 @@ hide:
 A friendly bot that lives in your DMs, not in your group chat. Create a meeting, share one message, and let Mitup handle RSVPs, reminders, and time-zones for you.
 
 <div class="hero-ctas" markdown>
-[:fontawesome-solid-paper-plane: Start with @mitupbot](https://t.me/mitupbot){.md-button .md-button--primary}
+[:fontawesome-solid-paper-plane: Start with @mitupbot](https://t.me/mitupbot?start=src_web){.md-button .md-button--primary}
 [See it in action ↓](#flow){.md-button}
 </div>
 
@@ -149,6 +149,6 @@ Mitup runs without ads, kept going by a community of monthly members. Pick a tie
 
 <div class="hero" markdown style="padding-top: 1rem; padding-bottom: 4rem;">
 
-[:fontawesome-solid-paper-plane: Plan your first meeting now](https://t.me/mitupbot){.md-button .md-button--primary}
+[:fontawesome-solid-paper-plane: Plan your first meeting now](https://t.me/mitupbot?start=src_web){.md-button .md-button--primary}
 
 </div>

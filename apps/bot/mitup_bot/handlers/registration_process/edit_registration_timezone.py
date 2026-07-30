@@ -8,6 +8,7 @@ from telegram.ext import ApplicationHandlerStop, ConversationHandler, filters
 from mitup_bot import guards, timezone_api
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.handlers.start_payload import start_acquisition_source
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature
@@ -58,7 +59,7 @@ async def start_onboarding(
         log.info("Onboarding entry declined", user_id=member.db_id, reason="already_member")
         return None
 
-    user, is_new_user = await get_or_create_onboarding_user(session, update)
+    user, is_new_user = await get_or_create_onboarding_user(session, update, start_acquisition_source(context.args))
     if user.status is UserStatus.DELETION_REQUESTED:
         log.info("Onboarding refused", user_id=user.db_id, status=user.status.value, reason="deletion_requested")
         await context.api.send_message(update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.get(lang=user.lang))

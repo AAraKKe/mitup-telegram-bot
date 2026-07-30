@@ -4,6 +4,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot import guards
+from mitup_bot.acquisition import SHARED_CARD_SOURCE
 from mitup_bot.db import racy_flush, with_session
 from mitup_bot.exceptions import EffectiveUserNotSet, UserNotFound
 from mitup_bot.handlers.registry import HandlersRegistry
@@ -78,7 +79,7 @@ async def register_default_user(session: AsyncSession, update: Update) -> User:
     if update.effective_user is None:  # pragma: no cover
         raise EffectiveUserNotSet(update)
 
-    new_user = utils.user_from_update(update, status=UserStatus.JOINED_ONLY)
+    new_user = utils.user_from_update(update, status=UserStatus.JOINED_ONLY, acquisition_source=SHARED_CARD_SOURCE)
     session.add(new_user)
     await session.flush()
     # The join/leave paths read the new user's collections right away (joined_meeting, and

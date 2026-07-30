@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlmodel import Integer, and_, cast, col, distinct, false, func, literal, null, or_, select, true
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from mitup_bot.acquisition import ACQUISITION_SOURCE_DIMENSION, AcquisitionSource, normalize_acquisition_source
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.db import with_session
 from mitup_bot.models import JoinedUsers, Meetup, Message, Settings, SupporterSubscription, User
@@ -114,6 +115,36 @@ async def users_stats(session: AsyncSession, metrics: MetricsClient) -> dict[str
         "new_users_24h": counts[6],
         "member_users_by_language": counts_by_language,
     }
+
+
+async def new_members_stats(session: AsyncSession, metrics: MetricsClient) -> dict[str, Any]:
+    """Count the users who completed onboarding in the last 24 hours, by where they arrived from.
+
+    Grouping happens in SQL on the raw stored value and normalization in Python, so the query stays
+    one row per distinct payload — a bounded number of them — while the dimension only ever carries
+    a value from the closed vocabulary. Grouping on a normalized expression is not an option: the
+    raw column is user text, and mapping it in SQL would duplicate the rules.
+    """
+    members_by_raw_source = (
+        await session.exec(
+            select(User.acquisition_source, func.count())
+            .where(User.member_time > PAST_24H)
+            .group_by(User.acquisition_source)
+        )
+    ).all()
+
+    counts_by_source = dict.fromkeys(AcquisitionSource, 0)
+    for raw_source, count in members_by_raw_source:
+        counts_by_source[normalize_acquisition_source(raw_source)] += count
+
+    # Every source reports every run, zero included: a sparse series cannot distinguish a channel
+    # that dried up from one nobody has queried yet, and only a real zero can be alarmed on.
+    for source, count in counts_by_source.items():
+        metrics.emit(
+            MetricKey.NEW_MEMBERS, count, MetricUnit.COUNT, dimensions={ACQUISITION_SOURCE_DIMENSION: source.value}
+        )
+
+    return {"new_members_24h_by_source": {source.value: count for source, count in counts_by_source.items()}}
 
 
 async def meetings_stats(session: AsyncSession, metrics: MetricsClient) -> dict[str, Any]:
@@ -274,6 +305,7 @@ async def run(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsCl
     collected: dict[str, Any] = {}
     for collect_stats in (
         users_stats,
+        new_members_stats,
         meetings_stats,
         meeting_activity_stats,
         participation_stats,

@@ -6,6 +6,7 @@ import pytest
 from telegram import Location, Message, Update
 from telegram.ext import ConversationHandler
 
+from mitup_bot.acquisition import AcquisitionSource
 from mitup_bot.handlers.registration_process.edit_registration_timezone import (
     registration_timezone_location_message_handler,
 )
@@ -77,7 +78,27 @@ async def test_registration_timezone_message_handler_set_the_correct_timezone_an
         dimensions={"Feature": str(Feature.SET_TIMEZONE)},
         properties={"InputMethod": "message"},
     )
-    metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.NEW_USER_REGISTERED)})
+
+
+@pytest.mark.parametrize("update", ([UpdateRequest(message_text="Something")]), indirect=True)
+async def test_completed_registration_names_the_source_the_user_arrived_from(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    get_timezone_from_api: mock.MagicMock,
+    user_with_settings: User,
+    caplog: pytest.LogCaptureFixture,
+):
+    """The closing funnel line carries the normalized source, never the raw payload the sender
+    chose."""
+    caplog.set_level(logging.INFO)
+    user_with_settings.acquisition_source = "src_web"
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    get_timezone_from_api.return_value = cast(Message, update.effective_message).text
+
+    await call_handler(RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT, handler_context=handler_context)
+
+    assert log_record(caplog, "Onboarding completed").__dict__["source"] == AcquisitionSource.WEB.value
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(message_text="some text")]), indirect=True)
@@ -119,7 +140,6 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
         dimensions={"Feature": str(Feature.SET_TIMEZONE)},
         properties={"InputMethod": "message"},
     )
-    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.NEW_USER_REGISTERED)})
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(location=Location(123.6, 103.5))]), indirect=True)

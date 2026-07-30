@@ -5,13 +5,14 @@ from telegram import Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot import guards, views
+from mitup_bot.acquisition import INLINE_KIND
 from mitup_bot.db import with_session
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.utils.entities import build_datetime_link
 
 from .command_enums import CommandsId
 from .registry import HandlersRegistry
-from .start_payload import INLINE_KIND, StartPayload, parse_start_payload
+from .start_payload import StartPayload, parse_start_payload
 
 if TYPE_CHECKING:
     # Runtime import would be circular (the meeting package pulls in create_meeting.py,

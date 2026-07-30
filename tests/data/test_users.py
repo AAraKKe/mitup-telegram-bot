@@ -175,3 +175,46 @@ def test_writing_the_status_a_user_already_has_changes_and_records_nothing():
 
     assert user.left_time == dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
     assert not [entry for entry in logs if entry["event"] == "User status changed"]
+
+
+def test_becoming_a_member_stamps_member_time_even_when_the_status_does_not_change():
+    """A row is MEMBER from the model default, so the promotion that ends onboarding asks for the
+    status it already holds — and that call is the moment being recorded. Were the stamp behind the
+    no-op check, every user who onboarded from scratch would have none."""
+    user = create_user(id=9, tg_user_id=990, status=UserStatus.MEMBER)
+    before = dt.datetime.now(dt.UTC)
+
+    user.set_status(UserStatus.MEMBER)
+
+    assert user.member_time is not None
+    assert before <= user.member_time <= dt.datetime.now(dt.UTC)
+
+
+def test_re_onboarding_restamps_member_time():
+    """Someone who left and came back became a member again, and the stamp names the latest time
+    they did — as `left_time` names the latest departure."""
+    first_time = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+    user = create_user(id=11, tg_user_id=1110, status=UserStatus.LEFT)
+    user.member_time = first_time
+
+    user.set_status(UserStatus.MEMBER)
+
+    assert user.member_time is not None
+    assert user.member_time > first_time
+
+
+@pytest.mark.parametrize(
+    "status",
+    [UserStatus.LEFT, UserStatus.JOINED_ONLY, UserStatus.DELETION_REQUESTED],
+    ids=lambda status: status.value,
+)
+def test_leaving_member_status_keeps_the_time_the_user_became_one(status: UserStatus):
+    """Unlike `left_time`, this stamp is not about the current status: it records that the user was
+    a member once, which stays true after they stop being one."""
+    stamped = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+    user = create_user(id=12, tg_user_id=1210, status=UserStatus.MEMBER)
+    user.member_time = stamped
+
+    user.set_status(status)
+
+    assert user.member_time == stamped

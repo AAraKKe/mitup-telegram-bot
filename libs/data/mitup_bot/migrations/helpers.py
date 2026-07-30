@@ -41,14 +41,19 @@ def remove_updated_time_trigger(table_name: str):
     op.execute(f"DROP TRIGGER IF EXISTS {table_name}_updated_time_timestamp ON {table_name}")
 
 
-def execute_bulk(revision: str, statement_tag: str, statement: str | sa.Executable) -> int:
+def execute_bulk(revision: str, statement_tag: str, statement: str | sa.Executable) -> int | None:
     """Run a bulk data mutation and record how many rows it changed, returning that count.
 
     Alembic reports only that a revision ran, so a statement that matched nothing and one that
     rewrote every row are indistinguishable afterwards — which is what makes a mass rewrite of user
     content unauditable. `statement_tag` is a short stable name for the statement, so a revision
-    holding several mutations stays readable. Requires a live connection; not usable in offline mode.
+    holding several mutations stays readable.
+
+    Offline mode writes the statement into a SQL script instead of running it, and reports no row
+    count. That case logs `rows=None` rather than a number nothing counted, which is what keeps it
+    distinguishable from a run that genuinely matched no row.
     """
     result = op.get_bind().execute(sa.text(statement) if isinstance(statement, str) else statement)
-    log.info("Migration data mutation", revision=revision, statement=statement_tag, rows=result.rowcount)
-    return result.rowcount
+    rows = result.rowcount if result is not None else None
+    log.info("Migration data mutation", revision=revision, statement=statement_tag, rows=rows)
+    return rows

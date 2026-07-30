@@ -4,13 +4,14 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
 import structlog
-from sqlalchemy import BigInteger, Column, DateTime, Enum, FetchedValue
+from sqlalchemy import BigInteger, Column, DateTime, Enum, FetchedValue, String
 from sqlalchemy.orm import QueryableAttribute, selectinload
 from sqlalchemy.orm.interfaces import LoaderOption
 from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import supporter
+from mitup_bot.acquisition import ACQUISITION_SOURCE_MAX_LENGTH
 from mitup_bot.exceptions import UserNotFound
 from mitup_bot.supporter import SupporterLevel
 
@@ -65,8 +66,20 @@ class User(BaseModel, SQLModel, table=True):
     # When the user entered LEFT status, NULL in every other status. `user_cleanup` measures the
     # LEFT grace period against it, so `set_status` owns the value rather than each caller.
     left_time: dt.datetime | None = None
+    # When the user last became a MEMBER, which is the moment onboarding completed rather than the
+    # moment the row appeared. NULL for a row whose owner never finished onboarding, and for every
+    # row that predates the column. `set_status` owns the value, as it does for `left_time`.
+    member_time: dt.datetime | None = None
     last_name: str | None = None
     username: str | None = None
+    # Where this user arrived from: the raw `/start` deep-link payload, or a sentinel naming the
+    # surface that created the row. Written once at creation and never rewritten, so a later visit
+    # cannot restate an origin; NULL where no surface owns the arrival. The stored value is
+    # client-forgeable, so it is mapped to a bounded vocabulary before any log line or metric
+    # dimension carries it (see `mitup_bot.acquisition`).
+    acquisition_source: str | None = Field(
+        default=None, sa_column=Column(String(ACQUISITION_SOURCE_MAX_LENGTH), nullable=True)
+    )
     # Kept directly on User (rather than joined from supporter_subscriptions) so every handler that
     # gates on support status reads it without a join; the recurring job and OAuth callback keep it
     # in sync with the subscription row. native_enum=False keeps the column a plain VARCHAR (no DB
@@ -197,17 +210,25 @@ class User(BaseModel, SQLModel, table=True):
         return self.settings.language
 
     def set_status(self, status: UserStatus):
-        """Move the user to `status`, keeping `left_time` in sync with it.
+        """Move the user to `status`, keeping `left_time` and `member_time` in sync with it.
 
         Every status write goes through here: `left_time` drives the LEFT grace period, and a
         status assigned around this method would leave the stamp describing a status the user
         is no longer in. A write that changes nothing is dropped, so re-detecting a departure
         cannot restart a grace period that is already running.
 
+        `member_time` is stamped by every write asking for MEMBER, dropped or not: a row starts out
+        MEMBER by model default, so the promotion that ends onboarding asks for the status it
+        already holds, and that call is the moment the user became one. Latest wins, so a returning
+        user who onboards again re-stamps it, the way `left_time` records the latest departure.
+
         This is also the one place a from/to transition and the grace stamp are both in hand, so
         it is where the transition is recorded — its callers otherwise spell the same event four
         different ways, or say nothing at all.
         """
+        if status is UserStatus.MEMBER:
+            self.member_time = dt.datetime.now(dt.UTC)
+
         if status is self.status:
             return
 

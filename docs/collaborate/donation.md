@@ -66,7 +66,7 @@ Patreon also lets you pledge a custom amount. You get the highest tier your pled
 ## How the perks turn on
 
 1. Pick a tier on [the Mitup Patreon page](https://www.patreon.com/cw/MitupBot/membership).
-2. Open [@mitupbot](https://t.me/mitupbot) and tap *♥ Collaborate*{.button-like} in the main menu.
+2. Open [@mitupbot](https://t.me/mitupbot?start=src_web) and tap *♥ Collaborate*{.button-like} in the main menu.
 3. Tap the button to link your Patreon account. Patreon asks you to confirm, then sends you back.
 4. That's the whole setup. Your badge and limits follow your Patreon membership automatically: pledge and they turn on, and it works in either order, so you can link first and become a member later.
 

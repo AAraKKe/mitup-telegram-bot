@@ -208,6 +208,11 @@ class MetricKey(CamelCaseStrEnum):
     PATREON_LINK_REFUSED = auto()
     """Pending Patreon links erased by the cleanup run (expired, spent, or purged with their user)"""
     PATREON_PENDING_LINKS_DELETED = auto()
+    NEW_MEMBERS = auto()
+    """Users who completed onboarding in the last 24 hours, split by the `AcquisitionSource`
+    dimension and reported once per source each run, zeros included. Read by the new-members widget
+    on the infra dashboard, which needs the dense series: a source that stops producing members is
+    only visible as a run of real zeros."""
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"
@@ -215,7 +220,6 @@ class MetricKey(CamelCaseStrEnum):
 
 class Feature(CamelCaseStrEnum):
     SET_TIMEZONE = auto()
-    NEW_USER_REGISTERED = auto()
     CREATE_MEETING = auto()
     EDIT_MEETING = auto()
     REACTIVATE_MEETING = auto()

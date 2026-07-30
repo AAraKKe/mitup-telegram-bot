@@ -6,7 +6,7 @@ icon: material/rocket-launch-outline
 
 Mitup runs entirely as a private conversation with you. Unlike other bots, it doesn't need to be added to your group. It works without any group context or permissions.
 
-Open [@mitupbot](https://t.me/mitupbot) and tap Start to begin the chat. Mitup then asks for your timezone, and once that's set the main menu appears.
+Open [@mitupbot](https://t.me/mitupbot?start=src_web) and tap Start to begin the chat. Mitup then asks for your timezone, and once that's set the main menu appears.
 
 ## Set your timezone
 
