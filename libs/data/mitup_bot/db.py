@@ -24,7 +24,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot.config import DbConfig
 from mitup_bot.models import MeetupLocation, MessageButtons
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit, current_metrics_client
 
 if TYPE_CHECKING:  # pragma: no cover
     # ContextOrBotAdapter reaches python-telegram-bot via mitup_bot.protocols; keeping the import
@@ -174,8 +174,10 @@ def configure_db(db_config: DbConfig, skip_if_initialized: bool = False, metrics
     """Configure the db module by creating the engine and the session factory.
 
     Passing a `metrics_client` enables connection-pool observability: pool-event gauges plus
-    the checkout wait time and pool-timeout counters emitted by `begin()`. Callers without a
-    metrics pipeline (CLI commands, unit tests) omit it and get an uninstrumented pool.
+    the checkout wait time and pool-timeout counters emitted by `begin()`. It both switches the
+    sampling on and takes the samples raised outside any instrumented invocation — see
+    `record_pool_sample`. Callers without a metrics pipeline (CLI commands, unit tests) omit it
+    and get an uninstrumented pool.
     """
     global __sessionmaker, __pool_metrics
 
@@ -206,17 +208,45 @@ def checked_out_connections(sync_engine: Engine) -> int:
     return pool.checkedout()
 
 
+def record_pool_sample(
+    configured: MetricsClient | None,
+    name: MetricKey,
+    value: float = 1.0,
+    unit: MetricUnit = MetricUnit.COUNT,
+):
+    """Write one connection-pool sample onto the client accountable for it.
+
+    Inside an instrumented invocation that is the invocation's own client, so the sample joins its
+    flush window and inherits the correlation key already on those records — `update_id` in the
+    bot, `run_id` in the events runner — and pool pressure is readable against the update or run
+    that raised it. Outside one — the web layer serving a Patreon request, a CLI command — the
+    sample rides `configured`, the client `configure_db` was given, which also gates the sampling:
+    without it the pool is uninstrumented.
+
+    An invocation's own dimensions ride the sample as EMF properties rather than as dimensions:
+    the pool series are process-wide and their alarms read them dimensionless, so which invocation
+    a sample was attributed to must not decide which series it lands in.
+    """
+    if configured is None:
+        return
+    client = current_metrics_client() or configured
+    client.emit_aggregate(name, value, unit)
+
+
 def instrument_pool(engine: AsyncEngine, metrics: MetricsClient):
     """Attach pool-event listeners emitting the in-use gauge and connection-open counter.
 
-    The listeners are synchronous (SQLAlchemy pool events) so they only accumulate records;
-    `begin()` flushes the shared client once per transaction, after the checkin has fired.
+    The listeners are synchronous (SQLAlchemy pool events) so they only accumulate records; the
+    client each sample lands on is flushed by whoever owns it — the invocation on the stack, or
+    `begin()` once per transaction outside one, after the checkin has fired. SQLAlchemy drives
+    them in the greenlet running the async connection, which carries the awaiting task's context,
+    so the invocation's client is visible from inside them.
     """
     sync_engine = engine.sync_engine
 
     @event.listens_for(sync_engine, "connect")
     def emit_connection_opened(dbapi_connection: DBAPIConnection, connection_record: ConnectionPoolEntry):
-        metrics.emit(MetricKey.DB_POOL_CONNECTIONS_OPENED)
+        record_pool_sample(metrics, MetricKey.DB_POOL_CONNECTIONS_OPENED)
 
     @event.listens_for(sync_engine, "checkout")
     def emit_checkout_gauge(
@@ -224,13 +254,13 @@ def instrument_pool(engine: AsyncEngine, metrics: MetricsClient):
         connection_record: ConnectionPoolEntry,
         connection_proxy: PoolProxiedConnection,
     ):
-        metrics.emit(MetricKey.DB_POOL_CONNECTIONS_IN_USE, checked_out_connections(sync_engine))
+        record_pool_sample(metrics, MetricKey.DB_POOL_CONNECTIONS_IN_USE, checked_out_connections(sync_engine))
 
     @event.listens_for(sync_engine, "checkin")
     def emit_checkin_gauge(dbapi_connection: DBAPIConnection, connection_record: ConnectionPoolEntry):
         # The checkin event fires before the pool's bookkeeping releases the connection, so
         # subtract the one being returned to report the post-release level (reaching 0 idle).
-        metrics.emit(MetricKey.DB_POOL_CONNECTIONS_IN_USE, checked_out_connections(sync_engine) - 1)
+        record_pool_sample(metrics, MetricKey.DB_POOL_CONNECTIONS_IN_USE, checked_out_connections(sync_engine) - 1)
 
 
 async def acquire_timed_connection(session: AsyncSession):
@@ -244,15 +274,14 @@ async def acquire_timed_connection(session: AsyncSession):
     try:
         await session.connection()
     except PoolTimeoutError:
-        if __pool_metrics is not None:
-            __pool_metrics.emit(MetricKey.DB_POOL_TIMEOUT)
+        record_pool_sample(__pool_metrics, MetricKey.DB_POOL_TIMEOUT)
         raise
-    if __pool_metrics is not None:
-        __pool_metrics.emit(
-            MetricKey.DB_POOL_CHECKOUT_WAIT_TIME,
-            (time.perf_counter() - checkout_started) * 1000,
-            MetricUnit.MILLISECONDS,
-        )
+    record_pool_sample(
+        __pool_metrics,
+        MetricKey.DB_POOL_CHECKOUT_WAIT_TIME,
+        (time.perf_counter() - checkout_started) * 1000,
+        MetricUnit.MILLISECONDS,
+    )
 
 
 @asynccontextmanager
@@ -274,9 +303,11 @@ async def begin() -> AsyncGenerator[AsyncSession]:
                 yield session
         finally:
             __active_connections[context] -= 1
-            if __pool_metrics is not None:
-                # The commit above released the connection, so this transaction's checkin
-                # gauge is already accumulated: one EMF line flushed per transaction.
+            if __pool_metrics is not None and current_metrics_client() is None:
+                # The commit above released the connection, so this transaction's checkin gauge is
+                # already accumulated: one EMF line flushed per transaction. Only the samples that
+                # had no invocation to ride are this layer's to flush — an invocation closes the
+                # window its own samples joined.
                 await __pool_metrics.flush()
 
 

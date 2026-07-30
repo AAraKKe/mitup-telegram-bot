@@ -228,6 +228,23 @@ client = MetricsClient(EmfBackend(), base_dimensions={"EventType": event_type.va
 client.emit(MetricKey.FAULT, 1, MetricUnit.COUNT, emit_global=True)
 ```
 
+## Process-level samples inside an invocation
+
+A sample raised by a shared resource rather than by the work in hand — the connection pool is the
+one such source — is attributed the same way an outbound call is: it rides
+`current_metrics_client()`, joining the invocation's flush window and inheriting its correlation
+key, and falls back to a process-scoped client outside any invocation. `db.record_pool_sample` is
+the reference implementation.
+
+<critical_rules>
+Such a sample must be written with `MetricsClient.emit_aggregate()`, never `emit()`. The series is
+process-wide and its alarm reads it dimensionless, so the dimensions must not depend on which
+invocation happened to be on the stack — `emit_aggregate` drops the client's `base_dimensions` and
+re-attaches them as EMF properties, keeping one series while the attribution rides the record.
+Routing such a sample through `emit()` re-dimensions it per invocation (`EventType` in the events
+runner), which mints a series per value and empties the one the alarm watches.
+</critical_rules>
+
 <note>
 `BotAdapter` delegates metrics to the `MetricsClient` provided at construction. When a real backend (e.g., `EmfBackend`) is used, metrics are emitted normally. For convenience, `build_api(bare_ext_bot)` defaults to `NullBackend` when metrics are not needed (see the `api-wrapper` skill).
 </note>

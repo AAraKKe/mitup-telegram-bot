@@ -10,7 +10,7 @@ user-invocable: false
 
 The database layer lives in `libs/data/mitup_bot/db.py`. It uses SQLAlchemy's **async engine** (psycopg 3 driver) with SQLModel's `AsyncSession`, managed through an `async_sessionmaker` configured at startup via `configure_db()`. Pool sizing comes from `DbConfig` (`pool_size` / `max_overflow` / `pool_timeout`), and the update-concurrency cap (`bot.concurrent_updates`) must fit inside it — `Config` validates `cap ≤ pool_size + max_overflow − POOL_CONNECTION_HEADROOM` at startup, keeping connections free for the job queue and reconcile transactions.
 
-**Pool observability:** when `configure_db()` receives a `metrics_client` (the bot runtime always passes one; CLI commands don't), pool events emit the `DbPool*` metrics defined in `MetricKey`, and `begin()` eagerly checks out the transaction's connection so pool wait time and pool timeouts are measured at transaction start, flushing the accumulated records once per transaction.
+**Pool observability:** when `configure_db()` receives a `metrics_client` (the bot runtime always passes one; CLI commands don't), pool events emit the `DbPool*` metrics defined in `MetricKey`, and `begin()` eagerly checks out the transaction's connection so pool wait time and pool timeouts are measured at transaction start. Every sample goes through `record_pool_sample`, which attributes it to the invocation on the stack — so pool pressure is readable against the update or run that raised it — and leaves that invocation to flush it; only the samples raised outside one ride the configured client, which `begin()` flushes once per transaction. See the `monitoring` skill for why they are written with `emit_aggregate`.
 
 **Never create sessions manually.** Use the session-injecting decorator instead.
 

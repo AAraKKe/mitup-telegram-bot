@@ -41,17 +41,35 @@ class MetricsClient:
     ):
         """Emit a metric record through the backend.
 
-        `emit_global=True` additionally emits a dimensionless copy that drops the client's
-        `base_dimensions` but keeps them as EMF properties. This gives an aggregate series
-        (no dimensions) to alarm on across every base-dimension value, while Logs Insights can
-        still break the aggregate down by the promoted properties.
+        `emit_global=True` additionally emits the aggregate copy (see `emit_aggregate`), giving a
+        series to alarm on across every base-dimension value while Logs Insights can still break
+        the aggregate down by the promoted properties.
         """
         merged_dims = {**self._base_dimensions, **(dimensions or {})}
         self._emit_record(name, value, unit, merged_dims, properties or {})
 
         if emit_global:
-            global_properties = {**self._base_dimensions, **(properties or {})}
-            self._emit_record(name, value, unit, dict(dimensions or {}), global_properties)
+            self.emit_aggregate(name, value, unit, dimensions=dimensions, properties=properties)
+
+    def emit_aggregate(
+        self,
+        name: str | MetricKey = MetricKey.COUNT,
+        value: float = 1.0,
+        unit: MetricUnit = MetricUnit.COUNT,
+        *,
+        dimensions: dict[str, str] | None = None,
+        properties: dict[str, Any] | None = None,
+    ):
+        """Emit one record that drops the client's `base_dimensions` and keeps them as EMF
+        properties instead.
+
+        The record's series is then the caller's own dimensions and nothing else, whichever client
+        it rides. That is what lets a sample belonging to the process rather than to one invocation
+        join an invocation's flush window — inheriting its correlation key — without that
+        invocation's dimensions renaming the series an alarm reads.
+        """
+        aggregate_properties = {**self._base_dimensions, **(properties or {})}
+        self._emit_record(name, value, unit, dict(dimensions or {}), aggregate_properties)
 
     def _emit_record(
         self,

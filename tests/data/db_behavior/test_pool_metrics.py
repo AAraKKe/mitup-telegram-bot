@@ -13,7 +13,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import db
 from mitup_bot.config import DbConfig
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit, bound_metrics_client
 from tests.helpers import make_test_metrics_client
 from tests.helpers.monitoring import MetricAssertions
 
@@ -41,6 +41,30 @@ async def test_begin_emits_gauges_and_wait_time_on_real_checkout(
     pool_metrics.assert_emitted(
         name=MetricKey.DB_POOL_CHECKOUT_WAIT_TIME, value=None, unit=MetricUnit.MILLISECONDS, times=1
     )
+
+
+async def test_pool_gauges_ride_the_invocation_client(db_session: AsyncSession, pool_metrics: MetricAssertions):
+    """SQLAlchemy fires the pool listeners from the greenlet driving the connection, so the honest
+    proof that a gauge reaches the invocation that caused it is a real checkout under a bound
+    client."""
+    invocation_client = make_test_metrics_client(base_dimensions={"EventType": "user_cleanup"})
+
+    with bound_metrics_client(invocation_client):
+        async with db.begin():
+            ...
+
+    # Checkout and checkin, both attributed to the invocation and both still dimensionless: the
+    # invocation's base dimension rides them as a property instead.
+    MetricAssertions(invocation_client).assert_emitted(
+        name=MetricKey.DB_POOL_CONNECTIONS_IN_USE,
+        value=None,
+        dimensions={},
+        dimensions_exact=True,
+        properties={"EventType": "user_cleanup"},
+        properties_exact=True,
+        times=2,
+    )
+    pool_metrics.assert_not_emitted(name=MetricKey.DB_POOL_CONNECTIONS_IN_USE)
 
 
 async def test_instrumented_pool_reports_opens_and_in_use_levels(live_db_config: DbConfig):

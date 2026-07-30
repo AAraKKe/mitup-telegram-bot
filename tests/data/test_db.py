@@ -18,12 +18,12 @@ from mitup_bot.config import DbConfig
 from mitup_bot.models import Meetup, MeetupLocation
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit, bound_metrics_client
 from mitup_bot.protocols import ContextOrBotAdapter
 from tests.helpers import make_test_metrics_client
 from tests.helpers.db_errors import integrity_error
 from tests.helpers.fixtures import create_meetup, create_message, create_user
-from tests.helpers.monitoring import MetricAssertions
+from tests.helpers.monitoring import FlushCountingBackend, MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -149,6 +149,55 @@ async def test_begin_emits_pool_timeout_and_reraises(mock_session: MockDbSession
     pool_assertions.assert_emitted(name=MetricKey.DB_POOL_TIMEOUT, value=1, times=1)
     # A timed-out checkout never acquired a connection, so no wait time is recorded for it.
     pool_assertions.assert_not_emitted(name=MetricKey.DB_POOL_CHECKOUT_WAIT_TIME)
+
+
+async def test_pool_samples_ride_the_invocation_client(mock_session: MockDbSession):
+    configured_backend = FlushCountingBackend()
+    configured_client = MetricsClient(configured_backend, record_history=True)
+    db.__pool_metrics = configured_client
+    invocation_client = make_test_metrics_client(base_dimensions={"EventType": "user_cleanup"})
+
+    with bound_metrics_client(invocation_client):
+        async with db.begin():
+            ...
+
+    # The sample joins the invocation's flush window, so it inherits that invocation's correlation
+    # key, and the invocation's base dimension rides it as a property: the series the pool alarms
+    # read stays dimensionless whichever invocation raised the sample.
+    MetricAssertions(invocation_client).assert_emitted(
+        name=MetricKey.DB_POOL_CHECKOUT_WAIT_TIME,
+        unit=MetricUnit.MILLISECONDS,
+        dimensions={},
+        dimensions_exact=True,
+        properties={"EventType": "user_cleanup"},
+        properties_exact=True,
+        times=1,
+    )
+    # The invocation owns that window; nothing about the sample is this layer's to write or close.
+    MetricAssertions(configured_client).assert_not_emitted(name=MetricKey.DB_POOL_CHECKOUT_WAIT_TIME)
+    assert configured_backend.flush_count == 0
+
+
+async def test_pool_samples_fall_back_to_the_configured_client(mock_session: MockDbSession):
+    configured_backend = FlushCountingBackend()
+    configured_client = MetricsClient(configured_backend, record_history=True)
+    db.__pool_metrics = configured_client
+
+    async with db.begin():
+        ...
+
+    # Outside any invocation the sample carries no correlation key and this layer closes the
+    # window itself, one flush per transaction.
+    MetricAssertions(configured_client).assert_emitted(
+        name=MetricKey.DB_POOL_CHECKOUT_WAIT_TIME,
+        unit=MetricUnit.MILLISECONDS,
+        dimensions={},
+        dimensions_exact=True,
+        properties={},
+        properties_exact=True,
+        times=1,
+    )
+    assert configured_backend.flush_count == 1
 
 
 async def test_begin_without_pool_metrics_stays_silent(mock_session: MockDbSession):
