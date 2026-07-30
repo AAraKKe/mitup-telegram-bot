@@ -8,6 +8,12 @@ user-invocable: false
 
 The bot uses [AWS Embedded Metrics Format (EMF)](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Embedded_Metric_Format.html) for zero-cost CloudWatch metric emission. The monitoring layer lives in `libs/monitoring/mitup_bot/monitoring/`.
 
+This skill is the EMF **mechanism** — clients, backends, units, and the dimensions-vs-properties
+cost rule. The `observability` skill states the **contract** the two planes share: which facts may
+ride a record at all, the correlation-key requirement, the property allowlist, the adopt-or-retire
+rule for a new `MetricKey`, and the structlog side none of this covers. Load it too whenever the
+work adds a metric or a log line.
+
 ## Architecture
 
 ### MetricsClient
@@ -23,7 +29,7 @@ In handler contexts, `MitupContext` wraps `MetricsClient` and provides convenien
 | Backend | When used |
 |---------|-----------|
 | `EmfBackend` | Production — delegates to `aws_embedded_metrics` for real CloudWatch emission |
-| `NullBackend` | Tests — silent no-op; records are captured in `MetricsClient._records` only when the client is built with `record_history=True` (see `tests/helpers/monitoring.py:make_test_metrics_client()`) |
+| `NullBackend` | Tests — silent no-op; records are readable from `MetricsClient.records` only when the client is built with `record_history=True` (see `tests/helpers/monitoring.py:make_test_metrics_client()`) |
 
 The backend is configured once globally by `configure_emf_backend()` in `app.py`. Never select backends conditionally in handler code.
 
@@ -109,8 +115,9 @@ The primary method. Handles dimensions and properties:
 # Most common: emit a metric carrying the handler identity as EMF properties (auto-included)
 context.emit_metric(MetricKey.ERROR, 1)
 
-# Custom dimensions, no handler identity attached
-context.emit_metric("ApiCallCount", 1, dimensions={"Service": "Google"}, include_handler_properties=False)
+# A shared-surface counter, emitted without the handler identity because the series is about the
+# surface rather than the callback that reached it. Dimensions stay a closed enum — see below.
+context.emit_metric(MetricKey.STALE_MEETING_MESSAGE, 0, include_handler_properties=False)
 ```
 
 Key parameters:
