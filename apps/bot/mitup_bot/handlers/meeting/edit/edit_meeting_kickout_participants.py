@@ -12,6 +12,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
 from mitup_bot.views.meeting_text import rich_title
 
+from ..utils import log_waiting_list_promotions
 from .enums import EditMeetingHandlerId
 from .views import edit_participants_view, kick_out_users_view
 
@@ -90,7 +91,9 @@ async def edit_meeting_kickout_participant(session: AsyncSession, update: Update
 
     participant = meeting.participant(callback_data.id)
     if participant is None:
-        await participant_no_longer_in_meeting(meeting, update, context, current_user)
+        await participant_no_longer_in_meeting(
+            meeting, update, context, current_user, target_user_id=callback_data.id, step="select"
+        )
         return
 
     participant_name = participant.user.inline_name
@@ -112,7 +115,22 @@ async def edit_meeting_kickout_participant(session: AsyncSession, update: Update
     )
 
 
-async def participant_no_longer_in_meeting(meeting: Meetup, update: Update, context: TMitupContext, current_user: User):
+async def participant_no_longer_in_meeting(
+    meeting: Meetup, update: Update, context: TMitupContext, current_user: User, target_user_id: int, step: str
+):
+    """Tell the owner the target is gone, saying at which point in the kick-out flow they found out.
+
+    `select` means the list they tapped was drawn before the participant left; `confirm` means the
+    participant left between the confirmation prompt and the owner's answer. The two look identical
+    on screen and mean different things.
+    """
+    log.info(
+        "Kick out target no longer a participant",
+        user_id=current_user.db_id,
+        target_user_id=target_user_id,
+        reason="participant_left_before_confirm",
+        step=step,
+    )
     participant_no_longer_exists = MeetingEditParticipantsMessages.KICK_OUT_NOT_IN_MEETING.get(lang=current_user.lang)
     await context.api.edit_message(
         update=update,
@@ -150,12 +168,37 @@ async def edit_meeting_kickout_participant_confirm(session: AsyncSession, update
     participant = meeting.participant(callback_data.id)
 
     if participant is None:
-        await participant_no_longer_in_meeting(meeting, update, context, current_user)
+        await participant_no_longer_in_meeting(
+            meeting, update, context, current_user, target_user_id=callback_data.id, step="confirm"
+        )
         return
 
+    # Recorded before the fan-out below, which can fail: after it, a partial delivery would read as
+    # a completed kick-out. `was_invited` is read here because the link is about to be detached.
+    log.info(
+        "Participant kicked out",
+        user_id=current_user.db_id,
+        participant_user_id=participant.user.id,
+        participant_tg_user_id=participant.user.tg_user_id,
+        was_invited=participant.invited_by is not None,
+        was_waiting_list=participant.is_waiting_list,
+        reason="owner_kicked_out",
+    )
+
     promoted_participants = meeting.remove_participant(participant)
+    log_waiting_list_promotions(meeting, promoted_participants, reason="participant_kicked_out")
+
     # If the participant is invited, remove it too
     if participant.invited_by is not None:
+        # A placeholder User row is destroyed here, not just a membership. Nothing else records
+        # that this account existed, so the line names it and the inviter it belonged to.
+        log.info(
+            "Invited user deleted",
+            user_id=current_user.db_id,
+            deleted_user_id=participant.user.id,
+            invited_by_user_id=participant.invited_by.id,
+            reason="invited_participant_kicked_out",
+        )
         await session.delete(participant.user)
 
     # We need to decide whetehr we go back to the edit participatns view or the list of participants to kick out
@@ -182,8 +225,6 @@ async def edit_meeting_kickout_participant_confirm(session: AsyncSession, update
         current_message=meeting.message_from_update(update),
         skip_current=True,
     )
-
-    log.info("Participant kicked out", meeting_id=meeting.db_id, participant_user_id=participant.user.db_id)
 
 
 async def kickout_user_to_edit_participants(

@@ -5,13 +5,18 @@ from __future__ import annotations
 import datetime as dt
 import html
 import re
+from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from enum import StrEnum, auto
 from string.templatelib import Interpolation, Template
 
+import structlog
 from telegram import MessageEntity
 
 from mitup_bot.format_tags import TOKEN_RE
+
+log = structlog.get_logger(__name__)
 
 
 class FormattedText:
@@ -278,6 +283,30 @@ STYLE_MAP: dict[str, str] = {
 ATTR_RE = re.compile(r"""([a-zA-Z-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
 
 
+class TagAnomaly(StrEnum):
+    """Why a tag in a tag-annotated string produced no entity.
+
+    Dropping is the parser's contract, not a failure: catalog strings are authored against a
+    fixed subset and anything outside it is stripped on purpose. The value of naming the cause is
+    for the *stored* population, where the string came out of the database and nothing else records
+    what the dialect lost.
+    """
+
+    UNKNOWN_TAG = auto()
+    MALFORMED_ATTRIBUTES = auto()
+    UNBALANCED_CLOSE = auto()
+    UNCLOSED_TAG = auto()
+
+
+@dataclass(frozen=True)
+class DroppedTag:
+    """One tag the parser could not turn into an entity, and where it sat."""
+
+    reason: TagAnomaly
+    tag: str
+    offset: int
+
+
 @dataclass
 class OpenTag:
     """An unclosed opening tag: the offset it began at and the entity to emit on close."""
@@ -286,6 +315,7 @@ class OpenTag:
     entity_type: str | None
     url: str | None = None
     custom_emoji_id: str | None = None
+    anomaly: TagAnomaly | None = None
 
 
 def parse_tag_attributes(attrs: str) -> dict[str, str]:
@@ -299,23 +329,34 @@ def resolve_open_tag(tag: str, attrs: str, offset: int) -> OpenTag:
     Tags that carry no entity — an unknown tag, an `<a>` without `href`, a
     `<span>` that is not a `tg-spoiler`, or a `<tg-emoji>` without `emoji-id` —
     resolve with `entity_type=None`, so the tag is stripped from the output
-    without producing an entity.
+    without producing an entity, and carry the `anomaly` naming which of the two
+    it was.
     """
     match tag:
         case "a":
             href = parse_tag_attributes(attrs).get("href")
-            return OpenTag(offset, MessageEntity.TEXT_LINK if href else None, url=href)
+            if href:
+                return OpenTag(offset, MessageEntity.TEXT_LINK, url=href)
+            return OpenTag(offset, None, anomaly=TagAnomaly.MALFORMED_ATTRIBUTES)
         case "span":
             classes = parse_tag_attributes(attrs).get("class", "").split()
-            return OpenTag(offset, MessageEntity.SPOILER if "tg-spoiler" in classes else None)
+            if "tg-spoiler" in classes:
+                return OpenTag(offset, MessageEntity.SPOILER)
+            return OpenTag(offset, None, anomaly=TagAnomaly.MALFORMED_ATTRIBUTES)
         case "tg-emoji":
             emoji_id = parse_tag_attributes(attrs).get("emoji-id")
-            return OpenTag(offset, MessageEntity.CUSTOM_EMOJI if emoji_id else None, custom_emoji_id=emoji_id)
+            if emoji_id:
+                return OpenTag(offset, MessageEntity.CUSTOM_EMOJI, custom_emoji_id=emoji_id)
+            return OpenTag(offset, None, anomaly=TagAnomaly.MALFORMED_ATTRIBUTES)
         case _:
-            return OpenTag(offset, STYLE_MAP.get(tag))
+            if (entity_type := STYLE_MAP.get(tag)) is not None:
+                return OpenTag(offset, entity_type)
+            return OpenTag(offset, None, anomaly=TagAnomaly.UNKNOWN_TAG)
 
 
-def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) -> FormattedText:
+def parse_format_tags(
+    text: str, substitutions: dict[str, str | FormattedText], *, anomalies: list[DroppedTag] | None = None
+) -> FormattedText:
     """Parse a tag-annotated translated string into a `FormattedText`.
 
     Supports the Telegram HTML subset: `<b>`/`<strong>`, `<i>`/`<em>`,
@@ -337,6 +378,11 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
     runs are decoded to their characters, matching Telegram's HTML spec. Decoding
     happens only on the non-tag segments and only after tag detection, so an
     escaped `&lt;` renders as a literal `<` and is never re-parsed as a tag.
+
+    Pass *anomalies* to learn what was dropped. Every caller that renders a catalog string wants
+    the silent behaviour — the subset is fixed and anything outside it is stripped by design — so
+    the report is opt-in and only the readers of *stored* values ask for it, through
+    `parse_stored_tagged_text`.
     """
     plain = ""
     utf16_offset = 0
@@ -360,9 +406,16 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
         else:
             flush(value)
 
+    def report(reason: TagAnomaly, tag: str, offset: int):
+        if anomalies is not None:
+            anomalies.append(DroppedTag(reason, tag, offset))
+
     def close_tag(tag: str):
         open_tag = active.pop(tag, None)
-        if open_tag is None or open_tag.entity_type is None:
+        if open_tag is None:
+            report(TagAnomaly.UNBALANCED_CLOSE, tag, utf16_offset)
+            return
+        if open_tag.entity_type is None:
             return
         length = utf16_offset - open_tag.offset
         if length > 0:
@@ -376,6 +429,12 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
                 )
             )
 
+    def open_tag(tag: str, attrs: str):
+        resolved = resolve_open_tag(tag, attrs, utf16_offset)
+        if resolved.anomaly is not None:
+            report(resolved.anomaly, tag, utf16_offset)
+        active[tag] = resolved
+
     for m in TOKEN_RE.finditer(text):
         flush_literal(text[cursor : m.start()])
         cursor = m.end()
@@ -384,11 +443,44 @@ def parse_format_tags(text: str, substitutions: dict[str, str | FormattedText]) 
         elif m.group("close"):
             close_tag(m.group("tag"))
         else:
-            active[m.group("tag")] = resolve_open_tag(m.group("tag"), m.group("attrs"), utf16_offset)
+            open_tag(m.group("tag"), m.group("attrs"))
 
     flush_literal(text[cursor:])
+    # Whatever is still open never got its closing tag, so its span never became an entity. An
+    # opening tag that was already an anomaly is not reported twice.
+    for tag, pending in active.items():
+        if pending.anomaly is None:
+            report(TagAnomaly.UNCLOSED_TAG, tag, pending.offset)
     entities.sort(key=lambda e: (e.offset, e.type))
     return FormattedText(plain, entities)
+
+
+def parse_stored_tagged_text(text: str, *, field: str) -> FormattedText:
+    """Parse a tagged string that came out of the database, saying what the dialect could not read.
+
+    The tagged string *is* the stored value — no copy of the user's original entities is kept
+    anywhere — so a tag this build cannot resolve degrades what the owner and every participant see
+    with nothing else to compare it against. The line names the meeting (bound ambiently by the
+    guard that resolved it), the column and the offending tag, so a corrupted row is findable
+    instead of inferred from a complaint.
+
+    One line per distinct (reason, tag) pair rather than per occurrence, carrying the count and the
+    first offset, so a pathological value cannot turn one render into hundreds of lines.
+    """
+    anomalies: list[DroppedTag] = []
+    parsed = parse_format_tags(text, {}, anomalies=anomalies)
+    counts = Counter((anomaly.reason, anomaly.tag) for anomaly in anomalies)
+    first_offsets = {(anomaly.reason, anomaly.tag): anomaly.offset for anomaly in reversed(anomalies)}
+    for (reason, tag), dropped in counts.items():
+        log.warning(
+            "Stored tagged text did not parse",
+            field=field,
+            tag=tag,
+            offset=first_offsets[(reason, tag)],
+            reason=reason.value,
+            dropped=dropped,
+        )
+    return parsed
 
 
 # --- serialize_entities() ---
@@ -405,6 +497,13 @@ ENTITY_TAG_MAP: dict[str, str] = {
 }
 
 
+class EntityDropReason(StrEnum):
+    """Why an entity the user's message carried did not reach the stored value."""
+
+    UNSUPPORTED_ENTITY_TYPE = auto()
+    OVERLAPPING_SPAN = auto()
+
+
 def is_serializable_entity(entity: MessageEntity) -> bool:
     if entity.type == MessageEntity.CUSTOM_EMOJI:
         return entity.custom_emoji_id is not None
@@ -418,7 +517,9 @@ def open_tag_markup(entity: MessageEntity) -> str:
     return f"<{ENTITY_TAG_MAP[entity.type]}>"
 
 
-def serialize_entities(text: str, entities: Sequence[MessageEntity]) -> str:
+def serialize_entities(
+    text: str, entities: Sequence[MessageEntity], *, dropped: Counter[tuple[EntityDropReason, str]] | None = None
+) -> str:
     """Render *(text, entities)* as a tag-annotated string for `parse_format_tags`.
 
     The capture-side inverse of `parse_format_tags`: literal text is
@@ -428,12 +529,21 @@ def serialize_entities(text: str, entities: Sequence[MessageEntity]) -> str:
     kept unstyled. Entities nest by sorting on `(offset, -length)`; an entity
     that partially overlaps an already-open span without nesting inside it is
     dropped — the earlier-starting entity wins. Telegram never sends partially
-    overlapping entities, so that rule is purely defensive.
+    overlapping entities, so that rule stops being defensive the day one arrives,
+    which is why it is countable rather than assumed unreachable.
+
+    Both kinds of loss are silent to the user: their formatting simply is not
+    there afterwards, and the tagged string is the only copy kept. Pass *dropped*
+    to tally them; `capture_tagged_text` is the caller that does and reports.
     """
     encoded = text.encode("utf-16-le")
     parts: list[str] = []
     open_spans: list[tuple[int, str]] = []  # (end offset, tag name), innermost last
     cursor = 0
+
+    def record(reason: EntityDropReason, entity_type: str):
+        if dropped is not None:
+            dropped[(reason, entity_type)] += 1
 
     def flush_until(end: int):
         nonlocal cursor
@@ -446,10 +556,18 @@ def serialize_entities(text: str, entities: Sequence[MessageEntity]) -> str:
             flush_until(end)
             parts.append(f"</{tag}>")
 
-    for entity in sorted(filter(is_serializable_entity, entities), key=lambda e: (e.offset, -e.length)):
+    serializable: list[MessageEntity] = []
+    for entity in entities:
+        if is_serializable_entity(entity):
+            serializable.append(entity)
+        else:
+            record(EntityDropReason.UNSUPPORTED_ENTITY_TYPE, entity.type)
+
+    for entity in sorted(serializable, key=lambda e: (e.offset, -e.length)):
         close_spans_ending_by(entity.offset)
         end = entity.offset + entity.length
         if open_spans and end > open_spans[-1][0]:
+            record(EntityDropReason.OVERLAPPING_SPAN, entity.type)
             continue
         flush_until(entity.offset)
         parts.append(open_tag_markup(entity))
@@ -458,3 +576,28 @@ def serialize_entities(text: str, entities: Sequence[MessageEntity]) -> str:
     close_spans_ending_by(utf16_len(text))
     flush_until(utf16_len(text))
     return "".join(parts)
+
+
+def capture_tagged_text(text: str, entities: Sequence[MessageEntity], *, field: str) -> str:
+    """Serialize what the user sent into the stored dialect, saying what it could not carry.
+
+    The capture-side counterpart of `parse_stored_tagged_text`, and the entry point every meeting
+    column is written through. A formatting style the dialect does not admit disappears here with
+    no other trace: the tagged string replaces the user's entities outright, so the drop is the
+    only evidence that a style was ever applied. *field* names the column so the warning has a
+    subject; the meeting, where one has been resolved, comes from the ambient bind.
+
+    One line per distinct (reason, entity type) pair with its count, so a heavily formatted message
+    cannot turn one edit into dozens of lines.
+    """
+    dropped: Counter[tuple[EntityDropReason, str]] = Counter()
+    tagged = serialize_entities(text, entities, dropped=dropped)
+    for (reason, entity_type), count in dropped.items():
+        log.warning(
+            "Dropped an unsupported message entity",
+            field=field,
+            entity_type=entity_type,
+            reason=reason.value,
+            dropped=count,
+        )
+    return tagged

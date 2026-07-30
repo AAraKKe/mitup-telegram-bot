@@ -1,17 +1,47 @@
 import datetime as dt
 from typing import assert_never
 
+import structlog
 from telegram import Update
 
 from mitup_bot import limits, supporter
 from mitup_bot.callback_data import MeetingListSource
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import User
+from mitup_bot.models import JoinedUsers, Meetup, User
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import ButtonMessages, SupporterMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views.collaborate import supporter_upsell_view
+
+log = structlog.get_logger(__name__)
+
+# One event name covers every promotion off a waiting list, whatever moved the queue, so a single
+# filter answers "why did this DM arrive?" for all of them. What freed the spot is the `reason`.
+WAITING_LIST_PROMOTED_EVENT = "Waiting list promoted"
+
+
+def log_waiting_list_promotions(meeting: Meetup, promoted_links: list[JoinedUsers], reason: str):
+    """Record who a freed spot promoted, and what freed it.
+
+    Promotion DMs the recipient without them having done anything, and nothing on the receiving end
+    says which departure caused it. Promoting nobody is not an event, so an empty list writes
+    nothing and the line's presence means someone moved.
+
+    Read through the nullable `id` rather than `db_id`: the promoted rows are reached off the
+    meeting mid-transaction, and a line that can raise on an unflushed row would turn a record of
+    the mutation into the thing that aborts it.
+    """
+    if not promoted_links:
+        return
+    log.info(
+        WAITING_LIST_PROMOTED_EVENT,
+        promoted_user_ids=[link.user.id for link in promoted_links],
+        promoted_count=len(promoted_links),
+        reason=reason,
+        n_participants=meeting.n_participants,
+        effective_max_members=meeting.effective_max_members,
+    )
 
 
 def meeting_detail_back_button(source: MeetingListSource | None, page: int, lang: str) -> ButtonConfig:
@@ -55,6 +85,17 @@ async def active_meetings_cap_reached(
 
     cap = limits.active_meetings_cap(user)
     assert cap is not None, "at_active_meetings_cap is only True when a finite cap is reached"
+    # This one helper is the sole cause of three conversation ends (create entry, create title,
+    # reactivate), and the user only ever sees an upsell screen, so the refusal is recorded here
+    # rather than at each caller.
+    log.warning(
+        "Meeting action refused by active meetings cap",
+        user_id=user.db_id,
+        reason="active_meetings_cap",
+        cap=cap,
+        supporter_level=user.supporter_level.value,
+        trigger="callback" if update.callback_query is not None else "message",
+    )
     below_patron = not supporter.meets(user.supporter_level, SupporterLevel.HOST_2)
     message = SupporterMessages.ACTIVE_MEETINGS_CAP if below_patron else SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON
     view = supporter_upsell_view(message.get(lang=user.lang, cap=cap), user.lang).with_context_menu([[back_button]])
@@ -70,19 +111,32 @@ def main_menu_back_button(lang: str) -> ButtonConfig:
     return ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)
 
 
-def scheduling_horizon_rejection(user: User, when: dt.datetime, *, title_flow: bool = False) -> str | None:
+def scheduling_horizon_rejection(user: User, when: dt.datetime, *, field: str) -> str | None:
     """Plain-text rejection when `when` is beyond the user's scheduling horizon, else None.
 
-    The Patron tier raises the horizon; both tiers get the Collaborate upsell. `title_flow` picks
-    the title-step wording, whose actionable step is resending the title rather than picking a
-    date. Returned as plain text so it fits both a view description and an alert.
+    The Patron tier raises the horizon; both tiers get the Collaborate upsell. `field` names the
+    datetime being refused — `title` additionally picks the title-step wording, whose actionable
+    step is resending the title rather than picking a date. Returned as plain text so it fits both
+    a view description and an alert.
+
+    Four call sites share this decision and the user sees only the upsell, so the refusal is
+    recorded here.
     """
     if limits.within_scheduling_horizon(user, when):
         return None
     days = limits.scheduling_horizon_days(user)
     assert days is not None, "within_scheduling_horizon is only False when a finite horizon applies"
+    log.warning(
+        "Meeting datetime refused by scheduling horizon",
+        user_id=user.db_id,
+        reason="beyond_scheduling_horizon",
+        field=field,
+        requested_datetime=when,
+        horizon_days=days,
+        supporter_level=user.supporter_level.value,
+    )
     below_patron = not supporter.meets(user.supporter_level, SupporterLevel.HOST_2)
-    if title_flow:
+    if field == "title":
         message = (
             SupporterMessages.SCHEDULING_HORIZON_TITLE
             if below_patron
@@ -102,6 +156,14 @@ def participant_capacity_rejection(user: User, max_members: int) -> str | None:
     cap = limits.participant_capacity(user)
     if cap is None or max_members <= cap:
         return None
+    log.warning(
+        "Participant limit refused by plan cap",
+        user_id=user.db_id,
+        reason="participant_capacity_cap",
+        requested_max=max_members,
+        cap=cap,
+        supporter_level=user.supporter_level.value,
+    )
     return SupporterMessages.PARTICIPANT_CAPACITY.get_text(lang=user.lang, cap=cap)
 
 

@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -12,6 +13,11 @@ from mitup_bot.views import factory
 from mitup_bot.views import meeting as meeting_views
 
 from .enums import EditMeetingHandlerId
+
+log = structlog.get_logger(__name__)
+
+# The `action` facet the clear-times confirmation lines carry.
+CLEAR_TIMES_ACTION = "clear_times"
 
 
 @HandlersRegistry.register_callback_query(EditMeetingHandlerId.WHEN_ENTRY_CALLBACK, callback_data=cb.EDIT_MEETING_WHEN)
@@ -39,6 +45,8 @@ async def callback_query_clear_times(session: AsyncSession, update: Update, cont
 
     await guards.meeting(session, user, callback_data.id, "clear_times", context)
 
+    log.info("Meeting destructive action prompted", user_id=user.db_id, action=CLEAR_TIMES_ACTION)
+
     view = factory.confirmation_view(
         guards.render_context(user, update, context),
         message=MeetingEditWhenMessages.CLEAR_CONFIRMATION.get(lang=user.lang),
@@ -59,6 +67,18 @@ async def callback_query_confirm_clear_times(session: AsyncSession, update: Upda
     user = await guards.current_user(update, session)
 
     meeting = await guards.meeting(session, user, callback_data.id, "confirm_clear_times", context)
+
+    # One tap wipes three fields, and the lock going with them is the direct cause of the
+    # `locked_on_start_in_progress` refusals no longer happening. Written before the wipe, which is
+    # the last moment the values it overwrites still exist.
+    log.info(
+        "Meeting times cleared",
+        user_id=user.db_id,
+        reason="owner_confirmed",
+        previous_datetime=meeting.datetime,
+        previous_end_datetime=meeting.end_datetime,
+        lock_on_start_reset=meeting.lock_on_start,
+    )
 
     meeting.datetime = None
     meeting.end_datetime = None
@@ -86,6 +106,8 @@ async def callback_query_decline_clear_times(session: AsyncSession, update: Upda
 
     meeting = await guards.meeting(session, user, callback_data.id, "decline_clear_times", context)
 
+    log.info("Meeting destructive action declined", user_id=user.db_id, action=CLEAR_TIMES_ACTION)
+
     view = meeting_views.when_view(meeting).with_context(MeetingEditWhenMessages.CLEAR_DECLINED.get(lang=user.lang))
     await context.api.edit_message(update=update, view=view)
 
@@ -101,6 +123,17 @@ async def callback_query_set_lock_on_start(session: AsyncSession, update: Update
     user = await guards.current_user(update, session)
 
     meeting = await guards.meeting(session, user, meeting_id, "set_lock_on_start", context)
+
+    # The rule that later refuses joins once the meeting is under way; the start time is on the line
+    # because whether the rule can ever fire depends on there being one.
+    log.info(
+        "Meeting lock on start toggled",
+        user_id=user.db_id,
+        old_value=meeting.lock_on_start,
+        new_value=not meeting.lock_on_start,
+        meeting_datetime=meeting.datetime,
+        reason="owner_toggled",
+    )
 
     meeting.lock_on_start = not meeting.lock_on_start
 

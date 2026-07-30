@@ -46,6 +46,18 @@ async def callback_set_meeting_language(session: AsyncSession, update: Update, c
     user = await guards.current_user(update, session)
     meeting = await guards.meeting(session, user, valid_data.meeting_id, "Set meeting language", context)
 
+    # Recorded before the write and the fan-out: the previous language is gone the moment the
+    # assignment lands, and the N persisted keyboards rewritten below are the reason a language
+    # change is a multi-message edit rather than one field.
+    log.info(
+        "Meeting language set",
+        user_id=user.db_id,
+        old_language=meeting.language,
+        new_language=SUPPORTED_LANGUAGES[valid_data.id],
+        keyboards_rebuilt=len(meeting.messages),
+        reason="owner_selected",
+    )
+
     # Edit the meeting language and also all the keyboard markups for any of the shared messages
     # This is needed because the keyboard markup is stored in the database to ensure it is accessible
     # everywhere
@@ -64,5 +76,3 @@ async def callback_set_meeting_language(session: AsyncSession, update: Update, c
 
     # Since the language has changed, we need to update the messages of the meeting
     await context.api.update_meeting_messages(meeting=meeting)
-
-    log.info("Meeting language set", meeting_id=meeting.db_id, language=meeting.language)

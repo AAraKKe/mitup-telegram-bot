@@ -48,12 +48,7 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
     # arrive from a past-meetings list or a deletion warning the owner already acted on, so a second
     # tap must not wipe the date they set after the first one.
     if meeting.active:
-        log.info(
-            "Skip meeting reactivation",
-            meeting_id=meeting.db_id,
-            tg_user_id=user.tg_user_id,
-            reason="already_active",
-        )
+        log.info("Skip meeting reactivation", user_id=user.db_id, reason="already_active")
         await context.api.edit_message(update=update, view=meeting_views.edit_view(meeting))
         return
 
@@ -72,10 +67,10 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
     # before the mutation, which is the last moment the values they overwrite still exist.
     log.info(
         "Meeting reactivated",
-        meeting_id=meeting.db_id,
-        tg_user_id=user.tg_user_id,
+        user_id=user.db_id,
         previous_activated_time=meeting.activated_time,
         previous_expiration_time=meeting.expiration_time,
+        previous_datetime=meeting.datetime,
         was_warned=meeting.expiration_notification_sent,
         reason="owner_reactivated",
     )

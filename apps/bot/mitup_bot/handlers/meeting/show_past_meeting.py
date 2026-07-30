@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -13,6 +14,11 @@ from mitup_bot.views.meeting_text import meeting_message
 
 from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
+
+log = structlog.get_logger(__name__)
+
+# The `action` facet both destructive-confirmation lines in this module carry.
+DELETE_PAST_MEETING_ACTION = "delete_past_meeting"
 
 
 def past_meeting_view(meeting: Meetup, user: User, page: int) -> MitupView:
@@ -59,6 +65,8 @@ async def callback_query_delete_past_meeting(session: AsyncSession, update: Upda
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
+
+    log.info("Meeting destructive action prompted", user_id=user.db_id, action=DELETE_PAST_MEETING_ACTION)
 
     await context.api.edit_message(
         update=update,
@@ -120,6 +128,19 @@ async def callback_query_confirm_delete_past_meeting(session: AsyncSession, upda
     # the deletion commits.
     await context.api.update_meeting_messages(meeting=meeting, was_deleted=True)
 
+    # The second row-deletion path in the domain; it shares the event name with the active-meeting
+    # one so a single filter covers every deletion, and names the reason it took. This screen is
+    # only reachable for a finished meeting, so `was_active` is settled rather than read.
+    log.info(
+        "Meeting deleted",
+        user_id=user.db_id,
+        reason="owner_confirmed_past",
+        was_active=False,
+        participants_count=meeting.n_participants,
+        waiting_count=meeting.n_waiting,
+        messages_count=len(meeting.messages),
+    )
+
     await session.delete(meeting)
 
     view = MitupView(
@@ -157,5 +178,7 @@ async def callback_query_decline_delete_past_meeting(session: AsyncSession, upda
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
+
+    log.info("Meeting destructive action declined", user_id=user.db_id, action=DELETE_PAST_MEETING_ACTION)
 
     await context.api.edit_message(update=update, view=past_meeting_view(meeting, user, callback_data.page))

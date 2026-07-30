@@ -28,6 +28,8 @@ async def callback_query_edit_meeting(session: AsyncSession, update: Update, con
 
     meeting = await guards.meeting(session, user, callback_data.id, "Edit meeting", context)
 
+    log.info("Meeting edit hub opened", user_id=user.db_id)
+
     # Only allow editing the meeting if the meeting belongs to the user
     await context.api.edit_message(update=update, view=meeting_views.edit_view(meeting))
 
@@ -49,10 +51,16 @@ async def callback_query_cancel_edit_meeting(session: AsyncSession, update: Upda
         # refers to. There is no edit screen to return to, so the flow is closed and the user lands
         # on the main menu — a recovered interaction, not a fault.
         cleanup_states(context)
+        # The meeting id is exactly what could not be recovered, so the payload it failed to parse
+        # is the only thing that identifies what the user tapped. It is a bounded, client-supplied
+        # token, not authored text — the same field the registry's entry line carries.
         log.warning(
             "Malformed callback data while cancelling meeting edit",
             exc_info=exc,
             reason=RecoveryReason.MALFORMED_CALLBACK_DATA.value,
+            user_id=user.db_id,
+            callback_data=update.callback_query.data if update.callback_query is not None else None,
+            conversation_state_cleared=True,
         )
         await context.api.edit_message(
             update=update, view=factory.main_menu_view(guards.render_context(user, update, context))
@@ -67,6 +75,8 @@ async def callback_query_cancel_edit_meeting(session: AsyncSession, update: Upda
         context,
         access=guards.MeetingAccess.OWNER_ANY_STATE,
     )
+
+    log.info("Meeting edit cancelled", user_id=user.db_id, reason="user_cancelled", conversation_state_cleared=True)
 
     await context.api.edit_message(update=update, view=meeting_views.edit_view(meetup))
 

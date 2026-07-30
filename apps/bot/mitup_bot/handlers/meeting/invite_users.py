@@ -58,17 +58,28 @@ def invitations_open(meeting: Meetup) -> bool:
     return meeting.join_allowed() and meeting.allow_invitation
 
 
-async def ensure_invitations_open(context: TMitupContext, user: User, meeting: Meetup) -> bool:
+async def ensure_invitations_open(context: TMitupContext, user: User, meeting: Meetup, step: str) -> bool:
     """Report whether `meeting` still takes guests, alerting the caller with the reason when it does not.
 
     The two business rules are the flow's own, not a matter of access: whoever got this far may act on
     the meeting, and what stops them is the meeting being full or its guest list being closed. A
     rejection ends the flow, so the conversation state goes with it.
+
+    The caller only ever sees an alert, and the same alert can arrive at three different points in
+    the flow, so `step` says which one this was.
     """
     if invitations_open(meeting):
         return True
 
-    message = MeetingInviteMessages.INVITES_DISABLED if meeting.join_allowed() else MeetingInviteMessages.MEETING_FULL
+    invitations_disabled = meeting.join_allowed()
+    message = MeetingInviteMessages.INVITES_DISABLED if invitations_disabled else MeetingInviteMessages.MEETING_FULL
+    log.info(
+        "Meeting invitation blocked",
+        user_id=user.db_id,
+        reason="invitations_disabled" if invitations_disabled else "meeting_full",
+        step=step,
+        conversation_state_cleared=True,
+    )
     await context.api.answer_callback_query(context.get_update(), text=message.get(lang=user.lang), show_alert=True)
     context.clean_user_data([ContextId.INVITE_USERS])
     return False
@@ -96,7 +107,7 @@ async def callback_query_invite_users(
     # The entry point is a tap on a shared card, so the id is client-supplied and the guard decides
     # both that the meeting is there and that the tapped message gives the caller a claim on it.
     meeting = await guards.shared_meeting(session, user, meeting_id, "invite users to a meeting", update)
-    if not await ensure_invitations_open(context, user, meeting):
+    if not await ensure_invitations_open(context, user, meeting, step="entry"):
         return ConversationHandler.END
 
     if update.effective_chat is None:
@@ -144,10 +155,22 @@ async def abort_invitation(
     # the owner branch below re-decides ownership. A meeting that is gone simply falls to the menu.
     meeting = await Meetup.by_id(session, meeting_id, include_inactive=False)
 
-    if meeting is not None and invitations_open(meeting) and user.own_meeting(meeting_id):
+    returns_to_meeting = meeting is not None and invitations_open(meeting) and user.own_meeting(meeting_id)
+    if returns_to_meeting:
+        assert meeting is not None, "returns_to_meeting is only True once the lookup resolved"
         view = meeting_views.view_for(meeting, user).with_context(message=message)
     else:
         view = main_menu_view(guards.render_context(user, update, context), message=message)
+
+    # No guard resolved this meeting — the lookup only picks a screen — so the id is named here.
+    log.info(
+        "Meeting invitation aborted",
+        meeting_id=meeting_id,
+        user_id=user.db_id,
+        destination="meeting_view" if returns_to_meeting else "main_menu",
+        reason="owner_returns_to_meeting" if returns_to_meeting else "meeting_unavailable_or_not_owner",
+        conversation_state_cleared=True,
+    )
 
     await context.api.edit_message(update, view)
     return ConversationHandler.END
@@ -177,7 +200,7 @@ async def invite_users_name_message_handler(
     invited_user_name = guards.message(update).text
     if invited_user_name is None:  # pragma: no cover
         # This should not happen due to the filter applied to the handler
-        log.warning("Abandoned the invite flow", reason="empty_invited_user_name")
+        log.warning("Abandoned the invite flow", user_id=user.db_id, reason="empty_invited_user_name")
         context.put_feature_metric(Feature.INVITE_USERS, name=MetricKey.ERROR)
         return ConversationHandler.END
 
@@ -192,7 +215,7 @@ async def invite_users_name_message_handler(
             "invite users to a meeting",
             flow_context=MeetingInviteMessages.FLOW_CONTEXT,
         )
-        if not await ensure_invitations_open(context, user, meeting):
+        if not await ensure_invitations_open(context, user, meeting, step="name"):
             # The alert says why; the user cannot continue mid conversation, so go back to the main menu
             await context.api.edit_message(
                 update=update,
@@ -236,6 +259,18 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             await context.api.answer_callback_query(
                 update, text=MeetingInviteMessages.MEETING_NOT_FOUND.get(lang=user.lang), show_alert=True
             )
+            # The counter this emits is a security series; without a line beside it there is no way
+            # to tell which meeting was aimed at from which conversation. Neither id is trusted, and
+            # no guard has run yet, so both are named here.
+            log.warning(
+                "Meeting invitation blocked",
+                meeting_id=meeting_id,
+                authorized_meeting_id=authorized_meeting_id,
+                user_id=user.db_id,
+                reason="meeting_id_not_authorized",
+                step="confirm",
+                conversation_state_cleared=True,
+            )
             context.clean_user_data([ContextId.INVITE_USERS])
             context.emit_metric(MetricKey.UNAUTHORIZED_MEETING_CALLBACK, include_handler_properties=False)
             return ConversationHandler.END
@@ -244,7 +279,7 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
         # lock: the fullness check and the membership insert below must happen under the per-meeting
         # row lock. The earlier steps only pre-validate and must not hold it across the user's typing.
         meeting = await guards.conversation_meeting(session, user, meeting_id, "invite users to a meeting", lock=True)
-        if not await ensure_invitations_open(context, user, meeting):
+        if not await ensure_invitations_open(context, user, meeting, step="confirm"):
             # The alert says why; the user cannot continue mid conversation, so go back to the main menu
             await context.api.edit_message(
                 update=update,
@@ -265,6 +300,13 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             # A concurrent update already registered this participant; the joined_users unique
             # constraint rejected our duplicate. No-op: report the existing membership instead of
             # emitting a fault, leaving the transaction consistent.
+            log.info(
+                "Meeting invitation confirmed",
+                inviter_user_id=user.db_id,
+                invited_user_name_len=len(invited_user_name),
+                outcome="duplicate_race",
+                reason="unique_constraint_conflict",
+            )
             await context.api.answer_callback_query(
                 update,
                 text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get(lang=user.lang),
@@ -272,6 +314,18 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             )
             context.clean_user_data([ContextId.INVITE_USERS])
             return ConversationHandler.END
+
+        # The birth record of a placeholder User (tg_user_id=-1) that the delete and kick-out paths
+        # later destroy outright: without this line those rows have neither an origin nor an owner.
+        # The name the inviter typed is theirs to keep, so only its length travels.
+        log.info(
+            "Meeting invitation confirmed",
+            inviter_user_id=user.db_id,
+            invited_user_id=invited_user.id,
+            invited_user_name_len=len(invited_user_name),
+            is_waiting_list=joined_link.is_waiting_list,
+            outcome="membership_created",
+        )
 
         message = MeetingInviteMessages.SUCCESS.get(
             lang=user.lang, name=invited_user_name, meeting_title=rich_title(meeting)
@@ -309,7 +363,7 @@ async def callback_query_fallback_invite_user(session: AsyncSession, update: Upd
 
     await context.api.send_message_to_user(user, view)
 
-    log.warning("Abandoned the invite flow", reason="fallback_invite_user_conversation")
+    log.warning("Abandoned the invite flow", user_id=user.db_id, reason="fallback_invite_user_conversation")
     context.put_feature_metric(Feature.INVITE_USERS, name=MetricKey.ERROR)
 
     return ConversationHandler.END

@@ -12,7 +12,7 @@ from mitup_bot.utils import (
     MeetingDisplayMessages,
     MeetingEditParticipantsMessages,
 )
-from mitup_bot.utils.entities import EntityDateTime, FormattedText, parse_format_tags, render
+from mitup_bot.utils.entities import EntityDateTime, FormattedText, parse_stored_tagged_text, render
 
 if TYPE_CHECKING:
     from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 def rich_title(meeting: Meetup) -> FormattedText:
     """Meeting title with the owner's formatting and custom-emoji entities restored."""
-    return parse_format_tags(meeting.tagged_title, {})
+    return parse_stored_tagged_text(meeting.tagged_title, field="title")
 
 
 def rich_description(meeting: Meetup) -> FormattedText | None:
@@ -28,7 +28,7 @@ def rich_description(meeting: Meetup) -> FormattedText | None:
     description so callers keep their placeholder branches."""
     if not (tagged := meeting.tagged_description):
         return None
-    return parse_format_tags(tagged, {})
+    return parse_stored_tagged_text(tagged, field="description")
 
 
 def participant_name(link: JoinedUsers) -> FormattedText:

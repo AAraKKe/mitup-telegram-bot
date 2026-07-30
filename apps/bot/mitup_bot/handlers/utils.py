@@ -70,6 +70,7 @@ async def recover_from_lost_context(
         exc_info=exc,
         reason=RecoveryReason.CONVERSATION_CONTEXT_MISSING.value,
         context_id=context_id.value,
+        user_id=user.db_id,
     )
     context.emit_metric(MetricKey.CONTEXT_LOST, 1)
     await context.api.send_message(

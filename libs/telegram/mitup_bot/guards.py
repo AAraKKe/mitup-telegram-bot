@@ -538,7 +538,7 @@ async def shared_meeting(
             meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=found_meeting.lang
         )
 
-    return found_meeting
+    return granted_meeting(found_meeting)
 
 
 async def conversation_meeting(
@@ -567,7 +567,7 @@ async def conversation_meeting(
         raise MeetingGoneError(
             meeting_id=meeting_id, action=action, user_db_id=user.db_id, lang=user.lang, flow_context=flow_context
         )
-    return found_meeting
+    return granted_meeting(found_meeting)
 
 
 async def user_registered(

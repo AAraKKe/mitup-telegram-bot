@@ -2,6 +2,7 @@ import datetime as dt
 from re import Match
 from typing import cast
 
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import MessageEntity, Update
 from telegram.ext import ConversationHandler, filters
@@ -49,6 +50,8 @@ from .utils import DateTimeEntityFilter, cleanup_states, is_in_past, prepend_err
 #     * datetime entity -> validate -> save -> END
 #     * wrong message fallback -> stay
 
+log = structlog.get_logger(__name__)
+
 
 # --- Conversation entry ---
 
@@ -68,6 +71,9 @@ async def callback_query_set_meeting_end_time(
     meeting = await guards.meeting(session, user, meeting_id, "set_meeting_end_time", context)
 
     if meeting.datetime is None:
+        # The End time button is only rendered for a meeting that has a start time, so reaching here
+        # means the keyboard was drawn before the owner cleared it.
+        log.info("Meeting duration edit refused", user_id=user.db_id, reason="start_datetime_missing")
         await context.api.answer_callback_query(
             update,
             text=MeetingEditDurationMessages.END_STALE_ALERT.get_text(lang=user.lang),
@@ -199,20 +205,36 @@ def validate_end_datetime(end_dt: dt.datetime, meeting: Meetup, lang: str) -> st
 
     The scheduling horizon is not checked here: call sites check it separately so the rejection can
     carry the Collaborate upsell.
+
+    Four call sites share this decision and collapse its three causes into one message on screen,
+    so the cause is recorded here alongside the start time it was judged against.
     """
     assert meeting.datetime is not None
+
+    def reject(reason: str) -> None:
+        log.info(
+            "Meeting end datetime rejected",
+            user_id=meeting.owner.db_id,
+            reason=reason,
+            proposed_end=end_dt,
+            meeting_datetime=meeting.datetime,
+        )
+
     if is_in_past(end_dt, meeting):
+        reject("end_in_past")
         return MeetingEditDurationMessages.END_IN_PAST.get_text(lang=lang)
     if to_utc(end_dt) <= to_utc(meeting.datetime):
+        reject("end_before_start")
         return MeetingEditDurationMessages.END_BEFORE_START.get_text(lang=lang)
     if not limits.within_max_duration(meeting.datetime, end_dt):
+        reject("exceeds_max_duration")
         return MeetingEditDurationMessages.END_MAX_DURATION.get_text(lang=lang)
     return None
 
 
 def end_beyond_horizon_view(meeting: Meetup, end_dt: dt.datetime, back_button: ButtonConfig) -> MitupView | None:
     """Collaborate upsell view when end_dt is beyond the owner's scheduling horizon, else None."""
-    rejection = scheduling_horizon_rejection(meeting.owner, end_dt)
+    rejection = scheduling_horizon_rejection(meeting.owner, end_dt, field="end")
     if rejection is None:
         return None
     return supporter_upsell_view(rejection, meeting.owner.lang).with_context_menu([[back_button]])
@@ -259,14 +281,37 @@ async def reply_end_beyond_horizon(
     return True
 
 
+def apply_end_datetime(meeting: Meetup, end_dt: dt.datetime, *, input_source: str):
+    """Set the meeting's end time, naming where the value came from and the span it produces.
+
+    The single write point for `meeting.end_datetime` across all three input paths. The resulting
+    duration is on the line because the end time is what the deactivation sweep judges a finished
+    meeting by, so "how long did the owner make it" is the question asked of this record later.
+    """
+    assert meeting.datetime is not None, "an end time is only editable once a start time exists"
+    old_end_datetime = meeting.end_datetime
+    meeting.end_datetime = end_dt
+
+    log.info(
+        "Meeting end datetime set",
+        user_id=meeting.owner.db_id,
+        old_end_datetime=old_end_datetime,
+        new_end_datetime=end_dt,
+        duration_minutes=int((to_utc(end_dt) - to_utc(meeting.datetime)).total_seconds() // 60),
+        input_source=input_source,
+    )
+
+
 async def save_end_datetime_and_finish(
     context: TMitupContext,
     update: Update,
     meeting: Meetup,
     end_dt: dt.datetime,
+    *,
+    input_source: str,
 ) -> int:
     """Shared tail of both end-datetime flows; broadcast runs post-commit via write mode."""
-    meeting.end_datetime = end_dt
+    apply_end_datetime(meeting, end_dt, input_source=input_source)
 
     response_view = meeting_views.when_view(meeting)
 
@@ -306,7 +351,7 @@ async def duration_end_datetime_entity_handler(
         if await reply_end_beyond_horizon(context, update, meeting, unix_time):
             return ConversationMeetingState.EDIT_END_DATETIME
 
-        return await save_end_datetime_and_finish(context, update, meeting, unix_time)
+        return await save_end_datetime_and_finish(context, update, meeting, unix_time, input_source="datetime_entity")
 
 
 @HandlersRegistry.register_message(
@@ -325,6 +370,13 @@ async def duration_end_wrong_input_message_handler(
         error = CommonMessages.DATETIME_INVALID.get(lang=user.lang, datetime_link=build_datetime_link())
         await context.api.send_message(
             update=update, view=build_end_datetime_entry_view(meeting, user.lang, error=error)
+        )
+        log.info(
+            "Meeting datetime input rejected",
+            user_id=user.db_id,
+            reason="wrong_datetime_format",
+            field="end",
+            conversation_state=ConversationMeetingState.EDIT_END_DATETIME.name,
         )
         context.put_feature_metric(
             Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "wrong_end_datetime_format"}
@@ -414,7 +466,7 @@ async def callback_query_duration_end_set_date(
         if await reject_end_beyond_horizon(context, update, meeting, proposed_end):
             return ConversationMeetingState.EDIT_END_DATE
 
-        meeting.end_datetime = proposed_end
+        apply_end_datetime(meeting, proposed_end, input_source="calendar_first_pick")
 
         return await show_end_time_prompt(context, update, meeting)
 
@@ -428,7 +480,7 @@ async def callback_query_duration_end_set_date(
     if await reject_end_beyond_horizon(context, update, meeting, proposed_end):
         return ConversationMeetingState.EDIT_END_DATE
 
-    meeting.end_datetime = proposed_end
+    apply_end_datetime(meeting, proposed_end, input_source="calendar_update")
 
     return await show_end_datetime_entry(context, update, meeting, user.lang)
 
@@ -525,6 +577,13 @@ async def duration_end_set_time_handler(
                     meeting, user.lang, error=CommonMessages.TIME_INVALID_VALUE.get(lang=user.lang)
                 ),
             )
+            log.info(
+                "Meeting datetime input rejected",
+                user_id=user.db_id,
+                reason="invalid_time_value",
+                field="end",
+                conversation_state=ConversationMeetingState.EDIT_END_TIME.name,
+            )
             context.put_feature_metric(
                 Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "invalid_time"}
             )
@@ -543,7 +602,7 @@ async def duration_end_set_time_handler(
         if await reply_end_beyond_horizon(context, update, meeting, proposed_end):
             return ConversationMeetingState.EDIT_END_DATETIME
 
-        return await save_end_datetime_and_finish(context, update, meeting, proposed_end)
+        return await save_end_datetime_and_finish(context, update, meeting, proposed_end, input_source="time_message")
 
 
 @HandlersRegistry.register_message(
@@ -564,6 +623,13 @@ async def duration_end_time_wrong_input_message_handler(
             view=build_end_time_prompt_view(
                 meeting, user.lang, error=CommonMessages.TIME_INVALID_FORMAT.get(lang=user.lang)
             ),
+        )
+        log.info(
+            "Meeting datetime input rejected",
+            user_id=user.db_id,
+            reason="wrong_time_format",
+            field="end",
+            conversation_state=ConversationMeetingState.EDIT_END_TIME.name,
         )
         context.put_feature_metric(
             Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "wrong_time_format"}

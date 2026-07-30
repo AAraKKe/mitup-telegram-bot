@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
@@ -15,12 +16,14 @@ from mitup_bot.models import Meetup
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import ButtonMessages, MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import serialize_entities
+from mitup_bot.utils.entities import capture_tagged_text
 from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.meeting_text import rich_title
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
+
+log = structlog.get_logger(__name__)
 
 
 def edit_title_prompt_view(meeting: Meetup, lang: str) -> MitupView:
@@ -77,7 +80,22 @@ async def edit_title_meeting_message_handler(session: AsyncSession, update: Upda
 
     with context.meeting_id(ContextId.EDIT_MEETING_TITLE) as meeting_id:
         meeting = await guards.meeting(session, user, meeting_id, "Edit title", context)
-        meeting.set_title(serialize_entities(message.text, message.entities))
+        old_len = len(meeting.tagged_title)
+        tagged = capture_tagged_text(message.text, message.entities, field="title")
+        meeting.set_title(tagged)
+
+        # Which meeting was edited and whether the owner grew or trimmed it — neither of which the
+        # EMF property alone gives. Both lengths measure the stored tagged form, so they compare
+        # like with like; the text itself is the owner's and never travels.
+        log.info(
+            "Meeting content edited",
+            user_id=user.db_id,
+            field="title",
+            old_len=old_len,
+            new_len=len(tagged),
+            had_entities=bool(message.entities),
+            reason="owner_edited",
+        )
 
         view = meeting_views.edit_view(meeting).with_context(
             MeetingEditContentMessages.TITLE_SUCCESS.get(title=rich_title(meeting))

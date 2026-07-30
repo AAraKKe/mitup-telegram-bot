@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -13,6 +14,8 @@ from mitup_bot.views import meeting as meeting_views
 
 from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
+
+log = structlog.get_logger(__name__)
 
 
 def is_already_attached(meeting: Meetup, chat_instance: str | None) -> bool:
@@ -66,13 +69,32 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
     if (current_message := meeting.message_from_update(update)) is None:
         current_message = Message.from_update(update, meeting, meeting_views.keyboard_for_update(update, meeting, user))
         meeting.messages.append(current_message)
+        outcome = "already_attached" if already_attached else "message_linked"
     else:
+        had_chat_instance = current_message.chat_instance is not None
         current_message.capture_chat_instance(update)
+        if already_attached:
+            outcome = "already_attached"
+        elif not had_chat_instance and current_message.chat_instance is not None:
+            outcome = "chat_instance_backfilled"
+        else:
+            outcome = "message_linked"
 
     # Not defensive: the broadcast payload snapshots message.id at enqueue time, and a
     # freshly appended Message only gets one from this flush (needed for the dead-message
     # reconcile if Telegram reports the message gone during the fan-out).
     await session.flush()
+
+    # What the tap decided is whether the meeting is findable in this chat, and only the stored
+    # chat instance makes it so — hence both the outcome and whether one is now held. The caller
+    # may have no account, so `user_id` is genuinely absent rather than omitted.
+    log.info(
+        "Meeting attached to chat",
+        user_id=user.db_id if user is not None else None,
+        outcome=outcome,
+        chat_instance_present=chat_instance is not None,
+        messages_count=len(meeting.messages),
+    )
 
     alert = MeetingAttachMessages.ALREADY_ENABLED_ALERT if already_attached else MeetingAttachMessages.ENABLED_ALERT
     await context.api.answer_callback_query(

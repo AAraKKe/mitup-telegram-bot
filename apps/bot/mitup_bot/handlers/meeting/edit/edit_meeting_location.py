@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
@@ -19,6 +20,8 @@ from mitup_bot.views import MitupView
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
 from .views import edit_location_view
+
+log = structlog.get_logger(__name__)
 
 
 def edit_location_name_prompt_view(meeting_id: int, lang: str) -> MitupView:
@@ -173,7 +176,19 @@ async def edit_meeting_location_name(session: AsyncSession, update: Update, cont
     except ContextPropertyNotSetError as exc:
         return await recover_from_lost_context(update, context, user, exc, ContextId.EDIT_MEETING_LOCATION_NAME)
 
+    had_previous_value = meeting.location.name is not None
     meeting.location.name = location_name
+
+    # A venue change is what makes a card gain or lose its map link. The name and the coordinates
+    # are the user's own — a home address, in the worst case — so only their presence travels.
+    log.info(
+        "Meeting location edited",
+        user_id=user.db_id,
+        field="name",
+        coordinates_set=meeting.location.coordinates is not None,
+        had_previous_value=had_previous_value,
+        reason="owner_edited",
+    )
 
     response_view = edit_location_view(meeting).with_context(
         MeetingEditLocationMessages.NAME_SUCCESS.get(name=meeting.location.name)
@@ -207,7 +222,17 @@ async def edit_meeting_location_coordinates(session: AsyncSession, update: Updat
 
     assert tg_location is not None, "the LOCATION filter this handler is registered with guarantees the location"
 
+    had_previous_value = meeting.location.coordinates is not None
     meeting.location.coordinates = (tg_location.longitude, tg_location.latitude)
+
+    log.info(
+        "Meeting location edited",
+        user_id=user.db_id,
+        field="coordinates",
+        coordinates_set=True,
+        had_previous_value=had_previous_value,
+        reason="owner_edited",
+    )
 
     response_view = edit_location_view(meeting).with_context(
         MeetingEditLocationMessages.COORDINATES_SUCCESS.get(lang=user.lang)

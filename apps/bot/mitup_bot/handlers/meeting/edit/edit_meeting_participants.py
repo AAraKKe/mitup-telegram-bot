@@ -1,5 +1,6 @@
 from typing import cast
 
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler
@@ -13,6 +14,7 @@ from mitup_bot.handlers.personal_filters import PositiveNumberFilter
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.handlers.utils import recover_from_lost_context
 from mitup_bot.mitup_types import TMitupContext
+from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import MeetingEditParticipantsMessages
 from mitup_bot.utils import callbacks as cb
@@ -20,6 +22,28 @@ from mitup_bot.views.collaborate import collaborate_button
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
 from .views import edit_max_participants_view, edit_participants_view
+
+log = structlog.get_logger(__name__)
+
+
+def log_capacity_change(meeting: Meetup, user: User, old_max_members: int | None, reason: str):
+    """Record a capacity write, with the state it decides.
+
+    `max_members` is not the cap that applies: a capped owner clearing the limit falls back to their
+    plan's, so the effective value is on the line beside the raw one. Capacity governs `join_allowed`,
+    the joined-versus-waiting split and every promotion, so the counts it is now judged against
+    belong on the same record.
+    """
+    log.info(
+        "Meeting capacity changed",
+        user_id=user.db_id,
+        old_max_members=old_max_members,
+        new_max_members=meeting.max_members,
+        effective_max_members=meeting.effective_max_members,
+        n_participants=meeting.n_participants,
+        n_waiting=meeting.n_waiting,
+        reason=reason,
+    )
 
 
 @HandlersRegistry.register_callback_query(
@@ -98,7 +122,9 @@ async def callback_edit_meeting_no_limit_participants(session: AsyncSession, upd
         lock=True,
     )
 
+    old_max_members = meeting.max_members
     meeting.max_members = None
+    log_capacity_change(meeting, user, old_max_members, reason="cleared_to_plan_default")
 
     # A capped owner's cleared limit resolves to the plan's cap (Meetup.effective_max_members),
     # so the confirmation states that number rather than claiming no limit.
@@ -164,7 +190,9 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
         await context.api.send_message(update=update, view=view.with_context(rejection))
         return ConversationMeetingState.EDIT_MAX_PARTICIPANTS
 
+    old_max_members = meeting.max_members
     meeting.max_members = requested_max
+    log_capacity_change(meeting, user, old_max_members, reason="owner_set_limit")
 
     response_view = edit_participants_view(meeting).with_context(
         MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=meeting.max_members)

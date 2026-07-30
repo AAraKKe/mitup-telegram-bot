@@ -1,5 +1,6 @@
 import datetime as dt
 
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Message, MessageEntity, Update
 from telegram.ext import ConversationHandler, filters
@@ -16,7 +17,7 @@ from mitup_bot.models import Meetup
 from mitup_bot.monitoring.metric_keys import Feature, MetricKey
 from mitup_bot.utils import MeetingCreationMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import build_datetime_link, serialize_entities
+from mitup_bot.utils.entities import build_datetime_link, capture_tagged_text
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views import meeting_text
 from mitup_bot.views.collaborate import supporter_upsell_view
@@ -25,6 +26,8 @@ from ..command_enums import CommandsId
 from ..main_menu.show_main_menu import callback_query_main_menu
 from .enums import ConversationMeetingState, MeetingHandlerId
 from .utils import active_meetings_cap_reached, main_menu_back_button, scheduling_horizon_rejection
+
+log = structlog.get_logger(__name__)
 
 
 class ValidTitleFilter(filters.MessageFilter):
@@ -101,13 +104,19 @@ async def create_meeting_message_handler(
         if unix_time is not None:
             # A title-embedded date beyond the horizon keeps the user in TITLE to pick a nearer one
             # rather than silently dropping the date.
-            if rejection := scheduling_horizon_rejection(user, unix_time, title_flow=True):
+            if rejection := scheduling_horizon_rejection(user, unix_time, field="title"):
+                log.info(
+                    "Meeting creation step rejected",
+                    user_id=user.db_id,
+                    step="title",
+                    reason="title_datetime_beyond_horizon",
+                )
                 await context.api.send_message(update=update, view=supporter_upsell_view(rejection, user.lang))
                 return ConversationMeetingState.TITLE
             meeting_datetime = unix_time
 
     meetup = Meetup(
-        title=serialize_entities(title, message.entities),
+        title=capture_tagged_text(title, message.entities, field="title"),
         owner=user,
         datetime=meeting_datetime,
         waiting_list=user.settings.default_waiting_list,
@@ -121,6 +130,23 @@ async def create_meeting_message_handler(
     # A freshly flushed instance has never loaded its joined_links collection, and the async
     # engine cannot lazy-load it when the view renders below — load it explicitly.
     await session.refresh(meetup, ["joined_links"])
+
+    # The origin line every later meeting line hangs off, and the only record of which owner
+    # defaults the new meeting was stamped with — the settings screen shows today's values, not the
+    # ones in force when this meeting was made.
+    log.info(
+        "Meeting created",
+        meeting_id=meetup.db_id,
+        user_id=user.db_id,
+        has_datetime=meeting_datetime is not None,
+        datetime_source="title_entity" if meeting_datetime is not None else "none",
+        title_len=len(title),
+        waiting_list=meetup.waiting_list,
+        public=meetup.public,
+        allow_invitation=meetup.allow_invitation,
+        incognito=meetup.incognito,
+        lock_on_start=meetup.lock_on_start,
+    )
 
     success_message = MeetingCreationMessages.SUCCESS.get(title=meeting_text.rich_title(meetup), lang=user.lang)
     view = meeting_views.edit_view(meetup).with_context(success_message)
@@ -139,6 +165,7 @@ async def create_meeting_invalid_title_message_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
     user = await guards.current_user(update, session)
+    log.info("Meeting creation step rejected", user_id=user.db_id, step="title", reason="invalid_title_entities")
     error_msg = MeetingCreationMessages.INVALID_TITLE_ENTITY.get(lang=user.lang)
     view = views.factory.create_meeting_view(guards.render_context(user, update, context), message=error_msg)
     await context.api.send_message(update=update, view=view)
@@ -155,6 +182,7 @@ async def create_meeting_rich_message_handler(
     session: AsyncSession, update: Update, context: TMitupContext
 ) -> ConversationMeetingState:
     user = await guards.current_user(update, session)
+    log.info("Meeting creation step rejected", user_id=user.db_id, step="title", reason="rich_message_unsupported")
     ctx = guards.render_context(user, update, context)
     view = views.factory.create_meeting_view(ctx, datetime_link=build_datetime_link())
     await reply_rich_message_not_supported(ctx, update, context, view)
@@ -165,6 +193,8 @@ async def create_meeting_rich_message_handler(
     MeetingHandlerId.CREATE_MEETING_CANCEL_CALLBACK, callback_data=cb.CANCEL_CREATE_MEETING, bindable=False
 )
 async def callback_query_cancel_meeting(update: Update, context: TMitupContext) -> int:
+    log.info("Meeting creation cancelled", reason="user_cancelled")
+
     # Just send the user to the main menu
     await callback_query_main_menu(update, context)
 

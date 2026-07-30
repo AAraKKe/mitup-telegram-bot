@@ -55,8 +55,20 @@ def validate_start_datetime(start_dt: dt.datetime, meeting: Meetup, lang: str) -
     not checked here: date-pick call sites check it separately so the rejection can carry the
     Collaborate upsell, and time-only edits skip it entirely so a grandfathered far-future meeting
     can still have its time adjusted.
+
+    All four start-datetime paths reach this, and the owner only ever sees the message, so the
+    rejection is recorded here. The owner's own clock sits next to what they proposed: whether a
+    datetime is in the past is a statement about their timezone, and a timezone-boundary bug is
+    otherwise indistinguishable from a user mistake.
     """
     if is_in_past(start_dt, meeting):
+        log.info(
+            "Meeting start datetime rejected",
+            user_id=meeting.owner.db_id,
+            reason="start_in_past",
+            proposed_datetime=start_dt,
+            owner_now=meeting.owner.now_in_tz(),
+        )
         return MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=lang)
     return None
 
@@ -68,7 +80,7 @@ async def reject_beyond_horizon(context: TMitupContext, update: Update, meeting:
     button back to the calendar, so the upsell replaces the screen instead of stacking an alert on
     top of it; the conversation stays in EDIT_DATE, where the calendar button is handled.
     """
-    rejection = scheduling_horizon_rejection(meeting.owner, start_dt)
+    rejection = scheduling_horizon_rejection(meeting.owner, start_dt, field="start")
     if rejection is None:
         return False
     lang = meeting.owner.lang
@@ -80,6 +92,35 @@ async def reject_beyond_horizon(context: TMitupContext, update: Update, meeting:
     view = supporter_upsell_view(rejection, lang).with_context_menu([[calendar_button]])
     await context.api.edit_message(update=update, view=view)
     return True
+
+
+def apply_start_datetime(meeting: Meetup, start_dt: dt.datetime, *, input_source: str) -> bool:
+    """Set the meeting's start time, reporting whether the end time was cleared with it.
+
+    The single write point for `meeting.datetime` across all four input paths, so the one line it
+    emits carries both the change the owner asked for and the two they did not: setting a start at
+    or after the end makes `enforce_datetime_ordering` drop the end time *and* the lock-on-start
+    rule that depended on it. Cause and effect land on the same record.
+    """
+    old_datetime = meeting.datetime
+    previous_end = meeting.end_datetime
+    previous_lock_on_start = meeting.lock_on_start
+
+    meeting.datetime = start_dt
+    end_cleared = meeting.enforce_datetime_ordering()
+
+    log.info(
+        "Meeting start datetime set",
+        user_id=meeting.owner.db_id,
+        old_datetime=old_datetime,
+        new_datetime=meeting.datetime,
+        input_source=input_source,
+        end_datetime_cleared=end_cleared,
+        previous_end_datetime=previous_end,
+        lock_on_start_reset=end_cleared and previous_lock_on_start,
+        timezone=str(meeting.timezone),
+    )
+    return end_cleared
 
 
 def prepend_end_cleared_notice(*, lang: str, base_message: str | FormattedText) -> FormattedText:
@@ -245,12 +286,17 @@ async def callback_query_edit_meeting_date(
     current_date = callback_data.date if today_in_user_timezone <= callback_data.date else today_in_user_timezone
 
     meeting_date_in_tz = meeting.owner.datetime_in_tz(meeting.datetime) if meeting.datetime else None
-    log.debug(
+    # The domain's only deliberately instrumented date arithmetic, and the one line carrying all
+    # four dates side by side. Every calendar-boundary report is about a specific meeting in a
+    # specific timezone, so it has to survive production's INFO threshold to be of any use.
+    log.info(
         "Rendering calendar view",
+        user_id=user.db_id,
+        timezone=str(meeting.timezone),
         anchor_date=anchor_date,
         current_date=current_date,
         meeting_date=meeting_date_in_tz,
-        now_in_user_timezone=now_in_user_timezone,
+        owner_now=now_in_user_timezone,
         callback_date=callback_data.date,
     )
 
@@ -305,8 +351,7 @@ async def handle_first_datetime_set(
     if await reject_beyond_horizon(context, update, meeting, proposed_start):
         return ConversationMeetingState.EDIT_DATE
 
-    meeting.datetime = proposed_start
-    end_cleared = meeting.enforce_datetime_ordering()
+    end_cleared = apply_start_datetime(meeting, proposed_start, input_source="calendar_first_pick")
 
     lang = meeting.lang
 
@@ -361,8 +406,7 @@ async def handle_datetime_update(
     if await reject_beyond_horizon(context, update, meeting, proposed_start):
         return ConversationMeetingState.EDIT_DATE
 
-    meeting.datetime = proposed_start
-    end_cleared = meeting.enforce_datetime_ordering()
+    end_cleared = apply_start_datetime(meeting, proposed_start, input_source="calendar_update")
 
     if end_cleared:
         await context.api.answer_callback_query(
@@ -465,7 +509,7 @@ async def date_time_entity_message_handler(
         # The horizon rejection is checked apart from the other validations so it can carry the
         # Collaborate button; a raised horizon is exactly what Collaborate offers. The back button
         # re-renders the Date & Time entry screen the message was sent from.
-        if rejection := scheduling_horizon_rejection(meeting.owner, unix_time):
+        if rejection := scheduling_horizon_rejection(meeting.owner, unix_time, field="start"):
             back_button = ButtonConfig(
                 text=ButtonMessages.DATE_TIME.back(lang=current_user.lang),
                 callback_data=cb.EDIT_MEETING.with_id(meeting.db_id),
@@ -474,8 +518,7 @@ async def date_time_entity_message_handler(
             await context.api.send_message(update=update, view=view)
             return ConversationMeetingState.EDIT_DATETIME
 
-        meeting.datetime = unix_time
-        end_cleared = meeting.enforce_datetime_ordering()
+        end_cleared = apply_start_datetime(meeting, unix_time, input_source="datetime_entity")
 
         assert meeting.datetime is not None
         datetime_entity = EntityDateTime(
@@ -519,6 +562,13 @@ async def set_time_message_handler(
                     meeting, current_user.lang, error=CommonMessages.TIME_INVALID_VALUE.get(lang=current_user.lang)
                 ),
             )
+            log.info(
+                "Meeting datetime input rejected",
+                user_id=current_user.db_id,
+                reason="invalid_time_value",
+                field="start",
+                conversation_state=ConversationMeetingState.EDIT_TIME.name,
+            )
             context.put_feature_metric(
                 Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "invalid_time"}
             )
@@ -534,8 +584,7 @@ async def set_time_message_handler(
             )
             return ConversationMeetingState.EDIT_TIME
 
-        meeting.datetime = proposed_start
-        end_cleared = meeting.enforce_datetime_ordering()
+        end_cleared = apply_start_datetime(meeting, proposed_start, input_source="time_message")
 
         assert meeting.datetime is not None
         datetime_entity = EntityDateTime(
@@ -569,6 +618,13 @@ async def fallback_answer(
             view=build_edit_time_prompt_view(
                 meeting, current_user.lang, error=CommonMessages.TIME_INVALID_FORMAT.get(lang=current_user.lang)
             ),
+        )
+        log.info(
+            "Meeting datetime input rejected",
+            user_id=current_user.db_id,
+            reason="wrong_time_format",
+            field="start",
+            conversation_state=ConversationMeetingState.EDIT_TIME.name,
         )
         context.put_feature_metric(
             Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "wrong_time_format"}
@@ -611,6 +667,13 @@ async def datetime_state_fallback_answer(
         error = CommonMessages.DATETIME_INVALID.get(lang=current_user.lang, datetime_link=build_datetime_link())
         await context.api.send_message(
             update=update, view=build_edit_datetime_entry_view(meeting, current_user.lang, today, error=error)
+        )
+        log.info(
+            "Meeting datetime input rejected",
+            user_id=current_user.db_id,
+            reason="wrong_datetime_format",
+            field="start",
+            conversation_state=ConversationMeetingState.EDIT_DATETIME.name,
         )
         context.put_feature_metric(
             Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "wrong_datetime_format"}

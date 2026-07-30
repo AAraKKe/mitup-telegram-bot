@@ -1059,6 +1059,33 @@ async def test_the_meeting_guard_names_the_meeting_on_every_later_line(
     assert [entry["meeting_id"] for entry in logs if entry["event"] == "after the guard"] == [1]
 
 
+async def test_every_meeting_guard_names_the_meeting_it_resolved(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    update: Update,
+):
+    """All three entry points bind, so the join, invite and attach surfaces name their meeting too.
+
+    Only `meeting` did before, which left every line those surfaces emit anonymous while the ones
+    behind an owner-only screen were named.
+    """
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    with capture_logs(processors=[merge_contextvars]) as shared_logs:
+        await guards.shared_meeting(mock_session, user_with_settings, 1, "join or leave a meeting", update)
+        structlog.get_logger("mitup_bot").info("after the shared guard")
+
+    with capture_logs(processors=[merge_contextvars]) as conversation_logs:
+        await guards.conversation_meeting(mock_session, user_with_settings, 1, "invite users to a meeting")
+        structlog.get_logger("mitup_bot").info("after the conversation guard")
+
+    assert [entry["meeting_id"] for entry in shared_logs if entry["event"] == "after the shared guard"] == [1]
+    assert [entry["meeting_id"] for entry in conversation_logs if entry["event"] == "after the conversation guard"] == [
+        1
+    ]
+
+
 async def test_a_rejected_meeting_binds_nothing(
     mock_session: MockDbSession,
     context: StubMitupContext,

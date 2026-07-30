@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -8,12 +9,14 @@ from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import Meetup
+from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
 
 from .enums import EditMeetingHandlerId
+
+log = structlog.get_logger(__name__)
 
 
 @HandlersRegistry.register_callback_query(
@@ -46,7 +49,7 @@ async def toggle_meeting_setting(
     handler_id: EditMeetingHandlerId,
     callback_data: cb.CallbackData,
     return_view: Callable[[Meetup], MitupView],
-) -> AsyncGenerator[Meetup]:
+) -> AsyncGenerator[tuple[Meetup, User]]:
     user = await guards.current_user(update, session)
 
     meeting_id = guards.valid_callback_data(callback_data.parse(context.match), handler_id).id
@@ -59,7 +62,7 @@ async def toggle_meeting_setting(
         context=context,
     )
 
-    yield meeting
+    yield meeting, user
 
     await context.api.edit_message(update=update, view=return_view(meeting))
     # Update all messages to ensure any visible message contains the new changes but skip current one
@@ -87,8 +90,19 @@ def create_meeting_settings_toggle_handler(
             handler_id=handler_id,
             callback_data=callback_data,
             return_view=return_view,
-        ) as meeting:
-            setattr(meeting, attribute, not getattr(meeting, attribute))
+        ) as (meeting, user):
+            old_value = getattr(meeting, attribute)
+            setattr(meeting, attribute, not old_value)
+            # One line in the factory instruments all four visibility and access booleans; the
+            # `field` facet is the attribute name, so a new toggle is recorded by construction.
+            log.info(
+                "Meeting setting toggled",
+                user_id=user.db_id,
+                field=attribute,
+                old_value=old_value,
+                new_value=not old_value,
+                reason="owner_toggled",
+            )
 
     return handler
 
