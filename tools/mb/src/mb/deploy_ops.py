@@ -171,8 +171,9 @@ def register_task_definition(ecs_client: ECSClient, family: str, image: str) -> 
         console.error(f"Task definition {family!r} does not have any container definitions")
         raise typer.Abort()
 
-    # The application container is the one named after the family; the task definition also
-    # carries sidecars (e.g. the OpenTelemetry init container) whose images must stay untouched.
+    # A task definition may carry more than one container, so the application is selected by name
+    # rather than by position: it is the one named after the family. Any other container keeps the
+    # image it was registered with.
     app_container = next((container for container in containers_definition if container.get("name") == family), None)
     if app_container is None:
         console.error(f"Task definition {family!r} does not have a container named {family!r}")

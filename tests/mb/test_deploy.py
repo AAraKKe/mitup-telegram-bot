@@ -236,8 +236,8 @@ def test_invoke_lambda_fails_on_execution_and_error_is_logged(capsys: pytest.Cap
 
 def test_register_task_definition_succeeds(capsys: pytest.CaptureFixture[str]):
     family, image, role, task_arn = "MyTask", "MyNewImage", "SomeRoleArn", "MyTaskArn"
-    # A sidecar ahead of the app container mirrors the real task definitions, where an init
-    # container sits at index 0 and only the container named after the family takes the new image.
+    # A second container ahead of the app one proves the selection is by name and not by position:
+    # only the container named after the family takes the new image.
     container_definitions = [
         {"name": "init", "image": "InitImage"},
         {"name": family, "image": "SomePreviousImage"},
@@ -278,7 +278,7 @@ def test_register_task_definition_succeeds(capsys: pytest.CaptureFixture[str]):
     context.assert_ecs_called("describe_task_definition", taskDefinition=family)
     # The definition passes through wholesale — volumes, roles and network mode included, the
     # response-only metadata stripped — with the new image and the release marker naming it only on
-    # the app container, never on a sidecar.
+    # the app container, never on the other one.
     context.assert_ecs_called(
         "register_task_definition",
         family=family,
