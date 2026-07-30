@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -5,6 +6,7 @@ from mitup_bot.db import with_session
 from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Broadcast, BroadcastMessage, User
+from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import BroadcastOperatorMessages
@@ -13,6 +15,8 @@ from mitup_bot.views import MitupView, factory
 from . import utils
 from .enums import ConversationBroadcastState
 from .validation import ValidatedBroadcast
+
+log = structlog.get_logger(__name__)
 
 
 async def present_preview(
@@ -26,9 +30,20 @@ async def present_preview(
     await render_language_previews(context, operator, validated)
     recipient_counts = await compute_recipient_counts(validated)
     draft_id = await create_draft(operator, validated)
-    summary = summary_text(operator.lang, validated, recipient_counts)
-    keyboard = confirmation_keyboard(operator.lang, draft_id)
-    await context.api.send_message(update=update, view=MitupView(summary, keyboard))
+    # From here on the draft has an id, and it is the key the sender's own run logs are bound to,
+    # so one `broadcast_id` filter returns the operator's side and the delivery side together.
+    with structlog.contextvars.bound_contextvars(broadcast_id=draft_id):
+        summary = summary_text(operator.lang, validated, recipient_counts)
+        keyboard = confirmation_keyboard(operator.lang, draft_id)
+        await context.api.send_message(update=update, view=MitupView(summary, keyboard))
+        log.info(
+            "Broadcast confirmation requested",
+            user_id=operator.db_id,
+            stage="preview",
+            outcome="awaiting_confirmation",
+            total_recipients=sum(recipient_counts.values()),
+            skipped_languages=validated.skipped_languages,
+        )
     return ConversationBroadcastState.AWAITING_CONTENT
 
 
@@ -44,6 +59,13 @@ async def render_language_previews(context: TMitupContext, operator: User, valid
         await context.api.send_message_to_user(
             operator, factory.broadcast_recipient_view(content.body_html, content.language)
         )
+    log.info(
+        "Broadcast previews sent to operator",
+        user_id=operator.db_id,
+        stage="preview",
+        languages=[content.language for content in validated.messages],
+        message_count=1 + 2 * len(validated.messages),
+    )
 
 
 def language_label(lang: str, code: str) -> FormattedText:
@@ -55,12 +77,25 @@ def language_label(lang: str, code: str) -> FormattedText:
 @with_session
 async def compute_recipient_counts(session: AsyncSession, validated: ValidatedBroadcast) -> dict[str, int]:
     members_by_language = await utils.count_members_by_language(session)
-    return utils.recipients_per_language(members_by_language, [content.language for content in validated.messages])
+    provided_languages = [content.language for content in validated.messages]
+    counts = utils.recipients_per_language(members_by_language, provided_languages)
+    # The audience is recomputed from a users table that keeps moving, so "why did N members get
+    # English?" is unanswerable after the fact unless the counts behind the summary are recorded.
+    log.info(
+        "Broadcast audience computed",
+        stage="audience",
+        per_language=counts,
+        total_recipients=sum(counts.values()),
+        fallback_language=TranslationEngine.FALLBACK_LANG,
+        folded_into_fallback=utils.folded_into_fallback(members_by_language, provided_languages),
+        provided_languages=provided_languages,
+    )
+    return counts
 
 
 @with_session
 async def create_draft(session: AsyncSession, operator: User, validated: ValidatedBroadcast) -> int:
-    await utils.discard_author_drafts(session, operator.tg_user_id)
+    await utils.discard_author_drafts(session, operator.tg_user_id, reason="replaced_by_new_upload")
     broadcast = Broadcast(
         name=utils.derive_name(validated.english_body),
         author_tg_id=operator.tg_user_id,
@@ -70,6 +105,18 @@ async def create_draft(session: AsyncSession, operator: User, validated: Validat
     )
     session.add(broadcast)
     await session.flush()
+    # Mints the id every later line — here, in the confirm handler and in the sender — references.
+    log.info(
+        "Broadcast draft created",
+        broadcast_id=broadcast.db_id,
+        broadcast_name=broadcast.name,
+        author_tg_id=operator.tg_user_id,
+        user_id=operator.db_id,
+        stage="create_draft",
+        languages=[content.language for content in validated.messages],
+        char_counts={content.language: content.char_count for content in validated.messages},
+        skipped_languages=validated.skipped_languages,
+    )
     return broadcast.db_id
 
 

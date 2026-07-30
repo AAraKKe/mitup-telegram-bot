@@ -350,6 +350,16 @@ def chat_member_is_banned(member: ChatMember) -> bool:
     return member.status == ChatMemberStatus.BANNED
 
 
+def membership_refusal(error: Forbidden | BadRequest) -> str:
+    """Name why a supergroup membership call was refused, as a bounded machine value.
+
+    The two classes mean different things to an operator: `forbidden` says the bot lost its rights
+    in the chat (every later call will fail the same way), `bad_request` says this one call was
+    rejected — a join request already handled, an unknown user, an unbannable admin.
+    """
+    return "forbidden" if isinstance(error, Forbidden) else "bad_request"
+
+
 def edit_target(update: Update) -> tuple[int | None, int | None, str | None]:
     """Extract (chat_id, message_id, inline_message_id) for an edit from the update."""
     if update.effective_message:
@@ -415,11 +425,13 @@ class TelegramApiWrapper(Protocol):
         meeting: Meetup,
     ): ...
     async def clear_reply_markup(self, update: Update): ...
-    # Immediate admin operations on a supergroup — never routed through the outbox.
-    async def approve_chat_join_request(self, chat_id: int, tg_user_id: int): ...
-    async def decline_chat_join_request(self, chat_id: int, tg_user_id: int): ...
-    async def ban_chat_member(self, chat_id: int, tg_user_id: int): ...
-    async def unban_chat_member(self, chat_id: int, tg_user_id: int, only_if_banned: bool = True): ...
+    # Immediate admin operations on a supergroup — never routed through the outbox. Each answers
+    # whether Telegram applied the change, so a caller never records a membership move that a
+    # swallowed Forbidden/BadRequest prevented.
+    async def approve_chat_join_request(self, chat_id: int, tg_user_id: int) -> bool: ...
+    async def decline_chat_join_request(self, chat_id: int, tg_user_id: int) -> bool: ...
+    async def ban_chat_member(self, chat_id: int, tg_user_id: int) -> bool: ...
+    async def unban_chat_member(self, chat_id: int, tg_user_id: int, only_if_banned: bool = True) -> bool: ...
     async def is_chat_member(self, chat_id: int, tg_user_id: int) -> bool: ...
     async def is_chat_admin(self, chat_id: int, tg_user_id: int) -> bool: ...
     async def is_chat_banned(self, chat_id: int, tg_user_id: int) -> bool: ...
@@ -1095,37 +1107,79 @@ class TelegramApi:
     # -- Supergroup admin operations --------------------------------------------------------
     # Immediate ops (never enqueued): join-request gating and ban/unban for the hosts-only
     # group. A Telegram failure is logged and swallowed so it never crashes the caller (the
-    # join-request handler, the daily supporter-check job, or the Collaborate screen render).
+    # join-request handler, the daily supporter-check job, or the Collaborate screen render),
+    # and reported as False so the caller records what it actually achieved rather than
+    # announcing a membership change Telegram refused. The round-trip itself is recorded by the
+    # outbound instrumentation, so only the swallowed refusal is logged here.
 
-    async def approve_chat_join_request(self, chat_id: int, tg_user_id: int):
+    async def approve_chat_join_request(self, chat_id: int, tg_user_id: int) -> bool:
         try:
             await self.adapter.bot.approve_chat_join_request(chat_id=chat_id, user_id=tg_user_id)
         except (Forbidden, BadRequest) as e:
-            log.warning("Failed to approve chat join request", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+            log.warning(
+                "Failed to approve chat join request",
+                chat_id=chat_id,
+                tg_user_id=tg_user_id,
+                reason=membership_refusal(e),
+                error=str(e),
+            )
+            return False
+        return True
 
-    async def decline_chat_join_request(self, chat_id: int, tg_user_id: int):
+    async def decline_chat_join_request(self, chat_id: int, tg_user_id: int) -> bool:
         try:
             await self.adapter.bot.decline_chat_join_request(chat_id=chat_id, user_id=tg_user_id)
         except (Forbidden, BadRequest) as e:
-            log.warning("Failed to decline chat join request", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+            log.warning(
+                "Failed to decline chat join request",
+                chat_id=chat_id,
+                tg_user_id=tg_user_id,
+                reason=membership_refusal(e),
+                error=str(e),
+            )
+            return False
+        return True
 
-    async def ban_chat_member(self, chat_id: int, tg_user_id: int):
+    async def ban_chat_member(self, chat_id: int, tg_user_id: int) -> bool:
         try:
             await self.adapter.bot.ban_chat_member(chat_id=chat_id, user_id=tg_user_id)
         except (Forbidden, BadRequest) as e:
-            log.warning("Failed to ban chat member", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+            log.warning(
+                "Failed to ban chat member",
+                chat_id=chat_id,
+                tg_user_id=tg_user_id,
+                reason=membership_refusal(e),
+                error=str(e),
+            )
+            return False
+        return True
 
-    async def unban_chat_member(self, chat_id: int, tg_user_id: int, only_if_banned: bool = True):
+    async def unban_chat_member(self, chat_id: int, tg_user_id: int, only_if_banned: bool = True) -> bool:
         try:
             await self.adapter.bot.unban_chat_member(chat_id=chat_id, user_id=tg_user_id, only_if_banned=only_if_banned)
         except (Forbidden, BadRequest) as e:
-            log.warning("Failed to unban chat member", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+            log.warning(
+                "Failed to unban chat member",
+                chat_id=chat_id,
+                tg_user_id=tg_user_id,
+                only_if_banned=only_if_banned,
+                reason=membership_refusal(e),
+                error=str(e),
+            )
+            return False
+        return True
 
     async def _fetch_chat_member(self, chat_id: int, tg_user_id: int) -> ChatMember | None:
         try:
             return await self.adapter.bot.get_chat_member(chat_id=chat_id, user_id=tg_user_id)
         except (Forbidden, BadRequest) as e:
-            log.warning("Failed to fetch chat member", chat_id=chat_id, tg_user_id=tg_user_id, error=str(e))
+            log.warning(
+                "Failed to fetch chat member",
+                chat_id=chat_id,
+                tg_user_id=tg_user_id,
+                reason=membership_refusal(e),
+                error=str(e),
+            )
             return None
 
     async def is_chat_member(self, chat_id: int, tg_user_id: int) -> bool:

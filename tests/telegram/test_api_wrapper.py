@@ -1,5 +1,6 @@
 """Tests for the real TelegramApi class with a mocked bot."""
 
+import logging
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -39,7 +40,7 @@ from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView, ViewDocument
-from tests.helpers import make_test_metrics_client
+from tests.helpers import log_record, make_test_metrics_client
 from tests.helpers.fixtures import create_joined_link, create_meetup, create_message, create_user
 from tests.helpers.monitoring import MetricAssertions
 
@@ -1533,8 +1534,43 @@ async def test_admin_ops_swallow_telegram_errors(
 ):
     getattr(bot, bot_attr).side_effect = error
 
-    # A Telegram failure must never propagate to the caller (handler / job / render).
-    await getattr(telegram_api, method_name)(chat_id=-100, tg_user_id=555)
+    # A Telegram failure must never propagate to the caller (handler / job / render), and the
+    # caller must be able to tell that the membership change did not happen.
+    assert await getattr(telegram_api, method_name)(chat_id=-100, tg_user_id=555) is False
+
+
+@pytest.mark.parametrize(
+    "method_name",
+    ["approve_chat_join_request", "decline_chat_join_request", "ban_chat_member", "unban_chat_member"],
+)
+async def test_admin_ops_report_an_applied_change(telegram_api: TelegramApi, bot: AsyncMock, method_name: str):
+    assert await getattr(telegram_api, method_name)(chat_id=-100, tg_user_id=555) is True
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_reason"),
+    [
+        pytest.param(Forbidden("not enough rights"), "forbidden", id="forbidden"),
+        pytest.param(BadRequest("USER_NOT_PARTICIPANT"), "bad_request", id="bad_request"),
+    ],
+)
+async def test_a_swallowed_membership_failure_names_which_kind_it_was(
+    telegram_api: TelegramApi,
+    bot: AsyncMock,
+    caplog: pytest.LogCaptureFixture,
+    error: Exception,
+    expected_reason: str,
+):
+    """`forbidden` means the bot lost its rights in the chat and every later call fails the same
+    way; `bad_request` means this one call was rejected. Only the reason separates them."""
+    caplog.set_level(logging.INFO)
+    bot.approve_chat_join_request.side_effect = error
+
+    await telegram_api.approve_chat_join_request(chat_id=-100, tg_user_id=555)
+
+    record = log_record(caplog, "Failed to approve chat join request")
+    assert record.levelname == "WARNING"
+    assert record.__dict__["reason"] == expected_reason
 
 
 # ---------------------------------------------------------------------------

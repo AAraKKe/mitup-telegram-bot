@@ -1,3 +1,4 @@
+import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler
@@ -14,6 +15,8 @@ from mitup_bot.views import MitupView
 from . import utils
 from .enums import BroadcastHandlerId, ConversationBroadcastState
 
+log = structlog.get_logger(__name__)
+
 
 @HandlersRegistry.register_callback_query(
     BroadcastHandlerId.BROADCAST_OPEN_CALLBACK, callback_data=cb.BROADCAST, bindable=False, admin_only=True
@@ -27,10 +30,14 @@ async def callback_query_open_broadcast(
     # member) bails silently rather than letting current_user raise UserNotFound.
     operator = await guards.member_user(update, session)
     if operator is None:
+        # The admin taps Broadcast and the screen does not change; nothing else explains it.
+        log.warning("Broadcast flow not opened", stage="entry", outcome="aborted", reason="admin_without_member_user")
         return ConversationHandler.END
 
-    await utils.discard_author_drafts(session, operator.tg_user_id)
+    await utils.discard_author_drafts(session, operator.tg_user_id, reason="flow_reentry")
     await context.api.edit_message(update=update, view=upload_prompt_view(operator.lang))
+    # The anchor of the audit trail: who opened a broadcast flow, and when.
+    log.info("Broadcast flow opened", user_id=operator.db_id, stage="entry", outcome="awaiting_content")
     return ConversationBroadcastState.AWAITING_CONTENT
 
 

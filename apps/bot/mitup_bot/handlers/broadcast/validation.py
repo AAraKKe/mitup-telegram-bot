@@ -1,14 +1,21 @@
 from dataclasses import dataclass
 
+import structlog
 import yaml
 
 from mitup_bot.translations import SUPPORTED_LANGUAGES, TranslationEngine
 from mitup_bot.utils.entities import parse_format_tags, utf16_len
 from mitup_bot.utils.messages import BroadcastOperatorMessages
 
+log = structlog.get_logger(__name__)
+
 # Telegram's sendMessage caps a single message at 4096 UTF-16 code units, measured on the rendered
 # text (tags do not count toward the limit).
 MAX_MESSAGE_UTF16_LENGTH = 4096
+
+# Substitutions that quote the uploaded document back at the operator. They belong in the reply,
+# never on a log line: the parser detail embeds the offending fragment of the message body.
+FREE_TEXT_PARAMS = frozenset({"detail"})
 
 
 class BroadcastContentError(ValueError):
@@ -22,6 +29,15 @@ class BroadcastContentError(ValueError):
         self.message = message
         self.params = params
         super().__init__(f"{message.name}: {params}")
+
+    @property
+    def reason(self) -> str:
+        """The failure as a bounded machine value — one per `BroadcastOperatorMessages` error."""
+        return self.message.name.lower()
+
+    @property
+    def log_params(self) -> dict[str, str | int]:
+        return {name: value for name, value in self.params.items() if name not in FREE_TEXT_PARAMS}
 
 
 @dataclass(frozen=True)
@@ -62,6 +78,15 @@ def parse_and_validate(raw: str) -> ValidatedBroadcast:
     for index, entry in enumerate(entries):
         language, body = entry_fields(entry, index)
         if language not in SUPPORTED_LANGUAGES:
+            # A typo'd locale code removes a whole language from the send while the upload still
+            # succeeds, and the operator only sees it as one warning line among the previews.
+            log.warning(
+                "Skipped unsupported broadcast language",
+                stage="validate",
+                language=language,
+                position=index + 1,
+                reason="unsupported_language_code",
+            )
             skipped_languages.append(language)
             continue
         if language in seen:
@@ -73,6 +98,15 @@ def parse_and_validate(raw: str) -> ValidatedBroadcast:
         raise BroadcastContentError(
             BroadcastOperatorMessages.ERROR_MISSING_ENGLISH, language=TranslationEngine.FALLBACK_LANG
         )
+    log.info(
+        "Broadcast content validated",
+        stage="validate",
+        outcome="accepted",
+        languages=[content.language for content in contents],
+        char_counts={content.language: content.char_count for content in contents},
+        skipped_languages=skipped_languages,
+        entry_count=len(entries),
+    )
     return ValidatedBroadcast(messages=contents, skipped_languages=skipped_languages)
 
 

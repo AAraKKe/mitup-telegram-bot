@@ -18,6 +18,17 @@ from .constants import DEFAULT_CURRENT_MESSAGE, DEFAULT_FALSE, DEFAULT_NONE, Def
 UNSET: Any = object()
 
 
+def applied(result: object) -> bool:
+    """Read a membership op's answer as the bool the real wrapper returns.
+
+    The ops report whether Telegram applied the change. Unstubbed they answer with a bare mock,
+    which stands for the ordinary success, so a test only registers a value to exercise the refusal
+    — and the mock stays uncreated until called, which is what `assert_method_just_called(times=0)`
+    reads.
+    """
+    return result is not False
+
+
 @dataclass
 class MockApi(TelegramApi):
     """
@@ -95,18 +106,20 @@ class MockApi(TelegramApi):
     async def clear_reply_markup(self, update: Update):
         return await self.call_mock("clear_reply_markup", update=update)
 
-    def approve_chat_join_request(self, chat_id: int, tg_user_id: int):
-        return self.call_mock("approve_chat_join_request", chat_id=chat_id, tg_user_id=tg_user_id)
+    async def approve_chat_join_request(self, chat_id: int, tg_user_id: int) -> bool:
+        return applied(await self.call_mock("approve_chat_join_request", chat_id=chat_id, tg_user_id=tg_user_id))
 
-    def decline_chat_join_request(self, chat_id: int, tg_user_id: int):
-        return self.call_mock("decline_chat_join_request", chat_id=chat_id, tg_user_id=tg_user_id)
+    async def decline_chat_join_request(self, chat_id: int, tg_user_id: int) -> bool:
+        return applied(await self.call_mock("decline_chat_join_request", chat_id=chat_id, tg_user_id=tg_user_id))
 
-    def ban_chat_member(self, chat_id: int, tg_user_id: int):
-        return self.call_mock("ban_chat_member", chat_id=chat_id, tg_user_id=tg_user_id)
+    async def ban_chat_member(self, chat_id: int, tg_user_id: int) -> bool:
+        return applied(await self.call_mock("ban_chat_member", chat_id=chat_id, tg_user_id=tg_user_id))
 
-    def unban_chat_member(self, chat_id: int, tg_user_id: int, only_if_banned: bool = True):
-        return self.call_mock(
-            "unban_chat_member", chat_id=chat_id, tg_user_id=tg_user_id, only_if_banned=only_if_banned
+    async def unban_chat_member(self, chat_id: int, tg_user_id: int, only_if_banned: bool = True) -> bool:
+        return applied(
+            await self.call_mock(
+                "unban_chat_member", chat_id=chat_id, tg_user_id=tg_user_id, only_if_banned=only_if_banned
+            )
         )
 
     def is_chat_member(self, chat_id: int, tg_user_id: int):

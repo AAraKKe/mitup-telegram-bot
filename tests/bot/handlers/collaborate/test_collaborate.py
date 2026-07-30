@@ -1,3 +1,5 @@
+import datetime as dt
+import logging
 from collections.abc import Iterator
 from urllib.parse import parse_qs, urlparse
 
@@ -8,6 +10,7 @@ from telegram import Update
 from mitup_bot import patreon, supporter
 from mitup_bot.config import BotConfig, LimitsConfig, PatreonConfig
 from mitup_bot.custom_context import BOT_CONFIG_KEY
+from mitup_bot.handlers.collaborate.entry import UNLINK_EVENT
 from mitup_bot.handlers.collaborate.enums import CollaborateHandlerId
 from mitup_bot.hosts_group import HostsGroupState
 from mitup_bot.models import User
@@ -28,6 +31,7 @@ from tests.helpers import (
     call_handler,
     create_patreon_config,
     create_supporter_subscription,
+    log_record,
 )
 from tests.helpers.api import MockApi
 from tests.helpers.stub_db import MockDbSession
@@ -575,3 +579,89 @@ async def test_declining_unlink_returns_to_collaborate_unchanged(
             user_with_settings.lang, SupporterLevel.HOST_2, PATRON_ACTIVE_MEETINGS, PATRON_SCHEDULING_DAYS
         ),
     )
+
+
+# --- The tier-loss trail ---
+#
+# The subscription row is deleted, so these lines are the only surviving answer to "why did this
+# user lose their tier?"; the competing cause, a Patreon webhook downgrade, records its own.
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_PATREON_UNLINK)], indirect=True)
+async def test_confirming_unlink_records_the_tier_it_took_away(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    patreon_config: PatreonConfig,
+    hosts_group_state: None,
+    caplog: pytest.LogCaptureFixture,
+):
+    caplog.set_level(logging.INFO)
+    user_with_settings.supporter_level = SupporterLevel.HOST_2
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    expiration = dt.datetime(2026, 9, 1, tzinfo=dt.UTC)
+    subscription = create_supporter_subscription(
+        user_id=user_with_settings.db_id, patreon_user_id="patreon-1", support_expiration=expiration
+    )
+    mock_session.add_object(subscription, "user_id")
+
+    await call_handler(CollaborateHandlerId.UNLINK_CONFIRM, handler_context=handler_context, api=MockApi())
+
+    record = log_record(caplog, UNLINK_EVENT)
+    assert record.__dict__["outcome"] == "unlinked"
+    assert record.__dict__["reason"] == "user_requested"
+    assert record.__dict__["patreon_user_id"] == "patreon-1"
+    assert record.__dict__["previous_supporter_level"] == SupporterLevel.HOST_2.value
+    assert record.__dict__["supporter_level"] == SupporterLevel.NONE.value
+    # Rendered, not raw: the log renderer serialises to JSON and a datetime would break the line.
+    assert record.__dict__["support_expiration"] == expiration.isoformat()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_PATREON_UNLINK)], indirect=True)
+async def test_confirming_unlink_with_nothing_linked_is_recorded_as_a_no_op(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    patreon_config: PatreonConfig,
+    caplog: pytest.LogCaptureFixture,
+):
+    """The confirmation is shown either way, so only this line separates a real unlink from a stale
+    button — and a level above NONE on it is a data inconsistency worth seeing."""
+    caplog.set_level(logging.INFO)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    await call_handler(CollaborateHandlerId.UNLINK_CONFIRM, handler_context=handler_context)
+
+    record = log_record(caplog, UNLINK_EVENT)
+    assert record.__dict__["outcome"] == "noop"
+    assert record.__dict__["reason"] == "no_subscription_row"
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.COLLABORATE)], indirect=True)
+async def test_the_hosts_group_row_says_why_it_was_left_out(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    patreon_config: PatreonConfig,
+    caplog: pytest.LogCaptureFixture,
+):
+    """A Host whose group row silently vanishes is a half-configured deployment, not a bug in the
+    view: the probe never ran because the invite url is missing."""
+    caplog.set_level(logging.INFO)
+    handler_context.app.bot_data[BOT_CONFIG_KEY] = BotConfig(
+        token=SecretStr("test-token"), hosts_group_chat_id=HOSTS_GROUP_CHAT_ID
+    )
+    user_with_settings.supporter_level = SupporterLevel.HOST_2
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(
+        create_supporter_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1"), "user_id"
+    )
+
+    context, _ = await call_handler(CollaborateHandlerId.SHOW, handler_context=handler_context)
+
+    assert log_record(caplog, "Hosts-only group row omitted").__dict__["reason"] == "invite_url_not_configured"
+    context.api.mock_method("is_chat_member").assert_not_called()
+    assert log_record(caplog, "Collaborate screen resolved").__dict__["state"] == "linked_patron"

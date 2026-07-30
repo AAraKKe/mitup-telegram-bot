@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterator
 
 import pytest
@@ -6,11 +7,13 @@ from telegram.ext import ChatJoinRequestHandler
 
 from mitup_bot.exceptions import HandlerRegisteredError
 from mitup_bot.handler_id import HandlerId
+from mitup_bot.handlers.hosts_group.entry import GATE_EVENT, IGNORED_EVENT
 from mitup_bot.handlers.hosts_group.enums import HostsGroupHandlerId
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.hosts_group import HostsGroupState
+from mitup_bot.models.users import UserStatus
 from mitup_bot.supporter import SupporterLevel
-from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler, create_user
+from tests.helpers import HandlerContext, MockApi, MockDbSession, UpdateRequest, call_handler, create_user, log_record
 from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_USER_ID
 
 OTHER_CHAT_ID = -1009999999999
@@ -93,6 +96,106 @@ async def test_feature_disabled_is_inert(mock_session: MockDbSession, handler_co
 
     context.api.assert_method_just_called("approve_chat_join_request", times=0)
     context.api.assert_method_just_called("decline_chat_join_request", times=0)
+
+
+# --- the gate decision on the log plane ---
+#
+# Approve and decline share one event name, so the question the trail exists to answer — stranger
+# vs. registered non-patron vs. lapsed host — is `stats count() by outcome, reason` rather than
+# three indistinguishable lines.
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(chat_join_request=True)], indirect=True)
+async def test_approval_names_the_supporter_evidence_it_decided_on(
+    mock_session: MockDbSession, handler_context: HandlerContext, caplog: pytest.LogCaptureFixture
+):
+    caplog.set_level(logging.INFO)
+    user = create_user(id=1, tg_user_id=DEFAULT_USER_ID, supporter_level=SupporterLevel.HOST_2)
+    mock_session.add_user(user)
+
+    await call_handler(HostsGroupHandlerId.JOIN_REQUEST, handler_context=handler_context)
+
+    record = log_record(caplog, GATE_EVENT)
+    assert record.levelname == "INFO"
+    assert record.__dict__["outcome"] == "approved"
+    assert record.__dict__["reason"] == "active_supporter"
+    assert record.__dict__["applied"] is True
+    assert record.__dict__["user_id"] == user.db_id
+    assert record.__dict__["supporter_level"] == SupporterLevel.HOST_2.value
+    assert record.__dict__["user_status"] == UserStatus.MEMBER.value
+
+
+@pytest.mark.parametrize(
+    ("registered", "expected_reason"),
+    [pytest.param(True, "not_a_supporter", id="known"), pytest.param(False, "unknown_telegram_user", id="stranger")],
+)
+@pytest.mark.parametrize("update", [UpdateRequest(chat_join_request=True)], indirect=True)
+async def test_decline_separates_a_stranger_from_a_registered_non_supporter(
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    caplog: pytest.LogCaptureFixture,
+    registered: bool,
+    expected_reason: str,
+):
+    caplog.set_level(logging.INFO)
+    if registered:
+        mock_session.add_user(create_user(id=1, tg_user_id=DEFAULT_USER_ID, supporter_level=SupporterLevel.NONE))
+
+    await call_handler(HostsGroupHandlerId.JOIN_REQUEST, handler_context=handler_context)
+
+    record = log_record(caplog, GATE_EVENT)
+    assert record.__dict__["outcome"] == "declined"
+    assert record.__dict__["reason"] == expected_reason
+    assert record.__dict__["applied"] is True
+    assert record.__dict__["supporter_level"] == (SupporterLevel.NONE.value if registered else None)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(chat_join_request=True)], indirect=True)
+async def test_a_refused_approval_is_not_reported_as_an_approval(
+    mock_session: MockDbSession, handler_context: HandlerContext, caplog: pytest.LogCaptureFixture
+):
+    """Telegram swallows the refusal, so `applied` is the only thing separating a granted host from
+    one the bot could not let in."""
+    caplog.set_level(logging.INFO)
+    mock_session.add_user(create_user(id=1, tg_user_id=DEFAULT_USER_ID, supporter_level=SupporterLevel.HOST_2))
+    api = MockApi()
+    api.register_on_method("approve_chat_join_request", return_value=False)
+
+    await call_handler(HostsGroupHandlerId.JOIN_REQUEST, handler_context=handler_context, api=api)
+
+    record = log_record(caplog, GATE_EVENT)
+    assert record.levelname == "WARNING"
+    assert record.__dict__["outcome"] == "approve_failed"
+    assert record.__dict__["applied"] is False
+    # The decision and its evidence survive the delivery failure.
+    assert record.__dict__["reason"] == "active_supporter"
+
+
+@pytest.mark.parametrize(
+    ("chat_id", "expected_reason"),
+    [
+        pytest.param(None, "hosts_group_not_configured", id="unconfigured"),
+        pytest.param(OTHER_CHAT_ID, "other_chat", id="foreign_chat"),
+    ],
+)
+@pytest.mark.parametrize("update", [UpdateRequest(chat_join_request=True)], indirect=True)
+async def test_an_untouched_request_says_why_the_gate_stood_down(
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    caplog: pytest.LogCaptureFixture,
+    chat_id: int | None,
+    expected_reason: str,
+):
+    """An inert gate and one seeing no traffic look identical without these lines."""
+    caplog.set_level(logging.INFO)
+    HostsGroupState.chat_id = chat_id
+    mock_session.add_user(create_user(id=1, tg_user_id=DEFAULT_USER_ID, supporter_level=SupporterLevel.HOST_2))
+
+    await call_handler(HostsGroupHandlerId.JOIN_REQUEST, handler_context=handler_context)
+
+    record = log_record(caplog, IGNORED_EVENT)
+    assert record.__dict__["outcome"] == "ignored"
+    assert record.__dict__["reason"] == expected_reason
 
 
 # --- registry wiring ---
