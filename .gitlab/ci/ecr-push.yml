@@ -7,7 +7,10 @@
   # Use our CI image that has both Docker CLI and AWS CLI
   image: ${CI_REGISTRY_IMAGE}/ci-python
   services:
-    - docker:29-dind
+    # Held at 29.6.2: the 29.7.0 daemon fails to extract the AWS Lambda base image layers
+    # ("mkdirat var/lang"), so the two lambda push jobs cannot build their images. Restore the
+    # floating 29 tag once a fixed daemon is out.
+    - docker:29.6.2-dind
   variables:
     # Enable BuildKit for better multi-stage builds and caching
     DOCKER_BUILDKIT: "1"

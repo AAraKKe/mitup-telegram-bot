@@ -258,7 +258,9 @@ validate-locales:
 test-db:
   stage: test
   services:
-    - name: docker:29-dind
+    # Held at 29.6.2 with the rest of the pipeline, where the 29.7.0 daemon fails to extract the
+    # AWS Lambda base image layers ("mkdirat var/lang"). This job only runs Postgres on the daemon.
+    - name: docker:29.6.2-dind
       alias: docker
   variables:
     DOCKER_HOST: tcp://docker:2375
