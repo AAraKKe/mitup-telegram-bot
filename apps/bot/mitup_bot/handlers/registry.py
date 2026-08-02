@@ -59,7 +59,10 @@ class HandlerOutcome(StrEnum):
 
 
 def handler_entry_fields(update: Update) -> dict[str, object]:
-    """What the user pressed or typed, for the handler-entry line.
+    """What the user pressed or typed, for the handler entry and exit lines.
+
+    Prod runs INFO, so the exit line is where an operator reads these; the entry line carries them
+    for a dev reading at DEBUG.
 
     A command's arguments are dropped: the command itself is a bounded value, while what follows
     it is user-supplied text (a deep-link payload, a search term) that no log line may carry.
@@ -143,7 +146,8 @@ def callback_with_metrics(
             structlog.contextvars.bound_contextvars(**handler_log_context(handler_id, handler_type, update)),
             bound_metrics_client(context.metrics),
         ):
-            log.debug("Entering handler", **handler_entry_fields(update))
+            entry_fields = handler_entry_fields(update)
+            log.debug("Entering handler", **entry_fields)
             start = perf_counter()
             return_value = None
             outcome = FaultOutcome(0)
@@ -206,6 +210,7 @@ def callback_with_metrics(
                 record_handler_invocation(faulted=bool(outcome.value))
                 log.info(
                     "Leaving handler",
+                    **entry_fields,
                     outcome=handler_outcome.value,
                     result=conversation_result(return_value),
                     duration_ms=round(latency, 1),
@@ -281,8 +286,6 @@ async def callback_query_fallback(update: Update, context: TMitupContext):
     """Fallback callback query handler. This will be called when no other callback query handler is found."""
     callback_query = guards.callback_query(update)
 
-    # The callback data is client-supplied and unbounded, so the line names the decision and leans on
-    # the ambient handler/update binds for the identity rather than echoing the payload back.
     log.warning("Callback query unhandled", reason="no_handler_matched")
 
     # No need to create a message for this as there will be no transaltions. Before translations

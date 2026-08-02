@@ -103,6 +103,7 @@ Use the registry below; do not invent a synonym for a field that already exists.
 | `previous_status`, `status`, `supporter_level`, `window_days` | state-transition and lifecycle facts |
 | `api_method`, `duration_ms`, `status_code` | outbound-call facts |
 | `stage`, `step`, `field`, `setting`, `list`, `check` | facets of a shared event name |
+| `callback_data`, `command` | what the user pressed or typed, on the bot's handler lines only — see [The interaction-input carve-out](#the-interaction-input-carve-out) |
 
 Order: ids first, then decision inputs, then `reason`/`outcome`.
 
@@ -119,10 +120,36 @@ Never bind a raw PTB `Update` or a config object — it renders as an unfilterab
 <critical_rules>
   <rule>**No user-supplied text.** Ids and bounded enum values only. Message text, meeting titles and descriptions, addresses, usernames, search queries, uploaded filenames, free-form names: log `*_len`, `has_*`, a rounded value or a presence flag instead. `retry_timezone_step` is the reference — it carries `address_length=len(address)` and never the address.</rule>
   <rule>**Deep-link payloads normalize through a closed vocabulary before logging.** A `/start` payload is client-forgeable and unbounded; map it onto the closed source enum first and log the enum value, never the raw payload.</rule>
+  <rule>**Two fields are carved out of the rule above, and only two: `callback_data` and `command`.** Both are bounded by something outside our code, which is what admits them — read [The interaction-input carve-out](#the-interaction-input-carve-out) before copying the shape onto anything else.</rule>
   <rule>**No URLs, no headers, no tokens, no secrets, no signed state.** See the api_method rule below.</rule>
   <rule>**No rendered prose on a record.** A property may carry an id or a bounded enum value; never a sentence, never a list of them.</rule>
   <rule>**No tracebacks on a record.** structlog's `format_exc_info` is the single renderer. A `log.exception` beside the fault emission puts it on the log plane once.</rule>
 </critical_rules>
+
+### The interaction-input carve-out
+
+Without the input, an operator reading a callback interaction cannot tell which button was pressed
+and a command interaction cannot be told from any other. `handler_entry_fields`
+(`apps/bot/mitup_bot/handlers/registry.py`) is the single producer of the two fields that answer
+that, and they ride the bot's handler entry and exit lines only. What admits them is that each is
+bounded by a contract we do not own:
+
+- **`callback_data`** is the payload of the pressed button, capped at 64 bytes by the Telegram Bot
+  API. On a handler that registered a pattern, the payload also had to satisfy that pattern to get
+  there, so what lands is the bot's own callback vocabulary plus ids. The unrouted-callback fallback
+  is the exception — nothing matched, so its exit line carries 64 bytes the client chose, and that
+  payload is precisely the diagnostic for "why did this button route nowhere".
+- **`command`** is the bare command, split off at the first whitespace. **Its arguments stay
+  forbidden**: a `/start` deep-link payload or a search term is free user text and falls squarely
+  under the rules above.
+
+They ride the **exit** line because prod runs INFO — carried by the entry DEBUG line alone they do
+not exist in production. Putting them on the line that already closes every invocation buys the
+input for zero extra log volume; promoting the entry line instead would double every invocation's
+line count for the same fact.
+
+Nothing generalises from this beyond those two fields. A value earns a place here only by being
+capped by an external contract *and* constrained to a vocabulary the bot itself minted.
 
 ### The api_method rule
 

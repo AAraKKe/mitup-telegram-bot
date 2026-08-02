@@ -650,6 +650,73 @@ async def test_the_entry_line_names_what_the_user_pressed(
     ClearableRegistry.clear()
 
 
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(7))], indirect=True)
+async def test_the_exit_line_names_the_button_that_was_pressed(
+    update: Update, app: StubMitupApp, mock_session: MockDbSession
+):
+    """Prod runs INFO, where the entry line does not exist — so the exit line is the only record of
+    which button produced the interaction."""
+
+    @ClearableRegistry.register_callback_query(HandlerTestId.BINDABLE, auto_answer=False)
+    async def callback_query_probe(update: Update, context: StubMitupContext): ...
+
+    assert update.callback_query is not None
+    context = build_context(update, app)
+    with capture_logs() as logs:
+        await invoke(HandlerTestId.BINDABLE, update, context)
+
+    exits = [entry for entry in logs if entry["event"] == "Leaving handler"]
+    assert len(exits) == 1
+    assert exits[0]["log_level"] == "info"
+    assert exits[0]["callback_data"] == update.callback_query.data
+    assert "command" not in exits[0]
+    ClearableRegistry.clear()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(command="whoami", command_args="a-deep-link-payload")], indirect=True)
+async def test_the_exit_line_names_the_command_without_its_arguments(
+    update: Update, app: StubMitupApp, mock_session: MockDbSession
+):
+    """The command is a bounded value, but what follows it is free user text — a deep-link payload,
+    a search term — that no log line may carry."""
+
+    @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND, command="whoami")
+    async def command_whoami(update: Update, context: StubMitupContext): ...
+
+    context = build_context(update, app)
+    with capture_logs() as logs:
+        await invoke(HandlerTestId.SOME_COMMAND, update, context)
+
+    exits = [entry for entry in logs if entry["event"] == "Leaving handler"]
+    assert len(exits) == 1
+    assert exits[0]["command"] == "/whoami"
+    assert "a-deep-link-payload" not in str(exits[0])
+    assert "callback_data" not in exits[0]
+    ClearableRegistry.clear()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="what the user typed")], indirect=True)
+async def test_the_exit_line_names_no_input_for_a_plain_message(
+    update: Update, app: StubMitupApp, mock_session: MockDbSession
+):
+    """A message that is not a command is free user text end to end, so nothing about what was typed
+    reaches the line."""
+
+    @ClearableRegistry.register_message(HandlerTestId.BINDABLE, filters=TEXT)
+    async def typed_message_handler(update: Update, context: StubMitupContext): ...
+
+    context = build_context(update, app)
+    with capture_logs() as logs:
+        await invoke(HandlerTestId.BINDABLE, update, context)
+
+    exits = [entry for entry in logs if entry["event"] == "Leaving handler"]
+    assert len(exits) == 1
+    assert "callback_data" not in exits[0]
+    assert "command" not in exits[0]
+    assert "what the user typed" not in str(exits[0])
+    ClearableRegistry.clear()
+
+
 HANDLER_EXITS: list[tuple[object, str, str]] = [
     (ConversationSettingsState.TIMEZONE, "success", "TIMEZONE"),
     (None, "success", "none"),
