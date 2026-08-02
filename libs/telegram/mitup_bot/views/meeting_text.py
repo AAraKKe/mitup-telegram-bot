@@ -44,19 +44,17 @@ MAPS_SEARCH_URL = "https://www.google.com/maps/search/"
 
 
 def maps_url(location: MeetupLocation) -> str | None:
-    """Google Maps universal search link for the location, or None when it has no coordinates or name.
+    """Google Maps universal search link for the location, or None when it has no coordinates.
 
-    Coordinates are stored as (longitude, latitude); Google expects latitude,longitude, so the pair is
-    flipped here. `api=1` is required by Google's Maps URL API.
+    The name never links: it is arbitrary user text ("my cousin's place"), so a search link built
+    from it points anywhere or nowhere. Coordinates are stored as (longitude, latitude); Google
+    expects latitude,longitude, so the pair is flipped here. `api=1` is required by Google's Maps
+    URL API.
     """
-    if location.coordinates is not None:
-        longitude, latitude = location.coordinates
-        query = f"{latitude},{longitude}"
-    elif location.coerced_name is not None:
-        query = location.coerced_name
-    else:
+    if location.coordinates is None:
         return None
-    return f"{MAPS_SEARCH_URL}?{urllib.parse.urlencode({'api': 1, 'query': query})}"
+    longitude, latitude = location.coordinates
+    return f"{MAPS_SEARCH_URL}?{urllib.parse.urlencode({'api': 1, 'query': f'{latitude},{longitude}'})}"
 
 
 def location_description(location: MeetupLocation, lang: str) -> FormattedText:
