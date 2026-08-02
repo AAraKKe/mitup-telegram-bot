@@ -1,4 +1,5 @@
 ---
+description: "Exactly what data the Mitup Telegram bot stores, how long it keeps it, who it shares it with, and how to export or delete your account."
 icon: material/shield-lock-outline
 ---
 

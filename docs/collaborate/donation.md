@@ -1,8 +1,9 @@
 ---
+description: "Back Mitup on Patreon for a Host badge, the members-only Telegram group, and higher limits, and see where the money actually goes."
 icon: material/gift-outline
 ---
 
-# Supporting Mitup financially
+# Support Mitup financially
 
 Your contribution keeps the bot online. It pays for the servers, the database, the domain, and the occasional pizza for whoever's debugging migrations at 1am.
 

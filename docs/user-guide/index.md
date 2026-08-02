@@ -1,4 +1,5 @@
 ---
+description: "A page-by-page guide to every screen in the Mitup Telegram bot, from your first chat to sharing a meeting your friends can join."
 icon: material/book-open-outline
 ---
 

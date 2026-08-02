@@ -1,0 +1,26 @@
+# Mitup
+
+> Mitup is a free, open-source Telegram bot for organizing meetups. You create a meeting in a private chat with @mitupbot, share one card into your group, and the bot tracks RSVPs and the waiting list and sends reminders in each person's own timezone. It is MIT-licensed, carries no ads, and never joins your group.
+
+## Docs
+
+- [Home](https://mitup.social/): What Mitup does, in one page, with a video of the whole meeting flow.
+- [User guide](https://mitup.social/user-guide/): Index of every screen the bot shows you, page by page.
+- [Getting started](https://mitup.social/user-guide/getting_started/): Open the bot, set your timezone, reach the main menu.
+- [The main menu](https://mitup.social/user-guide/main_menu/): What each button in the hub does.
+- [Create a meeting](https://mitup.social/user-guide/create_a_meeting/): Title, date and time, location, participant limit, meeting language.
+- [Meeting settings](https://mitup.social/user-guide/meeting_settings/): Waiting list, public, open invitations, incognito, lock on start.
+- [Sharing and joining](https://mitup.social/user-guide/sharing_and_joining/): Post the card into a chat, RSVPs, the queue, inviting a guest by name.
+- [Using Mitup from any chat](https://mitup.social/user-guide/inline_mode/): Type @mitupbot inline to post or find a meeting without adding the bot.
+- [Meeting lifecycle](https://mitup.social/user-guide/meeting_lifecycle/): When a meeting turns inactive, how to reactivate it, when it is deleted.
+- [Your settings](https://mitup.social/user-guide/settings/): Language, timezone, reminders, timeout, defaults, data export and deletion.
+- [Limits and Host perks](https://mitup.social/user-guide/limits/): The free caps and what each Patreon tier raises.
+- [Privacy](https://mitup.social/faq/privacy/): Every field stored, retention windows, third parties, and your GDPR rights.
+- [Troubleshooting](https://mitup.social/faq/troubleshooting/): The behaviours that look like bugs and what is actually happening.
+- [About us](https://mitup.social/faq/about/): Why Mitup exists, how it is built, and who maintains it.
+
+## Optional
+
+- [Ways to help](https://mitup.social/collaborate/): The four ways to help, side by side: Patreon, code, translations, bug reports.
+- [Support Mitup financially](https://mitup.social/collaborate/donation/): The Patreon tiers, how linking switches perks on, where the money goes.
+- [Contribute code](https://mitup.social/collaborate/code_contributor/): How code contributions work: MIT-licensed Python and Postgres, developed on GitLab.

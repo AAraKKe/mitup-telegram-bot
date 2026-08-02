@@ -1,4 +1,5 @@
 ---
+description: "Type @mitupbot in any Telegram chat to post one of your meetings or pull up the meetings already shared there. No bot in your group."
 icon: material/text-box-search-outline
 ---
 

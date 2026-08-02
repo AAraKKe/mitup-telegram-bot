@@ -1,6 +1,7 @@
 [project]
 site_name = "Mitup Telegram Bot"
 site_url = "https://mitup.social"
+site_description = "A free, open-source Telegram bot for organizing meetups. Create a meeting, share one card in your group, and let Mitup handle RSVPs, reminders, and timezones."
 repo_url = "https://gitlab.com/meetupbot/mitup-telegram-bot"
 repo_name = "MitupBot/mitup-telegram-bot"
 extra_css = [
@@ -31,16 +32,13 @@ nav = [
     { "About us" = "faq/about.md" },
   ] },
   { "Contribute" = [
-    { "Help out" = [
-      { "Ways to support" = "collaborate/donation.md" },
-      { "Translate Mitup" = "collaborate/translator.md" },
-      { "Code of conduct" = "collaborate/code_of_conduct.md" },
-    ] },
+    "collaborate/index.md",
+    { "Support financially" = "collaborate/donation.md" },
+    { "Contribute code" = "collaborate/code_contributor.md" },
+    { "Translate Mitup" = "collaborate/translator.md" },
+    { "Code of conduct" = "collaborate/code_of_conduct.md" },
     { "Developer handbook" = [
-      { "Start here" = [
-        { "Overview" = "collaborate/code_contributor.md" },
-        { "Setup" = "contribute/setup.md" },
-      ] },
+      { "Setup" = "contribute/setup.md" },
       { "Understand" = [
         { "Architecture" = "contribute/architecture.md" },
         { "Where things live" = "contribute/project_layout.md" },
@@ -73,6 +71,7 @@ language = "en"
 logo = "assets/images/mark-256.png"
 favicon = "assets/images/favicon-32.png"
 features = [
+  "navigation.indexes",
   "navigation.instant",
   "navigation.instant.prefetch",
   "navigation.tabs",

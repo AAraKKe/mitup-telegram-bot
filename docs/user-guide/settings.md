@@ -1,4 +1,5 @@
 ---
+description: "Set your language, timezone, reminders, timeout, and default meeting options in Mitup, plus export or delete the data it holds on you."
 icon: material/cog-outline
 ---
 

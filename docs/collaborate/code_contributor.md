@@ -1,8 +1,9 @@
 ---
+description: "How to contribute code to Mitup: the bot is MIT-licensed Python and Postgres, developed on GitLab, and work starts from an accepted issue."
 icon: material/code-tags
 ---
 
-# Code contributor
+# Contribute code
 
 Mitup started in 2014 as a side project to solve one problem: organizing meetings in a busy Telegram group. As the bot grew and more people came to rely on it, the same question kept landing in the inbox:
 

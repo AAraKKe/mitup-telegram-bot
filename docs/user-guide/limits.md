@@ -1,4 +1,5 @@
 ---
+description: "What a free Mitup account allows: 5 active meetings, 20 participants, 90 days ahead. And what each Patreon Host tier raises."
 icon: material/gauge
 ---
 
@@ -50,7 +51,7 @@ Once a meeting is full, further joins go to the [waiting list](meeting_settings.
 
 !!! note "Nobody gets kicked out"
 
-    If a meeting is already over a cap, everyone on the list stays. That can happen when a Host tier lapses. The meeting simply reads as full until it drops back under the cap.
+    If a meeting is already over a cap, everyone on the list stays. That can happen when a Host tier lapses. The meeting reads as full until it drops back under the cap.
 
 ## Meetings with no date
 

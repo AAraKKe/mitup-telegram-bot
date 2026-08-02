@@ -1,0 +1,39 @@
+# mitup.social is the documentation for Mitup, a free and open-source Telegram
+# bot for organizing meetups. Everything published here is public documentation:
+# crawl it, index it, quote it, answer questions with it.
+
+User-agent: *
+Allow: /
+
+# The AI search and assistant crawlers below are covered by the rule above.
+# They are listed one by one so the intent is on the record: Mitup wants to be
+# findable when someone asks an assistant how to organize a meetup in Telegram.
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+Sitemap: https://mitup.social/sitemap.xml

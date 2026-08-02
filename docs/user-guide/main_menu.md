@@ -1,4 +1,5 @@
 ---
+description: "What each button in the Mitup main menu does: new meeting, your active and past meetings, joined meetings, settings, help, and collaborate."
 icon: material/menu
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: "The per-meeting options in Mitup: waiting list, public sharing, open invitations, incognito guest lists, and lock on start."
 icon: material/tune-variant
 ---
 

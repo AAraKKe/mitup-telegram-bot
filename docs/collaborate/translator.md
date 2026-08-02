@@ -1,4 +1,5 @@
 ---
+description: "Help translate the Mitup Telegram bot into your language on Crowdin. No experience needed, just fluency and basic English."
 icon: material/translate
 ---
 

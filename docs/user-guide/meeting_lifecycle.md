@@ -1,4 +1,5 @@
 ---
+description: "When a Mitup meeting turns inactive, what happens to the shared cards, how to reactivate it, and how long it is kept before deletion."
 icon: material/calendar-clock-outline
 ---
 

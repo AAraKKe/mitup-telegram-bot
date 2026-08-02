@@ -1,4 +1,5 @@
 ---
+description: "Open Mitup in Telegram, set your timezone from a city name or a location pin, and reach the main menu. The bot never joins your group."
 icon: material/rocket-launch-outline
 ---
 

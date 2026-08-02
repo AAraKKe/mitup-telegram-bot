@@ -1,4 +1,5 @@
 ---
+description: "Why a Mitup button says you already answered, why an edit vanished, why a card is in another language, and who can edit a meeting."
 icon: material/wrench-outline
 ---
 

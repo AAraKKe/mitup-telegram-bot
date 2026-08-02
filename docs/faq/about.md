@@ -1,4 +1,5 @@
 ---
+description: "Mitup is an open-source Telegram bot for organizing meetups with friends, built by volunteers, free of ads, and funded on Patreon."
 icon: material/account-group-outline
 ---
 

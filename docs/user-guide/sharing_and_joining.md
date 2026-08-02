@@ -1,4 +1,5 @@
 ---
+description: "Post a Mitup meeting card into any Telegram chat and follow it through: joining, leaving, the waiting list, and inviting a guest by name."
 icon: material/share-variant-outline
 ---
 
