@@ -5,7 +5,7 @@ icon: material/code-tags
 
 # Contribute code
 
-Mitup started in 2014 as a side project to solve one problem: organizing meetings in a busy Telegram group. As the bot grew and more people came to rely on it, the same question kept landing in the inbox:
+Mitup started in 2015 as a side project to solve one problem: organizing meetings in a busy Telegram group. As the bot grew and more people came to rely on it, the same question kept landing in the inbox:
 
 > _"Can I help build this?"_
 
