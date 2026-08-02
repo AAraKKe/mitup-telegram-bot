@@ -30,6 +30,19 @@ class HandlerNotRegistered(RuntimeError):
         super().__init__(f"The handler(s) {handler_list!r} has not been registered")
 
 
+class UnboundCallbackError(RuntimeError):
+    """A callback query arrived carrying data no registered handler matches.
+
+    Every button the bot renders is bound to a handler, so this means either a button shipped
+    without one or a client sent forged data. The Bot API bounds callback data to 64 bytes, which
+    is what makes naming it here acceptable: this message is the only evidence of which button —
+    or which forged payload — produced the fault.
+    """
+
+    def __init__(self, callback_data: str | None):
+        super().__init__(f"Callback data {callback_data!r} matched no registered handler")
+
+
 class GuardError(RuntimeError):
     """Base class for input-validation failures raised by ``guards.py``.
 

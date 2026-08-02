@@ -29,7 +29,12 @@ from mitup_bot import db, guards
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import Env
 from mitup_bot.custom_context import MitupContext
-from mitup_bot.exceptions import HandlerNotRegistered, HandlerRegisteredError, WrongCommandNameError
+from mitup_bot.exceptions import (
+    HandlerNotRegistered,
+    HandlerRegisteredError,
+    UnboundCallbackError,
+    WrongCommandNameError,
+)
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.mitup_types import HandlerCallback, TMitupContext
 from mitup_bot.monitoring import MetricKey, bound_metrics_client
@@ -283,16 +288,15 @@ class UnhandledHandlerId(HandlerId):
 
 
 async def callback_query_fallback(update: Update, context: TMitupContext):
-    """Fallback callback query handler. This will be called when no other callback query handler is found."""
+    """Fail the invocation for a callback query no registered handler matched.
+
+    Every button the bot renders is bound to a handler, so reaching here means a button shipped
+    without one or a client forged the data — either way the interaction failed. Raising hands it to
+    the wrapper's fault path, which writes the correlated error line, redirects the user to the main
+    menu with the unexpected-error notice, and closes the invocation on Fault=1.
+    """
     callback_query = guards.callback_query(update)
-
-    log.warning("Callback query unhandled", reason="no_handler_matched")
-
-    # No need to create a message for this as there will be no transaltions. Before translations
-    # are added all features should be finished.
-    message = "Sorry, I don't understand that yet.\nThis feature will be available soon! Stay tuned! 😄🚀"
-    with suppress(TelegramError):
-        await context.bot.answer_callback_query(callback_query.id, message, show_alert=True)
+    raise UnboundCallbackError(callback_query.data)
 
 
 class HandlersRegistry:
@@ -480,10 +484,10 @@ class HandlersRegistry:
             conversation_handlers=sum(1 for wrapper in bound if wrapper.is_conversation()),
             groups=sorted({wrapper.group for wrapper in bound}),
         )
-        # Add a fallback handler for any update that is not handled by any of the registered handlers
-        # the intention is that the user gets a message saying that it is not implemented yet instead of
-        # the bot not responding at all. It goes through callback_with_metrics like every registered
-        # handler, so these interactions emit Fault/Time and get their metrics flushed.
+        # Catch every callback query the registered handlers left unclaimed. Each one is a fault —
+        # a button we shipped with no handler, or forged data — so the fallback raises rather than
+        # answering. It goes through callback_with_metrics like every registered handler, so the
+        # interaction emits Fault/Time and gets its metrics flushed.
         app.add_handler(
             CallbackQueryHandler(
                 callback=callback_with_metrics(

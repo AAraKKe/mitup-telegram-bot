@@ -17,20 +17,29 @@ from mitup_bot.api_wrapper import build_api
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import Env
 from mitup_bot.custom_context import BOT_CONFIG_KEY
-from mitup_bot.exceptions import ContextPropertyNotSetError, HandlerNotRegistered, HandlerRegisteredError
+from mitup_bot.exceptions import (
+    ContextPropertyNotSetError,
+    HandlerNotRegistered,
+    HandlerRegisteredError,
+    UnboundCallbackError,
+)
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
 from mitup_bot.handlers.registry import (
     HandlerWrapper,
+    UnhandledHandlerId,
     callback_query_fallback,
     callback_with_metrics,
     process_update_error,
 )
 from mitup_bot.monitoring import MetricsClient, MetricUnit
 from mitup_bot.monitoring.metric_keys import MetricKey
+from mitup_bot.translations import TranslationEngine
 from mitup_bot.update_trace import UPDATE_TRACE, UpdateTrace
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.messages import CommonMessages
+from mitup_bot.views import RenderContext, factory
 from tests.helpers import (
     AnyFloat,
     MockApi,
@@ -201,32 +210,75 @@ def test_cannot_register_same_conversation_twice():
     ClearableRegistry.clear()
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(callback_query=True)], indirect=True)
-async def test_callback_query_fallback_answers_with_sorry_message(
+UNBOUND_CALLBACK = CallbackData(action="ghost", entity="button")
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=UNBOUND_CALLBACK.with_id(3))], indirect=True)
+async def test_an_unmatched_callback_names_the_data_that_matched_nothing(
     update: Update,
     app: StubMitupApp,
     metrics_client: MetricsClient,
 ):
-    """callback_query_fallback answers with the fallback message and records the unhandled interaction."""
+    """The data is the only evidence of which button — or which forged payload — reached the
+    fallback, and the Bot API bounds it to 64 bytes, so the exception message carries it."""
     context = build_context(update, app, metrics=metrics_client)
     assert update.callback_query is not None
 
-    with capture_logs() as logs:
+    with pytest.raises(UnboundCallbackError) as raised:
         await callback_query_fallback(update, context)
 
-    # The bot's answer_callback_query method is called with the fallback message and show_alert=True
-    context.bot.answer_callback_query.assert_called_once_with(
-        update.callback_query.id,
-        "Sorry, I don't understand that yet.\nThis feature will be available soon! Stay tuned! 😄🚀",
-        show_alert=True,
+    assert str(raised.value) == f"Callback data {update.callback_query.data!r} matched no registered handler"
+    # The fallback speaks to Telegram not at all; whatever the user sees is the error handler's.
+    context.bot.answer_callback_query.assert_not_called()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=UNBOUND_CALLBACK.with_id(3))], indirect=True)
+async def test_an_unmatched_callback_closes_the_invocation_as_a_fault(
+    update: Update,
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+):
+    """Every shipped button has a handler, so an unmatched callback is a defect of ours or a forged
+    payload — not a feature the user should be told to wait for. Driven through the wrapper it is
+    indistinguishable from any other fault: one Fault=1 sample naming the class, the correlated
+    error line, and the generic redirect.
+
+    `mock_session` backs the language lookup the error handler makes while building that redirect.
+    """
+    context = build_context(update, app, metrics=metrics_client)
+    wrapped = callback_with_metrics(
+        UnhandledHandlerId.CALLBACK_QUERY_FALLBACK, "Callback", callback_query_fallback, Env.PROD
     )
-    unhandled = next(entry for entry in logs if entry["event"] == "Callback query unhandled")
-    assert unhandled["log_level"] == "warning"
-    assert unhandled["reason"] == "no_handler_matched"
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await wrapped(update, context)
+    await context.flush_metrics()
+
+    metrics.assert_emitted(
+        name=MetricKey.FAULT,
+        value=1,
+        times=1,
+        properties={"error_type": "mitup_bot.exceptions.UnboundCallbackError"},
+    )
+
+    faults = [entry for entry in logs if entry["event"] == "An error occurred while handling the update"]
+    assert len(faults) == 1
+    assert faults[0]["log_level"] == "error"
+    assert faults[0]["error_type"] == "mitup_bot.exceptions.UnboundCallbackError"
+    assert faults[0]["update_id"] == update.update_id
+    assert isinstance(faults[0]["exc_info"], UnboundCallbackError)
+
+    fallback_lang = TranslationEngine.FALLBACK_LANG
+    expected_view = factory.main_menu_view(
+        RenderContext(lang=fallback_lang), message=CommonMessages.UNEXPECTED_ERROR.get(lang=fallback_lang)
+    )
+    context.api.assert_send_message_called(update, expected_view)
 
 
 def test_bind_registers_fallback_through_metrics_wrapper():
-    """The catch-all fallback must go through callback_with_metrics so unhandled interactions
+    """The catch-all fallback must go through callback_with_metrics so unmatched interactions
     emit Fault/Time and get their buffered metrics flushed like every registered handler."""
     app = ApplicationBuilder().token("AAA").build()
     HandlersRegistry.bind(app)
