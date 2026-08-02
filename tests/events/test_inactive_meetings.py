@@ -379,4 +379,4 @@ async def test_destruction_count_is_split_by_owner_tier(
         await inactive_meetings.run(api, metrics_client)
 
     summary = next(entry for entry in logs if entry["event"] == "Deactivation sweep complete")
-    assert summary["supporter_levels"] == {SupporterLevel.HOST_3.value: 1}
+    assert summary["supporter_levels"] == {"none": 0, "host_1": 0, "host_2": 0, "host_3": 1}

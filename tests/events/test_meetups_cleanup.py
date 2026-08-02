@@ -654,7 +654,7 @@ async def test_purge_names_the_meetings_and_the_invitees_it_destroys(
 
     purged = next(entry for entry in logs if entry["event"] == "Meetups purged")
     assert (purged["count"], purged["meeting_ids"], purged["unnotified"]) == (1, [1], 0)
-    assert purged["supporter_levels"] == {SupporterLevel.HOST_2.value: 1}
+    assert purged["supporter_levels"] == {"none": 0, "host_1": 0, "host_2": 1, "host_3": 0}
     assert purged["reason"] == "retention_elapsed"
 
     invitees = next(entry for entry in logs if entry["event"] == "Invitee users purged")

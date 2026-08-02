@@ -20,7 +20,7 @@ from mitup_bot.monitoring import MetricsClient
 from mitup_bot.supporter import SupporterLevel
 
 from .lifecycle_queries import owner_tier_window_elapsed, resolved_windows, sql_interval
-from .telemetry import error_type_name
+from .telemetry import error_type_name, supporter_level_counts
 
 log = structlog.get_logger(__name__)
 
@@ -349,9 +349,7 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         windows=dict(Counter(due.window_days for due in deactivated)),
         # The retention windows are per tier, so a destruction count nobody can split by tier cannot
         # answer whether a free cohort's cliff or a mistakenly aged-out Patron cohort produced it.
-        supporter_levels={
-            level.value: count for level, count in Counter(due.owner_supporter_level for due in deactivated).items()
-        },
+        supporter_levels=supporter_level_counts(due.owner_supporter_level for due in deactivated),
     )
 
     if failed:

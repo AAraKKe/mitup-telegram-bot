@@ -1,5 +1,4 @@
 import datetime as dt
-from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -17,13 +16,13 @@ from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
-from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
 from mitup_bot.views import MitupView
 from mitup_bot.views.meeting_text import rich_title
 
 from .lifecycle_queries import loggable_windows, owner_tier_window_elapsed
+from .telemetry import supporter_level_counts
 
 log = structlog.get_logger(__name__)
 
@@ -126,11 +125,6 @@ def window_days(meetup: Meetup, duration_of: Callable[[LifecyclePolicy], dt.time
     resolved against the owner row the statement already joined and loaded.
     """
     return LifecyclePolicy.interval_days(duration_of(owner_policy(meetup)))
-
-
-def owner_levels(meetups: Sequence[Meetup]) -> Counter[SupporterLevel]:
-    """How many of `meetups` each supporter tier owns."""
-    return Counter(meetup.owner.supporter_level for meetup in meetups)
 
 
 def as_utc(stamp: dt.datetime | None) -> dt.datetime | None:
@@ -348,7 +342,7 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
         "Meetups purged",
         count=len(deletable),
         meeting_ids=meeting_ids,
-        supporter_levels={level.value: count for level, count in owner_levels(deletable).items()},
+        supporter_levels=supporter_level_counts(meetup.owner.supporter_level for meetup in deletable),
         windows=loggable_windows(lambda policy: policy.inactive_retention),
         unnotified=len(outcome.unreachable),
         reason="retention_elapsed",
