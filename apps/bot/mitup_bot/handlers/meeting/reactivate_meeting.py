@@ -88,7 +88,7 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
     # clears the times by hand.
     meeting.lock_on_start = False
     meeting.expiration_time = None
-    meeting.expiration_notification_sent = False
+    meeting.clear_deletion_warning()
 
     success_message = MeetingLifecycleMessages.REACTIVATE_SUCCESS.get(lang=user.lang)
     await context.api.edit_message(

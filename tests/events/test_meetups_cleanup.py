@@ -41,6 +41,7 @@ DELETED_MEETUP_IDS_PATTERN = re.compile(r"DELETE FROM meetups WHERE meetups\.id 
 # policy's windows — derived rather than pinned, so a retuned duration keeps the intended overdue days.
 WARNING_DAYS = LifecyclePolicy.interval_days(LifecyclePolicy.get().deletion_warning_delay)
 RETENTION_DAYS = LifecyclePolicy.interval_days(LifecyclePolicy.get().inactive_retention)
+LEAD_DAYS = LifecyclePolicy.interval_days(LifecyclePolicy.get().deletion_warning_lead)
 
 
 @pytest.fixture
@@ -442,19 +443,25 @@ async def test_delete_is_deferred_when_the_notice_raises(
 
 
 @pytest.mark.parametrize(
-    ("statement", "duration_of"),
+    ("statement", "duration_of", "column"),
     [
-        (meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, lambda policy: policy.deletion_warning_delay),
-        (meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, lambda policy: policy.inactive_retention),
+        (
+            meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT,
+            lambda policy: policy.deletion_warning_delay,
+            "expiration_time",
+        ),
+        (meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, lambda policy: policy.inactive_retention, "expiration_time"),
+        (meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, lambda policy: policy.deletion_warning_lead, "warned_time"),
     ],
-    ids=["deletion_warning", "permanent_deletion"],
+    ids=["deletion_warning", "permanent_deletion_retention", "permanent_deletion_lead"],
 )
 def test_cleanup_statements_carry_a_branch_per_tier_window(
-    statement: SelectOfScalar[Meetup], duration_of: Callable[[LifecyclePolicy], dt.timedelta]
+    statement: SelectOfScalar[Meetup], duration_of: Callable[[LifecyclePolicy], dt.timedelta], column: str
 ):
-    """Both cleanup windows are rendered from the policy per owner tier, measured from
-    `expiration_time`. Which meetings each one selects is covered in
-    tests/data/db_behavior/test_lifecycle_windows.py."""
+    """Every cleanup window is rendered from the policy per owner tier. The deletion carries two of
+    them — the retention from `expiration_time` and the lead from `warned_time` — because a warning
+    the sweep issued late has to carry its own deadline with it. Which meetings each one selects is
+    covered in tests/data/db_behavior/test_lifecycle_windows.py."""
     compiled = " ".join(
         str(statement.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True})).split()
     )
@@ -462,7 +469,7 @@ def test_cleanup_statements_carry_a_branch_per_tier_window(
     for duration, levels in LifecyclePolicy.levels_by_duration(duration_of).items():
         rendered_levels = ", ".join(f"'{level.value}'" for level in levels)
         assert (
-            f"users.supporter_level IN ({rendered_levels}) AND meetups.expiration_time "
+            f"users.supporter_level IN ({rendered_levels}) AND meetups.{column} "
             f"+ CAST('{LifecyclePolicy.interval_days(duration)} days' AS INTERVAL) < now()" in compiled
         )
 
@@ -521,6 +528,52 @@ async def test_warning_record_tells_a_delivered_notice_from_an_undeliverable_one
     assert records[1]["window_days"] == WARNING_DAYS
     assert reached.expiration_notification_sent is True
     assert blocked.expiration_notification_sent is True
+
+
+async def test_the_warning_sweep_stamps_when_it_warned_for_both_dispositions(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """The stamp is what holds the deletion off for a full lead afterwards, so it has to be written
+    wherever the flag is. An undeliverable notice sets both exactly like a delivered one: the meeting
+    still moves to the deletion pool, and it still owes its owner the lead it promised."""
+    reached = create_meetup(id=1, title="Reached Owner")
+    create_user(id=1, tg_user_id=10, owned_meetings=[reached], settings=create_settings(id=1))
+    blocked = create_meetup(id=2, title="Blocked Owner")
+    create_user(id=2, tg_user_id=20, owned_meetings=[blocked], settings=create_settings(id=2))
+
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, (reached, blocked))
+    api.mock_method("send_message_to_user").side_effect = [None, InactiveUserInteraction(20, private=True)]
+
+    before = dt.datetime.now(dt.UTC)
+    await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
+    after = dt.datetime.now(dt.UTC)
+
+    for meeting in (reached, blocked):
+        assert meeting.expiration_notification_sent is True
+        assert meeting.warned_time is not None
+        assert before <= meeting.warned_time <= after
+
+
+async def test_a_meeting_waiting_out_its_lead_is_not_counted_as_overdue(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, caplog: pytest.LogCaptureFixture
+):
+    """A late warning moves the deletion with it, so the days a meeting spends waiting out its lead
+    are not days it is running late. Measured against the retention alone this meeting would be
+    reported as months overdue and would trip the stuck-residue escalation on a healthy run."""
+    caplog.set_level(logging.WARNING)
+    meeting = create_meetup(id=1, title="Late Warning Meeting")
+    create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
+    # Naive UTC, the shape the timestamp columns read back with.
+    meeting.expiration_time = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(days=RETENTION_DAYS + 30)
+    meeting.warned_time = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(days=LEAD_DAYS + 1)
+
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, (meeting,))
+    api.mock_method("send_message_to_user").side_effect = InactiveUserInteraction(10, private=True)
+
+    await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
+
+    record = residue_record(caplog, "Meeting deleted without notifying its owner")
+    assert record.__dict__["days_overdue"] == 1
 
 
 def test_warning_deadline_comes_from_the_owners_own_policy(monkeypatch: pytest.MonkeyPatch):

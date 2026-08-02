@@ -62,7 +62,7 @@ def test_meetings_to_notify_started_query(mock_session: MockDbSession):
         " meetups.expiration_notification_sent, meetups.end_datetime,"
         " meetups.started_notification_sent, meetups.lock_on_start, meetups.description,"
         " meetups.created_time, meetups.updated_time, meetups.activated_time, meetups.expiration_time,"
-        " meetups.datetime, meetups.max_members, meetups.language, meetups.location,"
+        " meetups.warned_time, meetups.datetime, meetups.max_members, meetups.language, meetups.location,"
         " meetups.active\n"
         "FROM meetups\n"
         "WHERE meetups.active = true AND meetups.datetime IS NOT NULL"

@@ -68,6 +68,9 @@ class Meetup(BaseModel, SQLModel, table=True):
     # Set on creation, re-stamped on reactivation; the dateless deactivation window reads it.
     activated_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC), nullable=False)
     expiration_time: dt.datetime | None = None
+    # When the owner's deletion warning was recorded. The deletion sweep waits a full
+    # `deletion_warning_lead` from here, so a warning delivered late carries the deletion with it.
+    warned_time: dt.datetime | None = None
     datetime: dt.datetime | None = None
     max_members: int | None = None
     language: str | None = None
@@ -110,6 +113,21 @@ class Meetup(BaseModel, SQLModel, table=True):
     def set_description(self, tagged: str):
         """Set the description from user input; the counterpart of `set_title`."""
         self.description = tagged
+
+    def record_deletion_warning(self):
+        """Stamp the owner's deletion warning as issued now.
+
+        The flag is what the deletion sweep requires and `warned_time` is what holds that deletion
+        off for a full `deletion_warning_lead` afterwards, so neither is ever written on its own.
+        """
+        self.expiration_notification_sent = True
+        self.warned_time = dt.datetime.now(dt.UTC)
+
+    def clear_deletion_warning(self):
+        """Discard the record that the owner was warned; the counterpart of
+        `record_deletion_warning`, and equally indivisible."""
+        self.expiration_notification_sent = False
+        self.warned_time = None
 
     @property
     def tagged_title(self) -> str:

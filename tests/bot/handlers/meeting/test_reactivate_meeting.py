@@ -34,6 +34,7 @@ def inactive_meeting(user_with_settings: User):
     # Non-None sentinels so the test can verify the handler clears each of these fields
     meeting.expiration_time = dt.datetime(2099, 1, 1, tzinfo=dt.UTC)
     meeting.expiration_notification_sent = True
+    meeting.warned_time = dt.datetime(2099, 1, 2, tzinfo=dt.UTC)
     meeting.datetime = dt.datetime(2020, 3, 1, 18, 0, tzinfo=dt.UTC)
     meeting.end_datetime = dt.datetime(2020, 3, 1, 20, 0, tzinfo=dt.UTC)
     meeting.lock_on_start = True
@@ -62,7 +63,10 @@ async def test_reactivate_meeting_restarts_the_meeting_and_shows_edit_view(
 
     assert inactive_meeting.active is True
     assert inactive_meeting.expiration_time is None
+    # The flag and the stamp are the deletion sweep's two gates; a reactivation that dropped only one
+    # would leave a meeting warned in the eyes of whichever gate it forgot.
     assert inactive_meeting.expiration_notification_sent is False
+    assert inactive_meeting.warned_time is None
     assert inactive_meeting.datetime is None
     assert inactive_meeting.end_datetime is None
     assert inactive_meeting.lock_on_start is False

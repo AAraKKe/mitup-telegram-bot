@@ -31,8 +31,10 @@ log = structlog.get_logger(__name__)
 # retrying any more, it is stuck, and repeating the same warning every day has stopped being news.
 STUCK_RESIDUE_DAYS = 7
 
-# Both windows run from `expiration_time` (the deactivation stamp) and both depend on the owner's
-# tier, so each statement joins the owner.
+# Every window depends on the owner's tier, so each statement joins the owner. The warning runs from
+# `expiration_time` (the deactivation stamp); the deletion runs from it too but additionally waits out
+# the lead from `warned_time`, so it can never land sooner than the warning promised, however late
+# that warning was issued. A row whose `warned_time` is NULL satisfies neither comparison.
 MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT: SelectOfScalar[Meetup] = (
     select(Meetup)
     .join(User)
@@ -53,6 +55,7 @@ MEETUPS_TO_DELETE_STATEMENT: SelectOfScalar[Meetup] = (
             Meetup.expiration_notification_sent == true(),
             Meetup.expiration_time != null(),
             owner_tier_window_elapsed(col(Meetup.expiration_time), lambda policy: policy.inactive_retention),
+            owner_tier_window_elapsed(col(Meetup.warned_time), lambda policy: policy.deletion_warning_lead),
         )
     )
 )
@@ -68,8 +71,8 @@ class ResidueReason(StrEnum):
 class WarningDelivery(StrEnum):
     """Whether the owner of a warned meetup actually received the notice.
 
-    Both dispositions flip `expiration_notification_sent`, so this is the only thing that keeps
-    them apart once the flag is written.
+    Both dispositions record the warning, so this is the only thing that keeps them apart once the
+    stamp is written.
     """
 
     DELIVERED = "delivered"
@@ -130,20 +133,45 @@ def owner_levels(meetups: Sequence[Meetup]) -> Counter[SupporterLevel]:
     return Counter(meetup.owner.supporter_level for meetup in meetups)
 
 
-def days_overdue(meetup: Meetup, age: dt.timedelta) -> int | None:
-    """Whole days the meetup has been eligible for its phase, or None when it never expired.
-
-    The expiration column is naive UTC, so a stored value is read back without a timezone.
-    """
-    if meetup.expiration_time is None:
+def as_utc(stamp: dt.datetime | None) -> dt.datetime | None:
+    """A stored timestamp as an aware UTC value; the columns are naive UTC, so one reads back bare."""
+    if stamp is None:
         return None
-    expiration = meetup.expiration_time
-    if expiration.tzinfo is None:
-        expiration = expiration.replace(tzinfo=dt.UTC)
-    return (dt.datetime.now(dt.UTC) - expiration - age).days
+    return stamp if stamp.tzinfo else stamp.replace(tzinfo=dt.UTC)
 
 
-def log_residue(event: str, meetup: Meetup, reason: ResidueReason, age: dt.timedelta):
+def warning_due_time(meetup: Meetup) -> dt.datetime | None:
+    """When the warning became due, or None when the meetup never expired."""
+    expiration = as_utc(meetup.expiration_time)
+    return None if expiration is None else expiration + owner_policy(meetup).deletion_warning_delay
+
+
+def deletion_due_time(meetup: Meetup) -> dt.datetime | None:
+    """The later of the two gates the deletion statement applies, or None when neither stamp is set.
+
+    Retention runs from the deactivation stamp, and the owner is owed a full `deletion_warning_lead`
+    from the moment their warning was recorded — so a meetup still inside that lead is waiting
+    lawfully rather than running late, and measuring it against retention alone would report it as
+    overdue for as long as the warning was delayed.
+    """
+    policy = owner_policy(meetup)
+    gates = [
+        stamp + duration
+        for stamp, duration in (
+            (as_utc(meetup.expiration_time), policy.inactive_retention),
+            (as_utc(meetup.warned_time), policy.deletion_warning_lead),
+        )
+        if stamp is not None
+    ]
+    return max(gates) if gates else None
+
+
+def days_overdue(due: dt.datetime | None) -> int | None:
+    """Whole days the meetup has been eligible for its phase, or None when nothing dates it."""
+    return None if due is None else (dt.datetime.now(dt.UTC) - due).days
+
+
+def log_residue(event: str, meetup: Meetup, reason: ResidueReason, due: dt.datetime | None):
     """Record a nominated meetup its phase left behind, escalating one that stopped moving.
 
     A send that raised defers the meetup to the next run, which re-nominates and re-warns it at
@@ -151,7 +179,7 @@ def log_residue(event: str, meetup: Meetup, reason: ResidueReason, age: dt.timed
     warning is no longer news, so the row gets an error of its own instead. An unreachable owner
     is not a retry — the meetup is marked or deleted in the same run — so it never escalates.
     """
-    overdue = days_overdue(meetup, age)
+    overdue = days_overdue(due)
     stuck = reason is ResidueReason.OWNER_NOTIFICATION_FAILED and overdue is not None and overdue > STUCK_RESIDUE_DAYS
     if stuck:
         log.error(
@@ -173,6 +201,16 @@ def log_residue(event: str, meetup: Meetup, reason: ResidueReason, age: dt.timed
         days_overdue=overdue,
         reason=reason.value,
     )
+
+
+def log_residues(
+    outcome: SendOutcome, due_of: Callable[[Meetup], dt.datetime | None], *, unreachable_event: str, failed_event: str
+):
+    """Record everything the phase left behind, deriving each meetup's due time through `due_of`."""
+    for meetup in outcome.unreachable:
+        log_residue(unreachable_event, meetup, ResidueReason.OWNER_UNREACHABLE, due_of(meetup))
+    for meetup in outcome.failed:
+        log_residue(failed_event, meetup, ResidueReason.OWNER_NOTIFICATION_FAILED, due_of(meetup))
 
 
 def failed_meeting_properties(meetups: Sequence[Meetup]) -> dict[str, Any] | None:
@@ -214,9 +252,9 @@ def deletion_notice_view(meetup: Meetup) -> MitupView:
 
 
 def record_warning(meetup: Meetup, delivery: WarningDelivery):
-    """The mutation record for `expiration_notification_sent = True`.
+    """The mutation record for `record_deletion_warning`.
 
-    That flag is the precondition for the later permanent deletion and is written for a delivered
+    That stamp is the precondition for the later permanent deletion and is written for a delivered
     warning and an undeliverable one alike, so this line is the only place the two stay
     distinguishable once the run is over.
     """
@@ -243,20 +281,12 @@ async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: Telegra
     meetups = (await session.exec(MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT)).all()
     outcome = await notify_owners(api, meetups, deletion_warning_view)
 
-    for meetup in outcome.unreachable:
-        log_residue(
-            "Expiration warning undelivered",
-            meetup,
-            ResidueReason.OWNER_UNREACHABLE,
-            owner_policy(meetup).deletion_warning_delay,
-        )
-    for meetup in outcome.failed:
-        log_residue(
-            "Expiration warning failed",
-            meetup,
-            ResidueReason.OWNER_NOTIFICATION_FAILED,
-            owner_policy(meetup).deletion_warning_delay,
-        )
+    log_residues(
+        outcome,
+        warning_due_time,
+        unreachable_event="Expiration warning undelivered",
+        failed_event="Expiration warning failed",
+    )
 
     for meetup in outcome.delivered:
         record_warning(meetup, WarningDelivery.DELIVERED)
@@ -264,7 +294,7 @@ async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: Telegra
         record_warning(meetup, WarningDelivery.UNREACHABLE)
 
     for meetup in outcome.delivered + outcome.unreachable:
-        meetup.expiration_notification_sent = True
+        meetup.record_deletion_warning()
 
     log.info(
         "Deletion warning sweep complete",
@@ -287,7 +317,8 @@ async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: Telegra
 
 
 async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
-    """Permanently delete every meeting that stayed expired past its owner's `inactive_retention`.
+    """Permanently delete every meeting past its owner's `inactive_retention` and past a full
+    `deletion_warning_lead` since its warning was recorded.
 
     Delivering the notice is not a precondition for the deletion: an owner who has blocked the
     bot has opted out of the notice, and keeping their expired meetings alive to keep retrying
@@ -297,20 +328,12 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
     meetups = (await session.exec(MEETUPS_TO_DELETE_STATEMENT)).all()
     outcome = await notify_owners(api, meetups, deletion_notice_view)
 
-    for meetup in outcome.unreachable:
-        log_residue(
-            "Meeting deleted without notifying its owner",
-            meetup,
-            ResidueReason.OWNER_UNREACHABLE,
-            owner_policy(meetup).inactive_retention,
-        )
-    for meetup in outcome.failed:
-        log_residue(
-            "Meeting deletion deferred",
-            meetup,
-            ResidueReason.OWNER_NOTIFICATION_FAILED,
-            owner_policy(meetup).inactive_retention,
-        )
+    log_residues(
+        outcome,
+        deletion_due_time,
+        unreachable_event="Meeting deleted without notifying its owner",
+        failed_event="Meeting deletion deferred",
+    )
 
     deletable = outcome.delivered + outcome.unreachable
     meeting_ids = [cast(int, meetup.id) for meetup in deletable]

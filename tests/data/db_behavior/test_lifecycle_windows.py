@@ -50,6 +50,10 @@ def warning_days(level: SupporterLevel) -> int:
     return LifecyclePolicy.interval_days(LifecyclePolicy.get(level).deletion_warning_delay)
 
 
+def lead_days(level: SupporterLevel) -> int:
+    return LifecyclePolicy.interval_days(LifecyclePolicy.get(level).deletion_warning_lead)
+
+
 async def owned_meeting(
     db_session: AsyncSession,
     ref: int,
@@ -61,12 +65,18 @@ async def owned_meeting(
     active: bool = True,
     expiration_days_ago: int | None = None,
     notification_sent: bool = False,
+    warned_days_ago: int | None = None,
 ) -> Meetup:
     """Persist a meeting under an owner of its own and return it.
 
     `ref` seeds the owner's `tg_user_id` and the explicit ids of all three rows, so every call lands
     a scenario that cannot collide with another test's inside the shared session transaction.
+
+    `warned_days_ago` defaults to the age of the expiration when the notification flag is set, which
+    is the shape the sweep leaves behind on a run that warned the meeting the day it came due. A case
+    that needs the two to disagree — the whole point of the lead gate — passes it explicitly.
     """
+    warned_age = expiration_days_ago if notification_sent and warned_days_ago is None else warned_days_ago
     meeting = create_meetup(
         ref,
         title="Lifecycle Window Meeting",
@@ -74,6 +84,7 @@ async def owned_meeting(
         activated_time=days_ago(activated_days_ago),
         expiration_time=None if expiration_days_ago is None else days_ago(expiration_days_ago),
         expiration_notification_sent=notification_sent,
+        warned_time=None if warned_age is None else days_ago(warned_age),
         active=active,
     )
     owner = create_user(
@@ -275,7 +286,7 @@ async def test_warning_fires_inside_the_lead_before_the_deletion(
 
     assert await is_due_for_warning(db_session, meeting) is True
 
-    meeting.expiration_notification_sent = True
+    meeting.record_deletion_warning()
     await db_session.flush()
     assert await is_due_for_deletion(db_session, meeting) is False
 
@@ -301,3 +312,54 @@ async def test_warned_meeting_is_deleted_once_the_retention_runs_out(db_session:
     )
 
     assert await is_due_for_deletion(db_session, meeting) is True
+
+
+# --- The lead the warning promised is owed from when it was sent, not from the deactivation ---
+
+
+async def test_a_late_warning_carries_the_deletion_with_it(db_session: AsyncSession):
+    """The warning tells the owner their meeting goes in `deletion_warning_lead` days. A sweep that
+    fell behind can issue it long after the retention already ran out, and the owner still gets the
+    days they were promised — counted from the warning, not from the deactivation that preceded it."""
+    meeting = await owned_meeting(
+        db_session,
+        998_971,
+        active=False,
+        expiration_days_ago=retention_days(FREE_LEVEL) + 40,
+        notification_sent=True,
+        warned_days_ago=lead_days(FREE_LEVEL) - 1,
+    )
+
+    assert await is_due_for_deletion(db_session, meeting) is False
+
+
+async def test_the_deletion_follows_once_the_promised_lead_has_run(db_session: AsyncSession):
+    """The other side of the same boundary: once the lead the warning named has passed, the retention
+    gate is already long open and the meeting goes."""
+    meeting = await owned_meeting(
+        db_session,
+        998_975,
+        active=False,
+        expiration_days_ago=retention_days(FREE_LEVEL) + 40,
+        notification_sent=True,
+        warned_days_ago=lead_days(FREE_LEVEL) + 1,
+    )
+
+    assert await is_due_for_deletion(db_session, meeting) is True
+
+
+async def test_a_row_flagged_as_warned_without_a_stamp_is_never_deleted(db_session: AsyncSession):
+    """The shape a row would have if it were flagged as warned with no record of when. NULL fails the
+    interval comparison rather than passing it, so the missing stamp cannot be read as an ancient one
+    and the row is left for an operator instead of deleted on no evidence."""
+    meeting = await owned_meeting(
+        db_session,
+        998_976,
+        active=False,
+        expiration_days_ago=retention_days(FREE_LEVEL) + 40,
+        notification_sent=True,
+    )
+    meeting.warned_time = None
+    await db_session.flush()
+
+    assert await is_due_for_deletion(db_session, meeting) is False
