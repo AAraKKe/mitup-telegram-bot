@@ -45,30 +45,13 @@ class MetricKey(CamelCaseStrEnum):
     state, not a code fault, so it carries its own metric and bypasses the fault alarms."""
     MEETING_NOT_OWNED = auto()
     """Metric to be emitted when the user tries to do an action with a meeting that does not belong to them."""
-    MESSAGE_DELETED = auto()
-    """Represents a message that has been deleted in Telegram and deleted from the database"""
-    STALE_MEETING_MESSAGE = auto()
-    """This metrics is emitted when someone interacts with a message of a meeting that should not be available."""
     UNAUTHORIZED_MEETING_CALLBACK = auto()
     """Emitted when a callback carries a meeting id the caller has no claim on. Callback data is
     client-supplied, so this counts rejected attempts to act on an arbitrary meeting."""
     INACTIVE_USER_SET = auto()
     """Metric emitted when a MEMBER user has been detected as unreachable and transitioned to LEFT."""
-    INACTIVE_USERS_DELETED = auto()
-    """Metric emitted by the user cleanup lambda with the number of inactive users found and to be deleted"""
-    LEFT_USERS_DEMOTED = auto()
-    """Number of LEFT users past the grace period demoted to JOINED_ONLY because only join links to
-    active meetings still depend on them"""
     DELETION_REQUESTED_USERS = auto()
     """Gauge for users with status DELETION_REQUESTED (marked for erasure, awaiting the next cleanup purge)"""
-    NOTIFICATIONS_FAILED = auto()
-    """Number of joined links whose starting-soon write lifecycle raised (rolled back
-    pre-commit, or aborted mid-drain by a systemic network error after the flag committed)"""
-    NOTIFICATIONS_SENT = auto()
-    """Number of starting-soon notifications enqueued in committed per-link transactions
-    (post-commit delivery failures surface as Fault metrics, not here)"""
-    NOTIFICATIONS_TO_SEND = auto()
-    """Show how many notifications should be sent when a meeting is about to start"""
     ACTIVE_USERS = auto()
     """Stat for total number of active users"""
     INACTIVE_USERS = auto()
@@ -101,38 +84,14 @@ class MetricKey(CamelCaseStrEnum):
     """Stat for the total number of shared meetings"""
     TOTAL_MEETINGS = auto()
     """Stat for the total number of meetings in the database"""
-    MEETINGS_TO_DEACTIVATE = auto()
-    """Number of meetings that should be deactivated"""
-    MEETINGS_DEACTIVATED = auto()
-    """Number of meetings successfully deactivated"""
-    MEETINGS_DEACTIVATION_FAILED = auto()
-    """Number of meetings that failed to be deactivated"""
-    MEETUPS_ABOUT_TO_BE_DELETED = auto()
-    """Number of meetings that should be deleted"""
-    MEETUPS_DELETED = auto()
-    """Number of meetings successfully deleted"""
     DB_CONNECTIONS_LEAKED = auto()
     """Number of database connections that were not properly closed (leaked connections)"""
-    MEETINGS_STARTED_PROCESSED = auto()
-    """Number of meetings processed by the notify-meeting-started task"""
-    STARTED_NOTIFICATIONS_SENT = auto()
-    """Number of started-meeting notifications enqueued in committed per-meeting transactions
-    (post-commit delivery failures surface as Fault metrics, not here)"""
-    STARTED_NOTIFICATIONS_FAILED = auto()
-    """Number of meetings whose started-notification write lifecycle raised (rolled back
-    pre-commit, or aborted mid-drain by a systemic network error after the commit)"""
     WEBHOOK_FORBIDDEN = auto()
     """Telegram rejected the webhook request with a 403 Forbidden response"""
     WEBHOOK_MALFORMED_UPDATE = auto()
     """Webhook received a payload that could not be parsed as a Telegram Update"""
-    PATREON_WEBHOOK_RECEIVED = auto()
-    """A membership delivery reached the Patreon webhook endpoint (before signature verification)"""
     PATREON_WEBHOOK_FORBIDDEN = auto()
     """A Patreon webhook delivery was rejected for a missing or invalid HMAC signature (1), or passed (0)"""
-    PATREON_WEBHOOK_APPLIED = auto()
-    """A verified Patreon webhook delivery changed a linked user's supporter level (1), or was a no-op (0)"""
-    PATREON_WEBHOOK_MALFORMED = auto()
-    """A Patreon webhook delivery carried a body that could not be parsed as a membership event"""
     PATREON_WEBHOOK_FAULT = auto()
     """The Patreon webhook endpoint failed to process a verified delivery (surfaced as 500; Patreon retries)"""
     PATREON_WEBHOOK_REGISTRATION_FAILED = auto()
@@ -159,8 +118,6 @@ class MetricKey(CamelCaseStrEnum):
     """Number of rows streamed to S3 for an archived table"""
     JOINED_ONLY_USERS = auto()
     """Gauge for users with status JOINED_ONLY (joined via inline button, never DM-ed the bot)"""
-    JOINED_ONLY_USERS_DELETED = auto()
-    """Number of JOINED_ONLY users deleted after all their meetings were deactivated"""
     DB_POOL_CONNECTIONS_IN_USE = auto()
     """Gauge of pooled DB connections currently checked out (emitted on checkout and checkin)"""
     DB_POOL_CONNECTIONS_OPENED = auto()
@@ -189,30 +146,22 @@ class MetricKey(CamelCaseStrEnum):
     """Backlog gauge: deliveries parked RETRY_PENDING; emitted only on sender ticks with backlog to report"""
     MEETINGS_DELETION_FAILED = auto()
     """Number of expired meetings left undeleted this run because notifying the owner raised an error;
-    they are nominated again on the next run"""
+    they are nominated again on the next run. The cleanup job never raises, so the run closes on
+    Fault=0 and this series is the only alarmable trace of the deferral."""
     MEETUPS_DELETED_UNNOTIFIED = auto()
     """Number of expired meetings deleted this run without their owner being told, because the owner
-    has blocked the bot or no longer exists (subset of MeetupsDeleted)"""
+    has blocked the bot or no longer exists. Irreversible and silent — the cleanup job never raises,
+    so no Fault marks it — which is why the count is a series and not just a log field."""
     EXPIRATION_NOTIFICATIONS_FAILED = auto()
     """Number of expiration warnings that failed to send this run; their meetings stay in the warning
-    pool and are nominated again on the next run"""
-    UNHANDLED_CALLBACK = auto()
-    """A callback query reached the registry fallback — no registered handler matched it"""
+    pool and are nominated again on the next run. The cleanup job never raises, so the run closes on
+    Fault=0 and this series is the only alarmable trace of the undelivered warning."""
     FEATURE_CANCELLED = auto()
     """A user cancelled a feature flow before completing it (emitted under the Feature dimension)"""
     FLOW_STARTED = auto()
     """A multi-step flow was entered (emitted under the Feature dimension, e.g. the Patreon link funnel)"""
     FLOW_COMPLETED = auto()
     """A multi-step flow reached its success end (emitted under the Feature dimension)"""
-    PATREON_LINK_STAGED = auto()
-    """A Patreon consent completed and its pairing code was issued, awaiting confirmation in Telegram"""
-    PATREON_LINK_PROMPTED = auto()
-    """A pairing code reached the confirmation prompt in Telegram (emitted under the Feature dimension)"""
-    PATREON_LINK_REFUSED = auto()
-    """A Patreon link attempt ended without linking; the `Patreon link attempt refused` log line
-    says which branch"""
-    PATREON_PENDING_LINKS_DELETED = auto()
-    """Pending Patreon links erased by the cleanup run (expired, spent, or purged with their user)"""
     NEW_MEMBERS = auto()
     """Users who completed onboarding in the last 24 hours, split by the `AcquisitionSource`
     dimension and reported once per source each run, zeros included. Read by the new-members widget

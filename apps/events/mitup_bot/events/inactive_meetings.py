@@ -16,11 +16,11 @@ from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import JoinedUsers, Meetup, Message, Settings, User
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.monitoring import MetricsClient
 from mitup_bot.supporter import SupporterLevel
 
 from .lifecycle_queries import owner_tier_window_elapsed, resolved_windows, sql_interval
-from .telemetry import emit_per_supporter_level, error_type_name
+from .telemetry import error_type_name
 
 log = structlog.get_logger(__name__)
 
@@ -315,7 +315,6 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     deactivation already committed — the remaining meetings are still due on the next run.
     """
     nominated = await due_meetings()
-    metrics.emit(MetricKey.MEETINGS_TO_DEACTIVATE, len(nominated), MetricUnit.COUNT)
 
     deactivated: list[DueMeeting] = []
     skipped = 0
@@ -339,12 +338,6 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
 
     joined_only_deleted = await delete_joined_only_users()
 
-    emit_per_supporter_level(
-        metrics, MetricKey.MEETINGS_DEACTIVATED, Counter(due.owner_supporter_level for due in deactivated)
-    )
-    metrics.emit(MetricKey.MEETINGS_DEACTIVATION_FAILED, failed, MetricUnit.COUNT)
-    metrics.emit(MetricKey.JOINED_ONLY_USERS_DELETED, joined_only_deleted, MetricUnit.COUNT)
-
     log.info(
         "Deactivation sweep complete",
         nominated=len(nominated),
@@ -354,6 +347,11 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         joined_only_users_deleted=joined_only_deleted,
         reasons=dict(Counter(due.reason.value for due in deactivated)),
         windows=dict(Counter(due.window_days for due in deactivated)),
+        # The retention windows are per tier, so a destruction count nobody can split by tier cannot
+        # answer whether a free cohort's cliff or a mistakenly aged-out Patron cohort produced it.
+        supporter_levels={
+            level.value: count for level, count in Counter(due.owner_supporter_level for due in deactivated).items()
+        },
     )
 
     if failed:

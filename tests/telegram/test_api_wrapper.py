@@ -292,9 +292,13 @@ async def test_handle_edit_errors_ignores_message_not_modified(adapter: BotAdapt
 )
 async def test_handle_edit_errors_swallows_message_not_found(adapter: BotAdapter, error_message: str):
     # The DB cleanup for vanished meeting messages lives in update_single_meeting_message /
-    # the write-mode reconcile; here the error is only swallowed and counted.
-    async with handle_edit_errors(cast(ContextOrBotAdapter, adapter)):
-        raise BadRequest(error_message)
+    # the write-mode reconcile; here the error is only swallowed and recorded.
+    with capture_logs() as logs:
+        async with handle_edit_errors(cast(ContextOrBotAdapter, adapter)):
+            raise BadRequest(error_message)
+
+    gone = next(entry for entry in logs if entry["event"] == "Message to edit is gone")
+    assert gone["reason"] == "message_not_found"
 
 
 async def test_handle_edit_errors_reraises_other_bad_request(adapter: BotAdapter):
@@ -1372,11 +1376,13 @@ async def test_execute_queued_records_dead_message_for_reconcile(
     telegram_api.end_capture()
 
     bot.edit_message_text.side_effect = BadRequest("Message to edit not found")
-    await telegram_api.execute_queued(outbox)
+    with capture_logs() as logs:
+        await telegram_api.execute_queued(outbox)
     await api_metrics_client.flush()
 
     assert outbox.dead_message_ids == [1]  # msg.id — the reconcile transaction deletes the row
-    api_metrics.assert_emitted(name=MetricKey.MESSAGE_DELETED, times=1)
+    dropped = next(entry for entry in logs if entry["event"] == "Meeting message unreachable, dropping it")
+    assert dropped["reason"] == "message_not_found"
     api_metrics.assert_not_emitted(name=MetricKey.FAULT)
 
 
@@ -1390,11 +1396,15 @@ async def test_execute_queued_records_dead_message_on_forbidden(
     telegram_api.end_capture()
 
     bot.edit_message_text.side_effect = Forbidden("Forbidden: user is deactivated")
-    await telegram_api.execute_queued(outbox)
+    with capture_logs() as logs:
+        await telegram_api.execute_queued(outbox)
     await api_metrics_client.flush()
 
     assert outbox.dead_message_ids == [1]  # msg.id — the reconcile transaction deletes the row
-    api_metrics.assert_emitted(name=MetricKey.MESSAGE_DELETED, times=1)
+    # The other branch that retires a meeting message: the chat itself, not the message, is gone.
+    dropped = next(entry for entry in logs if entry["event"] == "Meeting message unreachable, dropping it")
+    assert dropped["log_level"] == "warning"
+    assert dropped["reason"] == "chat_forbidden"
     api_metrics.assert_not_emitted(name=MetricKey.FAULT)
 
 

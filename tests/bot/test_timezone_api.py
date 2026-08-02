@@ -18,7 +18,6 @@ from mitup_bot.exceptions import (
 )
 from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
 from mitup_bot.timezone_api import TimezoneLookupFailure
-from tests.helpers import AnyFloat
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.types import StubMitupContext
 
@@ -59,11 +58,16 @@ def reset_clients():
     timezone_api.__timezone_client = None
 
 
-async def assert_google_calls_timed(context: StubMitupContext, metrics: MetricAssertions, times: int):
+async def assert_google_calls_recorded(context: StubMitupContext, metrics: MetricAssertions, times: int):
+    """One fault sample per Google round-trip, and no timing series for the edge.
+
+    The Google edge declares no `time_metric`; the round-trip's `duration_ms` rides its
+    `Google API call` line, which `tests/monitoring/test_outbound.py` pins once for every edge.
+    """
     await context.metrics.flush()
 
-    metrics.assert_emitted(name="GoogleApiTime", value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=times)
     metrics.assert_emitted(name="GoogleApiFault", value=0, times=times)
+    metrics.assert_not_emitted(name="GoogleApiTime")
 
 
 def test_configure_fails_with_incorrect_keys(gmaps_client):
@@ -136,7 +140,7 @@ async def test_get_timezone_by_address_success(
     # The two round-trips log at INFO; a resolved address must produce no warning.
     assert [record for record in caplog.records if record.levelname == "WARNING"] == []
 
-    await assert_google_calls_timed(context, metrics, times=2)
+    await assert_google_calls_recorded(context, metrics, times=2)
 
 
 async def test_get_timezone_by_address_raises_with_missing_geocode_client(context: StubMitupContext):
@@ -154,7 +158,7 @@ async def test_get_timezone_by_address_raises_with_missing_timezone_client(
 
     geocode_client.geocode.assert_called_once_with("New York")
 
-    await assert_google_calls_timed(context, metrics, times=1)
+    await assert_google_calls_recorded(context, metrics, times=1)
 
 
 async def test_get_timezone_by_address_returns_none_when_geocode_finds_nothing(
@@ -183,7 +187,7 @@ async def test_get_timezone_by_location_success(timezone_client, context: StubMi
 
     assert timezone == "America/Los_Angeles"
 
-    await assert_google_calls_timed(context, metrics, times=1)
+    await assert_google_calls_recorded(context, metrics, times=1)
 
 
 async def test_get_timezone_by_location_raises_with_missing_timezone_client(context: StubMitupContext):

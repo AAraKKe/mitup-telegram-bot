@@ -14,7 +14,7 @@ from mitup_bot.events.inactive_meetings import (
 from mitup_bot.events.service import EventType
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Meetup
-from mitup_bot.monitoring import MetricKey, MetricsClient
+from mitup_bot.monitoring import MetricsClient
 from mitup_bot.supporter import SupporterLevel
 from tests.helpers import (
     MockApi,
@@ -62,39 +62,15 @@ def register_due_meetings(
         )
 
 
-def deactivated_metric(level: SupporterLevel = SupporterLevel.NONE) -> dict[str, str]:
-    """The dimensions one tier's `MeetingsDeactivated` sample carries."""
-    return {"EventType": EventType.DEACTIVATE_MEETINGS.value, "SupporterLevel": level.value}
-
-
-async def test_no_meetings_to_deactivate(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
-):
+async def test_no_meetings_to_deactivate(mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi):
     register_due_meetings(mock_session)
     await inactive_meetings.run(api, metrics_client)
     await metrics_client.flush()
 
     api.assert_method_just_called("update_meeting_messages", times=0)
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_TO_DEACTIVATE,
-        value=0,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATED,
-        value=0,
-        dimensions=deactivated_metric(),
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-    )
 
 
-async def test_single_meeting_deactivated(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
-):
+async def test_single_meeting_deactivated(mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi):
     meeting = create_meetup(id=1, title="Test Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
 
@@ -113,25 +89,9 @@ async def test_single_meeting_deactivated(
     assert call_kwargs["meeting"] is meeting
     assert "session" not in call_kwargs
 
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_TO_DEACTIVATE,
-        value=1,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATED,
-        value=1,
-        dimensions=deactivated_metric(),
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-    )
-
 
 async def test_meeting_no_longer_due_is_skipped(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
 ):
     """The under-lock re-check found the meeting rescheduled: it is neither deactivated nor
     counted as failed — the next sweep re-evaluates it from scratch."""
@@ -146,26 +106,8 @@ async def test_meeting_no_longer_due_is_skipped(
     assert meeting.expiration_time is None
     api.assert_method_just_called("update_meeting_messages", times=0)
 
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_TO_DEACTIVATE,
-        value=1,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATED,
-        value=0,
-        dimensions=deactivated_metric(),
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-    )
 
-
-async def test_meeting_with_invited_users(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
-):
+async def test_meeting_with_invited_users(mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi):
     meeting = create_meetup(id=1, title="Test Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
 
@@ -188,26 +130,8 @@ async def test_meeting_with_invited_users(
     assert f"DELETE FROM joined_users WHERE joined_users.meetup_id = {meeting.id}" in mock_session.queries_executed
     assert f"DELETE FROM messages WHERE messages.meetup_id = {meeting.id}" in mock_session.queries_executed
 
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_TO_DEACTIVATE,
-        value=1,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATED,
-        value=1,
-        dimensions=deactivated_metric(),
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-    )
 
-
-async def test_meeting_membership_is_cleared(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
-):
+async def test_meeting_membership_is_cleared(mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi):
     """Deactivation empties the meeting: participants and waiting-list entries alike.
 
     Both live in `joined_users`, so one delete scoped to the meeting covers them. What the meeting
@@ -233,15 +157,9 @@ async def test_meeting_membership_is_cleared(
     # (the JOINED_ONLY sweep at the end of the run deletes by status, not by id).
     assert not any("DELETE FROM users WHERE users.id IN" in query for query in mock_session.queries_executed)
 
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATED,
-        value=1,
-        dimensions=deactivated_metric(),
-    )
-
 
 async def test_api_failure_raises_runtime_error(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
 ):
     meeting_ok = create_meetup(id=1, title="OK Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting_ok], settings=create_settings(id=1))
@@ -267,30 +185,11 @@ async def test_api_failure_raises_runtime_error(
     # Second meeting should remain active since its processing failed
     assert meeting_fail.active is True
 
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_TO_DEACTIVATE,
-        value=2,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATED,
-        value=1,
-        dimensions=deactivated_metric(),
-    )
     # The failure counter is a number, not a report: the per-meeting id and error are on the
     # `Failed to deactivate meeting` log line, so nothing rides the record.
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
-        value=1,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-        properties={},
-        properties_exact=True,
-    )
 
 
-async def test_multiple_meetings_deactivated(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
-):
+async def test_multiple_meetings_deactivated(mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi):
     meeting_a = create_meetup(id=1, title="Meeting A")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting_a], settings=create_settings(id=1))
 
@@ -306,22 +205,6 @@ async def test_multiple_meetings_deactivated(
     assert meeting_b.active is False
     assert meeting_a.expiration_time is not None
     assert meeting_b.expiration_time is not None
-
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_TO_DEACTIVATE,
-        value=2,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATED,
-        value=2,
-        dimensions=deactivated_metric(),
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATION_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-    )
 
 
 def test_deactivation_statement_generates_a_branch_per_tier_window():
@@ -351,28 +234,25 @@ def test_deactivation_statement_generates_a_branch_per_tier_window():
 
 
 # ---------------------------------------------------------------------------
-# JOINED_ONLY cleanup metric — fires even when no JOINED_ONLY users exist
+# JOINED_ONLY cleanup count — reported even when no JOINED_ONLY users exist
 # ---------------------------------------------------------------------------
 
 
-async def test_joined_only_users_deleted_metric_emitted_when_no_orphans(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+async def test_joined_only_users_deleted_reported_when_no_orphans(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
 ):
-    """`JOINED_ONLY_USERS_DELETED` is always emitted, even with no candidates to delete.
+    """The sweep summary carries the count of JOINED_ONLY users deleted this run, zero included.
 
-    The metric is a counter, not a conditional emission — it gets the count of users
-    deleted in this run, including zero. Operators rely on the gauge being present.
+    A run that deleted nobody has to be distinguishable from a run that never got that far, so the
+    field is unconditional rather than emitted only when there was something to delete.
     """
     register_due_meetings(mock_session)
 
-    await inactive_meetings.run(api, metrics_client)
-    await metrics_client.flush()
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await inactive_meetings.run(api, metrics_client)
 
-    metrics.assert_emitted(
-        name=MetricKey.JOINED_ONLY_USERS_DELETED,
-        value=0,
-        dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value},
-    )
+    summary = next(entry for entry in logs if entry["event"] == "Deactivation sweep complete")
+    assert summary["joined_only_users_deleted"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -486,22 +366,17 @@ async def test_sweep_summary_reports_the_run_by_reason_and_window(
     assert summary["windows"] == {patron_window: 1}
 
 
-async def test_destruction_counter_is_split_by_owner_tier(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+async def test_destruction_count_is_split_by_owner_tier(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
 ):
-    """`MeetingsDeactivated = 400` cannot answer whether a free cohort's cliff or a mistakenly
-    aged-out Patron cohort produced it unless the tier is a dimension. Every level is emitted every
-    run so no series reads as missing data on a run that took nobody from it."""
+    """`deactivated=400` cannot answer whether a free cohort's cliff or a mistakenly aged-out Patron
+    cohort produced it unless the sweep summary splits it by tier."""
     meeting = create_meetup(id=1, title="Patron Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
 
     register_due_meetings(mock_session, meeting, level=SupporterLevel.HOST_3)
-    await inactive_meetings.run(api, metrics_client)
-    await metrics_client.flush()
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await inactive_meetings.run(api, metrics_client)
 
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATED, value=1, dimensions=deactivated_metric(SupporterLevel.HOST_3)
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_DEACTIVATED, value=0, dimensions=deactivated_metric(SupporterLevel.NONE)
-    )
+    summary = next(entry for entry in logs if entry["event"] == "Deactivation sweep complete")
+    assert summary["supporter_levels"] == {SupporterLevel.HOST_3.value: 1}

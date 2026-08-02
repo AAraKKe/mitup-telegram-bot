@@ -8,7 +8,7 @@ from mitup_bot.events import notify_meetings_started
 from mitup_bot.events.service import EventType
 from mitup_bot.models import Meetup
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey, MetricsClient
+from mitup_bot.monitoring import MetricsClient
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
 from tests.helpers import (
@@ -78,30 +78,13 @@ def test_meetings_to_notify_started_query(mock_session: MockDbSession):
 # ---------------------------------------------------------------------------
 
 
-async def test_no_meetings_to_notify(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
-):
+async def test_no_meetings_to_notify(mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi):
     register_due_meetings(mock_session)
 
     await notify_meetings_started.run(api, metrics_client)
     await metrics_client.flush()
 
     api.assert_method_just_called("update_meeting_messages", times=0)
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_STARTED_PROCESSED,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +93,7 @@ async def test_no_meetings_to_notify(
 
 
 async def test_started_notification_sent_to_participants(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str
 ):
     meeting = create_meetup(id=1, title="Demo meetup")
     participant_a = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
@@ -145,22 +128,6 @@ async def test_started_notification_sent_to_participants(
     call_kwargs = api.mock_method("update_meeting_messages").call_args.kwargs
     assert call_kwargs["meeting"] is meeting
 
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_STARTED_PROCESSED,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
-        value=2,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-
 
 # ---------------------------------------------------------------------------
 # Meeting no longer due at the per-meeting re-check — skipped, not failed
@@ -168,7 +135,7 @@ async def test_started_notification_sent_to_participants(
 
 
 async def test_meeting_no_longer_due_is_skipped(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str
 ):
     """The per-meeting re-check found the meeting already flagged or deactivated: nothing is
     sent, nothing fails — the next sweep re-evaluates from scratch."""
@@ -185,22 +152,6 @@ async def test_meeting_no_longer_due_is_skipped(
     api.assert_method_just_called("update_meeting_messages", times=0)
     api.assert_method_just_called("send_message_to_user", times=0)
 
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_STARTED_PROCESSED,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-
 
 # ---------------------------------------------------------------------------
 # Waiting-list participants do NOT receive the notification
@@ -208,7 +159,7 @@ async def test_meeting_no_longer_due_is_skipped(
 
 
 async def test_waiting_list_participants_not_notified(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str
 ):
     meeting = create_meetup(id=1, title="Demo meetup")
     regular = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
@@ -222,21 +173,6 @@ async def test_waiting_list_participants_not_notified(
     await metrics_client.flush()
 
     # Only 1 notification sent (the regular participant)
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_STARTED_PROCESSED,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
 
     # The waiting-list user's send_message_to_user was never called
     send_mock = api.mock_mapping.get("send_message_to_user")
@@ -251,7 +187,7 @@ async def test_waiting_list_participants_not_notified(
 
 
 async def test_joined_only_participants_not_notified(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str
 ):
     """JOINED_ONLY users cannot be DM-ed; they must be filtered before send_message_to_user.
 
@@ -274,16 +210,6 @@ async def test_joined_only_participants_not_notified(
     await metrics_client.flush()
 
     # Only the MEMBER participant gets a notification — the JOINED_ONLY user is filtered out.
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
 
     # The JOINED_ONLY user was never targeted.
     send_mock = api.mock_mapping.get("send_message_to_user")
@@ -301,7 +227,7 @@ async def test_joined_only_participants_not_notified(
 
 
 async def test_failed_meeting_increments_counter_and_raises(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str
 ):
     meeting_ok = create_meetup(id=1, title="Good meeting")
     create_user(id=1, tg_user_id=1, owned_meetings=[meeting_ok], settings=create_settings(id=1, language=lang))
@@ -329,25 +255,8 @@ async def test_failed_meeting_increments_counter_and_raises(
     # MEETINGS_STARTED_PROCESSED = len(meetings) = 2 (both were selected regardless of outcome)
     # STARTED_NOTIFICATIONS_SENT = 0 (no participants added to these meetings)
     # STARTED_NOTIFICATIONS_FAILED = 1 (the second meeting's update_meeting_messages raised)
-    metrics.assert_emitted(
-        name=MetricKey.MEETINGS_STARTED_PROCESSED,
-        value=2,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_SENT,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
     # The failure counter is a number, not a report: the per-meeting id and error are on the
     # `Failed to process started notification for meeting` log line, so nothing rides the record.
-    metrics.assert_emitted(
-        name=MetricKey.STARTED_NOTIFICATIONS_FAILED,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-        properties={},
-        properties_exact=True,
-    )
 
 
 # ---------------------------------------------------------------------------

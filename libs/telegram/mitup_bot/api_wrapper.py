@@ -269,7 +269,7 @@ async def handle_edit_errors(adapter: ContextOrBotAdapter):
 
         # The message was deleted by the user; nothing to edit anymore
         if any(pattern.findall(e.message) for pattern in MESSAGE_NOT_FOUND_ERROR_PATTERNS):
-            adapter.emit_metric(MetricKey.MESSAGE_DELETED)
+            log.info("Message to edit is gone", reason="message_not_found")
             return
         raise
 
@@ -1027,15 +1027,23 @@ class TelegramApi:
             if any(pattern.findall(e.message) for pattern in EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS):
                 return False
             if any(pattern.findall(e.message) for pattern in MESSAGE_NOT_FOUND_ERROR_PATTERNS):
-                self.adapter.emit_metric(MetricKey.MESSAGE_DELETED)
+                log.info(
+                    "Meeting message unreachable, dropping it",
+                    chat_id=edit.chat_id,
+                    reason="message_not_found",
+                )
                 return True
             raise
         except Forbidden as e:
             # The chat can no longer be written to (the user blocked the bot, deactivated
             # their account, or the bot lost access to the group): the stored message can
             # never be edited again, so it gets the same dead-message treatment.
-            log.warning("Meeting message unreachable, dropping it", chat_id=edit.chat_id, error=str(e))
-            self.adapter.emit_metric(MetricKey.MESSAGE_DELETED)
+            log.warning(
+                "Meeting message unreachable, dropping it",
+                chat_id=edit.chat_id,
+                reason="chat_forbidden",
+                error=str(e),
+            )
             return True
         return False
 

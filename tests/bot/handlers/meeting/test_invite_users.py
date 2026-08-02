@@ -153,7 +153,6 @@ async def test_invite_with_id_of_meeting_does_not_exist(
             keyboard=views_factory.main_menu_back_rows(user_with_settings.lang),
         ),
     )
-    MetricAssertions(result.last_context.metrics).assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1.0)
 
 
 async def test_invite_users_ask_for_name(

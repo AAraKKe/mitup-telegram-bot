@@ -367,5 +367,5 @@ async def test_registration_publishes_a_metrics_client_for_its_outbound_calls(
     await webhooks.register_membership_webhook(DESIRED_URI, metrics_client)
 
     # The creator-token refresh and the webhook list are two round-trips, each with its own sample.
-    metrics.assert_emitted(name="PatreonApiTime", times=2)
+    metrics.assert_emitted(name="PatreonApiFault", times=2)
     metrics.assert_emitted(name="PatreonApiFault", value=0, times=2)

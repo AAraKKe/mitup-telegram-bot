@@ -1,7 +1,8 @@
 """The signed ``POST /patreon/webhook`` endpoint and its membership-application logic.
 
 Two layers, mirroring ``test_patreon.py``: HTTP-level tests pin the status-code contract (403 bad/missing
-signature, 400 malformed body, 200 apply/no-op) and metric emission with the processing mocked out;
+signature, 400 malformed body, 200 apply/no-op), the fault metrics and the stage log lines with the
+processing mocked out;
 unit-level tests exercise ``apply_membership_event`` and the pure helpers against the mock session."""
 
 import contextlib
@@ -14,6 +15,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
+from structlog.testing import capture_logs
 
 from mitup_bot import patreon
 from mitup_bot.config import PatreonConfig, RunModes
@@ -158,42 +160,24 @@ async def test_valid_signature_applies_and_returns_200(
     monkeypatch.setattr(web_patreon, "apply_membership_event", apply_mock)
 
     body = json.dumps(member_dict()).encode()
-    async with build_web_client(app) as client:
-        response = await client.post(
-            "/patreon/webhook",
-            content=body,
-            headers={"X-Patreon-Signature": sign(SECRET, body), "X-Patreon-Event": "members:update"},
-        )
+    with capture_logs() as logs:
+        async with build_web_client(app) as client:
+            response = await client.post(
+                "/patreon/webhook",
+                content=body,
+                headers={"X-Patreon-Signature": sign(SECRET, body), "X-Patreon-Event": "members:update"},
+            )
 
     assert response.status_code == 200
     apply_mock.assert_awaited_once()
-    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_RECEIVED)
-    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_APPLIED, value=1)
     # Every fault series clears to its 0-baseline on the healthy apply path.
     metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_FORBIDDEN, value=0)
-    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_MALFORMED, value=0)
     metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_FAULT, value=0)
-
-
-async def test_unchanged_event_emits_applied_zero(
-    endpoint_app: tuple[FastAPI, MetricAssertions], monkeypatch: pytest.MonkeyPatch
-):
-    app, metrics = endpoint_app
-    monkeypatch.setattr(web_patreon.webhooks, "load_webhook_secret", AsyncMock(return_value=SECRET))
-    monkeypatch.setattr(web_patreon, "apply_membership_event", AsyncMock(return_value=WebhookApplied.UNCHANGED))
-
-    body = json.dumps(member_dict()).encode()
-    async with build_web_client(app) as client:
-        response = await client.post(
-            "/patreon/webhook",
-            content=body,
-            headers={"X-Patreon-Signature": sign(SECRET, body), "X-Patreon-Event": "members:update"},
-        )
-
-    assert response.status_code == 200
-    # A no-op emits APPLIED=0 (continuous series), never the change=1 value.
-    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_APPLIED, value=0)
-    metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_APPLIED, value=1)
+    # What the delivery carried rides the stage line, not a series.
+    received = next(entry for entry in logs if entry["event"] == "Patreon webhook received")
+    assert received["stage"] == "receive"
+    assert received["trigger"] == "members:update"
+    assert received["signed"] is True
 
 
 async def test_processing_fault_returns_500_and_emits_fault(
@@ -211,11 +195,10 @@ async def test_processing_fault_returns_500_and_emits_fault(
             headers={"X-Patreon-Signature": sign(SECRET, body), "X-Patreon-Event": "members:update"},
         )
 
-    # The fault surfaces as 500 (Patreon retries); the metric fires 1 and no 0-baseline or APPLIED.
+    # The fault surfaces as 500 (Patreon retries); the metric fires 1 and never its 0-baseline.
     assert response.status_code == 500
     metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_FAULT, value=1)
     metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_FAULT, value=0)
-    metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_APPLIED)
 
 
 async def test_bad_signature_returns_403_without_processing(
@@ -237,9 +220,8 @@ async def test_bad_signature_returns_403_without_processing(
     assert response.status_code == 403
     apply_mock.assert_not_awaited()
     metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_FORBIDDEN, value=1)
-    # A rejected delivery never reaches the signature-valid 0-baseline or the downstream series.
+    # A rejected delivery never reaches the signature-valid 0-baseline.
     metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_FORBIDDEN, value=0)
-    metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_MALFORMED)
 
 
 async def test_non_ascii_signature_header_returns_403_and_emits_forbidden_metric(
@@ -309,19 +291,21 @@ async def test_malformed_body_returns_400(
     monkeypatch.setattr(web_patreon, "apply_membership_event", apply_mock)
 
     body = b"not json at all"
-    async with build_web_client(app) as client:
-        response = await client.post(
-            "/patreon/webhook",
-            content=body,
-            headers={"X-Patreon-Signature": sign(SECRET, body), "X-Patreon-Event": "members:update"},
-        )
+    with capture_logs() as logs:
+        async with build_web_client(app) as client:
+            response = await client.post(
+                "/patreon/webhook",
+                content=body,
+                headers={"X-Patreon-Signature": sign(SECRET, body), "X-Patreon-Event": "members:update"},
+            )
 
     assert response.status_code == 400
     apply_mock.assert_not_awaited()
-    # The signature verified (FORBIDDEN cleared to 0), then the body failed to parse (MALFORMED=1).
+    # The signature verified (FORBIDDEN cleared to 0), then the body failed to parse.
     metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_FORBIDDEN, value=0)
-    metrics.assert_emitted(name=MetricKey.PATREON_WEBHOOK_MALFORMED, value=1)
-    metrics.assert_not_emitted(name=MetricKey.PATREON_WEBHOOK_MALFORMED, value=0)
+    malformed = next(entry for entry in logs if entry["event"] == "Malformed Patreon webhook payload")
+    assert malformed["log_level"] == "warning"
+    assert malformed["stage"] == "parse"
 
 
 # --- apply_membership_event + apply_membership_transition (mock session) ---
@@ -371,14 +355,21 @@ async def test_apply_upgrade_grants_and_notifies(
     patch_begin_write(session)
     api = MockApi()
 
-    outcome = await apply_membership_event(
-        api, "members:create", WebhookMemberPayload.model_validate(member_dict(cents=500))
-    )
+    with capture_logs() as logs:
+        outcome = await apply_membership_event(
+            api, "members:create", WebhookMemberPayload.model_validate(member_dict(cents=500))
+        )
 
     assert outcome is WebhookApplied.UPGRADED
     assert user.supporter_level is SupporterLevel.HOST_2
     # The 500-cent pledge lands on Patron, so the DM must be the Patron unlock message specifically.
     api.assert_send_message_to_user_called(user, SupporterNotificationMessages.PATRON_UNLOCKED.get(lang=user.lang))
+    # What the delivery changed rides the apply line: this is the branch where it changed something.
+    applied = next(entry for entry in logs if entry["event"] == "Patreon webhook applied")
+    assert applied["stage"] == "apply"
+    assert applied["outcome"] == "upgraded"
+    assert applied["previous_level"] == SupporterLevel.NONE.value
+    assert applied["supporter_level"] == SupporterLevel.HOST_2.value
 
 
 async def test_apply_downgrade_notifies(
@@ -470,13 +461,17 @@ async def test_apply_unchanged_sends_nothing(
     patch_begin_write(session)
     api = MockApi()
 
-    outcome = await apply_membership_event(
-        api, "members:update", WebhookMemberPayload.model_validate(member_dict(cents=500))
-    )
+    with capture_logs() as logs:
+        outcome = await apply_membership_event(
+            api, "members:update", WebhookMemberPayload.model_validate(member_dict(cents=500))
+        )
 
     assert outcome is WebhookApplied.UNCHANGED
     assert user.supporter_level is SupporterLevel.HOST_2
     api.assert_method_just_called("send_message_to_user", times=0)
+    # The no-op branch of the same line, so a delivery that changed nothing stays distinguishable.
+    applied = next(entry for entry in logs if entry["event"] == "Patreon webhook applied")
+    assert applied["outcome"] == "unchanged"
 
 
 async def test_apply_unknown_patron_is_noop(

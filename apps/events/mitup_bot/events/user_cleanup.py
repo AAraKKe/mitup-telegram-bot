@@ -8,7 +8,7 @@ from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import JoinedUsers, Meetup, User
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.monitoring import MetricsClient
 from mitup_bot.patreon import pending_links
 from mitup_bot.utils.messages import PrivacyMessages
 from mitup_bot.views import MitupView
@@ -200,9 +200,6 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         # thing that ever erases them.
         swept_pending_links = await pending_links.delete_finished_pending_links(session)
 
-    metrics.emit(MetricKey.LEFT_USERS_DEMOTED, demoted, MetricUnit.COUNT)
-    metrics.emit(MetricKey.INACTIVE_USERS_DELETED, len(inactive_user_ids), MetricUnit.COUNT)
-    metrics.emit(MetricKey.PATREON_PENDING_LINKS_DELETED, purged_pending_links + swept_pending_links, MetricUnit.COUNT)
     # Privacy purges are far too sparse for a useful CloudWatch series; the searchable log
     # carries the same information.
     log.info("Deletion-requested users purged", count=len(marked_users), pending_links=purged_pending_links)

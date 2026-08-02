@@ -530,10 +530,8 @@ async def test_meeting_inactive_owner_is_a_plain_screen(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=True)], indirect=True)
-async def test_shared_meeting_gone_replaces_the_card_and_counts_it_stale(
-    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
-):
-    """A card that outlived its meeting is replaced by the deleted banner, on its own counter."""
+async def test_shared_meeting_gone_replaces_the_card(context: StubMitupContext, mock_session: MockDbSession):
+    """A card that outlived its meeting is replaced by the deleted banner."""
     error = SharedMeetingGoneError(meeting_id=7, action="join or leave a meeting", user_db_id=1, lang="en")
 
     outcome = await error_handler.handler(context, error, Env.PROD)
@@ -546,7 +544,6 @@ async def test_shared_meeting_gone_replaces_the_card_and_counts_it_stale(
             keyboard=factory.main_menu_back_rows("en"),
         ),
     )
-    metrics.assert_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1)
     assert outcome == FaultOutcome(0)
 
 
@@ -567,7 +564,6 @@ async def test_shared_meeting_finished_replaces_the_card_with_the_finished_banne
             keyboard=factory.main_menu_back_rows("es"),
         ),
     )
-    metrics.assert_not_emitted(name=MetricKey.STALE_MEETING_MESSAGE, value=1)
     metrics.assert_not_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)
 
 

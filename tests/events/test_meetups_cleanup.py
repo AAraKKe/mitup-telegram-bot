@@ -84,11 +84,6 @@ async def test_notify_no_meetings(
     api.assert_method_just_called("send_message_to_user", times=0)
 
     metrics.assert_emitted(
-        name=MetricKey.MEETUPS_ABOUT_TO_BE_DELETED,
-        value=0,
-        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
-    )
-    metrics.assert_emitted(
         name=MetricKey.EXPIRATION_NOTIFICATIONS_FAILED,
         value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
@@ -137,11 +132,6 @@ async def test_notify_meeting_about_to_be_deleted(
     # The on_success callback fires after a successful send and sets this flag.
     assert meeting.expiration_notification_sent is True
 
-    metrics.assert_emitted(
-        name=MetricKey.MEETUPS_ABOUT_TO_BE_DELETED,
-        value=1,
-        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
-    )
     metrics.assert_emitted(
         name=MetricKey.EXPIRATION_NOTIFICATIONS_FAILED,
         value=0,
@@ -252,11 +242,6 @@ async def test_delete_no_meetings(
     api.assert_method_just_called("send_message_to_user", times=0)
 
     metrics.assert_emitted(
-        name=MetricKey.MEETUPS_DELETED,
-        value=0,
-        dimensions=purged_metric(),
-    )
-    metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED_UNNOTIFIED,
         value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
@@ -296,11 +281,6 @@ async def test_delete_meeting_successfully(
     assert "DELETE FROM users WHERE users.id IN (NULL) AND (1 != 1)" in mock_session.queries_executed
 
     metrics.assert_emitted(
-        name=MetricKey.MEETUPS_DELETED,
-        value=1,
-        dimensions=purged_metric(),
-    )
-    metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED_UNNOTIFIED,
         value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
@@ -331,11 +311,6 @@ async def test_delete_meeting_with_outside_users(
     # The outside user (id=2) must be deleted; the owner (id=1, tg_user_id != -1) must not appear.
     assert "DELETE FROM users WHERE users.id IN (2)" in mock_session.queries_executed
 
-    metrics.assert_emitted(
-        name=MetricKey.MEETUPS_DELETED,
-        value=1,
-        dimensions=purged_metric(),
-    )
     metrics.assert_emitted(
         name=MetricKey.MEETINGS_DELETION_FAILED,
         value=0,
@@ -385,11 +360,6 @@ async def test_delete_meeting_whose_owner_is_unreachable(
     assert record.__dict__["meeting_id"] == 2
     assert record.__dict__["days_overdue"] == 2
 
-    metrics.assert_emitted(
-        name=MetricKey.MEETUPS_DELETED,
-        value=2,
-        dimensions=purged_metric(),
-    )
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED_UNNOTIFIED,
         value=1,
@@ -459,11 +429,6 @@ async def test_delete_is_deferred_when_the_notice_raises(
     assert record.__dict__["days_overdue"] == 3
 
     metrics.assert_emitted(
-        name=MetricKey.MEETUPS_DELETED,
-        value=1,
-        dimensions=purged_metric(),
-    )
-    metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED_UNNOTIFIED,
         value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
@@ -512,19 +477,9 @@ async def test_run_orchestrates_both_functions(
     await metrics_client.flush()
 
     metrics.assert_emitted(
-        name=MetricKey.MEETUPS_ABOUT_TO_BE_DELETED,
-        value=0,
-        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
-    )
-    metrics.assert_emitted(
         name=MetricKey.EXPIRATION_NOTIFICATIONS_FAILED,
         value=0,
         dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.MEETUPS_DELETED,
-        value=0,
-        dimensions=purged_metric(),
     )
     metrics.assert_emitted(
         name=MetricKey.MEETUPS_DELETED_UNNOTIFIED,

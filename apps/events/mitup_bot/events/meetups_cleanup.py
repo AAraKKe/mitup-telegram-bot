@@ -24,7 +24,6 @@ from mitup_bot.views import MitupView
 from mitup_bot.views.meeting_text import rich_title
 
 from .lifecycle_queries import loggable_windows, owner_tier_window_elapsed
-from .telemetry import emit_per_supporter_level
 
 log = structlog.get_logger(__name__)
 
@@ -277,7 +276,8 @@ async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: Telegra
         reason="warning_window_elapsed",
     )
 
-    metrics.emit(MetricKey.MEETUPS_ABOUT_TO_BE_DELETED, len(meetups), MetricUnit.COUNT)
+    # This sweep never raises, so the run closes on Fault=0 whatever happened here: the counter is
+    # the only alarmable trace of a warning that never reached its owner.
     metrics.emit(
         MetricKey.EXPIRATION_NOTIFICATIONS_FAILED,
         len(outcome.failed),
@@ -350,7 +350,9 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
         invitee_users_purged=len(outside_user_ids),
     )
 
-    emit_per_supporter_level(metrics, MetricKey.MEETUPS_DELETED, owner_levels(deletable))
+    # Neither branch raises, so the run closes on Fault=0 either way. A meeting destroyed without its
+    # owner ever being told, and one whose deletion was deferred by a failed notice, are both
+    # irreversible enough to alarm on and invisible to every other series.
     metrics.emit(MetricKey.MEETUPS_DELETED_UNNOTIFIED, len(outcome.unreachable), MetricUnit.COUNT)
     metrics.emit(
         MetricKey.MEETINGS_DELETION_FAILED,

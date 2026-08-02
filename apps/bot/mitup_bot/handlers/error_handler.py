@@ -48,10 +48,10 @@ SUPPRESSED_EXCEPTIONS: dict[type, set[str]] = {
     }
 }
 
-# The shared-surface rejections that carry a counter of their own. A card whose meeting is finished
-# is a normal state transition and has none.
+# The shared-surface rejections that carry a counter of their own. A tap on a card whose meeting is
+# gone or finished is a normal state transition, so only the unauthorised tap — a claim the caller
+# never held — is metered; `Rejected meeting action` carries the rest under its `reason`.
 SHARED_MEETING_METRICS: dict[type, MetricKey] = {
-    SharedMeetingGoneError: MetricKey.STALE_MEETING_MESSAGE,
     SharedMeetingDeniedError: MetricKey.UNAUTHORIZED_MEETING_CALLBACK,
 }
 

@@ -9,7 +9,7 @@ from mitup_bot.events import notify_meetings
 from mitup_bot.events.service import EventType
 from mitup_bot.models import JoinedUsers
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey, MetricsClient
+from mitup_bot.monitoring import MetricsClient
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
 from tests.helpers import MockApi, MockDbSession, create_joined_link, create_meetup, create_settings, create_user
@@ -86,9 +86,7 @@ def test_users_and_settings_join_through_the_participant_not_the_owner():
     assert "meetups.owner_id" not in compiled
 
 
-async def test_meeting_start(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
-):
+async def test_meeting_start(mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str):
     meeting = create_meetup(id=1, title="Test meetup")
     joined_1 = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
     joined_2 = create_user(id=2, tg_user_id=2, settings=create_settings(id=2, language=lang))
@@ -113,25 +111,9 @@ async def test_meeting_start(
     api.assert_send_message_to_user_called(user=joined_1, view=view1, times=2)
     api.assert_send_message_to_user_called(user=joined_2, view=view2, times=2)
 
-    metrics.assert_emitted(
-        name=MetricKey.NOTIFICATIONS_TO_SEND,
-        value=2,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.NOTIFICATIONS_SENT,
-        value=2,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.NOTIFICATIONS_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-
 
 async def test_link_no_longer_due_is_skipped(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str
 ):
     """The per-link re-check found the link already flagged or its meeting rescheduled out
     of the notification window: nothing is sent, nothing fails — the next sweep
@@ -147,25 +129,9 @@ async def test_link_no_longer_due_is_skipped(
     assert link.notification_sent is False
     api.assert_method_just_called("send_message_to_user", times=0)
 
-    metrics.assert_emitted(
-        name=MetricKey.NOTIFICATIONS_TO_SEND,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.NOTIFICATIONS_SENT,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.NOTIFICATIONS_FAILED,
-        value=0,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-
 
 async def test_non_forbidden_exception_is_logged_and_loop_continues(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi, lang: str
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str
 ):
     """An exception while processing one link is counted as failed and logged.
 
@@ -194,22 +160,6 @@ async def test_non_forbidden_exception_is_logged_and_loop_continues(
     # notified and committed — the loop did not abort on the first failure.
     assert link_1.notification_sent is False
     assert link_2.notification_sent
-
-    metrics.assert_emitted(
-        name=MetricKey.NOTIFICATIONS_TO_SEND,
-        value=2,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.NOTIFICATIONS_SENT,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
-    metrics.assert_emitted(
-        name=MetricKey.NOTIFICATIONS_FAILED,
-        value=1,
-        dimensions={"EventType": EventType.NOTIFY_START_MEETING.value},
-    )
 
 
 async def test_failed_greater_than_zero_raises_runtime_error(

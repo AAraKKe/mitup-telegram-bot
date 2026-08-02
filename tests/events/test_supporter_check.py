@@ -569,21 +569,11 @@ async def test_process_all_isolates_a_failing_subscription():
 # run(): orchestration
 # ---------------------------------------------------------------------------
 
-# The per-run outcome counters the module contracts to emit on every exit path, zeros included.
-PER_RUN_COUNTERS = (
-    supporter_check.GRACE_EXTENDED_METRIC,
-    supporter_check.GRACE_STARTED_METRIC,
-    supporter_check.SUPPORT_LOST_METRIC,
-    supporter_check.UPGRADES_METRIC,
-    supporter_check.DOWNGRADES_METRIC,
-    supporter_check.SUBSCRIPTION_FAULTS_METRIC,
-    supporter_check.DUE_SUBSCRIPTIONS_PROCESSED_METRIC,
-    supporter_check.ACTIVE_PATRONS_METRIC,
-)
+
 ABORT_EVENT = "Supporter check aborted before reconciling any membership"
 
 
-async def test_run_happy_path_emits_creator_ttl_and_counters(
+async def test_run_happy_path_emits_creator_ttl_and_gauges(
     mock_session: MockDbSession,
     api: MockApi,
     config: PatreonConfig,
@@ -608,17 +598,9 @@ async def test_run_happy_path_emits_creator_ttl_and_counters(
     # The freshly rotated creator token drives the member sweep.
     assert client.members_access_token == "creator-access-seed-new"
     metrics.assert_emitted(name=supporter_check.CREATOR_TOKEN_TTL_METRIC, unit=MetricUnit.NONE)
-    # Outcome counters: everything a continuous zero on this no-op run.
+    # A clean refresh still emits the 0-baseline so the silent-failure series stays continuous.
     metrics.assert_emitted(name=supporter_check.CREATOR_REFRESH_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=supporter_check.UPGRADES_METRIC, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=supporter_check.DOWNGRADES_METRIC, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=supporter_check.GRACE_EXTENDED_METRIC, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=supporter_check.GRACE_STARTED_METRIC, value=0, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=supporter_check.SUPPORT_LOST_METRIC, value=0, unit=MetricUnit.COUNT)
-    # Per-subscription faults: a clean run still emits the 0-baseline so the series stays continuous.
-    metrics.assert_emitted(name=supporter_check.SUBSCRIPTION_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)
-    # Items-processed counters: nothing was due, and the sweep saw one active patron.
-    metrics.assert_emitted(name=supporter_check.DUE_SUBSCRIPTIONS_PROCESSED_METRIC, value=0, unit=MetricUnit.COUNT)
+    # The sweep saw one active patron. What the run did rides the summary log line.
     metrics.assert_emitted(name=supporter_check.ACTIVE_PATRONS_METRIC, value=1, unit=MetricUnit.COUNT)
 
 
@@ -688,9 +670,7 @@ async def test_run_stops_after_creator_invalid_grant(
     metrics.assert_emitted(name=supporter_check.CREATOR_REFRESH_FAULTS_METRIC, value=1, unit=MetricUnit.COUNT)
 
 
-@pytest.mark.parametrize("counter", PER_RUN_COUNTERS)
-async def test_run_emits_zero_counters_when_creator_token_is_unusable(
-    counter: str,
+async def test_run_emits_zero_active_patrons_when_creator_token_is_unusable(
     mock_session: MockDbSession,
     api: MockApi,
     config: PatreonConfig,
@@ -698,13 +678,17 @@ async def test_run_emits_zero_counters_when_creator_token_is_unusable(
     metrics: MetricAssertions,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """An aborted run still lands every per-run counter as a zero, so no series goes dark."""
+    """An aborted run still lands the gauge as a zero, so the series never goes dark.
+
+    The refresh-fault counter is the one series an abort does *not* zero — this is the branch that
+    sets it to 1, pinned by the test above.
+    """
     configure(config)
     stub_unusable_creator_token(mock_session, config, monkeypatch)
 
     await supporter_check.run(api, metrics_client)
 
-    metrics.assert_emitted(name=counter, value=0, unit=MetricUnit.COUNT)
+    metrics.assert_emitted(name=supporter_check.ACTIVE_PATRONS_METRIC, value=0, unit=MetricUnit.COUNT)
 
 
 async def test_run_logs_abort_reason_when_creator_token_is_unusable(
@@ -733,7 +717,6 @@ async def test_run_raises_when_a_subscription_fails(
     api: MockApi,
     config: PatreonConfig,
     metrics_client: MetricsClient,
-    metrics: MetricAssertions,
     monkeypatch: pytest.MonkeyPatch,
 ):
     configure(config)
@@ -750,13 +733,15 @@ async def test_run_raises_when_a_subscription_fails(
 
     monkeypatch.setattr(supporter_check, "process_due_subscription", boom)
 
-    with pytest.raises(RuntimeError, match="Supporter check failed for 1 subscriptions"):
-        await supporter_check.run(api, metrics_client)
+    with capture_logs() as logs:
+        with pytest.raises(RuntimeError, match="Supporter check failed for 1 subscriptions"):
+            await supporter_check.run(api, metrics_client)
 
-    # The lifecycle counters are emitted before the raise, so the series stay continuous on a failing run.
-    metrics.assert_emitted(name=supporter_check.GRACE_STARTED_METRIC, value=0, unit=MetricUnit.COUNT)
-    # The per-subscription fault count is emitted before the raise: N failures land as a datapoint.
-    metrics.assert_emitted(name=supporter_check.SUBSCRIPTION_FAULTS_METRIC, value=1, unit=MetricUnit.COUNT)
+    # The summary is written from the `finally`, before the raise, so a failing run still reports
+    # what it managed to do and how many rows it lost.
+    summary = next(entry for entry in logs if entry["event"] == "Supporter check complete")
+    assert summary["grace_started"] == 0
+    assert summary["subscription_faults"] == 1
 
 
 async def test_run_emits_counters_when_the_member_sweep_raises(
@@ -781,8 +766,9 @@ async def test_run_emits_counters_when_the_member_sweep_raises(
     with pytest.raises(RuntimeError, match="patreon is down"):
         await supporter_check.run(api, metrics_client)
 
-    for counter in PER_RUN_COUNTERS:
-        metrics.assert_emitted(name=counter, value=0, unit=MetricUnit.COUNT)
+    # The sweep never got a roster, so the gauge lands its zero from the `finally` rather than
+    # going dark on the run that failed.
+    metrics.assert_emitted(name=supporter_check.ACTIVE_PATRONS_METRIC, value=0, unit=MetricUnit.COUNT)
 
 
 async def test_run_counts_lifecycle_transitions(
@@ -790,7 +776,6 @@ async def test_run_counts_lifecycle_transitions(
     api: MockApi,
     config: PatreonConfig,
     metrics_client: MetricsClient,
-    metrics: MetricAssertions,
     monkeypatch: pytest.MonkeyPatch,
 ):
     configure(config)
@@ -827,14 +812,16 @@ async def test_run_counts_lifecycle_transitions(
     )
     monkeypatch.setattr(supporter_check, "PatreonClient", lambda _config: client)
 
-    await supporter_check.run(api, metrics_client)
+    with capture_logs() as logs:
+        await supporter_check.run(api, metrics_client)
 
-    metrics.assert_emitted(name=supporter_check.GRACE_STARTED_METRIC, value=1, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=supporter_check.UPGRADES_METRIC, value=1, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=supporter_check.DOWNGRADES_METRIC, value=1, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=supporter_check.SUPPORT_LOST_METRIC, value=0, unit=MetricUnit.COUNT)
-    # No still-active due member this run, so grace-extensions stay at the 0-baseline.
-    metrics.assert_emitted(name=supporter_check.GRACE_EXTENDED_METRIC, value=0, unit=MetricUnit.COUNT)
+    summary = next(entry for entry in logs if entry["event"] == "Supporter check complete")
+    assert summary["grace_started"] == 1
+    assert summary["upgraded"] == 1
+    assert summary["downgraded"] == 1
+    assert summary["support_lost"] == 0
+    # No still-active due member this run, so grace-extensions stay at zero.
+    assert summary["extended"] == 0
 
 
 async def test_run_counts_grace_extensions(
@@ -859,13 +846,15 @@ async def test_run_counts_grace_extensions(
     client = FakePatreonClient(members=(active_member("patreon-1", cents=500),))
     monkeypatch.setattr(supporter_check, "PatreonClient", lambda _config: client)
 
-    await supporter_check.run(api, metrics_client)
+    with capture_logs() as logs:
+        await supporter_check.run(api, metrics_client)
 
-    metrics.assert_emitted(name=supporter_check.GRACE_EXTENDED_METRIC, value=1, unit=MetricUnit.COUNT)
-    metrics.assert_emitted(name=supporter_check.SUBSCRIPTION_FAULTS_METRIC, value=0, unit=MetricUnit.COUNT)
-    # The one due subscription was processed and the sweep saw one active patron.
-    metrics.assert_emitted(name=supporter_check.DUE_SUBSCRIPTIONS_PROCESSED_METRIC, value=1, unit=MetricUnit.COUNT)
     metrics.assert_emitted(name=supporter_check.ACTIVE_PATRONS_METRIC, value=1, unit=MetricUnit.COUNT)
+    # The non-zero branch of the run's outcome counts, which ride the summary log line.
+    summary = next(entry for entry in logs if entry["event"] == "Supporter check complete")
+    assert summary["due_processed"] == 1
+    assert summary["extended"] == 1
+    assert summary["subscription_faults"] == 0
 
 
 # ---------------------------------------------------------------------------

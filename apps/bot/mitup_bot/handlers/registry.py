@@ -281,8 +281,9 @@ async def callback_query_fallback(update: Update, context: TMitupContext):
     """Fallback callback query handler. This will be called when no other callback query handler is found."""
     callback_query = guards.callback_query(update)
 
-    # A user reached a button with no matching handler; the counter makes these visible in CloudWatch.
-    context.emit_metric(MetricKey.UNHANDLED_CALLBACK)
+    # The callback data is client-supplied and unbounded, so the line names the decision and leans on
+    # the ambient handler/update binds for the identity rather than echoing the payload back.
+    log.warning("Callback query unhandled", reason="no_handler_matched")
 
     # No need to create a message for this as there will be no transaltions. Before translations
     # are added all features should be finished.

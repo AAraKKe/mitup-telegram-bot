@@ -4,7 +4,14 @@ import pytest
 from structlog.testing import capture_logs
 
 from mitup_bot.monitoring import MetricsClient, MetricUnit, bound_metrics_client, current_metrics_client
-from mitup_bot.monitoring.outbound import TELEGRAM_EDGE, OutboundOutcome, outbound_call
+from mitup_bot.monitoring.outbound import (
+    GOOGLE_EDGE,
+    PATREON_EDGE,
+    TELEGRAM_EDGE,
+    OutboundEdge,
+    OutboundOutcome,
+    outbound_call,
+)
 from tests.helpers import AnyFloat
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
@@ -39,6 +46,29 @@ async def test_a_completed_round_trip_lands_one_line_and_one_timing_pair(
     assert line["outcome"] == OutboundOutcome.OK
     assert line["status_code"] == 200
     assert line["chat_id"] == 42
+    assert isinstance(line["duration_ms"], float)
+
+
+@pytest.mark.parametrize("edge", [PATREON_EDGE, GOOGLE_EDGE], ids=["patreon", "google"])
+async def test_an_edge_without_a_time_metric_records_its_duration_only_on_the_line(
+    edge: OutboundEdge, client: MetricsClient, metrics: MetricAssertions
+):
+    """Only the Telegram edge charts latency as a series; the rest answer `how slow` from the line.
+
+    A latency series nothing reads still bills per series-month, while `duration_ms` on the line
+    answers the same question through `stats avg(duration_ms), pct(duration_ms, 99) by api_method`.
+    """
+    assert edge.time_metric is None
+
+    with capture_logs() as logs:
+        with outbound_call(edge, "identity", client=client) as call:
+            call.status_code = 200
+
+    await client.flush()
+
+    assert [record.name for record in client.records] == [edge.fault_metric]
+    metrics.assert_emitted(name=edge.fault_metric, value=0, times=1)
+    (line,) = [entry for entry in logs if entry["event"] == edge.event]
     assert isinstance(line["duration_ms"], float)
 
 

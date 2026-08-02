@@ -41,7 +41,7 @@ from .telemetry import error_type_name
 log = structlog.get_logger(__name__)
 
 DEFAULT_USER_CLEANUP_INTERVAL = 3600
-DEFAULT_GENERATE_STATS_INTERVAL = 3600
+DEFAULT_GENERATE_STATS_INTERVAL = 21600  # 6 hours
 DEFAULT_NOTIFY_MEETINGS_START = 60
 DEFAULT_DEACTIVATE_MEETINGS_INTERVAL = 60
 DEFAULT_MEETUPS_CLEANUP_INTERVAL = 86400  # 24 hours
@@ -217,7 +217,6 @@ async def handle_maintainance(
                 client.emit(MetricKey.FAULT, 0, MetricUnit.COUNT, emit_global=True)
             client.emit(MetricKey.TIME, (perf_counter() - start_time) * 1000, MetricUnit.MILLISECONDS, emit_global=True)
             leaked_connections = db.get_open_connections(event_type.value)
-            client.emit(MetricKey.DB_CONNECTIONS_LEAKED, leaked_connections, MetricUnit.COUNT)
             log.info(
                 "Recurrent event run finished",
                 outcome="failed" if fault else "completed",

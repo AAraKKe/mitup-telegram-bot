@@ -57,20 +57,12 @@ class CampaignMemberReader(Protocol):
 # MetricKey would emit "PatreonCreatorTokenTtl", breaking the alarm's exact-name match.
 CREATOR_TOKEN_TTL_METRIC = "PatreonCreatorTokenTTL"
 
-# Per-run outcome counters (same literal-name rationale as the TTL metric above). Dashboard/diagnosis
-# material, not a paging surface: they ride the run's MetricsClient with its EventType=SupporterCheck base
-# dimension only (one series per name). Emitted every run — zeros included — so the series stay continuous.
+# A creator-token refresh rejection returns rather than raising, so the framework Fault never fires
+# for it: this counter is its own alarm surface. Emitted every run — zeros included — so the series
+# is continuous rather than a failure-only signal.
 CREATOR_REFRESH_FAULTS_METRIC = "PatreonCreatorRefreshFaults"
-UPGRADES_METRIC = "PatreonUpgrades"
-DOWNGRADES_METRIC = "PatreonDowngrades"
-GRACE_STARTED_METRIC = "PatreonGraceStarted"
-SUPPORT_LOST_METRIC = "PatreonSupportLost"
-GRACE_EXTENDED_METRIC = "PatreonGraceExtended"
-# Per-subscription processing faults. Emitted every run (0 when the sweep is clean) so the series is
-# continuous rather than a failure-only signal; the run still raises after emitting when any row failed.
-SUBSCRIPTION_FAULTS_METRIC = "PatreonSubscriptionFaults"
-# Items-processed counters, emitted every run (zeros included) like the outcome counters above.
-DUE_SUBSCRIPTIONS_PROCESSED_METRIC = "PatreonDueSubscriptionsProcessed"
+# How many people are paying right now: state of the world, read as a gauge rather than as run
+# activity, which is why it stays a series while the run's outcome counts ride the summary line.
 ACTIVE_PATRONS_METRIC = "PatreonActivePatrons"
 
 # Machine-readable reason on the log line for a run that reconciled nothing, so log queries key on a
@@ -98,10 +90,10 @@ class LevelSyncOutcome(Enum):
 
 @dataclass
 class RunTally:
-    """What one run did, aggregated for the outcome counters and the completion log.
+    """What one run did, aggregated for the active-patron gauge and the completion log.
 
-    The defaults describe a run that reconciled nothing, so the counters can be emitted from any exit
-    path — including an abort before the sweep starts — and every series lands a datapoint."""
+    The defaults describe a run that reconciled nothing, so the gauge can be emitted from any exit
+    path — including an abort before the sweep starts — and the series lands a datapoint."""
 
     due_outcomes: list[DueOutcome] = field(default_factory=list)
     sync_outcomes: list[LevelSyncOutcome] = field(default_factory=list)
@@ -115,14 +107,7 @@ class RunTally:
     def count_synced(self, outcome: LevelSyncOutcome) -> int:
         return sum(1 for candidate in self.sync_outcomes if candidate is outcome)
 
-    def emit_counters(self, metrics: MetricsClient):
-        metrics.emit(GRACE_EXTENDED_METRIC, self.count_due(DueOutcome.EXTENDED), MetricUnit.COUNT)
-        metrics.emit(GRACE_STARTED_METRIC, self.count_due(DueOutcome.GRACE_STARTED), MetricUnit.COUNT)
-        metrics.emit(SUPPORT_LOST_METRIC, self.count_due(DueOutcome.SUPPORT_LOST), MetricUnit.COUNT)
-        metrics.emit(UPGRADES_METRIC, self.count_synced(LevelSyncOutcome.UPGRADED), MetricUnit.COUNT)
-        metrics.emit(DOWNGRADES_METRIC, self.count_synced(LevelSyncOutcome.DOWNGRADED), MetricUnit.COUNT)
-        metrics.emit(SUBSCRIPTION_FAULTS_METRIC, len(self.failures), MetricUnit.COUNT)
-        metrics.emit(DUE_SUBSCRIPTIONS_PROCESSED_METRIC, len(self.due_outcomes), MetricUnit.COUNT)
+    def emit_gauges(self, metrics: MetricsClient):
         metrics.emit(ACTIVE_PATRONS_METRIC, self.active_patrons, MetricUnit.COUNT)
 
 
@@ -448,7 +433,7 @@ async def reconcile_memberships(api: TelegramApiWrapper, metrics: MetricsClient,
 def log_run_summary(tally: RunTally, reconciled: bool):
     """Record what the run did, on every exit path.
 
-    Runs from ``run``'s ``finally`` alongside ``emit_counters``, so a partially-failed run lands a
+    Runs from ``run``'s ``finally`` alongside ``emit_gauges``, so a partially-failed run lands a
     summary next to its continuous counters rather than leaving the counters as the only account of
     it. A run that aborted before reconciling anything is described by its abort line instead."""
     if tally.failures:
@@ -477,15 +462,15 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     """Validate supporter memberships against Patreon and keep the creator token fresh.
 
     Each subscription is handled in its own write lifecycle; a mid-run failure leaves earlier commits
-    intact and re-nominates the rest next run. The per-run outcome counters (COUNT, EventType base
-    dimension only) are emitted in a ``finally``, so an aborting or raising run still lands zeros and
-    the series stay continuous."""
+    intact and re-nominates the rest next run. The active-patron gauge is emitted from a ``finally``,
+    so an aborting or raising run still lands a datapoint and the series stays continuous. What the
+    run did rides the ``Supporter check complete`` line."""
     tally = RunTally()
     reconciled = False
     try:
         reconciled = await reconcile_memberships(api, metrics, tally)
     finally:
-        tally.emit_counters(metrics)
+        tally.emit_gauges(metrics)
         log_run_summary(tally, reconciled)
 
     if tally.failures:

@@ -144,11 +144,14 @@ async def test_claiming_prompts_and_writes_nothing(
     register_member(mock_session, user_with_settings)
     claimable(mock_session, user_with_settings, "p-redeemed", SupporterLevel.HOST_2)
 
-    context, _ = await call_handler(CollaborateHandlerId.PATREON_LINK_REDEEM, handler_context=handler_context)
+    with capture_logs() as logs:
+        context, _ = await call_handler(CollaborateHandlerId.PATREON_LINK_REDEEM, handler_context=handler_context)
 
     assert not added_subscriptions(mock_session)
     assert user_with_settings.supporter_level is SupporterLevel.NONE
-    metrics.assert_emitted(name=MetricKey.PATREON_LINK_PROMPTED, dimensions={"Feature": str(Feature.PATREON_LINK)})
+    prompted = next(entry for entry in logs if entry["event"] == "Patreon link confirmation prompted")
+    assert prompted["stage"] == "prompt"
+    assert prompted["granted_level"] == SupporterLevel.HOST_2.value
     metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
     view = context.api.call_args("send_message").kwargs["view"]
     assert PATREON_NAME in view.description.text
@@ -484,7 +487,6 @@ async def test_unknown_code_explains_itself_and_links_nothing(
 
     context.api.assert_send_message_called(update, patreon_link_code_not_valid_view(user_with_settings.lang))
     assert not added_subscriptions(mock_session)
-    metrics.assert_emitted(name=MetricKey.PATREON_LINK_REFUSED, dimensions={"Feature": str(Feature.PATREON_LINK)})
     metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
 
 
@@ -514,7 +516,6 @@ async def test_a_code_from_someone_not_set_up_is_answered_and_the_row_is_left_al
     mock_session: MockDbSession,
     handler_context: HandlerContext,
     patreon_config: PatreonConfig,
-    metrics: MetricAssertions,
 ):
     # Onboarding claims every non-MEMBER `/start` and knows nothing about payloads, so without this
     # handler binding ahead of it the code would vanish. The pending row is not even claimed, so the
@@ -527,7 +528,6 @@ async def test_a_code_from_someone_not_set_up_is_answered_and_the_row_is_left_al
 
     context.api.assert_send_message_called(update, patreon_link_needs_setup_view(user_with_settings.lang))
     assert not added_subscriptions(mock_session)
-    metrics.assert_emitted(name=MetricKey.PATREON_LINK_REFUSED, dimensions={"Feature": str(Feature.PATREON_LINK)})
 
 
 @pytest.mark.parametrize("update", [REDEEM_UPDATE], indirect=True)
@@ -632,7 +632,6 @@ async def test_confirming_a_spent_link_says_so_instead_of_crashing(
     mock_session: MockDbSession,
     handler_context: HandlerContext,
     patreon_config: PatreonConfig,
-    metrics: MetricAssertions,
 ):
     # A double tap, a back button, or a prompt confirmed twice all land here. The happy path never
     # produces this branch, which is why it needs its own test.
@@ -642,7 +641,6 @@ async def test_confirming_a_spent_link_says_so_instead_of_crashing(
 
     context.api.assert_edit_message_called(update, patreon_link_code_not_valid_view(user_with_settings.lang))
     assert not added_subscriptions(mock_session)
-    metrics.assert_emitted(name=MetricKey.PATREON_LINK_REFUSED, dimensions={"Feature": str(Feature.PATREON_LINK)})
 
 
 @pytest.mark.parametrize("update", [CONFIRM_UPDATE], indirect=True)
@@ -695,13 +693,12 @@ async def test_already_linked_elsewhere_explains_itself(
 
 
 @pytest.mark.parametrize("update", [CONFIRM_UPDATE], indirect=True)
-async def test_a_forged_confirm_around_the_claim_step_is_metered_as_unclaimed(
+async def test_a_forged_confirm_around_the_claim_step_is_recorded_as_unclaimed(
     update: Update,
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
     patreon_config: PatreonConfig,
-    metrics: MetricAssertions,
 ):
     # A confirm carrying a live code nobody claimed cannot come from an honest tap — the button
     # only exists after a claim succeeds — so its refusal must not be metered as an expired code,
@@ -716,10 +713,8 @@ async def test_a_forged_confirm_around_the_claim_step_is_metered_as_unclaimed(
 
     context.api.assert_edit_message_called(update, patreon_link_code_not_valid_view(user_with_settings.lang))
     assert not added_subscriptions(mock_session)
-    metrics.assert_emitted(name=MetricKey.PATREON_LINK_REFUSED, dimensions={"Feature": str(Feature.PATREON_LINK)})
 
-    # Which branch refused is what tells a forged confirm apart from an expired code, and it varies
-    # per refusal — so it is read off the log line, never off the counter.
+    # Which branch refused is what tells a forged confirm apart from an expired code.
     refusals = [entry for entry in logs if entry["event"] == "Patreon link attempt refused"]
     assert len(refusals) == 1
     assert refusals[0]["outcome"] == "code_not_usable"
@@ -756,7 +751,6 @@ async def test_a_double_tap_after_success_keeps_the_linked_screen(
             user_with_settings.lang, SupporterLevel.HOST_2, PATRON_ACTIVE_MEETINGS, PATRON_SCHEDULING_DAYS
         ),
     )
-    metrics.assert_not_emitted(name=MetricKey.PATREON_LINK_REFUSED)
     metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
 
 
@@ -786,7 +780,6 @@ async def test_a_link_refused_for_pending_deletion_never_renders_as_completed(
     context.api.assert_edit_message_called(
         update, PrivacyMessages.PENDING_DELETION_ALERT.get(lang=user_with_settings.lang)
     )
-    metrics.assert_emitted(name=MetricKey.PATREON_LINK_REFUSED, dimensions={"Feature": str(Feature.PATREON_LINK)})
     metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
 
 

@@ -2,6 +2,7 @@ from typing import cast
 from unittest import mock
 
 import pytest
+from structlog.testing import capture_logs
 from telegram import MessageEntity, Update
 from telegram.error import BadRequest
 
@@ -14,7 +15,7 @@ from mitup_bot.api_wrapper import (
 from mitup_bot.exceptions import NoMessageAvailable
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, Message, MessageButtons, User
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.monitoring import MetricsClient
 from mitup_bot.utils.entities import FormattedText
 from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
@@ -231,17 +232,16 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
 
 
 @pytest.mark.parametrize("bad_request_message", [pat.pattern for pat in MESSAGE_NOT_FOUND_ERROR_PATTERNS])
-async def test_edit_meetup_messages_counts_dead_message_and_continues(
+async def test_edit_meetup_messages_records_dead_message_and_continues(
     meeting: Meetup,
     context: StubMitupContext,
     bad_request_message: str,
-    metrics: MetricAssertions,
 ):
-    """A user-deleted message is counted and skipped; the other messages are still edited.
+    """A user-deleted message is recorded and skipped; the other messages are still edited.
 
     The stale row's DB cleanup is the write lifecycle's reconcile job (see
     tests/test_api_wrapper.py::test_execute_queued_records_dead_message_for_reconcile) —
-    immediate mode only emits the metric.
+    immediate mode only writes the line.
     """
     meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
     buttons = MessageButtons(
@@ -257,13 +257,16 @@ async def test_edit_meetup_messages_counts_dead_message_and_continues(
 
     edit.side_effect = raise_error
 
-    await context.api.update_meeting_messages(meeting=meeting)
+    with capture_logs() as logs:
+        await context.api.update_meeting_messages(meeting=meeting)
     # Since this is outside a callback, make sure we flush metrics
     await context.metrics.flush()
 
     assert edit.call_count == 2
 
-    metrics.assert_emitted(name=MetricKey.MESSAGE_DELETED, value=1, unit=MetricUnit.COUNT)
+    dropped = [entry for entry in logs if entry["event"] == "Meeting message unreachable, dropping it"]
+    assert len(dropped) == 1
+    assert dropped[0]["reason"] == "message_not_found"
 
 
 @pytest.mark.parametrize("bad_request_message", [pat.pattern for pat in EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS])

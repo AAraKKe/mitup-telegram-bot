@@ -404,7 +404,8 @@ async def test_handle_maintainance(
     ):
         mock_db.get_open_connections.return_value = leaked_connections
 
-        await handle_maintainance(event_type, MagicMock(), [])
+        with capture_logs() as logs:
+            await handle_maintainance(event_type, MagicMock(), [])
 
         mock_db.set_connection_context.assert_called_once_with(event_type.value)
         assert len(captured_client) == 1
@@ -423,12 +424,10 @@ async def test_handle_maintainance(
             unit=MetricUnit.MILLISECONDS,
             dimensions={"EventType": event_type.value},
         )
-        assertions.assert_emitted(
-            name=MetricKey.DB_CONNECTIONS_LEAKED,
-            value=leaked_connections,
-            unit=MetricUnit.COUNT,
-            dimensions={"EventType": event_type.value},
-        )
+        # A leak belongs to the run, not to a series: the count rides the run's completion line,
+        # including the zero that says the run returned every connection it took.
+        finished = next(entry for entry in logs if entry["event"] == "Recurrent event run finished")
+        assert finished["db_connections_leaked"] == leaked_connections
 
         # Fault and Time additionally emit a dimensionless global copy (no EventType dimension) so
         # a single Mitup/Events alarm can watch every event type; EventType survives as a property.
@@ -447,7 +446,7 @@ async def test_handle_maintainance(
             dimensions_exact=True,
             properties={"EventType": event_type.value},
         )
-        # DbConnectionsLeaked and any business stats stay EventType-dimensioned only — no global copy.
+        # Business stats stay EventType-dimensioned only — no global copy.
         assertions.assert_not_emitted(
             name=MetricKey.DB_CONNECTIONS_LEAKED,
             dimensions={},
@@ -535,8 +534,8 @@ async def test_handle_maintainance_serializes_dimensioned_and_global_emf(
     expected_fault: int,
 ):
     """End-to-end through the real EmfBackend: every run serializes two EMF lines — the
-    EventType-dimensioned series (Fault/Time/DbConnectionsLeaked) and a dimensionless global copy
-    of Fault/Time carrying EventType as a property (not a dimension) for cross-event alarming."""
+    EventType-dimensioned Fault/Time series and a dimensionless global copy of them carrying
+    EventType as a property (not a dimension) for cross-event alarming."""
     event_type = EventType.USER_CLEANUP
     backend, sink = build_capturing_backend()
     client = MetricsClient(backend, base_dimensions={"EventType": event_type.value})
@@ -559,14 +558,10 @@ async def test_handle_maintainance_serializes_dimensioned_and_global_emf(
     dimensioned = next(p for p in payloads if {"EventType"} in dimension_sets(p))
     dimensionless = next(p for p in payloads if all(not dims for dims in dimension_sets(p)))
 
-    # Dimensioned series: EventType is a real dimension, all three metrics present.
+    # Dimensioned series: EventType is a real dimension, both metrics present.
     assert dimensioned["EventType"] == event_type.value
     assert dimensioned["Fault"] == expected_fault
-    assert metric_names(dimensioned) == {
-        str(MetricKey.FAULT),
-        str(MetricKey.TIME),
-        str(MetricKey.DB_CONNECTIONS_LEAKED),
-    }
+    assert metric_names(dimensioned) == {str(MetricKey.FAULT), str(MetricKey.TIME)}
 
     # Global copy: only Fault/Time, EventType present as a property but not in any dimension set.
     assert metric_names(dimensionless) == {str(MetricKey.FAULT), str(MetricKey.TIME)}

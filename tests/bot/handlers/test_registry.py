@@ -206,13 +206,13 @@ async def test_callback_query_fallback_answers_with_sorry_message(
     update: Update,
     app: StubMitupApp,
     metrics_client: MetricsClient,
-    metrics: MetricAssertions,
 ):
-    """callback_query_fallback answers with the fallback message and counts the unhandled interaction."""
+    """callback_query_fallback answers with the fallback message and records the unhandled interaction."""
     context = build_context(update, app, metrics=metrics_client)
     assert update.callback_query is not None
 
-    await callback_query_fallback(update, context)
+    with capture_logs() as logs:
+        await callback_query_fallback(update, context)
 
     # The bot's answer_callback_query method is called with the fallback message and show_alert=True
     context.bot.answer_callback_query.assert_called_once_with(
@@ -220,8 +220,9 @@ async def test_callback_query_fallback_answers_with_sorry_message(
         "Sorry, I don't understand that yet.\nThis feature will be available soon! Stay tuned! 😄🚀",
         show_alert=True,
     )
-    await context.flush_metrics()
-    metrics.assert_emitted(name=MetricKey.UNHANDLED_CALLBACK, value=1)
+    unhandled = next(entry for entry in logs if entry["event"] == "Callback query unhandled")
+    assert unhandled["log_level"] == "warning"
+    assert unhandled["reason"] == "no_handler_matched"
 
 
 def test_bind_registers_fallback_through_metrics_wrapper():

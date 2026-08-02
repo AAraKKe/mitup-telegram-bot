@@ -594,9 +594,6 @@ async def test_callback_funnel_counts_started_only_until_telegram_confirms(
 
     assert response.status_code == 200
     metrics.assert_emitted(name=MetricKey.FLOW_STARTED, value=1, dimensions={"Feature": str(Feature.PATREON_LINK)})
-    metrics.assert_emitted(
-        name=MetricKey.PATREON_LINK_STAGED, value=1, dimensions={"Feature": str(Feature.PATREON_LINK)}
-    )
     metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
 
 
@@ -656,5 +653,5 @@ async def test_an_endpoints_patreon_round_trips_land_on_the_requests_metrics_cli
 
     assert response.status_code == 200
     # The code exchange and the identity read are two round-trips, each with its own sample.
-    metrics.assert_emitted(name="PatreonApiTime", times=2)
+    metrics.assert_emitted(name="PatreonApiFault", times=2)
     metrics.assert_emitted(name="PatreonApiFault", value=0, times=2)

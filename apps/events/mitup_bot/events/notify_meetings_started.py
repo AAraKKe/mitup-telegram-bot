@@ -10,7 +10,7 @@ from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import JoinedUsers, Meetup
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.monitoring import MetricsClient
 from mitup_bot.utils.messages import NotificationMessages
 from mitup_bot.views import MitupView
 from mitup_bot.views.meeting_text import rich_title
@@ -176,7 +176,6 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     on the next run.
     """
     meeting_ids = await due_meeting_ids()
-    metrics.emit(MetricKey.MEETINGS_STARTED_PROCESSED, len(meeting_ids), MetricUnit.COUNT)
 
     sent = 0
     notified_meetings = 0
@@ -202,8 +201,6 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         sent += participants
         notified_meetings += 1
 
-    metrics.emit(MetricKey.STARTED_NOTIFICATIONS_SENT, sent, MetricUnit.COUNT)
-    metrics.emit(MetricKey.STARTED_NOTIFICATIONS_FAILED, failed, MetricUnit.COUNT)
     log.info(
         "Started notification sweep complete",
         nominated=len(meeting_ids),

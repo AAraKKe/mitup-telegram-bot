@@ -64,18 +64,15 @@ def claim_update[**P](
     return wrapper
 
 
-def refuse(context: TMitupContext, refusal: RedemptionRefusal, detail: str | None = None, **fields: object) -> None:
-    """Meter and log a link attempt that ended without linking, so the funnel shows where people
-    fall out and every branch says which one it was.
+def refuse(refusal: RedemptionRefusal, detail: str | None = None, **fields: object) -> None:
+    """Log a link attempt that ended without linking, so the funnel shows where people fall out and
+    every branch says which one it was.
 
-    ``detail`` narrows a refusal whose user-facing message is deliberately vague. Which branch fired
-    varies per refusal, so it rides the log line rather than the record: EMF properties are
-    last-writer-wins across a flush window, and the counter itself is what alarms read. It is left
-    off the line entirely when the outcome already is the whole answer, so ``reason`` never carries a
-    null a query has to filter around. ``fields`` carries whatever else the caller can correlate the
+    ``detail`` narrows a refusal whose user-facing message is deliberately vague. It is left off the
+    line entirely when the outcome already is the whole answer, so ``reason`` never carries a null a
+    query has to filter around. ``fields`` carries whatever else the caller can correlate the
     refusal with.
     """
-    context.put_feature_metric(Feature.PATREON_LINK, name=MetricKey.PATREON_LINK_REFUSED)
     narrowing = {"reason": detail} if detail is not None else {}
     log.info(
         "Patreon link attempt refused",
@@ -86,10 +83,8 @@ def refuse(context: TMitupContext, refusal: RedemptionRefusal, detail: str | Non
     )
 
 
-async def refuse_unusable_code(
-    session: AsyncSession, context: TMitupContext, code: str | None, tg_user_id: int, stage: str
-) -> None:
-    """Meter and log a code that could not be used, having already decided not to use it.
+async def refuse_unusable_code(session: AsyncSession, code: str | None, tg_user_id: int, stage: str) -> None:
+    """Log a code that could not be used, having already decided not to use it.
 
     The classification here NEVER reaches the user. Unknown, expired, spent and claimed-by-someone-
     else are one message on purpose: telling them apart would confirm to somebody guessing codes
@@ -97,9 +92,9 @@ async def refuse_unusable_code(
     and not say it — that is the point, and the vagueness is the thing being protected.
 
     It runs strictly after the transition has already failed, so it cannot influence the write, and
-    its result is only ever attached to a metric and a log line. Without it every bug on this path
-    would degrade into the same friendly message with nothing to alert on, because a conditional
-    UPDATE that matches zero rows looks exactly like an expired code.
+    its result is only ever attached to a log line. Without it every bug on this path would degrade
+    into the same friendly message with nothing to distinguish it, because a conditional UPDATE that
+    matches zero rows looks exactly like an expired code.
     """
     failure = await pending_links.classify_claim_failure(session, code, tg_user_id) if code else None
     # The stage rides along with the cause, because the same cause means different things on either
@@ -108,7 +103,6 @@ async def refuse_unusable_code(
     # expired code, which has an honest rate.
     detail = f"{stage}:{failure.name.lower() if failure is not None else 'no_code'}"
     refuse(
-        context,
         RedemptionRefusal.CODE_NOT_USABLE,
         detail,
         stage=stage,
@@ -156,19 +150,19 @@ async def command_start_patreon_link(session: AsyncSession, update: Update, cont
     if user is not None and user.status is UserStatus.DELETION_REQUESTED:
         # The account is mid-deletion, so there is nothing to link to and nothing to set up.
         await context.api.send_message(update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.get(lang=lang))
-        refuse(context, RedemptionRefusal.PENDING_DELETION)
+        refuse(RedemptionRefusal.PENDING_DELETION)
         return
 
     if user is None or user.status is not UserStatus.MEMBER:
         await context.api.send_message(update=update, view=patreon_link_needs_setup_view(lang))
-        refuse(context, RedemptionRefusal.NOT_A_MEMBER)
+        refuse(RedemptionRefusal.NOT_A_MEMBER)
         log.info("Patreon pairing code presented before setup", flow=patreon_link.LINK_FLOW, stage="claim")
         return
 
     claimed = await pending_links.claim_pending_link(session, code, tg_user_id) if code else None
     if claimed is None:
         await context.api.send_message(update=update, view=patreon_link_code_not_valid_view(lang))
-        await refuse_unusable_code(session, context, code, tg_user_id, stage="claim")
+        await refuse_unusable_code(session, code, tg_user_id, stage="claim")
         return
 
     assert code is not None, "a claimed link means the code was present"
@@ -183,7 +177,6 @@ async def command_start_patreon_link(session: AsyncSession, update: Update, cont
             current_level=user.supporter_level,
         ),
     )
-    context.put_feature_metric(Feature.PATREON_LINK, name=MetricKey.PATREON_LINK_PROMPTED)
     log.info(
         "Patreon link confirmation prompted",
         flow=patreon_link.LINK_FLOW,
@@ -267,7 +260,7 @@ async def answer_failed_consume(
         )
         return
     await context.api.edit_message(update=update, view=patreon_link_code_not_valid_view(user.lang))
-    await refuse_unusable_code(session, context, code, user.tg_user_id, stage="consume")
+    await refuse_unusable_code(session, code, user.tg_user_id, stage="consume")
 
 
 async def answer_link_outcome(
@@ -278,7 +271,7 @@ async def answer_link_outcome(
     match outcome:
         case LinkOutcome.ALREADY_LINKED_ELSEWHERE:
             await context.api.edit_message(update=update, view=patreon_already_linked_elsewhere_view(user.lang))
-            refuse(context, RedemptionRefusal.ALREADY_LINKED_ELSEWHERE)
+            refuse(RedemptionRefusal.ALREADY_LINKED_ELSEWHERE)
         case LinkOutcome.PENDING_DELETION:
             # Backstop: guards.current_user rejects a deletion-requested account before the consume
             # runs, so an honest tap never reaches this arm. If it ever runs, the code is spent and
@@ -287,7 +280,7 @@ async def answer_link_outcome(
             await context.api.edit_message(
                 update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.get(lang=user.lang)
             )
-            refuse(context, RedemptionRefusal.PENDING_DELETION)
+            refuse(RedemptionRefusal.PENDING_DELETION)
         case LinkOutcome.LINKED_SUPPORTER | LinkOutcome.LINKED_NO_PATRON:
             # The subscription row is still pending in the session; the view's own query autoflushes
             # it, so the screen renders the linked state rather than the not-linked one.

@@ -14,7 +14,7 @@ from mitup_bot.events.user_cleanup import (
 )
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
+from mitup_bot.monitoring import MetricsClient
 from mitup_bot.utils.messages import PrivacyMessages
 from mitup_bot.views import MitupView
 from tests.helpers import MockApi, MockDbSession, create_joined_link, create_meetup, create_member, create_user
@@ -52,7 +52,6 @@ def demoted_count(caplog: pytest.LogCaptureFixture) -> int:
 async def test_no_users_to_purge(
     mock_session: MockDbSession,
     metrics_client: MetricsClient,
-    metrics: MetricAssertions,
     api: MockApi,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -70,14 +69,12 @@ async def test_no_users_to_purge(
     assert "DELETE FROM users WHERE users.id IN (NULL) AND (1 != 1)" in mock_session.queries_executed
 
     api.assert_method_just_called("send_message_to_user", times=0)
-    metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=0, unit=MetricUnit.COUNT)
     assert purged_count(caplog) == 0
 
 
 async def test_inactive_users_deleted_silently(
     mock_session: MockDbSession,
     metrics_client: MetricsClient,
-    metrics: MetricAssertions,
     api: MockApi,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -99,14 +96,12 @@ async def test_inactive_users_deleted_silently(
 
     # LEFT users blocked the bot — no farewell is attempted for them
     api.assert_method_just_called("send_message_to_user", times=0)
-    metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=2, unit=MetricUnit.COUNT)
     assert purged_count(caplog) == 0
 
 
 async def test_deletion_requested_users_purged_with_farewell(
     mock_session: MockDbSession,
     metrics_client: MetricsClient,
-    metrics: MetricAssertions,
     api: MockApi,
     lang: str,
     caplog: pytest.LogCaptureFixture,
@@ -124,14 +119,12 @@ async def test_deletion_requested_users_purged_with_farewell(
     farewell = MitupView(description=PrivacyMessages.DELETION_COMPLETE.get(lang=lang), keyboard=[])
     api.assert_send_message_to_user_called(user=marked, view=farewell)
 
-    metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=0, unit=MetricUnit.COUNT)
     assert purged_count(caplog) == 1
 
 
 async def test_left_and_marked_users_purged_together(
     mock_session: MockDbSession,
     metrics_client: MetricsClient,
-    metrics: MetricAssertions,
     api: MockApi,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -152,7 +145,6 @@ async def test_left_and_marked_users_purged_together(
     farewell = MitupView(description=PrivacyMessages.DELETION_COMPLETE.get(lang=marked.lang), keyboard=[])
     api.assert_send_message_to_user_called(user=marked, view=farewell)
 
-    metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=1, unit=MetricUnit.COUNT)
     assert purged_count(caplog) == 1
 
 
@@ -222,9 +214,7 @@ async def test_deletion_requested_query_filters_correctly(mock_session: MockDbSe
     assert "= 'member'" not in expected_query
 
 
-async def test_joined_only_users_not_targeted(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
-):
+async def test_joined_only_users_not_targeted(mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi):
     """A JOINED_ONLY user registered in the session must not be picked up by user_cleanup."""
     joined_only_user = create_user(id=20, tg_user_id=20, status=UserStatus.JOINED_ONLY)
     # The selects return only LEFT / DELETION_REQUESTED users — JOINED_ONLY rows never appear.
@@ -237,7 +227,6 @@ async def test_joined_only_users_not_targeted(
 
     # Empty IDs → empty IN clause; the JOINED_ONLY user is never targeted.
     assert "DELETE FROM users WHERE users.id IN (NULL) AND (1 != 1)" in mock_session.queries_executed
-    metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=0, unit=MetricUnit.COUNT)
     # User stays JOINED_ONLY — no side effects.
     assert joined_only_user.status is UserStatus.JOINED_ONLY
 
@@ -245,7 +234,6 @@ async def test_joined_only_users_not_targeted(
 async def test_stale_left_user_is_demoted_to_joined_only(
     mock_session: MockDbSession,
     metrics_client: MetricsClient,
-    metrics: MetricAssertions,
     api: MockApi,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -263,7 +251,6 @@ async def test_stale_left_user_is_demoted_to_joined_only(
     assert demotable.status is UserStatus.JOINED_ONLY
     assert demotable.left_time is None
     api.assert_method_just_called("send_message_to_user", times=0)
-    metrics.assert_emitted(name=MetricKey.LEFT_USERS_DEMOTED, value=1, unit=MetricUnit.COUNT)
     assert demoted_count(caplog) == 1
 
 
@@ -291,9 +278,7 @@ async def test_demotion_deletes_owned_inactive_meetings_and_keeps_join_links(
     assert not any("DELETE FROM joined_users" in query for query in mock_session.queries_executed)
 
 
-async def test_demoted_user_is_not_purged(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
-):
+async def test_demoted_user_is_not_purged(mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi):
     """Demotion and purge are exclusive: a demoted user holds a link to an active meeting, which is
     exactly what keeps them out of the purge select."""
     demotable = create_user(
@@ -305,18 +290,18 @@ async def test_demoted_user_is_not_purged(
     await metrics_client.flush()
 
     assert "DELETE FROM users WHERE users.id IN (NULL) AND (1 != 1)" in mock_session.queries_executed
-    metrics.assert_emitted(name=MetricKey.INACTIVE_USERS_DELETED, value=0, unit=MetricUnit.COUNT)
 
 
 async def test_no_demotion_candidates_touches_no_meetings(
-    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
 ):
-    """The zero count is emitted every run, but an empty pass issues no meeting delete."""
-    await user_cleanup.run(api, metrics_client)
-    await metrics_client.flush()
+    """The zero count is reported every run, but an empty pass issues no meeting delete."""
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await user_cleanup.run(api, metrics_client)
 
     assert not any("DELETE FROM meetups" in query for query in mock_session.queries_executed)
-    metrics.assert_emitted(name=MetricKey.LEFT_USERS_DEMOTED, value=0, unit=MetricUnit.COUNT)
+    summary = next(entry for entry in logs if entry["event"] == "User cleanup complete")
+    assert summary["demoted"] == 0
 
 
 async def test_demotion_select_filters_correctly(mock_session: MockDbSession, api: MockApi):
@@ -348,19 +333,19 @@ async def test_demotion_select_filters_correctly(mock_session: MockDbSession, ap
 async def test_finished_pending_links_are_swept_every_run(
     mock_session: MockDbSession,
     metrics_client: MetricsClient,
-    metrics: MetricAssertions,
     api: MockApi,
 ):
     # patreon_pending_links has no foreign key to users, so nothing cascades into it. An unclaimed
     # row belongs to nobody the database can name, which makes this sweep the only thing that ever
     # erases it -- retention, not housekeeping.
-    await user_cleanup.run(api, metrics_client)
-    await metrics_client.flush()
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await user_cleanup.run(api, metrics_client)
 
     swept = next(query for query in mock_session.queries_executed if "DELETE FROM patreon_pending_links" in query)
     assert "consumed_time IS NOT NULL" in swept
     assert "expiration <= now()" in swept
-    metrics.assert_emitted(name=MetricKey.PATREON_PENDING_LINKS_DELETED, value=0, unit=MetricUnit.COUNT)
+    summary = next(entry for entry in logs if entry["event"] == "User cleanup complete")
+    assert summary["pending_links_purged"] == 0
 
 
 async def test_deletion_request_also_erases_that_users_pending_links(

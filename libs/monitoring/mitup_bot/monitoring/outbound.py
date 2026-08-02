@@ -42,26 +42,28 @@ class OutboundEdge:
 
     Instances are module constants so both metric names are literals fixed at author time: a name
     built from runtime data opens a separately billed CloudWatch series per distinct value.
+
+    `time_metric` is optional. An edge sets it only where a widget or an alarm charts the latency
+    series; everywhere else the round-trip's `duration_ms` on the line is the whole answer, and
+    `stats avg(duration_ms), pct(duration_ms, 99) by api_method, outcome` reads it without a series.
     """
 
     event: str
-    time_metric: str
     fault_metric: str
+    time_metric: str | None = None
 
 
 TELEGRAM_EDGE = OutboundEdge(
     event="Telegram API call",
-    time_metric=MetricKey.TIME.with_prefix("TelegramApi", separator=""),
     fault_metric=MetricKey.FAULT.with_prefix("TelegramApi", separator=""),
+    time_metric=MetricKey.TIME.with_prefix("TelegramApi", separator=""),
 )
 PATREON_EDGE = OutboundEdge(
     event="Patreon API call",
-    time_metric=MetricKey.TIME.with_prefix("PatreonApi", separator=""),
     fault_metric=MetricKey.FAULT.with_prefix("PatreonApi", separator=""),
 )
 GOOGLE_EDGE = OutboundEdge(
     event="Google API call",
-    time_metric=MetricKey.TIME.with_prefix("GoogleApi", separator=""),
     fault_metric=MetricKey.FAULT.with_prefix("GoogleApi", separator=""),
 )
 
@@ -112,11 +114,18 @@ def record_call(
     bot, `run_id` in the events runner) instead of carrying properties of their own. Outside any
     invocation there is no client and only the line is written. `log_call` never gates the metrics:
     a series with holes in it cannot be alarmed on.
+
+    An edge is one integration, not one caller, so its samples go through `emit_aggregate`: the
+    series must stay the same wherever the call is made from. Riding `emit` would re-dimension it by
+    whatever the host client dimensions itself by — `EventType` in the events runner — minting a
+    series per value and emptying the dimensionless one the alarm watches. The host's dimensions
+    survive as EMF properties, so Logs Insights still breaks the aggregate down by them.
     """
     resolved = client or current_metrics_client()
     if resolved is not None:
-        resolved.emit(edge.time_metric, duration_ms, MetricUnit.MILLISECONDS)
-        resolved.emit(edge.fault_metric, 1 if is_fault(outcome, status_code) else 0)
+        if edge.time_metric is not None:
+            resolved.emit_aggregate(edge.time_metric, duration_ms, MetricUnit.MILLISECONDS)
+        resolved.emit_aggregate(edge.fault_metric, 1 if is_fault(outcome, status_code) else 0)
 
     if not log_call:
         return
