@@ -98,6 +98,34 @@ Never add try/except blocks in handlers for either case.
 
 The `private` flag distinguishes private chat errors (where we should mark inactive) from group chat errors (where we should not). The `TelegramApi` methods in `api_wrapper.py` raise `InactiveUserInteraction` with the appropriate `private` value.
 
+### Missing account handling
+
+`UserNotFound` splits on **where the caller is standing**, because the friendly answer only works on one surface. `in_bot_chat()` is the private-chat predicate that split reads, shared with `shared_banner_keyboard()`; an update carrying no chat at all (an inline query, or a callback on an inline message, which sends only its `inline_message_id`) counts as "not the bot's chat", and so does an invocation with no update.
+
+The class is matched exactly on both paths: every other `GuardError` subclass outside the `MeetingAccessError` tree is a genuine fault wherever it came from.
+
+#### In the caller's own chat with the bot — an expected business state
+
+A row that no longer resolves is the normal end of the data-deletion and user-cleanup runs, not a code fault, and every button its owner is still holding goes through it. `handle_user_not_found()` answers it, the branch classifies the invocation as `FAULT=0`, and it mints no counter of its own — the occurrence is recorded on the log plane, under the constant event name `Rejected interaction from unregistered user` with `reason="user_row_not_found"`.
+
+A callback query has its screen replaced by `CommonMessages.ACCOUNT_NOT_FOUND` with **no keyboard** — every button on the replaced screen resolves through the missing row and would be answered with this same notice, so the only way forward is the `/start` the text names. Any other update in that chat gets the notice as a fresh reply.
+
+#### Anywhere else — a genuine fault
+
+Every other surface answers an unregistered caller through its own `guards.user_registered`, with the per-surface alert its call site chose, **before** any code that can raise `UserNotFound` runs. One reaching the error handler from a card tapped in a group, a card shared through inline mode, an inline query or a group message therefore means that path shipped unguarded. It falls through to the fault classification: `FAULT=1` carrying `error_type`, written to the single `log.error` site every fault shares. The `/start` notice would be wrong there regardless — the caller is not in the bot's chat, so the command they were told to send would land in the group.
+
+The generic `notify_guard_error` redirect does **not** run for these: there is no account to build a main menu for and no chat of ours to post one into. `answer_unregistered_caller()` answers in the shape the surface can carry instead:
+
+| Update | Answer |
+|---|---|
+| callback query | `answer_callback_query` alert with `CommonMessages.UNEXPECTED_ERROR_ALERT`; the card itself is left alone |
+| inline query | `answer_inline_query` with no results |
+| any other update | nothing at all — every delivery would post into somebody else's chat |
+
+The stored language went with the row on both paths, so `unregistered_caller_lang()` renders whichever message is used in the locale `locale_for_language_code()` maps the client's `language_code` onto — the same normalization registration uses.
+
+Delivery is best-effort on both paths, as everywhere else in this module.
+
 ### Meeting guard rejections
 
 Every `MeetingAccessError` subclass (see the table above) is answered by `handle_meeting_access_error()` and never reaches the fault metrics. Each one stands for a screen, and the exception carries everything the screen needs — `meeting_id`, `action`, `lang`, the back-navigation `keyboard`, and the optional `flow_context` — so no DB round-trip happens here. The guards render nothing themselves.

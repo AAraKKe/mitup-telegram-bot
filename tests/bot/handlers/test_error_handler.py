@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 import pytest
 from structlog.testing import capture_logs
 from telegram import Chat, Update
@@ -34,9 +36,10 @@ from mitup_bot.handlers.registry import callback_with_metrics
 from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import (
     CommonMessages,
     MeetingDisplayMessages,
@@ -58,6 +61,7 @@ from tests.helpers import (
 )
 from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_USER_ID
 from tests.helpers.fixtures import create_update
+from tests.helpers.logs import ACCOUNT_NOT_FOUND_LOG_EVENT, ACCOUNT_NOT_FOUND_LOG_REASON
 from tests.helpers.monitoring import MetricAssertions
 
 
@@ -225,6 +229,253 @@ async def test_pending_deletion_returns_early_when_no_update(app: StubMitupApp, 
 
     context.api.assert_method_just_called("send_message", times=0)
     context.api.assert_method_just_called("answer_callback_query", times=0)
+
+
+# --- Missing account handling in the bot's own chat ---
+
+
+def build_localized_callback_context(app: StubMitupApp, language_code: str) -> StubMitupContext:
+    """A bot-chat button press from a client asking for `language_code`."""
+    update = create_update(UpdateRequest(callback_query=True, language_code=language_code))
+    return build_context(update, app)
+
+
+async def test_user_not_found_replaces_the_bot_chat_screen_without_a_keyboard(
+    app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    """The tapped screen becomes the notice alone: with no account row, every button on it would
+    raise `UserNotFound` again, so the only way forward is the /start the text names."""
+    context = build_callback_context(app, metrics_client)
+
+    outcome = await error_handler.handler(context, UserNotFound(DEFAULT_USER_ID), Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_edit_message_called(
+        context.telegram_update, CommonMessages.ACCOUNT_NOT_FOUND.get(lang=TranslationEngine.FALLBACK_LANG)
+    )
+    delivered = context.api.call_args("edit_message").kwargs["view"]
+    assert isinstance(delivered, FormattedText), "a bare FormattedText is what leaves the replacement keyboard-free"
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    assert outcome == FaultOutcome(0)
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+
+
+async def test_user_not_found_replies_to_bot_chat_message_updates(
+    app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    """A message update has no screen of ours to replace, so the notice arrives as a fresh reply."""
+    context = build_message_context(app, metrics_client)
+
+    outcome = await error_handler.handler(context, UserNotFound(DEFAULT_USER_ID), Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_send_message_called(
+        context.telegram_update, CommonMessages.ACCOUNT_NOT_FOUND.get(lang=TranslationEngine.FALLBACK_LANG)
+    )
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    assert outcome == FaultOutcome(0)
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+
+
+async def test_user_not_found_renders_in_the_client_language(app: StubMitupApp, mock_session: MockDbSession):
+    """The row that would carry a stored language is gone, so the notice follows the client's
+    `language_code`, normalized to a supported locale exactly as it is at registration."""
+    context = build_localized_callback_context(app, "es-MX")
+
+    await error_handler.handler(context, UserNotFound(DEFAULT_USER_ID), Env.PROD)
+
+    context.api.assert_edit_message_called(context.telegram_update, CommonMessages.ACCOUNT_NOT_FOUND.get(lang="es_ES"))
+
+
+async def test_user_not_found_is_recorded_as_a_handled_rejection(app: StubMitupApp, mock_session: MockDbSession):
+    """One warning names the decision; the ambient contextvars already carry who and where.
+
+    It is the only record the bot-chat rejection produces, which is what separates a normal deletion
+    from the fault an unguarded surface raises through the same exception class.
+    """
+    context = build_callback_context(app)
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, UserNotFound(DEFAULT_USER_ID), Env.PROD)
+
+    rejections = [entry for entry in logs if entry["event"] == ACCOUNT_NOT_FOUND_LOG_EVENT]
+    assert len(rejections) == 1, f"captured {[entry['event'] for entry in logs]}"
+    assert rejections[0]["log_level"] == "warning"
+    assert rejections[0]["reason"] == ACCOUNT_NOT_FOUND_LOG_REASON
+    assert not [entry for entry in logs if entry["log_level"] in {"error", "critical"}]
+
+
+async def test_user_not_found_suppresses_delivery_failures(
+    app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    """Delivery is best-effort: a failing edit must not escape as a second fault."""
+    context = build_callback_context(app, metrics_client)
+    context.api.mock_method("edit_message").side_effect = TelegramError("edit failed")
+
+    with capture_logs() as logs:
+        # Must not raise a second exception.
+        outcome = await error_handler.handler(context, UserNotFound(DEFAULT_USER_ID), Env.PROD)
+    await context.metrics.flush()
+
+    swallowed = next(
+        entry for entry in logs if entry["event"] == "Failed to deliver the missing-account notice to the user"
+    )
+    assert swallowed["log_level"] == "warning"
+    assert swallowed["reason"] == "account_notice_undeliverable"
+    assert outcome == FaultOutcome(0)
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+
+
+# --- Missing account handling on an unguarded surface ---
+
+# The classification an unguarded surface produces. Every surface outside the bot's own chat answers
+# an unregistered caller through `guards.user_registered` before any code that can raise, so one
+# reaching the error handler from there is a path that shipped without its guard. The error type is
+# spelled out rather than derived from the class so a move between modules fails this assertion.
+UNGUARDED_SURFACE_OUTCOME = FaultOutcome(1, {"error_type": "mitup_bot.exceptions.UserNotFound"})
+
+# The two ways a tapped card can fail to be in the bot's own chat: it sits in a group, or it is an
+# inline message that carries no chat at all and so could be sitting anywhere. The builders are
+# wrapped in lambdas because they are defined further down the module, alongside the other ones.
+CARDS_OUTSIDE_THE_BOT_CHAT = [
+    pytest.param(lambda app, metrics: build_card_context(app, Chat.GROUP, metrics), id="group_card"),
+    pytest.param(lambda app, metrics: build_inline_card_context(app, metrics), id="inline_card"),
+]
+
+
+def build_group_message_context(app: StubMitupApp, metrics: MetricsClient | None = None) -> StubMitupContext:
+    """A plain message sent in a group the bot sits in, rather than in its own chat."""
+    update = create_update(UpdateRequest(message=True), tg_chat=Chat(id=DEFAULT_CHAT_ID, type=Chat.GROUP))
+    return build_context(update, app, metrics=metrics)
+
+
+@pytest.mark.parametrize("build_card", CARDS_OUTSIDE_THE_BOT_CHAT)
+async def test_user_not_found_on_a_card_outside_the_bot_chat_alerts_and_faults(
+    build_card: Callable[[StubMitupApp, MetricsClient], StubMitupContext],
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+):
+    """The caller gets the terse alert, the card is left alone, and the invocation closes as a fault.
+
+    The /start notice would be wrong here twice over: the card sits in a conversation between people,
+    and the command it names would go to that chat rather than to the bot. Nothing is sent either,
+    since a main-menu redirect would post into somebody else's chat.
+    """
+    context = build_card(app, metrics_client)
+
+    outcome = await error_handler.handler(context, UserNotFound(DEFAULT_USER_ID), Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_answer_callback_query_called(
+        context.telegram_update,
+        text=CommonMessages.UNEXPECTED_ERROR_ALERT.get_text(lang=TranslationEngine.FALLBACK_LANG),
+        show_alert=True,
+    )
+    context.api.assert_edit_message_not_called()
+    context.api.assert_send_message_not_called()
+    assert outcome == UNGUARDED_SURFACE_OUTCOME
+    # The classification travels back to `callback_with_metrics`, which owns the one emission.
+    metrics.assert_not_emitted(name=MetricKey.FAULT)
+
+
+async def test_user_not_found_faults_an_inline_query_and_clears_the_spinner(
+    app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    """An inline query can only be answered with results, so it gets none and the invocation faults."""
+    context = build_inline_context(app, metrics_client)
+
+    outcome = await error_handler.handler(context, UserNotFound(DEFAULT_USER_ID), Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_answer_inline_query_called(context.telegram_update, results=[], cache_time=0)
+    context.api.assert_send_message_not_called()
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    assert outcome == UNGUARDED_SURFACE_OUTCOME
+    metrics.assert_not_emitted(name=MetricKey.FAULT)
+
+
+async def test_user_not_found_in_a_group_message_is_answered_with_nothing(
+    app: StubMitupApp, mock_session: MockDbSession
+):
+    """A group message carries no answer that would not post into somebody else's chat.
+
+    So the fault is recorded and the chat is left untouched: there is no callback query to alert and
+    no inline query to empty.
+    """
+    context = build_group_message_context(app)
+
+    outcome = await error_handler.handler(context, UserNotFound(DEFAULT_USER_ID), Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_send_message_not_called()
+    context.api.assert_edit_message_not_called()
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    context.api.assert_method_just_called("answer_inline_query", times=0)
+    assert outcome == UNGUARDED_SURFACE_OUTCOME
+
+
+async def test_user_not_found_faults_when_there_is_no_update(app: StubMitupApp, mock_session: MockDbSession):
+    """An invocation with no update cannot be placed in the bot's chat, so it is not answered as one.
+
+    There is nothing to deliver to either, so the fault classification is the whole outcome.
+    """
+    context = build_message_context(app)
+    # telegram_update is typed Update, but production reads it as Update | None and short-circuits on
+    # None. Forcing None here is the only way to exercise that branch; it is an intentional test-only
+    # violation, not a ty false positive, so it is exempted from requiring a tracking issue.
+    context.telegram_update = None  # ty: ignore[invalid-assignment]  # nolink: intentional — exercising the None short-circuit branch
+
+    with capture_logs() as logs:
+        outcome = await error_handler.handler(context, UserNotFound(DEFAULT_USER_ID), Env.PROD)
+
+    assert outcome == UNGUARDED_SURFACE_OUTCOME
+    assert not [entry for entry in logs if entry["event"] == ACCOUNT_NOT_FOUND_LOG_EVENT]
+    context.api.assert_method_just_called("send_message", times=0)
+    context.api.assert_method_just_called("edit_message", times=0)
+
+
+async def test_user_not_found_on_an_unguarded_surface_uses_the_shared_fault_line(
+    app: StubMitupApp, mock_session: MockDbSession
+):
+    """The unguarded path is recorded on the one `log.error` every fault shares, not a second site.
+
+    The handled bot-chat rejection writes its own warning and no error at all, so the line a
+    `UserNotFound` lands on is what tells a normal deletion apart from a missing guard.
+    """
+    context = build_card_context(app, Chat.GROUP)
+    error = UserNotFound(DEFAULT_USER_ID)
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, error, Env.PROD)
+
+    faults = [entry for entry in logs if entry["event"] == "An error occurred while handling the update"]
+    assert len(faults) == 1, f"captured {[entry['event'] for entry in logs]}"
+    assert faults[0]["log_level"] == "error"
+    assert faults[0]["exc_info"] is error
+    assert faults[0]["error_type"] == "mitup_bot.exceptions.UserNotFound"
+    assert not [entry for entry in logs if entry["event"] == ACCOUNT_NOT_FOUND_LOG_EVENT]
+
+
+async def test_user_not_found_on_an_unguarded_surface_emits_one_fault_sample(
+    app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    """The classification reaches the registry, which writes the invocation's single `Fault` sample.
+
+    `MitupCriticalFaultRate` reads that sample's SampleCount as its denominator, so the unguarded
+    path has to close on exactly one record, at 1, naming the class that produced it.
+    """
+    context = build_card_context(app, Chat.GROUP, metrics_client)
+
+    async def unguarded_callback(update: Update, ctx: StubMitupContext):
+        raise UserNotFound(DEFAULT_USER_ID)
+
+    wrapped = callback_with_metrics(MainMenuHandlerId.MAIN_MENU_CALLBACK, "Callback", unguarded_callback, Env.PROD)
+    await wrapped(context.telegram_update, context)
+
+    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, exception=UserNotFound)
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=0)
 
 
 # --- Meeting guard rejections ---
@@ -762,31 +1013,36 @@ def test_guard_errors_subclass_guard_error_and_runtime_error(guard_error: type[E
     assert issubclass(guard_error, RuntimeError)
 
 
-def build_callback_context(app: StubMitupApp) -> StubMitupContext:
+# Each builder takes the suite's `metrics_client` so a test asserting on the metric plane reads the
+# same records the context writes to. Left unset, `build_context` mints a throwaway client and any
+# assertion against the `metrics` fixture would pass vacuously.
+
+
+def build_callback_context(app: StubMitupApp, metrics: MetricsClient | None = None) -> StubMitupContext:
     update = create_update(UpdateRequest(callback_query=True))
-    return build_context(update, app)
+    return build_context(update, app, metrics=metrics)
 
 
-def build_card_context(app: StubMitupApp, chat_type: str) -> StubMitupContext:
+def build_card_context(app: StubMitupApp, chat_type: str, metrics: MetricsClient | None = None) -> StubMitupContext:
     """A tap on a meeting card sitting in a chat of `chat_type`."""
     update = create_update(UpdateRequest(callback_query=True), tg_chat=Chat(id=DEFAULT_CHAT_ID, type=chat_type))
-    return build_context(update, app)
+    return build_context(update, app, metrics=metrics)
 
 
-def build_inline_card_context(app: StubMitupApp) -> StubMitupContext:
+def build_inline_card_context(app: StubMitupApp, metrics: MetricsClient | None = None) -> StubMitupContext:
     """A tap on a card shared through inline mode: Telegram sends its id, never the chat it sits in."""
     update = create_update(UpdateRequest(callback_query=cb.JOIN.with_id(7), from_bot_chat=False))
-    return build_context(update, app)
+    return build_context(update, app, metrics=metrics)
 
 
-def build_message_context(app: StubMitupApp) -> StubMitupContext:
+def build_message_context(app: StubMitupApp, metrics: MetricsClient | None = None) -> StubMitupContext:
     update = create_update(UpdateRequest(message=True))
-    return build_context(update, app)
+    return build_context(update, app, metrics=metrics)
 
 
-def build_inline_context(app: StubMitupApp) -> StubMitupContext:
+def build_inline_context(app: StubMitupApp, metrics: MetricsClient | None = None) -> StubMitupContext:
     update = create_update(UpdateRequest(message=False, inline_query="123"))
-    return build_context(update, app)
+    return build_context(update, app, metrics=metrics)
 
 
 async def test_guard_error_emits_fault_metrics_and_notifies_user(

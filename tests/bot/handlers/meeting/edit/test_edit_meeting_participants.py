@@ -47,20 +47,26 @@ def failure_cases(callback_data: CallbackData):
             UpdateRequest(callback_query=callback_data),
             "user_with_settings",
             MalformedCallbackData,
-            1,
         ),
         (
             UpdateRequest(callback_query=callback_data.with_id(1)),
             "none",
             UserNotFound,
-            1,
         ),
     ]
 
 
-def assert_metrics_for_failure(error_count: int, error_type: type[Exception], metrics_client: MetricsClient):
+def assert_metrics_for_failure(error_type: type[Exception], metrics_client: MetricsClient):
+    """Assert the invocation closed with exactly one `Fault` sample, naming its class when it faulted.
+
+    A caller with no account row is an expected business state the error handler answers, so its
+    sample is a 0 carrying no `error_type`; every other failure reaching here is a genuine fault.
+    """
+    handled = issubclass(error_type, UserNotFound)
     metrics = MetricAssertions(metrics_client)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=error_count, times=1, exception=error_type)
+    metrics.assert_emitted(
+        name=MetricKey.FAULT, value=0 if handled else 1, times=1, exception=None if handled else error_type
+    )
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
@@ -112,7 +118,7 @@ async def test_edit_meeting_participants_meeting_not_owned(
 
 
 @pytest.mark.parametrize(
-    "update, user_fixture, error_type, error_count",
+    "update, user_fixture, error_type",
     failure_cases(cb.EDIT_MEETING_PARTICIPANTS),
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
@@ -123,7 +129,6 @@ async def test_edit_meeting_participants_failures(
     update: Update,
     user_fixture: str,
     error_type: type[Exception],
-    error_count: int,
     handler_context: HandlerContext,
     caplog: pytest.LogCaptureFixture,
     lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
@@ -139,7 +144,7 @@ async def test_edit_meeting_participants_failures(
             assert_meeting_rejection_logged(caplog, action="Edit participants", reason="meeting_not_owned")
             context.api.assert_edit_message_called(update, factory.main_menu_view())
 
-    assert_metrics_for_failure(error_count, error_type, metrics_client)
+    assert_metrics_for_failure(error_type, metrics_client)
 
 
 @pytest.mark.parametrize(
@@ -166,7 +171,7 @@ async def test_edit_meeting_max_participants_works(
 
 
 @pytest.mark.parametrize(
-    "update, user_fixture, error_type, error_count",
+    "update, user_fixture, error_type",
     failure_cases(cb.EDIT_MEETING_MAX_PARTICIPANTS),
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
@@ -177,7 +182,6 @@ async def test_edit_meeting_max_participants_failures(
     update: Update,
     user_fixture: str,
     error_type: type[Exception],
-    error_count: int,
     handler_context: HandlerContext,
     caplog: pytest.LogCaptureFixture,
     lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
@@ -192,7 +196,7 @@ async def test_edit_meeting_max_participants_failures(
             EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK, handler_context=handler_context
         )
 
-    assert_metrics_for_failure(error_count, error_type, metrics_client)
+    assert_metrics_for_failure(error_type, metrics_client)
 
 
 @pytest.mark.parametrize(
@@ -385,7 +389,7 @@ async def test_max_participants_message_loads_meeting_with_row_lock(
 
 
 @pytest.mark.parametrize(
-    "update, user_fixture, error_type, error_count",
+    "update, user_fixture, error_type",
     failure_cases(cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS),
     indirect=["update"],
     ids=["no_meeting_id", "user_not_found"],
@@ -396,7 +400,6 @@ async def test_edit_meeting_no_limit_participants_failures(
     update: Update,
     user_fixture: str,
     error_type: type[Exception],
-    error_count: int,
     handler_context: HandlerContext,
     caplog: pytest.LogCaptureFixture,
     lang: str,  # Need to add it just to make sure the value is available when getting the user fixture
@@ -416,7 +419,7 @@ async def test_edit_meeting_no_limit_participants_failures(
             assert_meeting_rejection_logged(caplog, action="Edit no limit participants", reason="meeting_not_owned")
             context.api.assert_edit_message_called(update, factory.main_menu_view())
 
-    assert_metrics_for_failure(error_count, error_type, metrics_client)
+    assert_metrics_for_failure(error_type, metrics_client)
 
 
 @pytest.mark.parametrize(

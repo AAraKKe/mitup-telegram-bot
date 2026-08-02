@@ -632,6 +632,12 @@ msgstr "Ya has respondido esta pregunta"
 msgid "CommonMessages.UNEXPECTED_ERROR"
 msgstr "¡Uy! Algo inesperado sucedió. Te he vuelto a llevar al menú principal. Por favor, inténtalo de nuevo."
 
+msgid "CommonMessages.UNEXPECTED_ERROR_ALERT"
+msgstr "Algo salió mal por nuestra parte. Por favor, inténtalo de nuevo. Si sigue pasando, escribe a support@mitup.social."
+
+msgid "CommonMessages.ACCOUNT_NOT_FOUND"
+msgstr "No tienes una cuenta de Mitup en este momento. Envía /start y te lo preparo."
+
 msgid "InlineQueryMessages.CREATE_MEETING_BUTTON"
 msgstr "➕ Crear una nueva quedada"
 

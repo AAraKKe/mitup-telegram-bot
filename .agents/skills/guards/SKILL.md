@@ -18,7 +18,7 @@ Guards live in `libs/telegram/mitup_bot/guards.py`. They validate handler inputs
 
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
-| `current_user` | `(update, session, *, load_collections=False)` | `User` | `UserNotFound` (caught by global error handler) |
+| `current_user` | `(update, session, *, load_collections=False)` | `User` | `UserNotFound` (in the bot's own chat the global error handler answers it with the missing-account notice and no fault; on any other surface it is a fault — see the `error-handling` skill) |
 | `member_user` | `(update, session)` | `User \| None` (only when status is MEMBER) | — |
 | `user_language` | `(update, session)` | `str` (lang code or fallback) | — |
 | `user_registered` | `(update, session, context, alert_message)` | `User \| None` | — (answers callback query with alert) |

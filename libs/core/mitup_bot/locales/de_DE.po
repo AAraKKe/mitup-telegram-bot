@@ -427,6 +427,12 @@ msgstr "Dieses Treffen wurde gelöscht"
 msgid "CommonMessages.UNEXPECTED_ERROR"
 msgstr "Oops! Da ist etwas Unerwartetes passiert. Ich habe dich zum Hauptmenü zurückgebracht. Bitte versuche es erneut."
 
+msgid "CommonMessages.UNEXPECTED_ERROR_ALERT"
+msgstr "Bei uns ist etwas schiefgelaufen. Versuche es erneut, und schreibe an support@mitup.social, wenn es weiterhin passiert."
+
+msgid "CommonMessages.ACCOUNT_NOT_FOUND"
+msgstr "Du hast momentan kein Mitup-Konto. Sende /start und ich richte dich neu ein."
+
 msgid "MeetingEditDateTimeMessages.DESCRIPTION"
 msgstr "Wähle aus, was du für dein Treffen einstellen möchtest.\n\n<i>Tipp: du kannst auch eine Nachricht mit ${datetime_link} senden, um Datum und Uhrzeit auf einmal einzustellen.</i>"
 

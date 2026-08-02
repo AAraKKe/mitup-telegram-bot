@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-07-26 19:37\n"
+"PO-Revision-Date: 2026-08-03 01:24\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -298,6 +298,12 @@ msgstr "This meeting has been deleted"
 
 msgid "CommonMessages.UNEXPECTED_ERROR"
 msgstr "Oops! Something unexpected happened. I've brought you back to the main menu. Please try again."
+
+msgid "CommonMessages.UNEXPECTED_ERROR_ALERT"
+msgstr "Something went wrong on our side. Please try again, and write to support@mitup.social if it keeps happening."
+
+msgid "CommonMessages.ACCOUNT_NOT_FOUND"
+msgstr "You don't have a Mitup account right now. Send /start and I'll set you up."
 
 msgid "CommonMessages.CONTEXT_LOST"
 msgstr "<b>Sorry, we lost our place!</b>\n\nThe bot had a quick internal update and forgot where you were in the process. Everything you saved is safe. Please start what you were doing again from the menu below."

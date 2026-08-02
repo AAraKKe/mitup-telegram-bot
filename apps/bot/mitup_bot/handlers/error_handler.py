@@ -23,6 +23,7 @@ from mitup_bot.exceptions import (
     SharedMeetingError,
     SharedMeetingFinishedError,
     SharedMeetingGoneError,
+    UserNotFound,
     UserPendingDeletion,
 )
 from mitup_bot.handlers.utils import CONTEXT_LOST_EVENT, RecoveryReason
@@ -32,7 +33,7 @@ from mitup_bot.models import User
 from mitup_bot.models.users import InactiveReason
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.units import MetricUnit
-from mitup_bot.translations import TranslationEngine
+from mitup_bot.translations import TranslationEngine, locale_for_language_code
 from mitup_bot.utils.messages import CommonMessages, MeetingDisplayMessages, PrivacyMessages
 from mitup_bot.views import MitupView, RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
@@ -121,6 +122,17 @@ def fault_error_type(error: Exception) -> str:
     return f"{type(error).__module__}.{type(error).__qualname__}"
 
 
+def in_bot_chat(update: Update) -> bool:
+    """Whether `update` came from the user's own chat with the bot.
+
+    An update acting on an inline message carries no chat at all (Telegram sends only the
+    `inline_message_id`), and an inline message can sit in any chat — so an absent chat counts as
+    "not the bot's chat".
+    """
+    chat = update.effective_chat
+    return chat is not None and chat.type == Chat.PRIVATE
+
+
 @db.with_session
 async def handle_inactive_user(session: AsyncSession, tg_user_id: int):
     """Flip the user who just proved unreachable from MEMBER to LEFT.
@@ -176,6 +188,75 @@ async def handle_pending_deletion_user(context: TMitupContext, error: UserPendin
         )
 
 
+def unregistered_caller_lang(update: Update) -> str:
+    """The language to answer a caller with no account row in.
+
+    The row that would carry a stored language is gone, so the client's `language_code` is the only
+    signal left; it is normalized to a supported locale exactly as it is at registration.
+    """
+    tg_user = update.effective_user
+    return locale_for_language_code(tg_user.language_code if tg_user is not None else None)
+
+
+async def handle_user_not_found(context: TMitupContext, update: Update):
+    """Tell a caller in the bot's own chat how to get their account back, and touch nothing else.
+
+    There is no account to act on, so no state is read or written. A tapped screen is replaced by
+    the notice alone: every button on it resolves through the missing row and would be answered with
+    this same notice, so the only way forward is the /start the text names. A message update has no
+    screen of ours to replace, so the notice arrives as a fresh reply.
+
+    Delivery is best-effort like ``notify_guard_error``: a failure here must not escape as a second
+    fault.
+    """
+    log.warning("Rejected interaction from unregistered user", reason="user_row_not_found")
+
+    try:
+        notice = CommonMessages.ACCOUNT_NOT_FOUND.get(lang=unregistered_caller_lang(update))
+        if update.callback_query is not None:
+            await context.api.edit_message(update=update, view=notice)
+        else:
+            await context.api.send_message(update=update, view=notice)
+    except Exception:
+        log.warning(
+            "Failed to deliver the missing-account notice to the user",
+            exc_info=True,
+            reason="account_notice_undeliverable",
+        )
+
+
+async def answer_unregistered_caller(context: TMitupContext, update: Update | None):
+    """Answer a caller the surface's own guard should have stopped, without writing into their chat.
+
+    There is no account row, so there is no screen to rebuild and no main menu to send anyone back
+    to; the card or query they acted on sits in a conversation that is not the bot's, so it is left
+    untouched. A callback query carries an alert only that caller sees, an inline query can only be
+    answered with results and a caller with no account has none, and any other update has no answer
+    that would not post into somebody else's chat.
+
+    Best-effort like every other render in this module: a failure here has no handler left above it
+    and would reach `process_update` as a second, unhandled fault.
+    """
+    if update is None:
+        return
+
+    try:
+        if update.callback_query is not None:
+            await context.api.answer_callback_query(
+                update=update,
+                text=CommonMessages.UNEXPECTED_ERROR_ALERT.get_text(lang=unregistered_caller_lang(update)),
+                show_alert=True,
+            )
+        elif update.inline_query is not None:
+            await context.api.answer_inline_query(update=update, results=[], cache_time=0)
+    except Exception:
+        log.warning(
+            "Failed to deliver the unexpected-error alert to the user",
+            exc_info=True,
+            reason="unexpected_error_alert_undeliverable",
+        )
+
+
 def meeting_access_view(error: MeetingAccessError, ctx: RenderContext) -> MitupView:
     """Build the screen that answers a meeting rejection, one per rejection reason.
 
@@ -202,13 +283,8 @@ def shared_banner_keyboard(update: Update, lang: str) -> Keyboard:
     In the bot's own chat the banner is the whole screen the user is left looking at, so it offers the
     way back to the main menu. Anywhere else the card sits in a conversation between people: the
     banner replaces it in place, keyboard-free, and the main menu is not a screen that belongs there.
-
-    An update whose card is an inline message carries no chat at all (Telegram sends only the
-    `inline_message_id`), and an inline card can sit in any chat — so an absent chat is treated as
-    "not the bot's chat" and the banner keeps no keyboard.
     """
-    chat = update.effective_chat
-    return factory.main_menu_back_rows(lang) if chat is not None and chat.type == Chat.PRIVATE else []
+    return factory.main_menu_back_rows(lang) if in_bot_chat(update) else []
 
 
 async def deliver_shared_meeting_answer(context: TMitupContext, update: Update, error: SharedMeetingError):
@@ -391,6 +467,18 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
         await handle_pending_deletion_user(context, error)
         return HANDLED_OUTCOME
 
+    # An account row that no longer resolves is what the deletion and cleanup runs leave behind, and
+    # every button its owner is still holding goes through it. In the caller's own chat with the bot
+    # that is an expected business state, answered with the notice naming the /start that puts them
+    # back. Every other surface answers an unregistered caller through its own
+    # `guards.user_registered` before any code that can raise this runs, so one arriving from there
+    # means the path was left unguarded: it falls through to the fault classification below, where
+    # the caller gets an alert instead of a /start that would land in somebody else's chat.
+    update = context.telegram_update
+    if isinstance(error, UserNotFound) and update is not None and in_bot_chat(update):
+        await handle_user_not_found(context, update)
+        return HANDLED_OUTCOME
+
     # The meeting guard's rejections carry their own screen, so they are answered here and stop
     # before the fault classification below.
     if isinstance(error, MeetingAccessError):
@@ -415,7 +503,7 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
     # the handler's bound contextvars, so it carries flow/handler/update_id/tg_user_id — the
     # correlation the EMF Fault record lacks. exc_info is passed explicitly rather than read from
     # the ambient exception state, which the awaits above may have replaced.
-    update_payload = fault_fields_from_update(context.telegram_update) if context.telegram_update else None
+    update_payload = fault_fields_from_update(update) if update else None
     log.error(
         "An error occurred while handling the update",
         exc_info=error,
@@ -424,9 +512,14 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
         **write_phase_fields(db.current_write_state()),
     )
 
-    # Any fault leaves the user stranded mid-action with no feedback, so redirect them to the main
-    # menu with the generic notice. This delivery is best-effort and never raises, so it cannot
-    # become a second fault.
-    await notify_guard_error(context)
+    if isinstance(error, UserNotFound):
+        # The caller has no account to build a main menu for, and they are not in a chat of ours to
+        # post one into, so they get the terse alert their surface can carry and nothing else.
+        await answer_unregistered_caller(context, update)
+    else:
+        # Any other fault leaves the user stranded mid-action with no feedback, so redirect them to
+        # the main menu with the generic notice. This delivery is best-effort and never raises, so it
+        # cannot become a second fault.
+        await notify_guard_error(context)
 
     return FaultOutcome(1, {"error_type": error_type})

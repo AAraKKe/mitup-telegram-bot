@@ -219,6 +219,17 @@ class CommonMessages(MessageBase):
     DELETED_MEETING_ALERT = "This meeting has been deleted"
     # Generic error when an internal guard check fails
     UNEXPECTED_ERROR = "Oops! Something unexpected happened. I've brought you back to the main menu. Please try again."
+    # The same failure answered where no screen can be rebuilt: a card tapped in somebody else's
+    # chat. It ships as a plain callback-query alert (max 200 characters), so it must stay
+    # entity-free, and it promises nothing about where the caller is left. The address is written
+    # bare because Telegram alerts render no links.
+    UNEXPECTED_ERROR_ALERT = (
+        "Something went wrong on our side. Please try again, and write to support@mitup.social if it keeps happening."
+    )
+    # Shown in the caller's own chat with the bot when their account row is gone: it replaces the
+    # tapped screen, or arrives as a reply to a message. /start is written out so Telegram makes it
+    # tappable, since no button the caller can press would work.
+    ACCOUNT_NOT_FOUND = "You don't have a Mitup account right now. Send /start and I'll set you up."
     # Shown when in-memory conversation state was lost (e.g. after a rolling deploy mid-flow)
     CONTEXT_LOST = (
         "<b>Sorry, we lost our place!</b>\n\nThe bot had a quick internal update and forgot where you "

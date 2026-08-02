@@ -482,6 +482,12 @@ msgstr "Questo incontro è stato eliminato"
 msgid "CommonMessages.UNEXPECTED_ERROR"
 msgstr "Oops! Qualcosa di inaspettato è accaduto. Ti ho riportato al menu principale. Per favore, riprova."
 
+msgid "CommonMessages.UNEXPECTED_ERROR_ALERT"
+msgstr "Qualcosa è andato storto. Per favore, riprova e scrivi a support@mitup.social se continua."
+
+msgid "CommonMessages.ACCOUNT_NOT_FOUND"
+msgstr "Non hai un account Mitup al momento. Invia /start e ti preparo tutto."
+
 msgid "MeetingEditDateTimeMessages.DESCRIPTION"
 msgstr "Scegli cosa vuoi impostare per il tuo incontro.\n\n<i>Suggerimento: puoi anche inviare un messaggio utilizzando ${datetime_link} per impostare la data e l'ora contemporaneamente.</i>"
 

@@ -51,9 +51,17 @@ def failure_cases(callback_data: CallbackData):
     ]
 
 
-def assert_metrics_for_failure(error_count: int, error_type: type[Exception], metrics_client: MetricsClient):
+def assert_metrics_for_failure(error_type: type[Exception], metrics_client: MetricsClient):
+    """Assert the invocation closed with exactly one `Fault` sample, naming its class when it faulted.
+
+    A caller with no account row is an expected business state the error handler answers, so its
+    sample is a 0 carrying no `error_type`; every other failure reaching here is a genuine fault.
+    """
+    handled = issubclass(error_type, UserNotFound)
     metrics = MetricAssertions(metrics_client)
-    metrics.assert_emitted(name=MetricKey.FAULT, value=error_count, times=1, exception=error_type)
+    metrics.assert_emitted(
+        name=MetricKey.FAULT, value=0 if handled else 1, times=1, exception=None if handled else error_type
+    )
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
@@ -156,7 +164,7 @@ async def test_edit_location_failures(
     with caplog.at_level(logging.WARNING):
         context, _ = await call_handler(EditMeetingHandlerId.LOCATION_CALLBACK, handler_context=handler_context)
 
-    assert_metrics_for_failure(1, error_type, metrics_client)
+    assert_metrics_for_failure(error_type, metrics_client)
 
 
 @pytest.mark.parametrize(
@@ -251,7 +259,7 @@ async def test_edit_location_name_failures(
     # Check that meeting id has not been set
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
 
-    assert_metrics_for_failure(1, error_type, metrics_client)
+    assert_metrics_for_failure(error_type, metrics_client)
 
 
 @pytest.mark.parametrize(
@@ -351,7 +359,7 @@ async def test_edit_location_coordinates_failures(
     # Check that meeting id has not been set
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES)
 
-    assert_metrics_for_failure(1, error_type, metrics_client)
+    assert_metrics_for_failure(error_type, metrics_client)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="My Location")], indirect=True)

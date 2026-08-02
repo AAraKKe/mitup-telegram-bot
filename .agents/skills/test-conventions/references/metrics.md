@@ -78,7 +78,7 @@ metrics.assert_emitted(
     dimensions_exact=False,  # True = require exact dimension match (no extra dims allowed)
     properties={"key": "val"},  # None = skip; subset match by default
     properties_exact=False,  # True = require exact property match
-    exception=UserNotFound,  # type[Exception] or str; checks record's exception properties
+    exception=MalformedCallbackData,  # type[Exception] or str; checks record's exception properties
     times=1,  # Expected emission count
 )
 ```
@@ -116,7 +116,7 @@ sets. The traceback itself is never on the record; assert it on the structlog li
 
 ```python
 # By class — resolves to fully qualified name for matching
-metrics.assert_emitted(name=MetricKey.FAULT, value=1, exception=UserNotFound)
+metrics.assert_emitted(name=MetricKey.FAULT, value=1, exception=MalformedCallbackData)
 
 # By string — matches against the error_type property
 metrics.assert_emitted(name=MetricKey.FAULT, value=1, exception="RuntimeError")
@@ -154,7 +154,7 @@ repeated values under one name, so a stray second writer would serialise an arra
 fault alarms and the `filter Fault = 1` triage query:
 
 ```python
-metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, exception=UserNotFound)
+metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, exception=MalformedCallbackData)
 metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS)
 metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0)
 ```

@@ -6,6 +6,7 @@ We just need to update the factory methods that produces the parameters for each
 """
 
 import datetime as dt
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
@@ -16,7 +17,7 @@ from telegram import Location, MessageEntity, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import BOT_CONFIG_KEY, ContextId
-from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
+from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers.admin.enums import AdminHandlerId
 from mitup_bot.handlers.broadcast.enums import BroadcastHandlerId
@@ -35,6 +36,7 @@ from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricUnit
+from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, PrivacyMessages
 from mitup_bot.views import MitupView, RenderContext, factory
@@ -51,6 +53,7 @@ from tests.helpers import (
     create_user,
 )
 from tests.helpers.constants import DEFAULT_USER_ID
+from tests.helpers.logs import ACCOUNT_NOT_FOUND_LOG_EVENT
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
@@ -844,11 +847,12 @@ CONTEXTS = [
     ),
     # --- Documented exclusions ---
     #
-    # Handlers whose "user not found" path is intentionally not a guard fault, so no ErrorMode
+    # Handlers that serve a caller with no account row instead of stopping on one, so no ErrorMode
     # applies to them. Leaving USER_NOT_FOUND off a handler is a claim, not an omission:
-    # `test_handler_does_not_fault_when_user_is_not_found` runs every handler listed here with no
-    # user row and asserts no UserNotFound fault, so a handler that starts requiring an account
-    # fails there instead of quietly losing its coverage. The notes below say why each one belongs.
+    # `test_handler_does_not_reject_a_caller_with_no_account` runs every handler listed here with no
+    # user row and asserts the rejection was never recorded, so a handler that starts requiring an
+    # account fails there instead of quietly losing its coverage. The notes below say why each one
+    # belongs.
     #   - CommandsId.START_WITH_EXISTING_USER: gates on guards.member_user, which returns None
     #     instead of raising — an unknown user gets a silent END with no fault
     #     (guards.current_user only runs after the MEMBER check succeeded, so its UserNotFound
@@ -885,7 +889,7 @@ CONTEXTS = [
         id="command_main_menu",
     ),
     # The conversation-state handlers below reach guards.current_user before their claim_update
-    # wrapper can raise ApplicationHandlerStop, so the standard UserNotFound fault applies.
+    # wrapper can raise ApplicationHandlerStop, so the standard UserNotFound rejection applies.
     Context(
         handler_id=RegistrationProcessHandlerId.TIMEZONE_MESSAGE_WITH_TEXT,
         update_request=UpdateRequest(message_text="Madrid"),
@@ -1404,7 +1408,7 @@ def handler_tolerates_unregistered_user() -> list[Context]:
 
     The complement of `handler_stops_when_user_not_found`, so the two together cover the registry:
     omitting the mode has to mean the handler serves a caller with no account, not that nobody
-    checked. Without this pair a handler that starts faulting on a missing user is caught only if
+    checked. Without this pair a handler that starts turning a missing user away is caught only if
     somebody remembers to declare the mode, which is the same as not being caught.
 
     Grouped by handler rather than taken per context, because a handler carries several contexts —
@@ -1613,22 +1617,43 @@ async def test_callback_fails_with_malformed_callback_data(
     [pytest.param(context, context.update_request, id=context.id) for context in handler_stops_when_user_not_found()],
     indirect=["update"],
 )
-async def test_callback_fails_when_user_is_not_found(
+async def test_callback_answers_a_caller_with_no_account(
     mock_session: MockDbSession,
     test_context: Context,
     update: Update,
     handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
+    """A caller with no account row is told how to get one, and the invocation closes as handled.
+
+    Every context registered here drives the handler from the bot's own chat, which is the one
+    surface where a missing account is an expected business state: an account that no longer exists
+    is the normal end of the deletion and cleanup runs, so the interaction must stay in the `Fault`
+    denominator at value 0 rather than page as a code fault. A context on any other surface would
+    fail this assertion, which is the intended signal — there it is a fault, because that surface's
+    own `guards.user_registered` was supposed to answer the caller first.
+
+    The stored language went with the row, so the notice renders in the client's language, which
+    these updates leave unset.
+    """
     # Do not register the user in the db and call the handler
     make_admin_if_gated(handler_context, test_context)
     context, _ = await call_handler(
         test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
     )
 
-    metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, exception=UserNotFound)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+
+    notice = CommonMessages.ACCOUNT_NOT_FOUND.get(lang=TranslationEngine.FALLBACK_LANG)
+    if update.callback_query is not None:
+        # The tapped screen is replaced by the notice alone: every button on it resolves through the
+        # missing row and would be answered with this same notice.
+        context.api.assert_edit_message_called(update, notice)
+        context.api.assert_send_message_not_called()
+    else:
+        context.api.assert_send_message_called(update, notice)
 
 
 @pytest.mark.parametrize(
@@ -1636,24 +1661,29 @@ async def test_callback_fails_when_user_is_not_found(
     [pytest.param(context, context.update_request, id=context.id) for context in handler_tolerates_unregistered_user()],
     indirect=["update"],
 )
-async def test_handler_does_not_fault_when_user_is_not_found(
+async def test_handler_does_not_reject_a_caller_with_no_account(
     mock_session: MockDbSession,
     test_context: Context,
     update: Update,
     handler_context: HandlerContext,
-    metrics: MetricAssertions,
+    caplog: pytest.LogCaptureFixture,
 ):
     """A context that does not declare `USER_NOT_FOUND` must genuinely tolerate a caller with no row.
 
-    Only the `UserNotFound` fault is asserted against: the acting user is the single thing this test
-    withholds, so any other fault belongs to the mode that declares it, not here.
+    The rejection is read off the log rather than off the metric plane: the error handler closes a
+    missing account as a handled outcome, so its `Fault` record is indistinguishable from the one a
+    handler that served the caller normally produces. `handle_user_not_found` writes this line
+    before any delivery, whatever shape the answer takes and whatever language it renders in, so it
+    is the one signal that separates the two.
     """
     make_admin_if_gated(handler_context, test_context)
-    await call_handler(
-        test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
-    )
+    with caplog.at_level(logging.WARNING):
+        await call_handler(
+            test_context.handler_id, handler_context=handler_context, with_meeting_id=test_context.meeting_id
+        )
 
-    metrics.assert_not_emitted(name=MetricKey.FAULT, exception=UserNotFound)
+    rejections = [record for record in caplog.records if record.msg == ACCOUNT_NOT_FOUND_LOG_EVENT]
+    assert not rejections, f"{test_context.handler_id} rejected a caller it is expected to serve"
 
 
 @pytest.mark.parametrize(

@@ -791,6 +791,12 @@ msgstr "Xa respondiches a esta pregunta"
 msgid "CommonMessages.UNEXPECTED_ERROR"
 msgstr "Opa! Pasou algo inesperado. Traínte de volta ao menú principal. Por favor intenta de novo."
 
+msgid "CommonMessages.UNEXPECTED_ERROR_ALERT"
+msgstr "Pasou algo inesperado da nosa parte. Por favor inténtao de novo, e escribe a support@mitup.social se segue pasando."
+
+msgid "CommonMessages.ACCOUNT_NOT_FOUND"
+msgstr "Non tes conta de Mitup neste momento. Envía /start e prepároche todo."
+
 msgid "NotificationMessages.STARTED"
 msgstr "A quedada <b>${meeting_title}</b> comezou!"
 

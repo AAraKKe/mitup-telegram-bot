@@ -514,6 +514,12 @@ msgstr "Este evento foi excluído"
 msgid "CommonMessages.UNEXPECTED_ERROR"
 msgstr "Oops! Algo inesperado aconteceu. Levei você de volta ao menu principal. Por favor, tente novamente."
 
+msgid "CommonMessages.UNEXPECTED_ERROR_ALERT"
+msgstr "Algo deu errado de nossa parte. Tente novamente, e se o problema continuar, escreva para support@mitup.social."
+
+msgid "CommonMessages.ACCOUNT_NOT_FOUND"
+msgstr "Você não tem uma conta do Mitup agora. Envie /start e eu preparo tudo para você."
+
 msgid "MeetingEditDateTimeMessages.DESCRIPTION"
 msgstr "Escolha o que você deseja definir para seu evento.\n\n<i>Dica: você também pode enviar uma mensagem usando ${datetime_link} para definir a data e a hora de uma vez.</i>"
 

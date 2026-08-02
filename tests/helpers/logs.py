@@ -17,6 +17,12 @@ CONTEXT_LOST_LOG_REASON = "conversation_context_missing"
 # Likewise for the one event every meeting rejection is recorded under.
 MEETING_REJECTION_LOG_EVENT = "Rejected meeting action"
 
+# And for the one a caller whose account row does not exist is rejected under. Asserted positively
+# in the error-handler tests and negatively by the handlers that must serve such a caller, so both
+# sides read the same literal and a rename cannot pass one while silently vacating the other.
+ACCOUNT_NOT_FOUND_LOG_EVENT = "Rejected interaction from unregistered user"
+ACCOUNT_NOT_FOUND_LOG_REASON = "user_row_not_found"
+
 
 def assert_meeting_rejection_logged(caplog: pytest.LogCaptureFixture, action: str, reason: str):
     """Assert the guard's rejection reached the log naming what the caller was attempting.
