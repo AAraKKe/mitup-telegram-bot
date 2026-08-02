@@ -23,7 +23,9 @@ context, state = await call_handler(HandlerId, handler_context=handler_context)
 
 # With pre-populated meeting IDs in context
 context, state = await call_handler(
-    HandlerId, update=update, app=app,
+    HandlerId,
+    update=update,
+    app=app,
     with_meeting_id={ContextId.EDIT_MEETING_TIME: 99},
 )
 ```
@@ -80,6 +82,7 @@ Use `ConversationTester` for multi-step conversation flows:
 ```python
 from tests.helpers import ConversationTester, ConversationStep
 
+
 async def test_conversation_flow(mock_session: MockDbSession, conversation: ConversationTester):
     # Setup mock_session as needed...
 
@@ -115,10 +118,10 @@ The `expected_state` is asserted automatically. Pass `None` to skip state assert
 ### Accessing step results
 
 ```python
-result.last_state          # State after the last step
-result.last_context        # Context from the last step
-result.get_step(0).context # Context from a specific step
-result.history             # All StepResult objects
+result.last_state  # State after the last step
+result.last_context  # Context from the last step
+result.get_step(0).context  # Context from a specific step
+result.history  # All StepResult objects
 ```
 
 ## Inline message tests

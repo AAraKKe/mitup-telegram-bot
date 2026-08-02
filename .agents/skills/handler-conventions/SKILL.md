@@ -30,6 +30,7 @@ from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+
 @HandlersRegistry.register_callback_query(handler_id=MyHandlerId.SHOW)
 @with_session
 async def show(session: AsyncSession, update: Update, context: MitupContext):

@@ -46,8 +46,8 @@ context.api.assert_update_meeting_messages_not_called()
 ### Raw access (avoid unless necessary)
 
 ```python
-context.api.call_args("method_name")       # Last call args
-context.api.call_args_list("method_name")   # All call args
+context.api.call_args("method_name")  # Last call args
+context.api.call_args_list("method_name")  # All call args
 context.api.assert_method_just_called("method_name", times=N)  # Called N times, any args
 ```
 

@@ -37,15 +37,20 @@ CLI commands receive `MetricsClient` directly. Override the `metrics_client` fix
 from mitup_bot.monitoring import MetricKey, MetricsClient, NullBackend
 from tests.helpers.monitoring import MetricAssertions
 
+
 @pytest.fixture
 def metrics_client() -> MetricsClient:
     return MetricsClient(NullBackend(), base_dimensions={"EventType": EventType.DEACTIVATE_MEETINGS.value})
+
 
 @pytest.fixture
 def metrics(metrics_client: MetricsClient) -> MetricAssertions:
     return MetricAssertions(metrics_client)
 
-async def test_cli_command(mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi):
+
+async def test_cli_command(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
     await some_cli_command.run(api, metrics_client)
     await metrics_client.flush()
 
@@ -66,15 +71,15 @@ Asserts a metric was emitted the expected number of times.
 
 ```python
 metrics.assert_emitted(
-    name=MetricKey.FAULT,          # Required — str or MetricKey
-    value=1,                       # None = skip value check
+    name=MetricKey.FAULT,  # Required — str or MetricKey
+    value=1,  # None = skip value check
     unit=MetricUnit.MILLISECONDS,  # None = skip unit check
-    dimensions={"Feature": "X"},   # None = skip; subset match by default
-    dimensions_exact=False,        # True = require exact dimension match (no extra dims allowed)
-    properties={"key": "val"},     # None = skip; subset match by default
-    properties_exact=False,        # True = require exact property match
-    exception=UserNotFound,        # type[Exception] or str; checks record's exception properties
-    times=1,                       # Expected emission count
+    dimensions={"Feature": "X"},  # None = skip; subset match by default
+    dimensions_exact=False,  # True = require exact dimension match (no extra dims allowed)
+    properties={"key": "val"},  # None = skip; subset match by default
+    properties_exact=False,  # True = require exact property match
+    exception=UserNotFound,  # type[Exception] or str; checks record's exception properties
+    times=1,  # Expected emission count
 )
 ```
 
@@ -123,8 +128,8 @@ metrics.assert_emitted(name=MetricKey.FAULT, value=1, exception="RuntimeError")
 value drawn from a closed set the code itself enumerates:
 
 ```python
-MetricKey.TIME.with_prefix("TelegramApi", separator="")     # "TelegramApiTime"
-MetricKey.ACTIVE_USERS.with_prefix(language)                # "es_ES/ActiveUsers", language ∈ SUPPORTED_LANGUAGES
+MetricKey.TIME.with_prefix("TelegramApi", separator="")  # "TelegramApiTime"
+MetricKey.ACTIVE_USERS.with_prefix(language)  # "es_ES/ActiveUsers", language ∈ SUPPORTED_LANGUAGES
 ```
 
 A prefix taken from an open runtime value (an exception class, a user id, a DB column nothing

@@ -53,9 +53,7 @@ Multi-session concurrency tests use the `997_0xx` range for **committed** per-te
 ```python
 from sqlalchemy import text
 
-result = await session.exec(
-    text("SELECT * FROM users WHERE tg_user_id = :uid").bindparams(uid=999_001)
-)
+result = await session.exec(text("SELECT * FROM users WHERE tg_user_id = :uid").bindparams(uid=999_001))
 ```
 
 ## Migrations

@@ -297,9 +297,7 @@ Keep a comment only when it explains a non-obvious *local* fact a future maintai
 ```python
 class MalformedCallbackData(RuntimeError):
     def __init__(self, handler: HandlerId, callback_data: CallbackData):
-        super().__init__(
-            f"Callback data {callback_data!r} received in handler {handler!r} is malformed."
-        )
+        super().__init__(f"Callback data {callback_data!r} received in handler {handler!r} is malformed.")
 ```
 
 ## Logging

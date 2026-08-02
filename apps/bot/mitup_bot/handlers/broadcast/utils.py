@@ -1,3 +1,6 @@
+from collections.abc import Iterable
+from typing import cast
+
 import structlog
 from sqlalchemy import func
 from sqlmodel import col, select
@@ -38,7 +41,8 @@ async def count_members_by_language(session: AsyncSession) -> dict[str, int]:
         .where(col(User.status) == UserStatus.MEMBER)
         .group_by(col(Settings.language))
     )
-    rows = await session.exec(statement)
+    # The two-column select yields (language, count) rows; ty cannot see through Row unpacking.
+    rows = cast(Iterable[tuple[str, int]], await session.exec(statement))
     return {language: count for language, count in rows}
 
 

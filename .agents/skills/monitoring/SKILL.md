@@ -133,7 +133,9 @@ Convenience wrapper that adds a `Feature` dimension. Use it to track feature-lev
 
 ```python
 context.put_feature_metric(Feature.JOIN_MEETING)
-context.put_feature_metric(Feature.SET_TIMEZONE, name=MetricKey.ERROR, properties={"reason": "invalid_google_geocode_response"})
+context.put_feature_metric(
+    Feature.SET_TIMEZONE, name=MetricKey.ERROR, properties={"reason": "invalid_google_geocode_response"}
+)
 ```
 
 ## Outbound calls

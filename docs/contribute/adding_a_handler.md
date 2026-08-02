@@ -64,10 +64,7 @@ If the handler touches the database, add `@with_session` from [`mitup_bot/db.py`
     callback_data=cb.SHOW_REMINDERS,
 )
 @with_session
-async def callback_query_show_reminders(
-    session: AsyncSession, update: Update, context: TMitupContext
-) -> None:
-    ...
+async def callback_query_show_reminders(session: AsyncSession, update: Update, context: TMitupContext) -> None: ...
 ```
 
 A handler that mutates state and then fans out over Telegram (it takes the per-meeting row lock, refreshes meeting messages, or notifies participants) uses `@with_session(write=True)` instead. The [`database`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/database/SKILL.md) skill covers when and why.

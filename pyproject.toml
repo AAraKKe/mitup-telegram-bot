@@ -71,6 +71,16 @@ exclude = [
     "libs/data/mitup_bot/migrations/versions",
 ]
 
+# StubBot deliberately mixes ExtBot with AsyncMock, so its inherited `__setattr__`/`__delattr__`
+# genuinely conflict across the two bases — being both a real bot and a mock is the class's whole
+# purpose, so the LSP violation is accepted here rather than suppressed inline (a `ty: ignore`
+# would claim a false positive, and this is a true positive we opt out of for one test double).
+[[tool.ty.overrides]]
+include = ["tests/helpers/stub_bot.py"]
+
+[tool.ty.overrides.rules]
+invalid-method-override = "ignore"
+
 [tool.coverage.run]
 branch = true
 
@@ -233,14 +243,14 @@ dev = [
     "pytest-xdist~=3.8.0",
     "pytest-dotenv~=0.5.2",
     "pytest-json-report~=1.5.0",
-    "ty==0.0.61",
+    "ty==0.0.63",
     "freezegun~=1.5.5",
-    "ruff==0.15.0",
+    "ruff==0.16.0",
     "boto3~=1.34",
     "debugpy",
     "zensical",
     "deepdiff",
     "boto3-stubs[essential]",
-    "testcontainers[postgres]==4.14.2",
+    "testcontainers[postgres]==4.15.0",
     "asgi-lifespan==2.1.0",
 ]

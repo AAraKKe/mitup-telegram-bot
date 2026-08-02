@@ -1,3 +1,4 @@
+import typing
 from collections.abc import Sequence
 from typing import Any
 
@@ -89,14 +90,19 @@ async def users_stats(session: AsyncSession, metrics: MetricsClient) -> dict[str
 
     # Per-language gauges count MEMBER users only, so the language series sum to ActiveUsers. Every
     # supported language reports every run, zero included, so each series is gap-free.
-    user_languages = (
-        await session.exec(
-            select(Settings.language, func.count())
-            .join(User, col(Settings.user_id) == col(User.id))
-            .where(User.status == UserStatus.MEMBER)
-            .group_by(Settings.language)
-        )
-    ).all()
+    # The two-column select yields (language, count) rows; ty cannot see through Row unpacking.
+    # typing.cast stays qualified: bare `cast` is the SQL CAST imported from sqlmodel above.
+    user_languages = typing.cast(
+        Sequence[tuple[str, int]],
+        (
+            await session.exec(
+                select(Settings.language, func.count())
+                .join(User, col(Settings.user_id) == col(User.id))
+                .where(User.status == UserStatus.MEMBER)
+                .group_by(Settings.language)
+            )
+        ).all(),
+    )
 
     counts_by_language = dict.fromkeys([*SUPPORTED_LANGUAGES, OTHER_LANGUAGE_BUCKET], 0)
     for language, count in user_languages:

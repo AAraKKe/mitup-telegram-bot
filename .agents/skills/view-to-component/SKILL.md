@@ -81,8 +81,8 @@ If the description is a literal string in the factory (rare, but happens for `cr
 Every `ButtonConfig.text` is sourced from `ButtonMessages.<NAME>.get_text(lang=...)` in `libs/telegram/mitup_bot/utils/messages.py`. The enum value **already includes the emoji**:
 
 ```python
-NEW_MEETING = f"{Emojis.NEW_MEETING} New meeting"      # → "➕ New meeting"
-SETTINGS    = f"{Emojis.SETTINGS} Settings"            # → "⚙️ Settings"
+NEW_MEETING = f"{Emojis.NEW_MEETING} New meeting"  # → "➕ New meeting"
+SETTINGS = f"{Emojis.SETTINGS} Settings"  # → "⚙️ Settings"
 ```
 
 So the `.mitup-key` content is the rendered string, emoji included. Look up the actual `Emojis.<NAME>` value in `libs/core/mitup_bot/emojis.py` if you need the glyph. Never invent the emoji.

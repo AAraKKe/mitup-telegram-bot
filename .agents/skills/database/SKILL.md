@@ -22,10 +22,12 @@ The database layer lives in `libs/data/mitup_bot/db.py`. It uses SQLAlchemy's **
 from mitup_bot.db import with_session
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+
 @with_session
 async def my_handler(session: AsyncSession, update: Update, context: MitupContext) -> int:
     user = (await session.exec(select(User).where(User.id == user_id))).first()
     ...
+
 
 # Call without the session argument — the decorator supplies it:
 await my_handler(update, context)

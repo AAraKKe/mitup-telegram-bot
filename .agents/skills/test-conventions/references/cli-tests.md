@@ -54,6 +54,7 @@ Use `CancelledError` to break out of infinite async loops:
 ```python
 from asyncio import CancelledError
 
+
 async def test_run_periodic_runs_event():
     with (
         patch("...asyncio.sleep", side_effect=[None, CancelledError()]),
@@ -75,9 +76,13 @@ from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 client = make_test_metrics_client(base_dimensions={"EventType": event_type.value})
 # ... pass client as the metrics client to the function under test ...
 assertions = MetricAssertions(client)
-assertions.assert_emitted(name=MetricKey.FAULT, value=0, unit=MetricUnit.COUNT, dimensions={"EventType": event_type.value})
+assertions.assert_emitted(
+    name=MetricKey.FAULT, value=0, unit=MetricUnit.COUNT, dimensions={"EventType": event_type.value}
+)
 assertions.assert_emitted(name=MetricKey.TIME, unit=MetricUnit.MILLISECONDS, dimensions={"EventType": event_type.value})
-assertions.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, unit=MetricUnit.COUNT, dimensions={"EventType": event_type.value})
+assertions.assert_emitted(
+    name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, unit=MetricUnit.COUNT, dimensions={"EventType": event_type.value}
+)
 ```
 
 Note: `MetricAssertions.assert_emitted` requires explicit `dimensions` since no handler identity is attached automatically outside a `MitupContext` (and handler identity rides as EMF properties, never as dimensions — issue #205).

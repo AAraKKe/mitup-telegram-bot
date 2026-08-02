@@ -141,16 +141,20 @@ Protocol in `tests/helpers/types.py` and import it under `TYPE_CHECKING`):
 class RegisterMember(Protocol):
     def __call__(self, user: User) -> None: ...
 
+
 # conftest.py — factory fixture, injected not imported
 @pytest.fixture
 def register_member(mock_session: MockDbSession) -> RegisterMember:
     def register(user: User) -> None:
         mock_session.add_objects_with_statement(select(User).where(...), (user,))
+
     return register
+
 
 # test module — inject the fixture, annotate with the Protocol
 if TYPE_CHECKING:
     from tests.helpers.types import RegisterMember
+
 
 async def test_x(register_member: RegisterMember, user_with_settings: User):
     register_member(user_with_settings)
