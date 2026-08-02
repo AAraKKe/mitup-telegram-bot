@@ -29,6 +29,7 @@ from mitup_bot.handlers.utils import CONTEXT_LOST_EVENT, RecoveryReason
 from mitup_bot.keyboards import Keyboard
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
+from mitup_bot.models.users import InactiveReason
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.translations import TranslationEngine
@@ -121,7 +122,7 @@ def fault_error_type(error: Exception) -> str:
 
 
 @db.with_session
-async def handle_inactive_user(session: AsyncSession, context: TMitupContext, tg_user_id: int):
+async def handle_inactive_user(session: AsyncSession, tg_user_id: int):
     """Flip the user who just proved unreachable from MEMBER to LEFT.
 
     The transition is what the purge job later acts on, so all three outcomes are recorded: the
@@ -136,7 +137,7 @@ async def handle_inactive_user(session: AsyncSession, context: TMitupContext, tg
         return
 
     previous_status = user.status
-    if not user.mark_inactive():
+    if not user.mark_inactive(InactiveReason.INTERACTION_UNREACHABLE):
         log.info(
             "Skipped marking user inactive",
             tg_user_id=tg_user_id,
@@ -144,15 +145,6 @@ async def handle_inactive_user(session: AsyncSession, context: TMitupContext, tg
             previous_status=previous_status.value,
         )
         return
-
-    log.info(
-        "Marking user as inactive",
-        tg_user_id=tg_user_id,
-        reason="inactive_user_interaction",
-        previous_status=previous_status.value,
-        new_status=user.status.value,
-    )
-    context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_properties=False)
 
 
 async def handle_pending_deletion_user(context: TMitupContext, error: UserPendingDeletion):
@@ -390,7 +382,7 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
         return HANDLED_OUTCOME
 
     if isinstance(error, InactiveUserInteraction) and error.private:
-        await handle_inactive_user(context, error.tg_user_id)
+        await handle_inactive_user(error.tg_user_id)
         return HANDLED_OUTCOME
 
     # An expected business state, not a fault: answer with the standardized alert and stop before

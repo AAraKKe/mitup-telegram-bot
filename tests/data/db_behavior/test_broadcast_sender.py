@@ -281,7 +281,6 @@ async def test_unreachable_recipient_is_skipped_and_marked_left(db_session: Asyn
         deliveries = await fetch_deliveries(data.broadcast_id)
         assert [d.status for d in deliveries] == [BroadcastDeliveryStatus.SKIPPED_INACTIVE]
         assert await user_status(blocked) is UserStatus.LEFT
-        MetricAssertions(metrics).assert_emitted(name=MetricKey.INACTIVE_USER_SET, value=1, unit=MetricUnit.COUNT)
 
 
 async def test_language_without_message_falls_back_to_english(db_session: AsyncSession):
@@ -547,7 +546,6 @@ async def test_not_found_recipient_is_skipped_and_marked_left(db_session: AsyncS
         deliveries = await fetch_deliveries(data.broadcast_id)
         assert [d.status for d in deliveries] == [BroadcastDeliveryStatus.SKIPPED_INACTIVE]
         assert await user_status(gone) is UserStatus.LEFT
-        MetricAssertions(metrics).assert_emitted(name=MetricKey.INACTIVE_USER_SET, value=1, unit=MetricUnit.COUNT)
 
 
 async def test_network_error_leaves_broadcast_sending_for_the_next_run_to_finish(db_session: AsyncSession):

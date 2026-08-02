@@ -2,15 +2,15 @@ from typing import cast
 from unittest import mock
 
 import pytest
+from structlog.testing import capture_logs
 from telegram.ext import ExtBot
 
 from mitup_bot import reconcile
 from mitup_bot.api_wrapper import ApiOutbox, BotAdapter
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey, MetricsClient
+from mitup_bot.monitoring import MetricsClient
 from tests.helpers import make_test_metrics_client
 from tests.helpers.fixtures import create_user
-from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -48,11 +48,14 @@ async def test_reconcile_outbox_marks_unreachable_user(
     mock_session.add_user(user)
     outbox = ApiOutbox(inactive_tg_user_ids=[555])
 
-    await reconcile.reconcile_outbox(mock_session, adapter, outbox)
+    with capture_logs() as logs:
+        await reconcile.reconcile_outbox(mock_session, adapter, outbox)
     await reconcile_metrics_client.flush()
 
     assert user.status is UserStatus.LEFT
-    MetricAssertions(reconcile_metrics_client).assert_emitted(name=MetricKey.INACTIVE_USER_SET, times=1)
+    changed = [entry for entry in logs if entry["event"] == "User status changed"]
+    assert len(changed) == 1
+    assert changed[0]["reason"] == "post_commit_fanout_unreachable"
 
 
 async def test_reconcile_outbox_ignores_unknown_user(
@@ -60,8 +63,9 @@ async def test_reconcile_outbox_ignores_unknown_user(
 ):
     outbox = ApiOutbox(inactive_tg_user_ids=[999])
 
-    await reconcile.reconcile_outbox(mock_session, adapter, outbox)
+    with capture_logs() as logs:
+        await reconcile.reconcile_outbox(mock_session, adapter, outbox)
     await reconcile_metrics_client.flush()
 
-    # A tg user id with no matching row is a no-op: nothing to transition, no metric.
-    MetricAssertions(reconcile_metrics_client).assert_not_emitted(name=MetricKey.INACTIVE_USER_SET)
+    # A tg user id with no matching row is a no-op: nothing to transition, nothing recorded.
+    assert not [entry for entry in logs if entry["event"] == "User status changed"]

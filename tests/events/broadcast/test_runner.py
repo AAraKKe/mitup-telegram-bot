@@ -188,7 +188,8 @@ async def test_send_all_pending_drains_until_no_batch(
     monkeypatch.setattr(runner, "record_batch_outcomes", record)
     monkeypatch.setattr(runner, "count_unfinished_deliveries", mock.AsyncMock(return_value=0))
 
-    await runner.send_all_pending(api, metrics_client, 5, 1, {"en": "hi"})
+    with capture_logs() as logs:
+        await runner.send_all_pending(api, metrics_client, 5, 1, {"en": "hi"})
     await metrics_client.flush()
 
     assert claim.await_count == 2
@@ -201,8 +202,8 @@ async def test_send_all_pending_drains_until_no_batch(
     metrics.assert_emitted(name=MetricKey.BROADCAST_PROGRESS_PERCENT, value=100.0, unit=MetricUnit.PERCENT)
     # The per-delivery one-hot telemetry fired post-commit for the single SENT outcome.
     metrics.assert_emitted(name=MetricKey.BROADCAST_DELIVERY_SENT, value=1, properties={"broadcast_id": 5})
-    # No skipped recipients this batch, so no INACTIVE_USER_SET.
-    metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET)
+    # No skipped recipients this batch, so no demotions to confirm.
+    assert not [entry for entry in logs if entry["event"] == "Broadcast recipient demotions committed"]
 
 
 async def test_send_all_pending_stops_claiming_after_flood_control(
@@ -232,7 +233,7 @@ async def test_send_all_pending_stops_claiming_after_flood_control(
     metrics.assert_emitted(name=MetricKey.BROADCAST_PROGRESS_PERCENT, value=0.0, unit=MetricUnit.PERCENT)
 
 
-async def test_send_all_pending_emits_inactive_user_set_post_commit(
+async def test_send_all_pending_records_committed_demotions_post_commit(
     api: MockApi, metrics_client: MetricsClient, metrics: MetricAssertions, monkeypatch: pytest.MonkeyPatch
 ):
     batch = [PendingDelivery(1, create_member(1, 11, "en"), "en", 1)]
@@ -246,10 +247,13 @@ async def test_send_all_pending_emits_inactive_user_set_post_commit(
     monkeypatch.setattr(runner, "record_batch_outcomes", mock.AsyncMock(return_value=2))
     monkeypatch.setattr(runner, "count_unfinished_deliveries", mock.AsyncMock(return_value=0))
 
-    await runner.send_all_pending(api, metrics_client, 5, 1, {"en": "hi"})
+    with capture_logs() as logs:
+        await runner.send_all_pending(api, metrics_client, 5, 1, {"en": "hi"})
     await metrics_client.flush()
 
-    metrics.assert_emitted(name=MetricKey.INACTIVE_USER_SET, value=2, unit=MetricUnit.COUNT)
+    committed = next(entry for entry in logs if entry["event"] == "Broadcast recipient demotions committed")
+    assert committed["count"] == 2
+    assert committed["reason"] == "broadcast_unreachable"
 
 
 async def test_emit_batch_progress_emits_throughput_and_percent_from_the_delivery_table(

@@ -9,6 +9,7 @@ from sqlalchemy import URL
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlmodel.ext.asyncio.session import AsyncSession
+from structlog.testing import capture_logs
 from telegram.error import BadRequest, Forbidden, TimedOut
 from telegram.ext import ExtBot
 
@@ -425,11 +426,11 @@ async def test_begin_write_body_exception_discards_queue(
 
 
 @pytest.mark.parametrize(
-    "status, expected_status, metric_times",
+    "status, expected_status, transitions",
     [
         (UserStatus.MEMBER, UserStatus.LEFT, 1),
-        # mark_inactive is a no-op for JOINED_ONLY: no transition, and the counter only
-        # reflects genuine MEMBER → LEFT departures.
+        # mark_inactive is a no-op for JOINED_ONLY: no transition, and only a genuine
+        # MEMBER → LEFT departure is recorded.
         (UserStatus.JOINED_ONLY, UserStatus.JOINED_ONLY, 0),
     ],
     ids=["member_marked_left", "joined_only_untouched"],
@@ -442,7 +443,7 @@ async def test_write_mode_reconcile_marks_unreachable_user(
     fanout_metrics_client: MetricsClient,
     status: UserStatus,
     expected_status: UserStatus,
-    metric_times: int,
+    transitions: int,
 ):
     user = create_user(id=1, tg_user_id=555, status=status)
     mock_session.add_user(user)
@@ -452,11 +453,13 @@ async def test_write_mode_reconcile_marks_unreachable_user(
     async def handler(session: AsyncSession, context: SimpleNamespace):
         await context.api.send_message_to_user(user, "unreachable")
 
-    await handler(write_context)
+    with capture_logs() as logs:
+        await handler(write_context)
     await fanout_metrics_client.flush()
 
     assert user.status is expected_status
-    fanout_metrics.assert_emitted(name=MetricKey.INACTIVE_USER_SET, times=metric_times)
+    changed = [entry for entry in logs if entry["event"] == "User status changed"]
+    assert len(changed) == transitions
 
 
 async def test_write_mode_reconcile_dedups_repeated_inactive_user(
@@ -480,9 +483,8 @@ async def test_write_mode_reconcile_dedups_repeated_inactive_user(
     await fanout_metrics_client.flush()
 
     assert user.status is UserStatus.LEFT
-    # The reconcile deduplicates the recorded ids: one lookup, one transition, one metric.
+    # The reconcile deduplicates the recorded ids: one lookup, one transition, one line.
     assert sum("tg_user_id = 555" in query for query in mock_session.queries_executed) == 1
-    fanout_metrics.assert_emitted(name=MetricKey.INACTIVE_USER_SET, times=1)
 
 
 async def test_write_mode_reconcile_deletes_messages_reported_gone(
@@ -534,7 +536,6 @@ async def test_write_mode_connectivity_failure_stays_inside_the_drain(
     assert fanout_bot.send_message.await_count == 3
     # ...and the fix-ups the drain collected landed in the reconcile transaction.
     assert blocked.status is UserStatus.LEFT
-    fanout_metrics.assert_emitted(name=MetricKey.INACTIVE_USER_SET, times=1)
 
 
 # ---------------------------------------------------------------------------

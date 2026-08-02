@@ -6,7 +6,7 @@ from structlog.testing import capture_logs
 from mitup_bot.emojis import Emojis
 from mitup_bot.exceptions import UserNotFound
 from mitup_bot.models import Meetup, User
-from mitup_bot.models.users import UserStatus
+from mitup_bot.models.users import InactiveReason, UserStatus
 from mitup_bot.supporter import SupporterLevel
 from tests.helpers import MockDbSession, create_meetup, create_user
 
@@ -72,10 +72,10 @@ def test_own_meeting(meeting_id: int, expected_meeting: Meetup):
 
 
 def test_mark_inactive_transitions_member_to_left_and_returns_true():
-    """The metric path keys off the True return — only real transitions should flip it."""
+    """Callers key off the True return — only real transitions should flip it."""
     user = create_user(id=1, tg_user_id=1, status=UserStatus.MEMBER)
 
-    transitioned = user.mark_inactive()
+    transitioned = user.mark_inactive(InactiveReason.BLOCKED_BOT)
 
     assert transitioned is True
     assert user.status is UserStatus.LEFT
@@ -85,17 +85,17 @@ def test_mark_inactive_on_joined_only_is_a_noop_returning_false():
     """JOINED_ONLY users were never reachable; flipping them to LEFT would corrupt the model."""
     user = create_user(id=2, tg_user_id=2, status=UserStatus.JOINED_ONLY)
 
-    transitioned = user.mark_inactive()
+    transitioned = user.mark_inactive(InactiveReason.BLOCKED_BOT)
 
     assert transitioned is False
     assert user.status is UserStatus.JOINED_ONLY
 
 
 def test_mark_inactive_on_left_is_a_noop_returning_false():
-    """Re-running mark_inactive() on a LEFT user must not re-fire INACTIVE_USER_SET."""
+    """Re-running mark_inactive() on a LEFT user must not re-record a departure."""
     user = create_user(id=3, tg_user_id=3, status=UserStatus.LEFT)
 
-    transitioned = user.mark_inactive()
+    transitioned = user.mark_inactive(InactiveReason.BLOCKED_BOT)
 
     assert transitioned is False
     assert user.status is UserStatus.LEFT
@@ -106,7 +106,7 @@ def test_mark_inactive_stamps_left_time():
     user = create_user(id=4, tg_user_id=4, status=UserStatus.MEMBER)
     before = dt.datetime.now(dt.UTC)
 
-    user.mark_inactive()
+    user.mark_inactive(InactiveReason.BLOCKED_BOT)
 
     assert user.left_time is not None
     assert before <= user.left_time <= dt.datetime.now(dt.UTC)
@@ -118,7 +118,7 @@ def test_mark_inactive_keeps_the_original_left_time_of_a_left_user():
     stamped = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
     user = create_user(id=5, tg_user_id=5, status=UserStatus.LEFT, left_time=stamped)
 
-    user.mark_inactive()
+    user.mark_inactive(InactiveReason.BLOCKED_BOT)
 
     assert user.left_time == stamped
 
@@ -218,3 +218,33 @@ def test_leaving_member_status_keeps_the_time_the_user_became_one(status: UserSt
     user.set_status(status)
 
     assert user.member_time == stamped
+
+
+def test_mark_inactive_names_the_path_on_the_status_change_line():
+    """The reason is what separates a user who tapped Block from a batch of bounced deliveries.
+
+    It rides the shared `User status changed` event so one `stats count() by reason` splits every
+    way a user can leave, rather than each caller minting its own event name.
+    """
+    user = create_user(id=6, tg_user_id=6, status=UserStatus.MEMBER)
+
+    with capture_logs() as logs:
+        user.mark_inactive(InactiveReason.BROADCAST_UNREACHABLE)
+
+    changed = next(entry for entry in logs if entry["event"] == "User status changed")
+    assert changed["reason"] == "broadcast_unreachable"
+    assert changed["tg_user_id"] == 6
+    assert changed["previous_status"] == "member"
+    assert changed["status"] == "left"
+
+
+def test_a_status_change_with_no_departure_path_carries_no_reason():
+    """Onboarding and the LEFT→JOINED_ONLY demotion are not departures; a null `reason` on the line
+    would make every query filter around it."""
+    user = create_user(id=7, tg_user_id=7, status=UserStatus.LEFT)
+
+    with capture_logs() as logs:
+        user.set_status(UserStatus.JOINED_ONLY)
+
+    changed = next(entry for entry in logs if entry["event"] == "User status changed")
+    assert "reason" not in changed

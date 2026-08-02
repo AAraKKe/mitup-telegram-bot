@@ -9,7 +9,7 @@ from mitup_bot.db import with_session
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.models.users import InactiveReason
 
 from .registry import HandlersRegistry
 
@@ -18,6 +18,21 @@ log = structlog.get_logger(__name__)
 
 class ChatMemberHandlerId(HandlerId):
     MY_CHAT_MEMBER = auto()
+
+
+def block_status_change(update: Update) -> tuple[str, str] | None:
+    """The bot's `(old, new)` membership status in this update, or `None` when it carries none.
+
+    `my_chat_member` describes the **bot's** membership in the chat, so a user blocking the bot
+    reads as the bot moving to BANNED. The pair is what the block line reports, so a widened
+    `is_block_transition` keeps naming the transition it actually acted on.
+    """
+    if (chat_member_update := update.my_chat_member) is None:
+        return None
+    if (status_change := chat_member_update.difference().get("status")) is None:
+        return None
+    old_status, new_status = status_change
+    return str(old_status), str(new_status)
 
 
 def is_block_transition(update: Update) -> bool:
@@ -61,8 +76,17 @@ async def chat_member_block_handler(session: AsyncSession, update: Update, conte
         log.warning("Received a my_chat_member update without an effective_user", update=update)
         return
 
-    if (user := await User.by_tg_user_id(session, update.effective_user.id)) is None:
-        return
-
-    if user.mark_inactive():
-        context.emit_metric(MetricKey.INACTIVE_USER_SET, 1, include_handler_properties=False)
+    tg_user_id = update.effective_user.id
+    user = await User.by_tg_user_id(session, tg_user_id)
+    # The block itself, separately from the demotion it may cause: a block by a user who is already
+    # LEFT — or who has no row at all — moves no status and would otherwise leave no trace.
+    demoted = user is not None and user.mark_inactive(InactiveReason.BLOCKED_BOT)
+    old_status, new_status = block_status_change(update) or ("unknown", "unknown")
+    log.info(
+        "Bot blocked by user",
+        tg_user_id=tg_user_id,
+        old_bot_status=old_status,
+        new_bot_status=new_status,
+        user_found=user is not None,
+        demoted=demoted,
+    )

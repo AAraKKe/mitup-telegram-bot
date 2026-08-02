@@ -5,6 +5,7 @@ import structlog
 
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models.broadcasts import BroadcastDeliveryStatus, BroadcastStatus
+from mitup_bot.models.users import InactiveReason
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 
 from .claiming import (
@@ -126,11 +127,18 @@ async def send_all_pending(
     while batch := await claim_pending_batch(broadcast_id):
         result = await deliver_batch(api, broadcast_id, batch, views)
         deactivated = await record_batch_outcomes(result)
-        # Both post-commit (see record_batch_outcomes): the per-delivery one-hot telemetry, and the
-        # count of MEMBERs this batch flipped to LEFT (only when > 0, matching the historic emit).
+        # Post-commit (see record_batch_outcomes): the per-delivery one-hot telemetry, and the
+        # confirmation that this batch's MEMBER → LEFT flips actually landed. The per-user
+        # `User status changed` lines are written inside the transaction, so this line is what
+        # separates a committed batch from one that rolled back after logging them.
         emit_delivery_outcomes(metrics, result.outcomes, broadcast_id)
         if deactivated:
-            metrics.emit(MetricKey.INACTIVE_USER_SET, deactivated, MetricUnit.COUNT)
+            log.info(
+                "Broadcast recipient demotions committed",
+                broadcast_id=broadcast_id,
+                count=deactivated,
+                reason=InactiveReason.BROADCAST_UNREACHABLE.value,
+            )
         await emit_batch_progress(metrics, broadcast_id, total, result)
         await metrics.flush()
         if result.flood_control:

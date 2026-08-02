@@ -11,6 +11,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from mitup_bot import db
 from mitup_bot.models import BroadcastDelivery, User
 from mitup_bot.models.broadcasts import BroadcastDeliveryStatus
+from mitup_bot.models.users import InactiveReason
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 
 from .types import BatchResult, DeliveryOutcome, PendingDelivery
@@ -36,10 +37,10 @@ async def record_batch_outcomes(session: AsyncSession, result: BatchResult) -> i
 
     Terminal outcomes (SENT, FAILED, SKIPPED_INACTIVE) are written in bulk; a RETRY_PENDING
     outcome is re-parked with its own `next_attempt_time`. A skipped recipient is also flipped to
-    LEFT. No metrics are emitted here: both the per-delivery telemetry (`emit_delivery_outcomes`)
-    and the INACTIVE_USER_SET count must fire only after this transaction commits, so the caller
-    emits them once this returns — otherwise a failed commit would leave rows IN_PROGRESS (or
-    MEMBERs un-flipped) while the metrics already claimed the outcome happened.
+    LEFT. No telemetry is emitted here: both the per-delivery metrics (`emit_delivery_outcomes`)
+    and the committed-demotion line must fire only after this transaction commits, so the caller
+    writes them once this returns — otherwise a failed commit would leave rows IN_PROGRESS (or
+    MEMBERs un-flipped) while the telemetry already claimed the outcome happened.
     """
     by_status: dict[BroadcastDeliveryStatus, list[DeliveryOutcome]] = defaultdict(list)
     for outcome in result.outcomes:
@@ -135,12 +136,11 @@ async def schedule_retries(session: AsyncSession, outcomes: list[DeliveryOutcome
 async def deactivate_skipped_users(session: AsyncSession, skipped: list[DeliveryOutcome]) -> int:
     """Flip unreachable MEMBERs to LEFT via `User.mark_inactive`; return how many transitioned.
 
-    The INACTIVE_USER_SET metric is emitted by the caller post-commit (see `record_batch_outcomes`),
-    not here — a rolled-back flip must not report users as deactivated.
+    Each flip writes its own `User status changed` line from inside the transaction; the caller
+    confirms the committed total post-commit (see `record_batch_outcomes`), because a rolled-back
+    flip must not be reported as a landed deactivation.
     """
     user_ids = [outcome.user_id for outcome in skipped]
     users = (await session.exec(select(User).where(col(User.id).in_(user_ids)))).all()
-    left = sum(user.mark_inactive() for user in users)
-    if left:
-        log.info("Broadcast marked unreachable recipients inactive", count=left)
+    left = sum(user.mark_inactive(InactiveReason.BROADCAST_UNREACHABLE) for user in users)
     return left

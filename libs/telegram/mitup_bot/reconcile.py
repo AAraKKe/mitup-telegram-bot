@@ -11,13 +11,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import db
 from mitup_bot.models import Message, User
-from mitup_bot.monitoring import MetricKey
+from mitup_bot.models.users import InactiveReason
 from mitup_bot.protocols import ContextOrBotAdapter
 
 log = structlog.get_logger(__name__)
 
 
-async def reconcile_outbox(session: AsyncSession, adapter: ContextOrBotAdapter, outbox: db.OutboxProtocol):
+async def reconcile_outbox(session: AsyncSession, _adapter: ContextOrBotAdapter, outbox: db.OutboxProtocol):
     """Apply the DB fix-ups discovered while draining a write-mode outbox: drop Message rows
     Telegram reported gone and mark unreachable users inactive."""
     if outbox.dead_message_ids:
@@ -27,8 +27,8 @@ async def reconcile_outbox(session: AsyncSession, adapter: ContextOrBotAdapter, 
         )
     for tg_user_id in dict.fromkeys(outbox.inactive_tg_user_ids):
         user = (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).first()
-        if user is not None and user.mark_inactive():
-            adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
+        if user is not None:
+            user.mark_inactive(InactiveReason.POST_COMMIT_FANOUT_UNREACHABLE)
 
 
 def register_outbox_reconciler():

@@ -2,6 +2,7 @@ import datetime as dt
 from collections.abc import Callable
 
 import pytest
+from structlog.testing import capture_logs
 from telegram import (
     Chat,
     ChatMember,
@@ -126,18 +127,26 @@ async def test_block_flips_member_to_left_and_emits_metric(
     metrics_client: MetricsClient,
     metrics: MetricAssertions,
 ):
-    """A known MEMBER user blocking the bot in a private chat flips status to LEFT and emits the metric once."""
+    """A known MEMBER user blocking the bot in a private chat flips status to LEFT and records both facts."""
     user = create_user(id=1, tg_user_id=DEFAULT_CHAT_ID, status=UserStatus.MEMBER)
     mock_session.add_user(user)
 
-    context, _ = await call_handler(
-        ChatMemberHandlerId.MY_CHAT_MEMBER,
-        handler_context=make_handler_context(make_block_update(), app, metrics_client),
-    )
-    await context.flush_metrics()
+    with capture_logs() as logs:
+        await call_handler(
+            ChatMemberHandlerId.MY_CHAT_MEMBER,
+            handler_context=make_handler_context(make_block_update(), app, metrics_client),
+        )
 
     assert user.status is UserStatus.LEFT
-    metrics.assert_emitted(name=MetricKey.INACTIVE_USER_SET, value=1, times=1)
+    blocked = next(entry for entry in logs if entry["event"] == "Bot blocked by user")
+    assert blocked["tg_user_id"] == DEFAULT_CHAT_ID
+    assert (blocked["old_bot_status"], blocked["new_bot_status"]) == ("member", "kicked")
+    assert blocked["user_found"] is True
+    assert blocked["demoted"] is True
+    # The demotion itself is recorded once, on the event every other departure path shares.
+    changed = next(entry for entry in logs if entry["event"] == "User status changed")
+    assert changed["reason"] == "blocked_bot"
+    assert changed["status"] == "left"
 
 
 @pytest.mark.parametrize(
@@ -156,19 +165,19 @@ async def test_unblock_transition_is_noop(
     metrics_client: MetricsClient,
     metrics: MetricAssertions,
 ):
-    """Unblock/rejoin transitions back to MEMBER are intentionally not handled: no status change, no metric."""
+    """Unblock/rejoin transitions back to MEMBER are intentionally not handled: no status change, no line."""
     user = create_user(id=1, tg_user_id=DEFAULT_CHAT_ID, status=UserStatus.LEFT)
     mock_session.add_user(user)
     update = make_chat_member_update(old=old_factory(make_tg_user()), new=new_factory(make_tg_user()))
 
-    context, _ = await call_handler(
-        ChatMemberHandlerId.MY_CHAT_MEMBER,
-        handler_context=make_handler_context(update, app, metrics_client),
-    )
-    await context.flush_metrics()
+    with capture_logs() as logs:
+        await call_handler(
+            ChatMemberHandlerId.MY_CHAT_MEMBER,
+            handler_context=make_handler_context(update, app, metrics_client),
+        )
 
     assert user.status is UserStatus.LEFT
-    metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
+    assert not [entry for entry in logs if entry["event"] == "Bot blocked by user"]
 
 
 @pytest.mark.parametrize("chat_type", [Chat.GROUP, Chat.SUPERGROUP])
@@ -179,18 +188,18 @@ async def test_block_in_non_private_chat_is_noop(
     metrics_client: MetricsClient,
     metrics: MetricAssertions,
 ):
-    """A MEMBER -> BANNED transition in a group/supergroup must not touch the user nor emit the metric."""
+    """A MEMBER -> BANNED transition in a group/supergroup must not touch the user nor record a block."""
     user = create_user(id=1, tg_user_id=DEFAULT_CHAT_ID, status=UserStatus.MEMBER)
     mock_session.add_user(user)
 
-    context, _ = await call_handler(
-        ChatMemberHandlerId.MY_CHAT_MEMBER,
-        handler_context=make_handler_context(make_block_update(chat_type=chat_type), app, metrics_client),
-    )
-    await context.flush_metrics()
+    with capture_logs() as logs:
+        await call_handler(
+            ChatMemberHandlerId.MY_CHAT_MEMBER,
+            handler_context=make_handler_context(make_block_update(chat_type=chat_type), app, metrics_client),
+        )
 
     assert user.status is UserStatus.MEMBER
-    metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
+    assert not [entry for entry in logs if entry["event"] == "Bot blocked by user"]
 
 
 async def test_irrelevant_status_change_is_noop(
@@ -207,14 +216,14 @@ async def test_irrelevant_status_change_is_noop(
         new=ChatMemberMember(user=make_tg_user(), until_date=UNTIL),
     )
 
-    context, _ = await call_handler(
-        ChatMemberHandlerId.MY_CHAT_MEMBER,
-        handler_context=make_handler_context(update, app, metrics_client),
-    )
-    await context.flush_metrics()
+    with capture_logs() as logs:
+        await call_handler(
+            ChatMemberHandlerId.MY_CHAT_MEMBER,
+            handler_context=make_handler_context(update, app, metrics_client),
+        )
 
     assert user.status is UserStatus.MEMBER
-    metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
+    assert not [entry for entry in logs if entry["event"] == "Bot blocked by user"]
 
 
 async def test_unknown_user_block_is_noop(
@@ -223,15 +232,19 @@ async def test_unknown_user_block_is_noop(
     metrics_client: MetricsClient,
     metrics: MetricAssertions,
 ):
-    """A block transition for a tg_user_id absent from the DB returns silently with no metric and no exception."""
+    """A block by a tg_user_id absent from the DB still records the block, with nothing to demote."""
     # No user added to the session; lookup returns None.
-    context, _ = await call_handler(
-        ChatMemberHandlerId.MY_CHAT_MEMBER,
-        handler_context=make_handler_context(make_block_update(), app, metrics_client),
-    )
+    with capture_logs() as logs:
+        context, _ = await call_handler(
+            ChatMemberHandlerId.MY_CHAT_MEMBER,
+            handler_context=make_handler_context(make_block_update(), app, metrics_client),
+        )
     await context.flush_metrics()
 
-    metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
+    blocked = next(entry for entry in logs if entry["event"] == "Bot blocked by user")
+    assert blocked["user_found"] is False
+    assert blocked["demoted"] is False
+    assert not [entry for entry in logs if entry["event"] == "User status changed"]
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
 
 
@@ -240,25 +253,28 @@ async def test_unknown_user_block_is_noop(
     [UserStatus.LEFT, UserStatus.JOINED_ONLY],
     ids=["already_left", "joined_only"],
 )
-async def test_already_inactive_user_does_not_emit_metric(
+async def test_already_inactive_user_is_still_recorded_as_a_block(
     status: UserStatus,
     mock_session: MockDbSession,
     app: StubMitupApp,
     metrics_client: MetricsClient,
-    metrics: MetricAssertions,
 ):
-    """A matched non-MEMBER user yields mark_inactive() == False, so no metric fires despite the block transition."""
+    """A matched non-MEMBER user yields mark_inactive() == False, so nothing moves — but the block
+    still happened, and `demoted=False` is what tells the two apart."""
     user = create_user(id=1, tg_user_id=DEFAULT_CHAT_ID, status=status)
     mock_session.add_user(user)
 
-    context, _ = await call_handler(
-        ChatMemberHandlerId.MY_CHAT_MEMBER,
-        handler_context=make_handler_context(make_block_update(), app, metrics_client),
-    )
-    await context.flush_metrics()
+    with capture_logs() as logs:
+        await call_handler(
+            ChatMemberHandlerId.MY_CHAT_MEMBER,
+            handler_context=make_handler_context(make_block_update(), app, metrics_client),
+        )
 
     assert user.status is status
-    metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
+    blocked = next(entry for entry in logs if entry["event"] == "Bot blocked by user")
+    assert blocked["user_found"] is True
+    assert blocked["demoted"] is False
+    assert not [entry for entry in logs if entry["event"] == "User status changed"]
 
 
 # --- registry wiring ---

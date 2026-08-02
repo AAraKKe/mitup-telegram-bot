@@ -213,6 +213,32 @@ The one addition: `registry.process_update_error` samples a failure that reached
 with no wrapped callback owning it, and skips the update entirely when its trace already carries a
 fault.
 
+### A metric is a continuous time series
+
+<critical_rules>
+A value earns an EMF series only if it is emitted on **every** occurrence of its carrier cadence —
+per request, per run, per stats tick — so its widget draws an unbroken line. An **event-conditional
+counter**, one that fires only when the thing happens and has no meaningful zero in between, is a
+log line with a `reason`, not a series.
+</critical_rules>
+
+Operational observables qualify inherently: latency, faults and request counts are emitted by the
+wrapper that owns every invocation, so a gap in them is real traffic information. State gauges
+qualify because the stats job recomputes them every tick whatever the answer is. A departure, a
+refusal, a webhook rejection does not — its series is mostly absent, which CloudWatch renders as
+missing data rather than zero, so no alarm can read it and no widget can chart a rate from it.
+
+The **0-baseline** is the deliberate device that converts a conditional counter into a continuous
+one: emit `0` on the path that clears the condition and `1` on the path that trips it, and the
+series becomes alarmable. `PatreonWebhookForbidden` and `PatreonWebhookFault` are the reference
+implementations. Reach for it only when something actually reads the series — otherwise the value
+belongs on a log line, where `stats count() by reason` costs nothing per distinct value.
+
+One consequence worth stating: when several code paths produce the same domain event, they share
+**one** event name and separate themselves with `reason`, rather than each minting a counter.
+`User status changed` is the reference — five paths reach `User.mark_inactive`, each passes its
+`InactiveReason`, and one query splits every way a user can leave.
+
 ### Adopt or retire
 
 <critical_rules>

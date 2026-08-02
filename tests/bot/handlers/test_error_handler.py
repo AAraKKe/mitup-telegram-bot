@@ -74,30 +74,33 @@ async def test_errors_ignored(error: type, message: str, context: StubMitupConte
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
 
 
-async def test_handle_inactive_user_not_found(
-    context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
-):
-    """When no user with that tg_user_id exists, handle_inactive_user returns silently without emitting metrics."""
+async def test_handle_inactive_user_not_found(mock_session: MockDbSession):
+    """When no user with that tg_user_id exists, the miss is recorded and nothing transitions."""
     # Do not add any user to the session so the lookup returns None
-    await error_handler.handle_inactive_user(context, tg_user_id=999)
-    await context.metrics.flush()
+    with capture_logs() as logs:
+        await error_handler.handle_inactive_user(tg_user_id=999)
 
-    metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
+    missing = next(entry for entry in logs if entry["event"] == "Could not mark an unknown user inactive")
+    assert missing["reason"] == "user_row_not_found"
+    assert not [entry for entry in logs if entry["event"] == "User status changed"]
 
 
 async def test_handle_inactive_user_error(
     context: StubMitupContext, user: User, mock_session: MockDbSession, metrics: MetricAssertions
 ):
-    """MEMBER → LEFT transition: the metric MUST fire."""
+    """MEMBER → LEFT transition: the departure MUST be recorded, naming this path."""
     assert user.status is UserStatus.MEMBER
 
     mock_session.add_object(user, query_field="tg_user_id")
 
-    await error_handler.handler(context, InactiveUserInteraction(user.tg_user_id, private=True), Env.DEV)
+    with capture_logs() as logs:
+        await error_handler.handler(context, InactiveUserInteraction(user.tg_user_id, private=True), Env.DEV)
     await context.metrics.flush()
 
     assert user.status is UserStatus.LEFT
-    metrics.assert_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
+    changed = next(entry for entry in logs if entry["event"] == "User status changed")
+    assert changed["reason"] == "interaction_unreachable"
+    assert changed["status"] == "left"
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
 
 
@@ -112,26 +115,30 @@ async def test_handle_inactive_user_joined_only_is_noop(
     user = create_user(id=10, tg_user_id=500, status=UserStatus.JOINED_ONLY)
     mock_session.add_object(user, query_field="tg_user_id")
 
-    await error_handler.handler(context, InactiveUserInteraction(user.tg_user_id, private=True), Env.DEV)
+    with capture_logs() as logs:
+        await error_handler.handler(context, InactiveUserInteraction(user.tg_user_id, private=True), Env.DEV)
     await context.metrics.flush()
 
     assert user.status is UserStatus.JOINED_ONLY
-    metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
+    skipped = next(entry for entry in logs if entry["event"] == "Skipped marking user inactive")
+    assert skipped["reason"] == "already_inactive"
+    assert not [entry for entry in logs if entry["event"] == "User status changed"]
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
 
 
 async def test_handle_inactive_user_left_is_noop(
     context: StubMitupContext, mock_session: MockDbSession, metrics: MetricAssertions
 ):
-    """Re-hitting an already-LEFT user must not double-emit the INACTIVE_USER_SET metric."""
+    """Re-hitting an already-LEFT user must not record a second departure."""
     user = create_user(id=11, tg_user_id=501, status=UserStatus.LEFT)
     mock_session.add_object(user, query_field="tg_user_id")
 
-    await error_handler.handler(context, InactiveUserInteraction(user.tg_user_id, private=True), Env.DEV)
+    with capture_logs() as logs:
+        await error_handler.handler(context, InactiveUserInteraction(user.tg_user_id, private=True), Env.DEV)
     await context.metrics.flush()
 
     assert user.status is UserStatus.LEFT
-    metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET, value=1)
+    assert not [entry for entry in logs if entry["event"] == "User status changed"]
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
 
 
@@ -1044,7 +1051,7 @@ async def test_successful_callback_emits_fault_zero_without_notification(
 # --- The MEMBER→LEFT flip ---
 
 INACTIVE_USER_LINES: list[tuple[UserStatus | None, str, str, str]] = [
-    (UserStatus.MEMBER, "Marking user as inactive", "info", "inactive_user_interaction"),
+    (UserStatus.MEMBER, "User status changed", "info", "interaction_unreachable"),
     (UserStatus.JOINED_ONLY, "Skipped marking user inactive", "info", "already_inactive"),
     (None, "Could not mark an unknown user inactive", "warning", "user_row_not_found"),
 ]
@@ -1084,9 +1091,9 @@ async def test_the_transition_line_names_both_statuses(context: StubMitupContext
     with capture_logs() as logs:
         await error_handler.handler(context, InactiveUserInteraction(777, private=True), Env.DEV)
 
-    transitions = [entry for entry in logs if entry["event"] == "Marking user as inactive"]
+    transitions = [entry for entry in logs if entry["event"] == "User status changed"]
     assert transitions[0]["previous_status"] == "member"
-    assert transitions[0]["new_status"] == "left"
+    assert transitions[0]["status"] == "left"
 
 
 # --- The write phase on the fault line ---

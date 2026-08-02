@@ -48,8 +48,6 @@ class MetricKey(CamelCaseStrEnum):
     UNAUTHORIZED_MEETING_CALLBACK = auto()
     """Emitted when a callback carries a meeting id the caller has no claim on. Callback data is
     client-supplied, so this counts rejected attempts to act on an arbitrary meeting."""
-    INACTIVE_USER_SET = auto()
-    """Metric emitted when a MEMBER user has been detected as unreachable and transitioned to LEFT."""
     DELETION_REQUESTED_USERS = auto()
     """Gauge for users with status DELETION_REQUESTED (marked for erasure, awaiting the next cleanup purge)"""
     ACTIVE_USERS = auto()

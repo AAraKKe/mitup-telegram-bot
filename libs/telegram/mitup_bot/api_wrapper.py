@@ -37,6 +37,7 @@ from mitup_bot.exceptions import (
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.models.joined_users import JoinedUsers
+from mitup_bot.models.users import InactiveReason
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.units import MetricUnit
@@ -788,8 +789,7 @@ class TelegramApi:
             )
 
     def _mark_user_inactive(self, user: User):
-        if user.mark_inactive():
-            self.adapter.emit_metric(MetricKey.INACTIVE_USER_SET)
+        user.mark_inactive(InactiveReason.FANOUT_UNREACHABLE)
 
     async def notify_users_promoted_from_waiting_list(
         self,

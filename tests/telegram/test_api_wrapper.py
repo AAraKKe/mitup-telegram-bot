@@ -404,7 +404,7 @@ async def test_send_messages_to_users_on_success_called_for_each(telegram_api: T
 async def test_send_messages_to_users_inactive_user_marked_inactive(
     telegram_api: TelegramApi, bot: AsyncMock, api_metrics: MetricAssertions, api_metrics_client: MetricsClient
 ):
-    """MEMBER user blocking the bot must transition to LEFT and emit INACTIVE_USER_SET."""
+    """MEMBER user blocking the bot must transition to LEFT and have the departure recorded."""
     user1 = create_user(id=1, tg_user_id=100)
     user2 = create_user(id=2, tg_user_id=200)
     bot.send_message.side_effect = [
@@ -412,13 +412,16 @@ async def test_send_messages_to_users_inactive_user_marked_inactive(
         MagicMock(spec=Message),
     ]
 
-    await telegram_api.send_messages_to_users([user1, user2], ["msg1", "msg2"])
+    with capture_logs() as logs:
+        await telegram_api.send_messages_to_users([user1, user2], ["msg1", "msg2"])
     await api_metrics_client.flush()
 
     assert user1.status is UserStatus.LEFT
     assert user2.status is UserStatus.MEMBER
-    # Only the MEMBER → LEFT transition emits the metric.
-    api_metrics.assert_emitted(name=MetricKey.INACTIVE_USER_SET, times=1)
+    # Only the MEMBER → LEFT transition is recorded as a departure.
+    changed = [entry for entry in logs if entry["event"] == "User status changed"]
+    assert len(changed) == 1
+    assert changed[0]["reason"] == "fanout_unreachable"
 
 
 async def test_send_messages_to_users_joined_only_user_not_transitioned(
@@ -439,7 +442,6 @@ async def test_send_messages_to_users_joined_only_user_not_transitioned(
 
     # Status stays JOINED_ONLY — mark_inactive() returns False.
     assert joined_only_user.status is UserStatus.JOINED_ONLY
-    api_metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET)
 
 
 async def test_send_messages_to_users_general_error_calls_on_error(telegram_api: TelegramApi, bot: AsyncMock):
@@ -1363,7 +1365,6 @@ async def test_execute_queued_unreachable_user_recorded_for_reconcile(
     # ...and an unreachable user is expected churn, not a fault; the drain continued.
     assert bot.send_message.await_count == 2
     api_metrics.assert_not_emitted(name=MetricKey.FAULT)
-    api_metrics.assert_not_emitted(name=MetricKey.INACTIVE_USER_SET)
 
 
 async def test_execute_queued_records_dead_message_for_reconcile(

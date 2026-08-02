@@ -40,6 +40,22 @@ class UserStatus(StrEnum):
     DELETION_REQUESTED = "deletion_requested"
 
 
+class InactiveReason(StrEnum):
+    """How a departure was detected, carried as the `reason` on the status-change line.
+
+    Five paths reach `mark_inactive` and they answer different operational questions — a user who
+    tapped Block is a product signal, while a batch of bounced deliveries usually is not. The
+    counts are only separable if each path names itself, so the reason is a required argument
+    rather than something a caller may omit.
+    """
+
+    BLOCKED_BOT = "blocked_bot"
+    INTERACTION_UNREACHABLE = "interaction_unreachable"
+    FANOUT_UNREACHABLE = "fanout_unreachable"
+    POST_COMMIT_FANOUT_UNREACHABLE = "post_commit_fanout_unreachable"
+    BROADCAST_UNREACHABLE = "broadcast_unreachable"
+
+
 class User(BaseModel, SQLModel, table=True):
     # Until better configuration is available through SQLModel (https://github.com/tiangolo/sqlmodel/issues/159)
     __tablename__: str = "users"
@@ -209,7 +225,7 @@ class User(BaseModel, SQLModel, table=True):
     def lang(self) -> str:
         return self.settings.language
 
-    def set_status(self, status: UserStatus):
+    def set_status(self, status: UserStatus, reason: InactiveReason | None = None):
         """Move the user to `status`, keeping `left_time` and `member_time` in sync with it.
 
         Every status write goes through here: `left_time` drives the LEFT grace period, and a
@@ -224,7 +240,8 @@ class User(BaseModel, SQLModel, table=True):
 
         This is also the one place a from/to transition and the grace stamp are both in hand, so
         it is where the transition is recorded — its callers otherwise spell the same event four
-        different ways, or say nothing at all.
+        different ways, or say nothing at all. `reason` names the path that detected a departure,
+        so one `stats count() by reason` over this event splits every way a user can leave.
         """
         if status is UserStatus.MEMBER:
             self.member_time = dt.datetime.now(dt.UTC)
@@ -242,19 +259,18 @@ class User(BaseModel, SQLModel, table=True):
             previous_status=previous_status.value,
             status=status.value,
             left_time=self.left_time,
+            **({"reason": reason.value} if reason is not None else {}),
         )
 
-    def mark_inactive(self) -> bool:
-        """Transition a MEMBER user to LEFT.
+    def mark_inactive(self, reason: InactiveReason) -> bool:
+        """Transition a MEMBER user to LEFT, recording which path detected the departure.
 
-        Returns `True` iff a real transition happened. JOINED_ONLY and LEFT
-        users are no-ops so callers (e.g. the `INACTIVE_USER_SET` metric path)
-        only react on genuine member departures — and a LEFT user's grace period
-        keeps running from the first detection instead of restarting on every
-        failed delivery.
+        Returns `True` iff a real transition happened. JOINED_ONLY and LEFT users are no-ops so
+        callers only react on genuine member departures — and a LEFT user's grace period keeps
+        running from the first detection instead of restarting on every failed delivery.
         """
         if self.status is UserStatus.MEMBER:
-            self.set_status(UserStatus.LEFT)
+            self.set_status(UserStatus.LEFT, reason=reason)
             return True
         return False
 
