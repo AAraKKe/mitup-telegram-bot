@@ -9,12 +9,9 @@
 # run together on a match.
 .docker-build-template: &docker-build-template
   stage: test
-  # Docker is held at 29.6.2 across the pipeline: the 29.7.0 daemon fails to extract the AWS Lambda
-  # base image layers ("mkdirat var/lang: no such file or directory"), so the two lambda matrix
-  # entries below cannot build. Restore the floating 29 tag once a fixed daemon is out.
-  image: docker:29.6.2-cli
+  image: docker:29-cli
   services:
-    - name: docker:29.6.2-dind
+    - name: docker:29-dind
       alias: docker
   variables:
     DOCKER_HOST: tcp://docker:2375
