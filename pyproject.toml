@@ -243,7 +243,7 @@ dev = [
     "pytest-xdist~=3.8.0",
     "pytest-dotenv~=0.5.2",
     "pytest-json-report~=1.5.0",
-    "ty==0.0.63",
+    "ty==0.0.64",
     "freezegun~=1.5.5",
     "ruff==0.16.0",
     "boto3~=1.34",
