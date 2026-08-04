@@ -264,6 +264,8 @@ If you joined a meeting via someone else's group message without ever opening th
 
 **What we don't do.** We don't undergo regular third-party security audits or hold formal certifications like SOC 2. We rely on AWS's infrastructure and standard operational hygiene.
 
+**Reporting.** If you find a security issue, email [security@mitup.social](mailto:security@mitup.social). The same address is published at [mitup.social/security.txt](https://mitup.social/security.txt).
+
 ## Third parties
 
 Mitup shares your data only with:

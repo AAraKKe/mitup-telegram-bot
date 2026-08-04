@@ -1,0 +1,8 @@
+# Security contact for Mitup (mitup.social and the @mitupbot Telegram bot).
+# Found a vulnerability? Please report it privately to the address below.
+# The Expires date needs a yearly bump; update it when it passes.
+
+Contact: mailto:security@mitup.social
+Expires: 2027-08-01T00:00:00.000Z
+Preferred-Languages: en, es
+Canonical: https://mitup.social/security.txt
