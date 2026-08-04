@@ -1102,3 +1102,6 @@ msgstr "Möglichkeiten zu helfen"
 
 msgid "CollaborateMessages.LIMITS_PAGE_LABEL"
 msgstr "Limits und Host-Vorteile"
+
+msgid "CommonMessages.OLD_VERSION_MESSAGE"
+msgstr "Diese Nachricht stammt aus einer älteren Version von Mitup, deshalb funktionieren ihre Buttons nicht mehr. Dein Konto und deine Treffen sind sicher. Öffne das Hauptmenü, um weiterzumachen."

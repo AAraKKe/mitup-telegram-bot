@@ -21,6 +21,33 @@ Errors are **not** routed through PTB's built-in error handler — they are caug
 
 The two planes divide the failures rather than overlapping on them. A fault that passed through an invocation is the registry's to record, line and sample both; when the update's trace already carries one, `process_update_error` skips the update whole. It writes its correlated `error` line and its `FAULT` sample only for what nothing owned.
 
+## The unrouted-callback fallback
+
+`registry.callback_query_fallback` catches every callback query no registered handler matched and
+splits them on the wire format of the data.
+
+A payload minted by the bot Mitup replaced is **answered, not failed**. That bot built every button's
+callback data as a JSON object of exactly `{"c": <controller>, "d": "<action>:<data>"}`, and used the
+bare string `nothing` for its calendar's blank cells. Neither shape is reachable from `CallbackData`
+(`{action};{entity}:{id}`), so `legacy_callbacks.is_legacy_callback_data` recognises them
+unambiguously; the key set is matched **exactly**, so a near-miss object stays a fault. Users are
+still holding messages that bot sent, so the tap gets `CommonMessages.OLD_VERSION_MESSAGE`:
+
+| Where the tap came from | Answer |
+|---|---|
+| the caller's own chat (`in_bot_chat`) | `edit_message` replaces the dead message with the notice and a main-menu button |
+| anywhere else (the old bot left cards in groups) | `answer_callback_query` alert; the message is left untouched |
+
+The language is the one on the caller's account row — most of them were migrated with one — via
+`stored_lang`, falling back to the client's `language_code` as `unregistered_caller_lang` normalizes
+it. The invocation closes as a completed one on `FAULT=0` and records one info line, `Answered a
+legacy bot callback`, with no `callback_data` of its own: the wrapper's exit line already carries it.
+Delivery is best-effort like every render in `error_handler`.
+
+Anything else raises `UnboundCallbackError`. Every button this bot renders is bound to a handler, so
+data that matched nothing is a button shipped without one or a forged payload — a genuine fault,
+answered by the generic redirect and counted `FAULT=1`.
+
 ## Exception categories
 
 ### Guard exceptions

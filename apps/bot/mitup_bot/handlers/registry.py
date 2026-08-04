@@ -43,6 +43,7 @@ from mitup_bot.update_trace import current_update_trace, record_handler_invocati
 
 from .error_handler import FaultOutcome, fault_error_type
 from .error_handler import handler as error_handler
+from .legacy_callbacks import answer_legacy_callback, is_legacy_callback_data
 
 # Remove the warning that is sent when using the per_message option in the registry.
 # We have a case in which the user can interact with a simialr message in different palces
@@ -288,14 +289,23 @@ class UnhandledHandlerId(HandlerId):
 
 
 async def callback_query_fallback(update: Update, context: TMitupContext):
-    """Fail the invocation for a callback query no registered handler matched.
+    """Answer a callback query no registered handler matched, or fail the invocation.
 
-    Every button the bot renders is bound to a handler, so reaching here means a button shipped
-    without one or a client forged the data — either way the interaction failed. Raising hands it to
-    the wrapper's fault path, which writes the correlated error line, redirects the user to the main
-    menu with the unexpected-error notice, and closes the invocation on Fault=1.
+    Two different things arrive here and the wire format tells them apart. A button rendered by the
+    bot Mitup replaced carries a payload `is_legacy_callback_data` recognises; its owner is holding a
+    message older than this bot and cannot tell, so the tap is answered with the notice saying so and
+    the invocation closes as a success.
+
+    Every button this bot renders is bound to a handler, so anything else reaching here means a
+    button shipped without one or a client forged the data — either way the interaction failed.
+    Raising hands it to the wrapper's fault path, which writes the correlated error line, redirects
+    the user to the main menu with the unexpected-error notice, and closes the invocation on Fault=1.
     """
     callback_query = guards.callback_query(update)
+    if is_legacy_callback_data(callback_query.data):
+        await answer_legacy_callback(context, update)
+        return
+
     raise UnboundCallbackError(callback_query.data)
 
 
@@ -484,10 +494,12 @@ class HandlersRegistry:
             conversation_handlers=sum(1 for wrapper in bound if wrapper.is_conversation()),
             groups=sorted({wrapper.group for wrapper in bound}),
         )
-        # Catch every callback query the registered handlers left unclaimed. Each one is a fault —
-        # a button we shipped with no handler, or forged data — so the fallback raises rather than
-        # answering. It goes through callback_with_metrics like every registered handler, so the
-        # interaction emits Fault/Time and gets its metrics flushed.
+        # Catch every callback query the registered handlers left unclaimed. The fallback answers
+        # the ones the previous bot's buttons produce, which are recognisable on the wire, with the
+        # notice saying that message is dead; anything else is a fault — a button we shipped with no
+        # handler, or forged data — and it raises rather than answering. It goes through
+        # callback_with_metrics like every registered handler, so the interaction emits Fault/Time
+        # and gets its metrics flushed either way.
         app.add_handler(
             CallbackQueryHandler(
                 callback=callback_with_metrics(

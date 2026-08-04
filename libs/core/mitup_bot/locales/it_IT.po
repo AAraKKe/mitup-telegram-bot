@@ -1072,3 +1072,6 @@ msgstr "<b>Scollegare il tuo account Patreon?</b>\n\nQuesto scollega il tuo acco
 
 msgid "CollaborateMessages.UNLINK_CONFIRM_HOST"
 msgstr "<b>Scollegare il tuo account Patreon?</b>\n\nOggi sei un ${current_tier}. Scollegare disattiva il tuo badge da ${current_tier} e i limiti più alti, e il tuo accesso all'Hosts-Only Group termina.\n\nIl tuo contributo su Patreon non si ferma da solo. Se vuoi smettere di pagare, annullalo su Patreon. Se colleghi di nuovo il tuo account mentre il tuo contributo è attivo, i tuoi vantaggi da Host tornano."
+
+msgid "CommonMessages.OLD_VERSION_MESSAGE"
+msgstr "Questo messaggio proviene da una vecchia versione di Mitup e i suoi pulsanti non funzionano più. Il tuo account e i tuoi incontri sono al sicuro. Apri il menu principale per continuare."

@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-08-03 01:24\n"
+"PO-Revision-Date: 2026-08-05 01:01\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -307,6 +307,9 @@ msgstr "You don't have a Mitup account right now. Send /start and I'll set you u
 
 msgid "CommonMessages.CONTEXT_LOST"
 msgstr "<b>Sorry, we lost our place!</b>\n\nThe bot had a quick internal update and forgot where you were in the process. Everything you saved is safe. Please start what you were doing again from the menu below."
+
+msgid "CommonMessages.OLD_VERSION_MESSAGE"
+msgstr "This message is from an older version of Mitup, so its buttons no longer work. Your account and meetings are safe. Open the main menu to keep going."
 
 msgid "CommonMessages.RICH_MESSAGE_NOT_SUPPORTED"
 msgstr "<b>That's a rich message!</b>\n\nI can tell you sent one, but I can't work with rich messages just yet. Support is coming with the v2.0 update, and I'll announce it here when it arrives, so keep an eye out. For now, send your text as a plain message and we'll keep going."

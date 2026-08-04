@@ -236,6 +236,14 @@ class CommonMessages(MessageBase):
         "were in the process. Everything you saved is safe. Please start what you were doing again from "
         "the menu below."
     )
+    # Answers a tap on a button rendered by the bot Mitup replaced. It is shown both as a screen
+    # (with a main-menu button under it) and as a plain callback-query alert, so it must stay
+    # entity-free, must not point at a keyboard that is not always there, and has to leave room for
+    # translation inside the 200-character alert limit.
+    OLD_VERSION_MESSAGE = (
+        "This message is from an older version of Mitup, so its buttons no longer work. "
+        "Your account and meetings are safe. Open the main menu to keep going."
+    )
     # Shown when a user sends a Telegram rich message where plain text input is expected
     # (title/description prompts). The bot cannot use rich content yet.
     RICH_MESSAGE_NOT_SUPPORTED = (

@@ -397,10 +397,12 @@ def should_ignore_error(error: Exception) -> bool:
 
 
 @db.with_session
-async def resolve_lang(session: AsyncSession, update: Update | None) -> str:
-    """Best-effort lookup of the effective user's language.
+async def stored_lang(session: AsyncSession, update: Update | None) -> str | None:
+    """Best-effort lookup of the language on the caller's account row.
 
-    Falls back to the project default language when the update, user, or DB record is missing.
+    `None` means there was no row to read one from, which is a different answer from a row whose
+    language happens to be the project default: a caller with no row still has the client's
+    `language_code` left to fall back to, and only this shape lets a caller distinguish the two.
     """
     if (
         update is not None
@@ -408,7 +410,15 @@ async def resolve_lang(session: AsyncSession, update: Update | None) -> str:
         and (user := await User.by_tg_user_id(session, update.effective_user.id))
     ):
         return user.lang
-    return TranslationEngine.FALLBACK_LANG
+    return None
+
+
+async def resolve_lang(update: Update | None) -> str:
+    """Best-effort lookup of the effective user's language.
+
+    Falls back to the project default language when the update, user, or DB record is missing.
+    """
+    return await stored_lang(update) or TranslationEngine.FALLBACK_LANG
 
 
 async def send_guard_notification(context: TMitupContext, update: Update, lang: str, message: CommonMessages):

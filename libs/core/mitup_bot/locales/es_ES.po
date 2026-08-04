@@ -1099,3 +1099,6 @@ msgstr "<b>¿Desvincular tu cuenta de Patreon?</b>\n\nHoy eres ${current_tier}. 
 
 msgid "SettingsMessages.TIMEOUT_INVALID"
 msgstr "¡Vaya! Ese no parece un tiempo de prórroga válido. Envíame un número entero positivo de minutos, hasta <b>${max_timeout}</b> (un día). ¡No se permiten decimales!"
+
+msgid "CommonMessages.OLD_VERSION_MESSAGE"
+msgstr "Este mensaje es de una versión antigua de Mitup, así que sus botones ya no funcionan. Tu cuenta y tus quedadas están a salvo. Abre el menú principal para continuar."

@@ -7,8 +7,9 @@ import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
-from telegram import Update
-from telegram.error import TimedOut
+from telegram import CallbackQuery, Chat, Message, Update
+from telegram import User as TgUser
+from telegram.error import BadRequest, TimedOut
 from telegram.ext import ApplicationBuilder, ApplicationHandlerStop, CommandHandler, ConversationHandler
 from telegram.ext.filters import PHOTO, TEXT, BaseFilter
 
@@ -33,13 +34,14 @@ from mitup_bot.handlers.registry import (
     callback_with_metrics,
     process_update_error,
 )
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.monitoring import MetricsClient, MetricUnit
 from mitup_bot.monitoring.metric_keys import MetricKey
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.update_trace import UPDATE_TRACE, UpdateTrace
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import CommonMessages
-from mitup_bot.views import RenderContext, factory
+from mitup_bot.utils.messages import ButtonMessages, CommonMessages
+from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import (
     AnyFloat,
     MockApi,
@@ -48,9 +50,16 @@ from tests.helpers import (
     UpdateRequest,
     build_context,
     create_bot_config,
+    create_member,
     make_test_metrics_client,
 )
-from tests.helpers.constants import DEFAULT_USER_ID
+from tests.helpers.constants import (
+    DEFAULT_CHAT_ID,
+    DEFAULT_MESSAGE_ID,
+    DEFAULT_TEST_DATE,
+    DEFAULT_TG_USER_PARAMS,
+    DEFAULT_USER_ID,
+)
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
@@ -287,6 +296,204 @@ def test_bind_registers_fallback_through_metrics_wrapper():
     wrapped_callback = cast(Any, fallback_handler.callback)
     assert wrapped_callback is not callback_query_fallback
     assert wrapped_callback.__qualname__.startswith("callback_with_metrics")
+
+
+# ---------------------------------------------------------------------------
+# Buttons rendered by the bot Mitup replaced
+# ---------------------------------------------------------------------------
+
+# The two payload shapes the previous bot put on a button: a JSON object of exactly
+# {"c": controller, "d": "action:data"}, and the bare marker its calendar used for blank cells.
+LEGACY_MENU_BUTTON = '{"c": "mm", "d": "main_menu:data"}'
+LEGACY_BLANK_CALENDAR_CELL = "nothing"
+
+LEGACY_PAYLOADS = [
+    pytest.param(LEGACY_MENU_BUTTON, id="controller_payload"),
+    pytest.param(LEGACY_BLANK_CALENDAR_CELL, id="blank_calendar_cell"),
+]
+
+NON_LEGACY_PAYLOADS = [
+    pytest.param('{"c": "mm", "d": ', id="malformed_json"),
+    pytest.param('{"c": "mm", "d": "main_menu:data", "x": "1"}', id="one_key_too_many"),
+    pytest.param('{"c": "mm"}', id="one_key_too_few"),
+    pytest.param('{"c": "mm", "d": 3}', id="value_that_is_not_a_string"),
+    pytest.param('["c", "d"]', id="json_that_is_not_an_object"),
+    pytest.param("nothing at all", id="near_miss_on_the_blank_cell_marker"),
+    pytest.param(str(UNBOUND_CALLBACK.with_id(3)), id="current_format_bound_to_no_handler"),
+]
+
+LEGACY_FALLBACK = callback_with_metrics(
+    UnhandledHandlerId.CALLBACK_QUERY_FALLBACK, "Callback", callback_query_fallback, Env.PROD
+)
+
+
+def legacy_callback_update(data: str, chat_type: str = Chat.PRIVATE, language_code: str | None = None) -> Update:
+    """A tap on a button carrying raw `data`, on a message sitting in a chat of `chat_type`.
+
+    `UpdateRequest` renders callback data through `CallbackData`, which cannot express the legacy
+    wire format at all — being unreachable from it is what makes that format recognisable — so this
+    update is assembled directly.
+    """
+    tg_user = TgUser(**DEFAULT_TG_USER_PARAMS, language_code=language_code)
+    chat = Chat(id=DEFAULT_CHAT_ID, type=chat_type)
+    message = Message(DEFAULT_MESSAGE_ID, date=DEFAULT_TEST_DATE, chat=chat, from_user=tg_user, text="")
+    return Update(
+        DEFAULT_MESSAGE_ID,
+        callback_query=CallbackQuery(
+            id=str(DEFAULT_MESSAGE_ID), from_user=tg_user, data=data, chat_instance="someinstance", message=message
+        ),
+    )
+
+
+def old_version_notice(lang: str) -> MitupView:
+    """The screen a legacy tap in the bot's own chat is expected to leave behind.
+
+    The keyboard is spelled out rather than built through the view helper the code uses, so the test
+    pins that the notice carries the main-menu row and nothing else.
+    """
+    return MitupView(
+        description=CommonMessages.OLD_VERSION_MESSAGE.get(lang=lang),
+        keyboard=[[ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)]],
+    )
+
+
+@pytest.mark.parametrize("data", LEGACY_PAYLOADS)
+async def test_a_legacy_button_in_the_bot_chat_is_replaced_by_the_old_version_notice(
+    data: str,
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+):
+    """Users still hold messages the previous bot sent, and every button on them is dead. The tap is
+    a real interaction rather than a defect of ours, so the message becomes the notice saying so,
+    carrying the one button that still works, and the invocation closes as a completed one.
+
+    `mock_session` backs the language lookup made while building that screen.
+    """
+    update = legacy_callback_update(data)
+    context = build_context(update, app, metrics=metrics_client)
+
+    await LEGACY_FALLBACK(update, context)
+    await context.flush_metrics()
+
+    context.api.assert_edit_message_called(update, old_version_notice(TranslationEngine.FALLBACK_LANG))
+    # Answered with no text: the screen underneath carries the whole message, and the empty answer is
+    # only what clears the pressed button's spinner.
+    context.api.assert_answer_callback_query_called(update, text="", show_alert=False)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+
+
+async def test_a_legacy_button_tapped_outside_the_bot_chat_is_answered_with_an_alert(
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+):
+    """The old bot could leave cards in group chats, where the message belongs to a conversation that
+    is not the bot's: the notice goes to the caller alone as an alert and the card is left standing.
+    """
+    update = legacy_callback_update(LEGACY_MENU_BUTTON, chat_type=Chat.GROUP)
+    context = build_context(update, app, metrics=metrics_client)
+
+    await LEGACY_FALLBACK(update, context)
+    await context.flush_metrics()
+
+    context.api.assert_answer_callback_query_called(
+        update,
+        text=CommonMessages.OLD_VERSION_MESSAGE.get_text(lang=TranslationEngine.FALLBACK_LANG),
+        show_alert=True,
+    )
+    context.api.assert_method_just_called("edit_message", times=0)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+
+
+async def test_the_answered_legacy_tap_is_recorded_once_without_repeating_the_payload(
+    app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient
+):
+    """One constant-event line says a legacy tap was answered. The payload rides the exit line the
+    wrapper writes for every invocation, so carrying it here too would report it twice."""
+    update = legacy_callback_update(LEGACY_MENU_BUTTON)
+    context = build_context(update, app, metrics=metrics_client)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await LEGACY_FALLBACK(update, context)
+
+    answered = [entry for entry in logs if entry["event"] == "Answered a legacy bot callback"]
+    assert len(answered) == 1
+    assert answered[0]["log_level"] == "info"
+    assert answered[0]["update_id"] == update.update_id
+    assert "callback_data" not in answered[0]
+    assert [entry for entry in logs if entry["event"] == "An error occurred while handling the update"] == []
+
+
+@pytest.mark.parametrize("data", NON_LEGACY_PAYLOADS)
+async def test_data_the_old_bot_never_minted_still_fails_the_invocation(
+    data: str, app: StubMitupApp, metrics_client: MetricsClient
+):
+    """The legacy key set is matched exactly so that recognising the old format cannot swallow a
+    genuinely unbound button: near-miss JSON and current-format data alike keep faulting."""
+    update = legacy_callback_update(data)
+    context = build_context(update, app, metrics=metrics_client)
+
+    with pytest.raises(UnboundCallbackError):
+        await callback_query_fallback(update, context)
+
+    context.api.assert_method_just_called("edit_message", times=0)
+
+
+async def test_a_notice_that_cannot_be_delivered_never_becomes_a_fault(
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+):
+    """The tapped message can be years old and no longer editable, and a delivery that fails must not
+    put the interaction back on the fault path this branch exists to keep it off."""
+    update = legacy_callback_update(LEGACY_MENU_BUTTON)
+    context = build_context(update, app, metrics=metrics_client)
+    context.api.mock_method("edit_message").side_effect = BadRequest("Message can't be edited")
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await LEGACY_FALLBACK(update, context)
+    await context.flush_metrics()
+
+    failures = [entry for entry in logs if entry["event"] == "Failed to deliver the old-version notice to the user"]
+    assert len(failures) == 1
+    assert failures[0]["log_level"] == "warning"
+    assert failures[0]["reason"] == "old_version_notice_undeliverable"
+    assert [entry for entry in logs if entry["event"] == "Answered a legacy bot callback"] == []
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+
+
+async def test_the_notice_follows_the_language_stored_on_the_caller_account(
+    app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient
+):
+    """These callers were migrated with their accounts, so the language they picked is still on the
+    row and beats the tag their client happens to send."""
+    mock_session.add_object(create_member(id=1, tg_user_id=DEFAULT_USER_ID, language="es_ES"), query_field="tg_user_id")
+    update = legacy_callback_update(LEGACY_MENU_BUTTON, language_code="de")
+    context = build_context(update, app, metrics=metrics_client)
+
+    await LEGACY_FALLBACK(update, context)
+
+    assert old_version_notice("es_ES") != old_version_notice("de_DE"), (
+        "the assertion below only means anything while the two languages render differently"
+    )
+    context.api.assert_edit_message_called(update, old_version_notice("es_ES"))
+
+
+async def test_the_notice_falls_back_to_the_client_language_without_an_account(
+    app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient
+):
+    """A caller whose row is gone still has the tag their client sends, normalized onto a supported
+    locale exactly as it is at registration."""
+    update = legacy_callback_update(LEGACY_MENU_BUTTON, language_code="es-MX")
+    context = build_context(update, app, metrics=metrics_client)
+
+    await LEGACY_FALLBACK(update, context)
+
+    context.api.assert_edit_message_called(update, old_version_notice("es_ES"))
 
 
 def test_cannot_register_same_inline_handler_twice():

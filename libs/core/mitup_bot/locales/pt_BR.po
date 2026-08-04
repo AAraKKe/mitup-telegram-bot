@@ -1102,3 +1102,6 @@ msgstr "<b>Desconectar sua conta do Patreon?</b>\n\nIsso desconecta sua conta do
 
 msgid "CollaborateMessages.UNLINK_CONFIRM_HOST"
 msgstr "<b>Desconectar sua conta do Patreon?</b>\n\nVocê é um ${current_tier} hoje. Desconectar desativa seu selo de ${current_tier} e seus limites ampliados, e seu acesso ao Grupo Exclusivo de Hosts termina.\n\nSua contribuição no Patreon não para por si só. Se quiser parar de pagar, cancele-a no Patreon. Se conectar sua conta novamente enquanto sua contribuição está ativa, suas vantagens de Host voltam."
+
+msgid "CommonMessages.OLD_VERSION_MESSAGE"
+msgstr "Esta mensagem é de uma versão antiga do Mitup, então seus botões não funcionam mais. Sua conta e seus eventos estão seguros. Abra o menu principal para continuar."
