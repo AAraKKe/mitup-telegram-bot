@@ -21,7 +21,9 @@ from . import console
 LAMBDA_POLL_INTERVAL_SECONDS = 5
 DEPLOYMENT_POLL_INTERVAL_SECONDS = 10
 DEPLOYMENT_HEARTBEAT_SECONDS = 60
-DEPLOYMENT_DISCOVERY_ATTEMPTS = 6
+# ECS materializes the service-deployment record asynchronously after update_service returns, and
+# prod has shown the lag exceeding 25 seconds, so the window is generous: 36 x 5s = 3 minutes.
+DEPLOYMENT_DISCOVERY_ATTEMPTS = 36
 DEPLOYMENT_DISCOVERY_DELAY_SECONDS = 5
 
 COLUMN_SEPARATOR = " · "
@@ -240,6 +242,8 @@ def find_service_deployment_arn(ecs_client: ECSClient, cluster: str, service: st
     deployment is always ours. It can take a moment to appear, hence the retries.
     """
     for attempt in range(DEPLOYMENT_DISCOVERY_ATTEMPTS):
+        if attempt == 1:
+            console.info("Waiting for ECS to materialize the service-deployment record...")
         if attempt:
             time.sleep(DEPLOYMENT_DISCOVERY_DELAY_SECONDS)
 
@@ -250,7 +254,11 @@ def find_service_deployment_arn(ecs_client: ECSClient, cluster: str, service: st
         if deployments and (arn := deployments[0].get("serviceDeploymentArn")) is not None:
             return arn
 
-    console.error(f"No active deployment found for ECS service {service!r} after updating it")
+    window_seconds = DEPLOYMENT_DISCOVERY_ATTEMPTS * DEPLOYMENT_DISCOVERY_DELAY_SECONDS
+    console.error(
+        f"No active deployment found for ECS service {service!r} within {window_seconds}s of updating it. "
+        "The service update was submitted, so a rollout may be running unwatched - check the ECS console."
+    )
     raise typer.Abort()
 
 

@@ -492,17 +492,19 @@ def test_find_service_deployment_arn_found_after_retries(mock_time: mock.MagicMo
 def test_find_service_deployment_arn_aborts_when_never_found(
     mock_time: mock.MagicMock, capsys: pytest.CaptureFixture[str]
 ):
-    context = DeploymentContext(list_deployments_responses=[deployments_response()] * 6)
+    context = DeploymentContext(list_deployments_responses=[deployments_response()] * 36)
 
     with context.setup_mock() as (function, ecs):
         with pytest.raises(typer.Abort):
             deploy_ops.find_service_deployment_arn(ecs, cluster="MyCluster", service="MyService")
 
     context.assert_ecs_called(
-        "list_service_deployments", n=6, service="MyService", cluster="MyCluster", status=["PENDING", "IN_PROGRESS"]
+        "list_service_deployments", n=36, service="MyService", cluster="MyCluster", status=["PENDING", "IN_PROGRESS"]
     )
-    assert mock_time.sleep.call_count == 5
-    assert "✗ No active deployment found for ECS service 'MyService' after updating it" in combined(capsys)
+    assert mock_time.sleep.call_count == 35
+    output = combined(capsys)
+    assert "✗ No active deployment found for ECS service 'MyService' within 180s" in output
+    assert "Waiting for ECS" in output
 
 
 def test_describe_service_deployment_returns_first_deployment():
