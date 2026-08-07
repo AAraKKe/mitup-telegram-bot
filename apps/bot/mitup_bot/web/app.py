@@ -184,13 +184,15 @@ def create_app(
         # the Patreon round-trips behind the OAuth callback and the membership webhook — land its
         # timing sample in the window this request flushes, instead of finding no client at all.
         #
-        # A request no route matched is only counted — the lifespan's reporter publishes the total
-        # on an interval, so a scan costs one metric sample a minute rather than anything per
-        # request — and deliberately not flushed: the router answers 404 without reaching an
-        # endpoint, so nothing can have emitted, while a flush walks every logger the backend has
-        # cached and writes a document for each, putting the per-request cost straight back. Were
-        # something below to emit anyway it stays buffered until the next served request, not lost.
-        # A request a route did serve is narrated by the endpoint that served it.
+        # A request no route matched is only counted — the lifespan's reporter publishes the
+        # accounting on an interval, so a scan costs one metric sample and one summary line a
+        # minute rather than anything per request — and deliberately not flushed: the router
+        # answers 404 without reaching an endpoint, so nothing can have emitted, while a flush
+        # walks every logger the backend has cached and writes a document for each, putting the
+        # per-request cost straight back. Were something below to emit anyway it stays buffered
+        # until the next served request, not lost. A request a route did serve is narrated by the
+        # endpoint that served it. `url.path` carries no query string, and the accounting must
+        # never see one: a near-miss on a real route could carry a live OAuth code in its query.
         try:
             with bound_metrics_client(metrics_client):
                 return await call_next(request)
@@ -198,6 +200,6 @@ def create_app(
             if matched_a_route(request):
                 await metrics_client.flush()
             else:
-                unrouted.record()
+                unrouted.record(request.method, request.url.path)
 
     return app
