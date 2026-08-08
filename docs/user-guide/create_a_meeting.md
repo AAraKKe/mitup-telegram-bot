@@ -151,7 +151,7 @@ Turn on *🔴 Lock on start*{.button-like} in the When menu and joining and leav
 Open *🗺️ Location*{.button-like} in the edit hub and you get two ways to say where the meeting is:
 
 * *🅰️ Name*{.button-like}: type a place name. Anything works: "The Usual Pub", "Park Entrance by the Fountain", or a video-call link for a meeting that isn't anywhere physical.
-* *📍 Location*{.button-like}: share a map location from your phone. Tap the attachment icon, choose Location, and send any spot, not only where you are right now. This one is phone-only, since Telegram only offers location sharing on mobile.
+* *📍 Map pin*{.button-like}: share a map location from your phone. Tap the attachment icon, choose Location, and send any spot, not only where you are right now. This one is phone-only, since Telegram only offers location sharing on mobile.
 
 You can set just a name, just a location, or both. When you've shared a location, the meeting card carries an *📍 Open in Maps*{.button-like} button, so anyone looking at it can open the spot in their maps app.
 

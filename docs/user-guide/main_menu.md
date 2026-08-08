@@ -27,8 +27,8 @@ After registration, you'll see the main menu. This is the hub for everything in 
         </div>
         <div class="mitup-bot-msg__keyboard">
           <div class="mitup-bot-msg__row"><div class="mitup-key">➕ New meeting</div></div>
-          <div class="mitup-bot-msg__row"><div class="mitup-key">📂 Your active meetings</div></div>
-          <div class="mitup-bot-msg__row"><div class="mitup-key">💾 Your past meetings</div></div>
+          <div class="mitup-bot-msg__row"><div class="mitup-key">📂 Active meetings</div></div>
+          <div class="mitup-bot-msg__row"><div class="mitup-key">💾 Past meetings</div></div>
           <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
             <div class="mitup-key">👥 Joined meetings</div>
             <div class="mitup-key">⚙️ Settings</div>
@@ -48,8 +48,8 @@ The buttons represent all actions you can take in Mitup. There are no slash comm
 Available actions:
 
 * *➕ New meeting*{.button-like}: Create a new meeting, configure it, and share. See [Create a meeting](create_a_meeting.md).
-* *📂 Your active meetings*{.button-like}: Meetings you've created that are still active. Meetings become inactive a set time after they happen.
-* *💾 Your past meetings*{.button-like}: Inactive meetings you haven't deleted yet.
+* *📂 Active meetings*{.button-like}: Meetings you've created that are still active. Meetings become inactive a set time after they happen.
+* *💾 Past meetings*{.button-like}: Inactive meetings you haven't deleted yet.
 * *👥 Joined meetings*{.button-like}: Meetings you joined but don't own. Useful if you need to find a meeting you were sent but can't locate the original message. You can view these but not edit them.
 * *⚙️ Settings*{.button-like}: Configure Mitup. See [Settings](settings.md).
 * *❓ Help*{.button-like}: The three ways to get help. Buttons for *📖 Open the user guide*{.button-like} and *👥 Join the community group*{.button-like}, plus the support email address in the message itself.

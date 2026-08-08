@@ -18,7 +18,7 @@ With the cutover behind us, this week went into something quieter: tuning how lo
 
 A meeting with no date is a draft: you type a title, mean to pick a Saturday for it, and then you don't. That is how we see meetings without a date. You are still creating it, and you have not picked a when before sharing it. Drafts used to live almost forever, and that is not sustainable at the scale Mitup runs at now.
 
-A draft's lifetime now matches how far ahead you can actually schedule: 90 days on a free or Brewer account, a year for Gamemasters and Commissioners. Bringing a draft back from *💾 Your past meetings*{.button-like} restarts that clock, which it never used to do. That was another bug fixed this week: before it, you could reactivate a meeting and in less than a minute, puf, back to inactive.
+A draft's lifetime now matches how far ahead you can actually schedule: 90 days on a free or Brewer account, a year for Gamemasters and Commissioners. Bringing a draft back from *💾 Past meetings*{.button-like} restarts that clock, which it never used to do. That was another bug fixed this week: before it, you could reactivate a meeting and in less than a minute, puf, back to inactive.
 
 The grace period that keeps a meeting active after it finishes, your *⌛ Timeout*{.button-like}, now stops at a day. There was no ceiling before, so a big enough number kept every meeting you own active forever: never finished, never tidied away. It was one of the favourite abuse tactics on the old bot, and it carried over in the migration. Mitup was cluttered with meetings that would never end, and that slows things down for everyone; the database cannot simply keep scaling, so it gets boundaries instead. Five minutes is still the default, and a day covers leaving a meeting up through the day after it ended.
 
@@ -32,7 +32,7 @@ The title, description, location, language, and every option come back exactly a
 
 Finished meetings used to be kept 180 days for everyone. That is now 90 days on a free or Brewer account, and a year for Gamemasters and Commissioners. Storing them is a real part of the bill, and that is the part Hosts cover, so the longer window is theirs.
 
-A year is the number that matters for anything annual: the summer tournament, the Christmas dinner, the birthday drinks you organize every July. When it comes around again, open *💾 Your past meetings*{.button-like}, reactivate last year's meeting, set the date, share it. Nothing to retype.
+A year is the number that matters for anything annual: the summer tournament, the Christmas dinner, the birthday drinks you organize every July. When it comes around again, open *💾 Past meetings*{.button-like}, reactivate last year's meeting, set the date, share it. Nothing to retype.
 
 On a free account, 90 days still leaves a whole season to notice a meeting and bring it back.
 

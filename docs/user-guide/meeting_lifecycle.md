@@ -5,7 +5,7 @@ icon: material/calendar-clock-outline
 
 # Meeting lifecycle
 
-Every meeting has two lives. While it's active, people can join, leave, and see it in the cards you shared into your chats. Once it finishes it becomes inactive: read-only, kept under *💾 Your past meetings*{.button-like} until you reactivate it, delete it, or the time Mitup keeps it for runs out. That button is where your inactive meetings live.
+Every meeting has two lives. While it's active, people can join, leave, and see it in the cards you shared into your chats. Once it finishes it becomes inactive: read-only, kept under *💾 Past meetings*{.button-like} until you reactivate it, delete it, or the time Mitup keeps it for runs out. That button is where your inactive meetings live.
 
 This page covers when a meeting switches from active to inactive, what happens to it then, and how long you have to bring it back before it's gone for good.
 
@@ -137,7 +137,7 @@ You don't mark a meeting as finished by hand. Mitup does it for you once the mee
 
 * **Start and end time set.** It becomes inactive once the timeout has passed after the end time. Start to end can [cover a week at most](limits.md#how-long-one-meeting-can-last), so a whole weekend away fits in one meeting.
 * **Start time only.** It becomes inactive once the timeout has passed after the start time. There's no separate duration that keeps it open.
-* **No date at all.** It stays active so you can still add a date later. If you don't, Mitup closes it out [90 days after you created it, or a year](limits.md#meetings-with-no-date) if you're a Gamemaster or a Commissioner. Bringing the meeting back from *💾 Your past meetings*{.button-like} starts that count again.
+* **No date at all.** It stays active so you can still add a date later. If you don't, Mitup closes it out [90 days after you created it, or a year](limits.md#meetings-with-no-date) if you're a Gamemaster or a Commissioner. Bringing the meeting back from *💾 Past meetings*{.button-like} starts that count again.
 
 !!! warning "A meeting with no end time closes right after it starts"
 
@@ -161,7 +161,7 @@ If a month goes by and the only thing still tying you to Mitup is a spot in some
 Becoming inactive is tidy, not destructive. Here's what changes:
 
 * The cards you shared into chats pick up a "finished" note and lose their buttons, so no one can still tap Join.
-* The meeting moves into your *💾 Your past meetings*{.button-like} list, where you can still open it and read everything you wrote.
+* The meeting moves into your *💾 Past meetings*{.button-like} list, where you can still open it and read everything you wrote.
 * Its date and time stay exactly as you set them, so the meeting reads as it happened. Reactivating it later is what clears them.
 * The participant list is cleared. The gathering is over, so everyone's spot is released, and the temporary entries for guests you invited by name go with it.
 
@@ -176,7 +176,7 @@ Both land in each participant's own timezone, so a meeting at 19:00 in Madrid re
 
 ## Reactivating an inactive meeting
 
-A meeting isn't gone once it's inactive. Open *💾 Your past meetings*{.button-like} from the main menu, pick the one you want, and you'll see it with two choices.
+A meeting isn't gone once it's inactive. Open *💾 Past meetings*{.button-like} from the main menu, pick the one you want, and you'll see it with two choices.
 
 <div class="mitup-annotated">
   <div class="mitup-annotated__chat">
@@ -211,7 +211,7 @@ A meeting isn't gone once it's inactive. Open *💾 Your past meetings*{.button-
             <div class="mitup-key">🗑️ Delete</div>
           </div>
           <div class="mitup-bot-msg__row">
-            <div class="mitup-key">≪ 💾 Your past meetings</div>
+            <div class="mitup-key">≪ 💾 Past meetings</div>
           </div>
         </div>
       </div>

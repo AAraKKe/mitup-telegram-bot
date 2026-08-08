@@ -288,13 +288,13 @@ ANCHOR_COPY: dict[str, AnchorCopy] = {
         "Wenn du das nicht gerade getan hast, ist der Link von jemand anderem in diesem Chat gelandet.",
     ),
     "pt_BR": AnchorCopy(
-        "você mesmo autorizar o mitup no patreon",
+        "você ter autorizado pessoalmente o mitup no patreon",
         "se você não acabou de fazer isso",
-        "Você só deveria estar vendo isto logo depois de autorizar o Mitup no Patreon. "
+        "Você só deveria estar vendo isto logo depois de você ter autorizado o Mitup no Patreon. "
         "Se você não acabou de fazer isso, o link de outra pessoa chegou a este chat.",
     ),
     "it_IT": AnchorCopy(
-        "autorizzato tu stesso mitup su patreon",
+        "autorizzato personalmente mitup su patreon",
         "se non l'hai appena fatto",
         "Dovresti vedere questo messaggio solo subito dopo aver autorizzato Mitup su Patreon. "
         "Se non l'hai appena fatto, è arrivato in questa chat il link di qualcun altro.",

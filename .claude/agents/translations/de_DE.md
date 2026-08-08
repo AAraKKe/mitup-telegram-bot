@@ -17,16 +17,63 @@ and register. They take priority over existing `.po` entries when there is a con
 | full + waiting list | **Voll. Warteliste ist offen** | |
 | settings | **Einstellungen** | |
 | privacy | **Datenschutz** | NOT "Privatsphäre" |
+| the Hosts group | **Hosts-Gruppe** | Canonical name everywhere — never "Hosts-Only Group" left verbatim, never "Gruppe nur für Hosts" |
+| user guide | **Handbuch** | NOT "Anleitung" or "Benutzerhandbuch" — one term everywhere, incl. link labels |
+| location (Telegram attach feature / GPS pin) | **Standort** | Telegram's own German UI says "Standort"; instructions about the 📎 menu must match it |
+| location (the meeting's place) | **Ort** | The place where the meeting happens; keep the Standort/Ort split consistent |
+| tap (a button) | **tippe auf** | NEVER "drücke", "klicke" — everything is a phone screen |
+| button | **Button** | NOT "Schaltfläche" — matches the informal du register |
+| link / unlink (Patreon account) | **verbinden / trennen** | One verb pair everywhere: buttons, headlines, body text. Not "verknüpfen" |
+| run / host (a meeting) | **veranstalten** | NOT "durchführen" — that is business-meeting German |
+| raised limits (Host perk) | **höhere Limits** | NOT "erweiterte Limits" |
+| open invitations (the toggle) | **Offene Einladungen** | It lets participants add other people; never render as invite-only ("mit Einladung") |
+| set (a date/time/option, in body text) | **festlegen / einstellen** | "feststellen" means *to notice*, not *to set* — a recurring mistranslation |
+| Telegram id | **Telegram-ID** | "ID" always uppercase, never "Id" |
+
+## Brand spelling
+
+- The product is **Mitup** / **Mitup Bot** — never "MitUp" or "MeetUp". Even if the English
+  source misspells it, the German text uses the correct spelling (and the English defect gets
+  reported upstream).
+
+## Write German, not translated English
+
+- Translate the **meaning of the sentence in its screen context**, never word by word. If a
+  literal rendering sounds like a translation ("von der Warteliste befördert", "bei der
+  gemeinsamen Nutzung", "neue Hinzufügungen"), rewrite it the way a native speaker would say it
+  ("von der Warteliste nachgerückt", "beim Teilen", "es können keine Gäste mehr hinzugefügt
+  werden").
+- Use natural spoken tense: perfect, not preterite, in bot speech ("ich habe ... erwartet",
+  never "ich erwartete ...").
+- English interjections get their German form: "Oops!" → **"Ups!"**.
+- Never invent content that is not in the English source (no added "erfolgreich"/"korrekt" in
+  confirmations, no extra sentences), and never drop content that is.
+- Success confirmations are short and active, following the English framing: "Treffen gelöscht.",
+  "Sprache eingestellt." — not "Das Treffen wurde erfolgreich gelöscht".
 
 ## Register
 
 - Use **du** (informal singular) throughout — **never Sie**
+- Prompts use the du **imperative** ("Sende mir die Uhrzeit"), never the infinitive
+- Button labels use the infinitive ("Teilnehmen", "Mitup erkunden"), per German UI convention
+- Never gender the user. German predicate nouns for roles drop the article, which keeps them
+  genderless — "Du bist Brewer", "Werde Host", never "Du bist ein Brewer" / "Werde ein Host"
+- The same applies to third parties named via placeholders: no gendered role noun next to a
+  name ("Benutzer ${name} wurde hinzugefügt" → "${name} wurde hinzugefügt"); where a noun is
+  needed, use "Person" ("die eingeladene Person"). Uninflected participles ("wurde entfernt",
+  "eingeladen von ${user}") are safe
 - Standard German punctuation only — no inverted exclamation marks
 
 ## Grammar
 
 - "Treffen" is **neuter** — "das Treffen" — agreements use neuter:
   "dieses Treffen", "das Treffen wurde gelöscht"
+- After a colon that introduces a complete sentence, capitalize ("Tipp: Du kannst ...")
+- "tippen" takes "auf": "Tippe auf den Button", never "Tippe den Button"
+- Weekday abbreviations are the standard two-letter forms (Mo, Di, Mi, Do, Fr, Sa, So);
+  short month for März is "Mär"
+- Language names in the language picker are translated into German ("Spanisch", "Englisch", ...),
+  matching the other catalogs
 
 ## Button Labels
 

@@ -143,7 +143,7 @@ Match the words the bot itself uses. These apply to the user-facing pages (see a
 * **Meeting state is "active" or "inactive".** That mirrors what the bot says (it marks a finished meeting as inactive / deactivated). A meeting that has finished is *inactive*, not "past" and not "gone by".
   * **Don't:** `Once a meeting goes past, its buttons disappear.`, `Past meetings are read-only.`
   * **Do:** `Once a meeting becomes inactive, its buttons disappear.`, `Inactive meetings are read-only.`
-  * The one exception is the literal button label *💾 Your past meetings*{.button-like}, which uses the word "past". It's the real button name, so refer to the button by its name, but describe the underlying state as inactive: "Your inactive meetings live under *💾 Your past meetings*{.button-like}." Always confirm the exact glyph and text in `ButtonMessages` before writing the chip.
+  * The one exception is the literal button label *💾 Past meetings*{.button-like}, which uses the word "past". It's the real button name, so refer to the button by its name, but describe the underlying state as inactive: "Your inactive meetings live under *💾 Past meetings*{.button-like}." Always confirm the exact glyph and text in `ButtonMessages` before writing the chip.
 * **Link the bot handle every time.** Every `@mitupbot` in prose is a link to `https://t.me/mitupbot`, so a reader can tap straight through. A bare `@mitupbot` with no link is a bug.
   * **Don't:** `Open @mitupbot and start a conversation.`
   * **Do:** `Open [@mitupbot](https://t.me/mitupbot) and start a conversation.`

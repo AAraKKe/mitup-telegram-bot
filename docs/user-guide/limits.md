@@ -21,7 +21,7 @@ The Brewer tier is a pure thank-you: it comes with the badge and the Hosts-only 
 
 ## Active meetings
 
-You can own up to 5 active meetings at once. Meetings you joined don't count, only the ones you created, and neither do inactive ones sitting in *💾 Your past meetings*{.button-like}. The cap is checked when you create a meeting and when you reactivate an inactive one:
+You can own up to 5 active meetings at once. Meetings you joined don't count, only the ones you created, and neither do inactive ones sitting in *💾 Past meetings*{.button-like}. The cap is checked when you create a meeting and when you reactivate an inactive one:
 
 !!! quote "At the cap"
 
@@ -55,11 +55,11 @@ Once a meeting is full, further joins go to the [waiting list](meeting_settings.
 
 ## Meetings with no date
 
-A meeting with no date stays active so you can add one later, and nothing else will ever finish it, so it gets a clock of its own: 90 days on a free or Brewer account, a year for Gamemasters and Commissioners. The count runs from when you created the meeting, or from the last time you brought it back from *💾 Your past meetings*{.button-like}. When it runs out the meeting becomes inactive and moves into that list, where you can reactivate it.
+A meeting with no date stays active so you can add one later, and nothing else will ever finish it, so it gets a clock of its own: 90 days on a free or Brewer account, a year for Gamemasters and Commissioners. The count runs from when you created the meeting, or from the last time you brought it back from *💾 Past meetings*{.button-like}. When it runs out the meeting becomes inactive and moves into that list, where you can reactivate it.
 
 ## How long a finished meeting is kept
 
-An inactive meeting sits in *💾 Your past meetings*{.button-like} for 90 days, or a year on the Gamemaster and Commissioner tiers, and is then deleted permanently. A week before that the bot sends you one heads-up with a button to bring the meeting back. The [meeting lifecycle](meeting_lifecycle.md#how-long-an-inactive-meeting-is-kept) page follows the whole path.
+An inactive meeting sits in *💾 Past meetings*{.button-like} for 90 days, or a year on the Gamemaster and Commissioner tiers, and is then deleted permanently. A week before that the bot sends you one heads-up with a button to bring the meeting back. The [meeting lifecycle](meeting_lifecycle.md#how-long-an-inactive-meeting-is-kept) page follows the whole path.
 
 !!! note "The tier you're on right now decides"
 

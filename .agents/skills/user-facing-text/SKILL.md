@@ -14,6 +14,7 @@ The bot is **not a chat bot** — it is an app whose UI happens to be a Telegram
 
 - **Friendly without being over the top.** Warm and helpful; not excessively enthusiastic.
 - **Direct without being terse.** Clear and concise — no padding, no hedging.
+- **Genderless by design.** Never assume the gender of the reader or of anyone named in a message. This is a product-wide rule inherited from the original bot: we never know who is reading. English is usually safe by default, but write with translation in mind: a sentence built around a `${name}`-style placeholder will be restructured in gendered languages, so keep the English focused on the action, not on a role noun next to the name ("${name} was added", never "The user ${name} was added").
 - **Social context.** Meetings here are social gatherings with friends, family, and groups — not just work meetings. Examples and prompts should reflect that variety.
 
 ### What to avoid
@@ -59,6 +60,7 @@ The list above is illustrative — treat `messages.py` as the source of truth an
   <rule>NEVER use MarkdownV2 syntax (`*bold*`, `_italic_`) in message values. Use the HTML-like tags listed below.</rule>
   <rule>Template placeholders use `${variable_name}` syntax — not `{variable_name}` or `%s`.</rule>
   <rule>Unclosed inline-formatting tags are silently dropped at runtime — no error is raised. Always close every tag you open.</rule>
+  <rule>A short status or label string (e.g. "Enabled") may render in exactly ONE sentence context. Gendered languages must inflect it to agree with what it describes, so reusing it under a second referent makes correct translation impossible. When a new screen needs the same English word, add a new enum member instead of reusing the existing one.</rule>
 </critical_rules>
 
 ## Rendering strings — `.get()` / `.get_text()` / `.back()`

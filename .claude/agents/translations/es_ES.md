@@ -17,10 +17,42 @@ and register. They take priority over existing `.po` entries when there is a con
 | full + waiting list | **Completa con lista de espera** | |
 | settings | **Ajustes** | NOT "Configuración" |
 | privacy | **Privacidad** | |
+| members (of a meeting) | **participantes** | NEVER "miembros" for the people in a quedada |
+| the Hosts group | **el Grupo de Hosts** | Canonical name, always with the article — never "Grupo solo para Hosts", "Grupo para Hosts", or the English "Hosts-Only Group" left verbatim |
+| user guide | **guía de usuario** | NOT "guía de uso" |
+| Host grants (admin flow) | **Ventajas de Host** | NEVER "concesiones" in user-visible copy |
+| searchable | **se puede buscar** | Rephrase with the verb — never the calque "buscable" |
+| a spot / free place in a meeting | **plaza / hueco** | Never "lugar" or "espacio" for spots — "lugar" is the venue |
+| lead time (notifications, scheduling horizon) | **antelación** | "con más antelación", button "⏰ Antelación" — never the spatial calque "programar más lejos" |
+| the meeting's location (the attribute holding name + pin) | **localización** | The umbrella concept: "Una quedada puede tener una localización asociada" |
+| the map pin / coordinates (Telegram attach feature) | **ubicación** | The pin sent in a message; Telegram's Spanish UI item is "Ubicación" |
+| the place / venue (casual references, its name) | **lugar** | "el nombre del lugar", button "🗺️ Lugar" |
+| open invitations (the toggle) | **Invitaciones abiertas** | It lets participants add other people; "Con invitación" reads as invite-only — meaning inversion |
+
+## Brand spelling
+
+- The product is **Mitup** / **Mitup Bot** — never "MitUp". Copy the casing from the English source.
+
+## Write Spanish, not translated English
+
+- Translate the **meaning of the sentence in its screen context**, never word by word. If a literal
+  rendering sounds like a translation ("buscable", "adición", "debe ser en el futuro"), rewrite it
+  the way a native speaker would say it ("se puede buscar", "invitación", "tiene que ser una hora futura").
+- Never invent content that is not in the English source, and never drop content that is.
+- A success confirmation tells the user what they will experience, not that a value was stored —
+  follow the English source's framing.
 
 ## Register
 
-- Use **tú** (informal singular) throughout — **never usted**
+- Use **tú** (informal singular) throughout — **never usted** ("Selecciona", never "Seleccione")
+- Prompts use the tú **imperative** ("Envíame la hora"), never the infinitive ("Enviarme la hora")
+- Never gender the user. Masculine defaults like "Bienvenido", "conectado", "listo" are not
+  acceptable; rephrase to a genderless form: "Te damos la bienvenida", "Tu cuenta ya está
+  conectada", "Todo listo"
+- The same applies to **third parties named via placeholders** (`${name}`, `${user}`,
+  `${participant}`): no masculine participle or article chains around a name. Restructure:
+  "Se ha añadido a ${name}", "Se ha expulsado a ${participant}", "invitación de ${user}",
+  "la persona invitada" — never "El usuario ${name} ha sido añadido"
 
 ## Punctuation
 
@@ -32,6 +64,10 @@ and register. They take priority over existing `.po` entries when there is a con
 - "quedada" is **feminine** — all agreeing adjectives and past participles must be feminine:
   "completa", "pública", "creada por", "nueva quedada"
 - "participante/participantes" is gender-neutral
+- Question words keep their accent in indirect questions: "Dime cuál será el título",
+  "elige a quién quieres expulsar"
+- Pronouns and articles must agree in number with their referent: "reenviar tus quedadas a
+  quienes **las** reciban" (not "la")
 
 ## Button Labels
 

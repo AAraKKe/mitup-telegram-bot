@@ -67,7 +67,7 @@ Tap *⏰ Notifications*{.button-like} to turn reminders on or off and choose how
 
 ## Timeout
 
-Tap *⌛ Timeout*{.button-like} to set how long a meeting stays in your active list after it finishes. Mitup counts from the end time, or from the start time if you didn't set an end. When that grace period passes, the meeting becomes inactive and moves to *💾 Your past meetings*{.button-like}, where you can reactivate it.
+Tap *⌛ Timeout*{.button-like} to set how long a meeting stays in your active list after it finishes. Mitup counts from the end time, or from the start time if you didn't set an end. When that grace period passes, the meeting becomes inactive and moves to *💾 Past meetings*{.button-like}, where you can reactivate it.
 
 Send the number of minutes you want. It's five by default, and [a day (1440 minutes) is the ceiling](limits.md#the-timeout-grace-period), so a meeting can stay up through the day after it ended but not longer.
 

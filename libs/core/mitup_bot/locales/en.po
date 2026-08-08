@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-08-07 18:17\n"
+"PO-Revision-Date: 2026-08-08 17:02\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -39,10 +39,10 @@ msgid "ButtonMessages.NEW_MEETING"
 msgstr "➕ New meeting"
 
 msgid "ButtonMessages.ACTIVE_MEETINGS"
-msgstr "📂 Your active meetings"
+msgstr "📂 Active meetings"
 
 msgid "ButtonMessages.PAST_MEETINGS"
-msgstr "💾 Your past meetings"
+msgstr "💾 Past meetings"
 
 msgid "ButtonMessages.JOINED_MEETINGS"
 msgstr "👥 Joined meetings"
@@ -168,7 +168,7 @@ msgid "ButtonMessages.MEETING_LOCATION_NAME"
 msgstr "🅰️ Name"
 
 msgid "ButtonMessages.MEETING_LOCATION_COORDINATES"
-msgstr "📍 Location"
+msgstr "📍 Map pin"
 
 msgid "ButtonMessages.MEETING_MAX_PARTICIPANTS"
 msgstr "Max participants"
@@ -351,13 +351,13 @@ msgid "RegistrationMessages.TIMEZONE_INVALID_INPUT"
 msgstr "Please send your city name as text or share your location."
 
 msgid "SettingsMessages.DESCRIPTION"
-msgstr "Configure MitUp."
+msgstr "Configure Mitup."
 
 msgid "SettingsMessages.TIMEZONE_PROMPT"
-msgstr "Your timezone is set to <b>${timezone}</b>. \nSend me the name of your city or your location to set your timezone or touch in <b>Cancel</b> to go back."
+msgstr "Your timezone is set to <b>${timezone}</b>.\nSend me the name of your city or your location to set your timezone or tap <b>Cancel</b> to go back."
 
 msgid "SettingsMessages.TIMEZONE_SUCCESS"
-msgstr "Your timezone has been set to: <b>${timezone}</b> "
+msgstr "Your timezone has been set to: <b>${timezone}</b>"
 
 msgid "SettingsMessages.TIMEZONE_ON_EXIT"
 msgstr "You were in the middle of changing your timezone. Send me either the name of your city or your location to continue.  If you don't want to continue, tap Cancel to exit."
@@ -372,7 +372,7 @@ msgid "SettingsMessages.DEFAULT_OPTIONS_DESCRIPTION"
 msgstr "Here you can configure the default options used when creating a meeting. Do you usually create public meetings? Set it here. Are you always allowing people to invite other people or to share the meeting in other chats? Do it here. All your meetings will inherit this configuration.\n\nYou can configure different aspects of your meeting:\n\n<b>Waiting list</b>: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n<b>Public</b>: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n<b>Open invitations</b>: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n<b>Lock on start</b>: when enabled and a meeting has a duration set, participants cannot join or leave once the meeting starts. When disabled, participants can still join or leave freely."
 
 msgid "SettingsMessages.TIMEOUT_PROMPT"
-msgstr "Timeout defines how long after a meeting starts it is kept active. Meetings without a set duration are deactivated once this time has passed. After deactivation, you can reactivate a meeting from your <b>Past meetings menu</b>.\n\nThe current timeout is <b>${timeout} minutes</b>\n\nSend the timeout (in minutes) you would like to use or touch Cancel to go back. The maximum is <b>${max_timeout} minutes</b>, which is one day."
+msgstr "Timeout defines how long after a meeting starts it is kept active. Meetings without a set duration are deactivated once this time has passed. After deactivation, you can reactivate a meeting from <b>Past meetings</b>.\n\nThe current timeout is <b>${timeout} minutes</b>\n\nSend the timeout (in minutes) you would like to use or touch Cancel to go back. The maximum is <b>${max_timeout} minutes</b>, which is one day."
 
 msgid "SettingsMessages.TIMEOUT_INVALID"
 msgstr "That doesn't look like a valid timeout. Send a positive whole number of minutes, up to <b>${max_timeout}</b> (one day). No decimals allowed!"
@@ -381,7 +381,7 @@ msgid "SettingsMessages.TIMEOUT_SUCCESS"
 msgstr "Timeout set to: <b>${timeout} minutes</b>"
 
 msgid "SettingsMessages.NOTIFICATIONS_DESCRIPTION"
-msgstr "Configure MeetUp notifications.\n\nNotifications: ${notifications_status}\nWhen notifications are enabled, MeetUp will notify you <b>${notifications_time} minutes</b> before a meeting starts."
+msgstr "Configure Mitup notifications.\n\nNotifications: ${notifications_status}\nWhen notifications are enabled, Mitup will notify you <b>${notifications_time} minutes</b> before a meeting starts."
 
 msgid "SettingsMessages.NOTIFICATIONS_TIME_PROMPT"
 msgstr "Send how long before a meeting starts (in minutes) you would like to be notified or touch Cancel to go back."
@@ -417,7 +417,7 @@ msgid "PrivacyMessages.DELETION_COMPLETE"
 msgstr "<b>Your data is deleted</b>\n\nEverything linked to your account is permanently gone: the meetings you created, your spot in the meetings you joined, and your settings. Buttons on older messages in this chat no longer do anything.\n\nTo use Mitup again, send the /start command. Mitup has no memory of you now and will set you up from scratch."
 
 msgid "MeetingCreationMessages.PROMPT"
-msgstr "Lets create a meeting. What is the title?\n\n<i>Tip: you can also use ${datetime_link} to include a date and time directly.</i>"
+msgstr "Let's create a meeting. What is the title?\n\n<i>Tip: you can also use ${datetime_link} to include a date and time directly.</i>"
 
 msgid "MeetingCreationMessages.SUCCESS"
 msgstr "Meeting created: <b>${title}</b>\n\nYou can add more information to the meeting with the options below. The information which has not been added won't be shown when the meeting is shared.\n\nWhen finished click on ✅ Done"
@@ -576,7 +576,7 @@ msgid "MeetingAttachMessages.ALREADY_ENABLED_ALERT"
 msgstr "✅ Already Searchable!\n\nThis meeting was already attached to this chat from a previous share. It is already included in your search results."
 
 msgid "MeetingEditContentMessages.TITLE_PROMPT"
-msgstr "This is the current title of your meeting:\n<b>${title}</b>\n\n Send me the new one"
+msgstr "This is the current title of your meeting:\n<b>${title}</b>\n\nSend me the new one"
 
 msgid "MeetingEditContentMessages.TITLE_SUCCESS"
 msgstr "Title updated to: <b>${title}</b>"
@@ -585,7 +585,7 @@ msgid "MeetingEditContentMessages.TITLE_ON_EXIT"
 msgstr "Sorry, I was expecting the title of your meeting. Would you like to send it? If not, tap Cancel to exit."
 
 msgid "MeetingEditContentMessages.DESCRIPTION_PROMPT"
-msgstr "This is the current description of your meeting:\n${description}\n\n Send me the new one"
+msgstr "This is the current description of your meeting:\n${description}\n\nSend me the new one"
 
 msgid "MeetingEditContentMessages.DESCRIPTION_SUCCESS"
 msgstr "Description updated to: <b>${description}</b>"
@@ -621,10 +621,10 @@ msgid "MeetingEditParticipantsMessages.DESCRIPTION"
 msgstr "Here you will be able to manage the participants of the meeting: you can set the maximum number of people that can attend the meeting as well as kick out any of the participants that joined the meeting."
 
 msgid "MeetingEditParticipantsMessages.MAX_PROMPT"
-msgstr "Send me the maximum number of members allowed in the meeting (must be a number greater than 0) or press in <i>No limit</i> to allow an unlimited number of participants."
+msgstr "Send me the maximum number of participants allowed in the meeting (must be a number greater than 0) or tap <i>No limit</i> to allow an unlimited number of participants."
 
 msgid "MeetingEditParticipantsMessages.MAX_PROMPT_CAPPED"
-msgstr "Send me the maximum number of members allowed in the meeting (must be a number greater than 0) or press <i>Max (${cap})</i> to allow your plan's maximum of ${cap} participants."
+msgstr "Send me the maximum number of participants allowed in the meeting (must be a number greater than 0) or tap <i>Max (${cap})</i> to allow your plan's maximum of ${cap} participants."
 
 msgid "MeetingEditParticipantsMessages.MAX_SUCCESS"
 msgstr "Max participants set to: <b>${max_participants}</b>"

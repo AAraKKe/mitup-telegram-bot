@@ -63,8 +63,8 @@ class ButtonMessages(MessageBase):
 
     # Main Menu buttons
     NEW_MEETING = f"{Emojis.NEW_MEETING} New meeting"
-    ACTIVE_MEETINGS = f"{Emojis.LIST} Your active meetings"
-    PAST_MEETINGS = f"{Emojis.PAST} Your past meetings"
+    ACTIVE_MEETINGS = f"{Emojis.LIST} Active meetings"
+    PAST_MEETINGS = f"{Emojis.PAST} Past meetings"
     JOINED_MEETINGS = f"{Emojis.JOINED} Joined meetings"
     SETTINGS = f"{Emojis.SETTINGS} Settings"
     HELP = f"{Emojis.HELP} Help"
@@ -110,7 +110,7 @@ class ButtonMessages(MessageBase):
     EDIT = f"{Emojis.EDIT} Edit"
     SHARE = f"{Emojis.SHARE} Share"
     MEETING_LOCATION_NAME = f"{Emojis.TITLE} Name"
-    MEETING_LOCATION_COORDINATES = f"{Emojis.PIN} Location"
+    MEETING_LOCATION_COORDINATES = f"{Emojis.PIN} Map pin"
     MEETING_MAX_PARTICIPANTS = "Max participants"
     MEETING_NO_LIMIT_PARTICIPANTS = "No limit"
     # Replaces MEETING_NO_LIMIT_PARTICIPANTS for owners whose plan caps participant capacity.
@@ -334,15 +334,15 @@ class RegistrationMessages(MessageBase):
 
 
 class SettingsMessages(MessageBase):
-    DESCRIPTION = "Configure MitUp."
+    DESCRIPTION = "Configure Mitup."
 
     # Timezone settings
     TIMEZONE_PROMPT = (
-        "Your timezone is set to <b>${timezone}</b>. \n"
+        "Your timezone is set to <b>${timezone}</b>.\n"
         "Send me the name of your city or your location to set your "
-        "timezone or touch in <b>Cancel</b> to go back."
+        "timezone or tap <b>Cancel</b> to go back."
     )
-    TIMEZONE_SUCCESS = "Your timezone has been set to: <b>${timezone}</b> "
+    TIMEZONE_SUCCESS = "Your timezone has been set to: <b>${timezone}</b>"
     # On-exit prompt shown when an unexpected message interrupts timezone edit
     TIMEZONE_ON_EXIT = (
         "You were in the middle of changing your timezone. "
@@ -381,7 +381,7 @@ class SettingsMessages(MessageBase):
     TIMEOUT_PROMPT = (
         "Timeout defines how long after a meeting starts it is kept active. "
         "Meetings without a set duration are deactivated once this time has passed. "
-        "After deactivation, you can reactivate a meeting from your <b>Past meetings menu</b>.\n\n"
+        "After deactivation, you can reactivate a meeting from <b>Past meetings</b>.\n\n"
         "The current timeout is <b>${timeout} minutes</b>\n\n"
         "Send the timeout (in minutes) you would like to use or touch Cancel to go back. "
         "The maximum is <b>${max_timeout} minutes</b>, which is one day."
@@ -394,9 +394,9 @@ class SettingsMessages(MessageBase):
 
     # Notification settings
     NOTIFICATIONS_DESCRIPTION = (
-        "Configure MeetUp notifications.\n\n"
+        "Configure Mitup notifications.\n\n"
         "Notifications: ${notifications_status}\n"
-        "When notifications are enabled, MeetUp will notify "
+        "When notifications are enabled, Mitup will notify "
         "you <b>${notifications_time} minutes</b> before a meeting starts."
     )
     NOTIFICATIONS_TIME_PROMPT = (
@@ -459,7 +459,7 @@ class PrivacyMessages(MessageBase):
 
 class MeetingCreationMessages(MessageBase):
     PROMPT = (
-        "Lets create a meeting. What is the title?\n\n"
+        "Let's create a meeting. What is the title?\n\n"
         "<i>Tip: you can also use ${datetime_link} to include a date and time directly.</i>"
     )
     SUCCESS = (
@@ -604,12 +604,12 @@ class MeetingAttachMessages(MessageBase):
 
 
 class MeetingEditContentMessages(MessageBase):
-    TITLE_PROMPT = "This is the current title of your meeting:\n<b>${title}</b>\n\n Send me the new one"
+    TITLE_PROMPT = "This is the current title of your meeting:\n<b>${title}</b>\n\nSend me the new one"
     TITLE_SUCCESS = "Title updated to: <b>${title}</b>"
     TITLE_ON_EXIT = (
         "Sorry, I was expecting the title of your meeting. Would you like to send it? If not, tap Cancel to exit."
     )
-    DESCRIPTION_PROMPT = "This is the current description of your meeting:\n${description}\n\n Send me the new one"
+    DESCRIPTION_PROMPT = "This is the current description of your meeting:\n${description}\n\nSend me the new one"
     # The user-supplied description is intentionally wrapped in bold so the newly set value
     # is visually highlighted in the confirmation message.
     DESCRIPTION_SUCCESS = "Description updated to: <b>${description}</b>"
@@ -654,14 +654,14 @@ class MeetingEditParticipantsMessages(MessageBase):
         "participants that joined the meeting."
     )
     MAX_PROMPT = (
-        "Send me the maximum number of members allowed in the meeting (must be a number greater than 0) "
-        "or press in <i>No limit</i> to allow an unlimited number of participants."
+        "Send me the maximum number of participants allowed in the meeting (must be a number greater than 0) "
+        "or tap <i>No limit</i> to allow an unlimited number of participants."
     )
     # Shown instead of MAX_PROMPT when the owner's plan caps participant capacity: promising
     # "unlimited" would be false, since the effective capacity clamps to the plan's cap.
     MAX_PROMPT_CAPPED = (
-        "Send me the maximum number of members allowed in the meeting (must be a number greater than 0) "
-        "or press <i>Max (${cap})</i> to allow your plan's maximum of ${cap} participants."
+        "Send me the maximum number of participants allowed in the meeting (must be a number greater than 0) "
+        "or tap <i>Max (${cap})</i> to allow your plan's maximum of ${cap} participants."
     )
     MAX_SUCCESS = "Max participants set to: <b>${max_participants}</b>"
     NO_LIMIT_LABEL = "No limit"
