@@ -1,5 +1,5 @@
 ---
-description: "Mitup is a free Telegram bot for organizing meetups: create a meeting, share one card, and let it handle RSVPs, reminders, and timezones."
+description: "Mitup is a free Telegram bot for organizing events and meetups: create a meeting, share one card, and it handles RSVPs, reminders, and timezones."
 hide:
     - navigation
     - toc

@@ -1,7 +1,7 @@
 [project]
 site_name = "Mitup Telegram Bot"
 site_url = "https://mitup.social"
-site_description = "A free, open-source Telegram bot for organizing meetups. Create a meeting, share one card in your group, and let Mitup handle RSVPs, reminders, and timezones."
+site_description = "A free, open-source Telegram bot for organizing events and meetups. Create a meeting, share one card in your group, and let Mitup handle RSVPs, reminders, and timezones."
 repo_url = "https://gitlab.com/meetupbot/mitup-telegram-bot"
 repo_name = "MitupBot/mitup-telegram-bot"
 extra_css = [

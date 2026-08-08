@@ -1,5 +1,5 @@
 ---
-description: "Create a meeting in Telegram with a title, then add a date, a place, a participant limit, and a language before you share the card."
+description: "Create a meeting in Telegram for any event: add a title, a date, a place, a participant limit, and a language, then share the card."
 icon: material/calendar-plus-outline
 ---
 

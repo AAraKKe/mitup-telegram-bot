@@ -1,6 +1,6 @@
 # Mitup
 
-> Mitup is a free, open-source Telegram bot for organizing meetups. You create a meeting in a private chat with @mitupbot, share one card into your group, and the bot tracks RSVPs and the waiting list and sends reminders in each person's own timezone. It is MIT-licensed, carries no ads, and never joins your group.
+> Mitup is a free, open-source Telegram bot for organizing events and meetups. You create a meeting in a private chat with @mitupbot, share one card into your group, and the bot tracks RSVPs and the waiting list and sends reminders in each person's own timezone. It is MIT-licensed, carries no ads, and never joins your group.
 
 ## Docs
 
