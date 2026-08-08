@@ -113,6 +113,29 @@ async def test_link_new_non_patron_stores_without_support():
     api.assert_method_just_called("send_message_to_user", times=1)
 
 
+@pytest.mark.parametrize(
+    "link_level, expected_outcome",
+    [
+        (SupporterLevel.NONE, LinkOutcome.LINKED_NO_PATRON),
+        (SupporterLevel.HOST_1, LinkOutcome.LINKED_SUPPORTER),
+    ],
+    ids=["no_patronage", "lower_patronage"],
+)
+async def test_link_never_drops_the_level_below_the_grant_floor(
+    link_level: SupporterLevel, expected_outcome: LinkOutcome
+):
+    session = MockDbSession()
+    user = create_user(id=1, tg_user_id=997_652)
+    user.supporter_level = SupporterLevel.HOST_3
+    user.granted_supporter_level = SupporterLevel.HOST_3
+    api = MockApi()
+
+    outcome = await link_patreon_account(session, api, user, patreon_user_id="p-652", granted_level=link_level)
+
+    assert outcome is expected_outcome
+    assert user.supporter_level is SupporterLevel.HOST_3
+
+
 async def test_link_binds_to_the_user_it_is_given():
     # The whole security fix in one assertion: the subscription row is written against the user
     # handed to the function, which the handler takes from the sender of the redemption message.

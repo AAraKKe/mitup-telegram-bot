@@ -67,11 +67,12 @@ class RedemptionRefusal(Enum):
 
 
 class HostsGroupTrigger(StrEnum):
-    """Which path asked for a hosts-group readmission. Both reach the same two no-ops, and a
+    """Which path asked for a hosts-group readmission. All reach the same two no-ops, and a
     readmission that did not happen means something different depending on which one it was."""
 
     LINK = "link"
     WEBHOOK = "webhook"
+    GRANT = "grant"
 
 
 class LinkKind(StrEnum):
@@ -266,13 +267,15 @@ async def link_patreon_account(
         return LinkOutcome.ALREADY_LINKED_ELSEWHERE
 
     subscription = linked.subscription
+    # The stored level never drops below the manually-granted floor, so linking a Patreon account
+    # with a lower (or no) entitlement cannot strip an admin grant.
+    effective = supporter.highest(granted_level, user.granted_supporter_level)
+    user.supporter_level = effective
     if supporter.is_supporter(granted_level):
-        user.supporter_level = granted_level
         subscription.support_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=SUPPORT_GRACE_DAYS)
-        message = SupporterNotificationMessages.unlocked_for(granted_level)
+        message = SupporterNotificationMessages.unlocked_for(effective)
         outcome = LinkOutcome.LINKED_SUPPORTER
     else:
-        user.supporter_level = SupporterLevel.NONE
         subscription.support_expiration = None
         message = CollaborateMessages.LINK_CONFIRMED_NO_PATRON
         outcome = LinkOutcome.LINKED_NO_PATRON

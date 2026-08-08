@@ -38,7 +38,6 @@ from mitup_bot.patreon.creator_token import (
     store_creator_token,
 )
 from mitup_bot.patreon.models import MemberResource
-from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils.messages import SupporterNotificationMessages
 from mitup_bot.views.collaborate import hosts_group_removed_view
 
@@ -258,16 +257,25 @@ async def advance_grace_flow(
         return DueOutcome.GRACE_STARTED
 
     previous = user.supporter_level
-    user.supporter_level = SupporterLevel.NONE
+    target = user.granted_supporter_level
+    user.supporter_level = target
+    # Clearing the runway takes the row out of the due sweep, so the revoke fires once instead of
+    # re-notifying daily; a later reactivation is picked up by the level-sync pass, which restores
+    # the runway on the change it writes.
+    subscription.support_expiration = None
     log.info(
         "Supporter level revoked",
         patreon_user_id=subscription.patreon_user_id,
         previous_level=previous.value,
-        new_level=SupporterLevel.NONE.value,
+        new_level=target.value,
+        granted_level=user.granted_supporter_level.value,
         reason="grace_expired_and_not_active_patron",
     )
-    await api.send_message_to_user(user, SupporterNotificationMessages.SUPPORT_LOST.get(lang=user.lang))
-    await remove_from_hosts_group(api, user)
+    if not supporter.is_supporter(target):
+        await api.send_message_to_user(user, SupporterNotificationMessages.SUPPORT_LOST.get(lang=user.lang))
+        await remove_from_hosts_group(api, user)
+    elif target is not previous:
+        await api.send_message_to_user(user, SupporterNotificationMessages.downgraded_to(target).get(lang=user.lang))
     return DueOutcome.SUPPORT_LOST
 
 
@@ -278,8 +286,8 @@ async def process_due_subscription(
 
     Owns the lapse lifecycle only: for a still-active member it extends grace (the level itself is
     reconciled by the level-sync pass), and for a lapsed member it starts grace and then revokes to
-    NONE. Re-checks under the fresh transaction that the row is still due. Returns the transition
-    taken so ``run`` can tally lifecycle counts."""
+    the manually-granted floor (NONE absent a grant). Re-checks under the fresh transaction that the
+    row is still due. Returns the transition taken so ``run`` can tally lifecycle counts."""
     async with db.begin_write(api) as session:
         subscription = (
             await session.exec(DUE_SUBSCRIPTIONS.where(SupporterSubscription.id == subscription_id))
@@ -299,19 +307,22 @@ async def process_due_subscription(
 async def apply_target_level(
     api: TelegramApiWrapper, subscription: SupporterSubscription, user: User, amount: int, config: PatreonConfig
 ) -> LevelSyncOutcome:
-    """Write the tier the entitled amount buys, tell the user, and record the move.
+    """Write the tier the entitled amount buys, clamped to the manually-granted floor, tell the
+    user, and record the move.
 
     The unchanged case is logged too: it is bounded by the number of linked accounts, and it is the
     only evidence that a tier was checked and deliberately left alone.
     """
     previous = user.supporter_level
-    target = supporter.level_for_amount(amount, config)
+    entitled = supporter.level_for_amount(amount, config)
+    target = supporter.highest(entitled, user.granted_supporter_level)
     if previous == target:
+        reason = "entitled_amount_matches_level" if target is entitled else "level_held_by_grant"
         log.info(
             "Supporter level unchanged",
             supporter_level=previous.value,
             amount_cents=amount,
-            reason="entitled_amount_matches_level",
+            reason=reason,
         )
         return LevelSyncOutcome.UNCHANGED
 
@@ -342,8 +353,9 @@ async def sync_subscription_level(
     """Reconcile one active member's supporter tier with their entitled amount, in its own write
     lifecycle.
 
-    Derives the target tier from ``currently_entitled_amount_cents`` and writes it when it differs,
-    refreshing grace on any change (the member is confirmed active this run). A rank increase notifies
+    Derives the target tier from ``currently_entitled_amount_cents``, clamps it to the
+    manually-granted floor, and writes it when it differs, refreshing grace on any change (the
+    member is confirmed active this run). A rank increase notifies
     the user with the per-tier unlock message; a between-tier drop (still an active supporter) notifies
     with the neutral per-tier tier-set message. A member absent from the amounts map is lapsing and
     left to the grace flow, so this returns SKIPPED for them."""

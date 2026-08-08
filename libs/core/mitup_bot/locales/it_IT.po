@@ -1075,3 +1075,54 @@ msgstr "<b>Scollegare il tuo account Patreon?</b>\n\nOggi sei un ${current_tier}
 
 msgid "CommonMessages.OLD_VERSION_MESSAGE"
 msgstr "Questo messaggio proviene da una vecchia versione di Mitup e i suoi pulsanti non funzionano più. Il tuo account e i tuoi incontri sono al sicuro. Apri il menu principale per continuare."
+
+msgid "AdminMessages.BUTTON_SUPPORTER_GRANTS"
+msgstr "🎁 Concessioni Host"
+
+msgid "GrantOperatorMessages.TARGET_PROMPT"
+msgstr "<b>Concessioni Host</b>\n\nInvia l'id Telegram o lo @username della persona da gestire. Solo i membri registrati possono ricevere un livello Host."
+
+msgid "GrantOperatorMessages.TARGET_NOT_FOUND"
+msgstr "🚫 Nessun membro corrisponde a <code>${identifier}</code>. Controlla l'id o lo username e invialo di nuovo."
+
+msgid "GrantOperatorMessages.TARGET_SUMMARY"
+msgstr "<b>${name}</b>\nId Telegram: <code>${tg_user_id}</code>\nLivello attuale: ${current_level}\nLivello concesso: ${granted_level}\nPatreon collegato: ${patreon_linked}\n\nScegli il livello Host da concedere. Il livello concesso è una soglia minima: i cambiamenti su Patreon non porteranno mai la persona al di sotto."
+
+msgid "GrantOperatorMessages.CONFIRM_PROMPT"
+msgstr "Impostare il livello Host concesso per <b>${name}</b> su ${level}?"
+
+msgid "GrantOperatorMessages.APPLIED_CONFIRMATION"
+msgstr "Il livello Host concesso per <b>${name}</b> è ora ${level}."
+
+msgid "GrantOperatorMessages.CANCELLED_CONFIRMATION"
+msgstr "Concessione abbandonata. Non è stato modificato nulla."
+
+msgid "GrantOperatorMessages.LEVEL_NONE"
+msgstr "Nessuno"
+
+msgid "GrantOperatorMessages.LEVEL_HOST_1"
+msgstr "☕️ Brewer"
+
+msgid "GrantOperatorMessages.LEVEL_HOST_2"
+msgstr "🎲 Gamemaster"
+
+msgid "GrantOperatorMessages.LEVEL_HOST_3"
+msgstr "🏆 Commissioner"
+
+msgid "GrantOperatorMessages.BUTTON_REMOVE_GRANT"
+msgstr "🚫 Nessuna concessione"
+
+msgid "GrantOperatorMessages.BUTTON_CANCEL"
+msgstr "❌ Annulla"
+
+msgid "SupporterNotificationMessages.HOST_1_GRANTED"
+msgstr "<b>☕️ Sei un Brewer</b>\n\nHai ricevuto in regalo il livello Host Brewer. Il tuo badge da Brewer è ora visibile sul tuo profilo."
+
+msgid "SupporterNotificationMessages.HOST_2_GRANTED"
+msgstr "<b>🎲 Sei un Gamemaster</b>\n\nHai ricevuto in regalo il livello Host Gamemaster. Il tuo badge da Gamemaster è attivo e i tuoi limiti sono appena aumentati: gestisci più incontri contemporaneamente, pianificali con più anticipo e invita quante persone vuoi a ciascuno."
+
+msgid "SupporterNotificationMessages.HOST_3_GRANTED"
+msgstr "<b>🏆 Sei un Commissioner</b>\n\nHai ricevuto in regalo il livello Host Commissioner. Il tuo badge da Commissioner è attivo e ogni limite è rimosso: gestisci tutti gli incontri che vuoi, pianificali con tutto l'anticipo che ti serve e invita quante persone vuoi a ciascuno."
+
+msgid "SupporterNotificationMessages.GRANT_REMOVED"
+msgstr "<b>I tuoi vantaggi da Host regalati sono terminati</b>\n\nIl livello Host che hai ricevuto in regalo non è più attivo. Puoi diventare un Host in qualsiasi momento dal menu Collabora."

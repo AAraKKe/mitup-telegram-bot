@@ -227,6 +227,49 @@ class PaginatedCallbackData(CallbackData):
         return self.__class__(entity=self.entity, action=self.action, id=id, page=self.page, source=self.source)
 
 
+class ValidGrantCallbackData(ValidCallbackData):
+    """Validated GrantCallbackData: the target user id and the tier rank are both present."""
+
+    level: int
+
+
+class GrantCallbackData(CallbackData):
+    """CallbackData for the admin supporter-grant flow.
+
+    The id addresses the target user's row and `level` carries the picked tier as its rank in the
+    supporter policy's `LEVEL_ORDER`, so every button of the flow is self-contained and the
+    conversation needs no per-user draft state. The rank is re-validated server-side on every tap.
+
+    Format string: {action};{entity}:{id};lvl:{rank}
+    Example: "set;grant:42;lvl:2"
+    """
+
+    level: int | None = Field(default=None, ge=0)
+
+    def __str__(self) -> str:
+        return f"{super().__str__()};lvl:{'' if self.level is None else self.level}"
+
+    @property
+    @override
+    def pattern_body(self) -> str:
+        return f"{super().pattern_body};lvl:(?P<level>\\d*)"
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def validate_level(cls, value: str | int | None) -> str | int | None:
+        # A missing level is parsed as an empty string from the wire format; normalize it to None
+        # so `is_malformed` has a single shape to check.
+        return value or None if isinstance(value, str) else value
+
+    @override
+    def is_malformed(self) -> bool:
+        return super().is_malformed() or self.level is None
+
+    def with_level(self, id: int, level: int) -> Self:
+        """Creates a GrantCallbackData addressing the target user `id` with the tier rank `level`."""
+        return self.__class__(entity=self.entity, action=self.action, id=id, level=level)
+
+
 class ValidMeetingCallbackData(ValidCallbackData):
     """
     Callback data to be used when performing an action on a meeting

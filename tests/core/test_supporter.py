@@ -51,6 +51,22 @@ def test_is_supporter(level: SupporterLevel, expected: bool):
 
 
 @pytest.mark.parametrize(
+    "earned,granted,expected",
+    [
+        (SupporterLevel.NONE, SupporterLevel.NONE, SupporterLevel.NONE),
+        (SupporterLevel.HOST_1, SupporterLevel.NONE, SupporterLevel.HOST_1),
+        (SupporterLevel.NONE, SupporterLevel.HOST_2, SupporterLevel.HOST_2),
+        (SupporterLevel.HOST_3, SupporterLevel.HOST_1, SupporterLevel.HOST_3),
+        (SupporterLevel.HOST_2, SupporterLevel.HOST_2, SupporterLevel.HOST_2),
+    ],
+)
+def test_highest_returns_the_higher_ranked_level(
+    earned: SupporterLevel, granted: SupporterLevel, expected: SupporterLevel
+):
+    assert supporter.highest(earned, granted) is expected
+
+
+@pytest.mark.parametrize(
     "cents,expected",
     [
         (0, SupporterLevel.HOST_1),  # active member below the lowest threshold still counts

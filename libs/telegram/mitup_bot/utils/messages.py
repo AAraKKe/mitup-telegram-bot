@@ -1011,10 +1011,11 @@ class CollaborateMessages(MessageBase):
 
 
 class SupporterNotificationMessages(MessageBase):
-    """Direct messages sent by the daily Host-validation job when a Host's status changes.
+    """Direct messages sent when a Host's status changes: by the daily Host-validation job, the
+    Patreon webhook, and the admin grant flow.
 
     Full messages (not callback-query alerts), so inline `<b>` tags are allowed. Each mirrors a
-    transition in the grace/upgrade/revoke flow the job drives against Patreon."""
+    transition in the grace/upgrade/revoke flow driven against Patreon, or a manual grant."""
 
     # Support lapsed while we could not confirm an active pledge: perks stay on for one grace week.
     GRACE_STARTED = (
@@ -1079,6 +1080,33 @@ class SupporterNotificationMessages(MessageBase):
         "them further ahead, and invite as many people as you like to each one. Thanks for backing Mitup."
     )
 
+    # A tier turned on by an operator grant: gift framing rather than Patreon thanks. Each mirrors
+    # the perks description of the corresponding *_UNLOCKED message.
+    HOST_1_GRANTED = (
+        f"<b>{Emojis.HOST_1} You're a Brewer</b>\n\n"
+        "You've been given the Brewer Host level as a gift. Your Brewer badge now shows on your "
+        "profile."
+    )
+    HOST_2_GRANTED = (
+        f"<b>{Emojis.HOST_2} You're a Gamemaster</b>\n\n"
+        "You've been given the Gamemaster Host level as a gift. Your Gamemaster badge is on, and "
+        "your limits just went up: run more meetings at once, schedule them further ahead, and "
+        "invite as many people as you like to each one."
+    )
+    HOST_3_GRANTED = (
+        f"<b>{Emojis.HOST_3} You're a Commissioner</b>\n\n"
+        "You've been given the Commissioner Host level as a gift. Your Commissioner badge is on, "
+        "and every limit is off: run as many meetings as you want, schedule them as far ahead as "
+        "you need, and invite as many people as you like to each one."
+    )
+    # A gifted tier withdrawn by an operator, for a user with no active Patreon pledge to fall
+    # back on.
+    GRANT_REMOVED = (
+        "<b>Your gifted Host perks have ended</b>\n\n"
+        "The Host level you were given is no longer active. You can become a Host anytime from "
+        "the Collaborate menu."
+    )
+
     # Support lapsed for a Host who was in the members-only group: the job bans them and sends this DM.
     HOSTS_GROUP_REMOVED = (
         "<b>Your Hosts-Only Group access has ended</b>\n\n"
@@ -1109,6 +1137,24 @@ class SupporterNotificationMessages(MessageBase):
                 return cls.ORGANIZER_UNLOCKED
             case SupporterLevel.NONE:
                 raise ValueError("No unlock message exists for the NONE tier")
+            case _ as unreachable:
+                assert_never(unreachable)
+
+    @classmethod
+    def granted_for(cls, level: SupporterLevel) -> SupporterNotificationMessages:
+        """The per-tier gift message for a manually granted paying tier.
+
+        NONE never reaches here: a withdrawn grant is announced with GRANT_REMOVED, so it raises
+        rather than inventing gift copy for the free tier."""
+        match level:
+            case SupporterLevel.HOST_1:
+                return cls.HOST_1_GRANTED
+            case SupporterLevel.HOST_2:
+                return cls.HOST_2_GRANTED
+            case SupporterLevel.HOST_3:
+                return cls.HOST_3_GRANTED
+            case SupporterLevel.NONE:
+                raise ValueError("No gift message exists for the NONE tier")
             case _ as unreachable:
                 assert_never(unreachable)
 
@@ -1307,3 +1353,53 @@ class AdminMessages(MessageBase):
     MENU_DESCRIPTION = "<b>Admin</b>\n\nOperator actions for running the bot."
     BUTTON_ADMIN = f"{Emojis.TOOLS} Admin"
     BUTTON_BROADCAST = f"{Emojis.SHARE} Broadcast"
+    BUTTON_SUPPORTER_GRANTS = f"{Emojis.GIFT} Host grants"
+
+
+class GrantOperatorMessages(MessageBase):
+    TARGET_PROMPT = (
+        "<b>Host grants</b>\n\n"
+        "Send the Telegram id or @username of the user to manage. "
+        "Only registered members can be granted a Host level."
+    )
+    TARGET_NOT_FOUND = (
+        f"{Emojis.PROHIB} No member matches <code>${{identifier}}</code>. Check the id or username and send it again."
+    )
+    # `${current_level}`/`${granted_level}` receive a level label (see `level_label`);
+    # `${patreon_linked}` receives a boolean emoji.
+    TARGET_SUMMARY = (
+        "<b>${name}</b>\n"
+        "Telegram id: <code>${tg_user_id}</code>\n"
+        "Current level: ${current_level}\n"
+        "Granted level: ${granted_level}\n"
+        "Patreon linked: ${patreon_linked}\n\n"
+        "Pick the Host level to grant. The granted level is a floor: Patreon changes never drop "
+        "the user below it."
+    )
+    CONFIRM_PROMPT = "Set the granted Host level for <b>${name}</b> to ${level}?"
+    APPLIED_CONFIRMATION = "The granted Host level for <b>${name}</b> is now ${level}."
+    CANCELLED_CONFIRMATION = "Host grant flow abandoned. Nothing changed."
+
+    # Level display labels, used in the summary and confirmation lines and on the tier picker
+    # buttons. The picker's remove option gets its own label because "None" under-describes the act.
+    LEVEL_NONE = "None"
+    LEVEL_HOST_1 = f"{Emojis.HOST_1} Brewer"
+    LEVEL_HOST_2 = f"{Emojis.HOST_2} Gamemaster"
+    LEVEL_HOST_3 = f"{Emojis.HOST_3} Commissioner"
+    BUTTON_REMOVE_GRANT = f"{Emojis.PROHIB} No grant"
+    BUTTON_CANCEL = f"{Emojis.CANCEL} Cancel"
+
+    @classmethod
+    def level_label(cls, level: SupporterLevel) -> GrantOperatorMessages:
+        """The display label for a tier on the operator's screens."""
+        match level:
+            case SupporterLevel.NONE:
+                return cls.LEVEL_NONE
+            case SupporterLevel.HOST_1:
+                return cls.LEVEL_HOST_1
+            case SupporterLevel.HOST_2:
+                return cls.LEVEL_HOST_2
+            case SupporterLevel.HOST_3:
+                return cls.LEVEL_HOST_3
+            case _ as unreachable:
+                assert_never(unreachable)

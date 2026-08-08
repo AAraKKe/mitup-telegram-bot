@@ -91,6 +91,10 @@ def admin_menu_view(ctx: RenderContext) -> MitupView:
         [
             [
                 ButtonConfig(text=AdminMessages.BUTTON_BROADCAST.get_text(lang=lang), callback_data=cb.BROADCAST),
+                ButtonConfig(
+                    text=AdminMessages.BUTTON_SUPPORTER_GRANTS.get_text(lang=lang),
+                    callback_data=cb.SUPPORTER_GRANT,
+                ),
             ],
             [
                 ButtonConfig(

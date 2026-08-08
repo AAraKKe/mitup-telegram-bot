@@ -488,6 +488,7 @@ class ChangeReason(StrEnum):
     """Why the applied transition landed where it did."""
 
     ALREADY_AT_TARGET_LEVEL = "already_at_target_level"
+    LEVEL_HELD_BY_GRANT = "level_held_by_grant"
     NOTHING_TO_LOSE = "nothing_to_lose"
     TIER_UPGRADE = "tier_upgrade"
     TIER_DOWNGRADE = "tier_downgrade"
@@ -504,9 +505,10 @@ class TargetLevel:
 
 @dataclass(frozen=True)
 class MembershipTransition:
-    """What applying an event changed, and why. ``UNCHANGED`` covers two unrelated situations — an
-    event landing on the tier the user already holds, and a loss for somebody with nothing to lose —
-    so the outcome alone cannot answer a support question about it."""
+    """What applying an event changed, and why. ``UNCHANGED`` covers unrelated situations — an
+    event landing on the tier the user already holds, a tier propped up by the manually-granted
+    floor, and a loss for somebody with nothing to lose — so the outcome alone cannot answer a
+    support question about it."""
 
     applied: WebhookApplied
     reason: ChangeReason
@@ -545,28 +547,32 @@ def apply_membership_transition(
 ) -> MembershipTransition:
     """Apply ``target`` to the user and reconcile the subscription runway. Returns what changed.
 
-    A gain (``target`` is a paying tier) applies instantly: on a level change it refreshes the grace
-    runway; an event landing on the level the user already holds changes nothing. A loss (``target`` is
-    NONE — a decline, former patron, or delete) does NOT cut perks off; instead it keeps the user's
-    current level and opens a cancellation grace window, marking the row already-notified so the daily
-    job goes straight to revoke when the window elapses (no duplicate grace message). A loss for a user
-    who already has nothing to lose is a no-op."""
+    A gain (``target`` is a paying tier) applies instantly, clamped to the manually-granted floor:
+    on a level change it refreshes the grace runway; an event landing on the level the user already
+    holds changes nothing. A loss (``target`` is NONE — a decline, former patron, or delete) does NOT
+    cut perks off; instead it keeps the user's current level and opens a cancellation grace window,
+    marking the row already-notified so the daily job goes straight to revoke when the window elapses
+    (no duplicate grace message). A loss for a user with nothing to lose — at NONE already, or whose
+    granted floor covers everything they hold — is a no-op."""
     previous = user.supporter_level
     if supporter.is_supporter(target):
         # Gain or between-tier change: apply the entitled tier instantly.
-        if previous == target:
-            return MembershipTransition(WebhookApplied.UNCHANGED, ChangeReason.ALREADY_AT_TARGET_LEVEL)
-        user.supporter_level = target
+        effective = supporter.highest(target, user.granted_supporter_level)
+        if previous == effective:
+            reason = ChangeReason.ALREADY_AT_TARGET_LEVEL if effective is target else ChangeReason.LEVEL_HELD_BY_GRANT
+            return MembershipTransition(WebhookApplied.UNCHANGED, reason)
+        user.supporter_level = effective
         subscription.support_expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=SUPPORT_GRACE_DAYS)
         subscription.expiration_notified = False
-        if supporter.meets(previous, target):
+        if supporter.meets(previous, effective):
             # A drop to a lower paying tier: adjust silently.
             return MembershipTransition(WebhookApplied.DOWNGRADED, ChangeReason.TIER_DOWNGRADE)
         return MembershipTransition(WebhookApplied.UPGRADED, ChangeReason.TIER_UPGRADE)
 
     # target is NONE: membership loss. Give our own grace rather than cutting perks now.
-    if not supporter.is_supporter(previous):
-        # Nothing to lose — the user is already at NONE.
+    if supporter.meets(user.granted_supporter_level, previous):
+        # Nothing to lose — the granted floor already covers everything the user holds (which
+        # includes a user sitting at NONE), so no grace window and no revoke are needed.
         return MembershipTransition(WebhookApplied.UNCHANGED, ChangeReason.NOTHING_TO_LOSE)
     # Keep the current level (perks stay on) and let the daily job revoke when the window elapses.
     # expiration_notified=True so the daily due-flow revokes straight away rather than re-announcing grace.

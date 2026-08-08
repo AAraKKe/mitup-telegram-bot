@@ -32,6 +32,7 @@ from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.privacy.enums import PrivacyHandlerId
 from mitup_bot.handlers.registration_process.enums import RegistrationProcessHandlerId
 from mitup_bot.handlers.stale_cancel import StaleCancelHandlerId
+from mitup_bot.handlers.supporter_grant.enums import GrantHandlerId
 from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.models import User
 from mitup_bot.models.users import UserStatus
@@ -1392,6 +1393,55 @@ CONTEXTS = [
         error_modes={ErrorMode.USER_NOT_FOUND},
         admin_only=True,
         id="broadcast_cancel",
+    ),
+    # --- Supporter grant handlers ---
+    # All grant handlers are admin-gated (admin_only=True), so these contexts stash an admin config
+    # to reach the guard under the gate. The entry/target handlers gate on guards.member_user
+    # (returns None → silent state), so they never raise UserNotFound and are covered by their own
+    # handler tests.
+    Context(
+        handler_id=GrantHandlerId.GRANT_LEVEL_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_GRANT_LEVEL.with_level(1, 1)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        admin_only=True,
+        id="grant_level",
+    ),
+    Context(
+        handler_id=GrantHandlerId.GRANT_LEVEL_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_GRANT_LEVEL),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        admin_only=True,
+        id="grant_level_malformed",
+    ),
+    # A rank outside LEVEL_ORDER parses as valid wire data but names no tier, so the decode rejects
+    # it as malformed too.
+    Context(
+        handler_id=GrantHandlerId.GRANT_LEVEL_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_GRANT_LEVEL.with_level(1, 9)),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        admin_only=True,
+        id="grant_level_rank_out_of_range",
+    ),
+    Context(
+        handler_id=GrantHandlerId.GRANT_CONFIRM_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_GRANT.with_level(1, 1)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        admin_only=True,
+        id="grant_confirm",
+    ),
+    Context(
+        handler_id=GrantHandlerId.GRANT_CONFIRM_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_GRANT),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        admin_only=True,
+        id="grant_confirm_malformed",
+    ),
+    Context(
+        handler_id=GrantHandlerId.GRANT_CANCEL_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_GRANT),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        admin_only=True,
+        id="grant_cancel",
     ),
 ]
 

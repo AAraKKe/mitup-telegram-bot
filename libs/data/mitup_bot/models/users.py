@@ -113,6 +113,23 @@ class User(BaseModel, SQLModel, table=True):
             server_default=SupporterLevel.NONE.value,
         ),
     )
+    # Manually-granted floor for `supporter_level`, set only through the admin grant flow. The
+    # Patreon writers (OAuth confirm, webhook, daily reconciliation, unlink) clamp every level they
+    # write to at least this value, so a grant survives any Patreon state change. NONE means no
+    # grant.
+    granted_supporter_level: SupporterLevel = Field(
+        default=SupporterLevel.NONE,
+        sa_column=Column(
+            Enum(
+                SupporterLevel,
+                native_enum=False,
+                length=16,
+                values_callable=lambda enum: [member.value for member in enum],
+            ),
+            nullable=False,
+            server_default=SupporterLevel.NONE.value,
+        ),
+    )
     # lazy="selectin": `user.lang` is read for virtually every loaded user (including meeting
     # participants), and implicit lazy loads raise MissingGreenlet under the async engine.
     settings: Settings = Relationship(

@@ -67,6 +67,13 @@ def is_supporter(level: SupporterLevel) -> bool:
     return meets(level, SupporterLevel.HOST_1)
 
 
+def highest(*levels: SupporterLevel) -> SupporterLevel:
+    """The highest-ranked of ``levels``. The resolution rule between an earned tier and the
+    manually-granted floor (``User.granted_supporter_level``): every writer of
+    ``User.supporter_level`` resolves through this, so a grant survives any Patreon transition."""
+    return max(levels, key=rank)
+
+
 def level_for_amount(cents: int, config: PatreonConfig) -> SupporterLevel:
     """The tier an active member's `currently_entitled_amount_cents` maps to: the highest threshold
     it reaches. An active member below the lowest threshold still counts as HOST_1 — an active

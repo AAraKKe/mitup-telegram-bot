@@ -30,6 +30,15 @@ def link_confirmation_view(text: str | FormattedText, lang: str) -> MitupView:
     ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
 
 
+def grant_notification_view(text: str | FormattedText, lang: str) -> MitupView:
+    """DM sent when an operator changes a user's granted Host level: the per-tier gift or removal
+    copy plus a Main-menu button so the user is never stranded on a button-less message."""
+    return MitupView(
+        description=text,
+        keyboard=[],
+    ).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
+
+
 def patreon_link_confirmation_view(
     ctx: RenderContext, *, patreon_name: str, code: str, current_level: SupporterLevel
 ) -> MitupView:

@@ -11,11 +11,13 @@ from mitup_bot.callback_data import (
     CallbackData,
     CodeCallbackData,
     DateCallbackData,
+    GrantCallbackData,
     MeetingCallbackData,
     PaginatedCallbackData,
     ValidCallbackData,
     ValidCodeCallbackData,
     ValidDateCallbackData,
+    ValidGrantCallbackData,
     ValidMeetingCallbackData,
     ValidPaginatedCallbackData,
 )
@@ -216,6 +218,19 @@ def valid_meeting_callback_data(cb: MeetingCallbackData, handler_id: HandlerId) 
     if cb.id is None or cb.unknown() or cb.meeting_id is None:
         raise MalformedCallbackData(handler_id, cb)
     return ValidMeetingCallbackData(entity=cb.entity, action=cb.action, id=cb.id, meeting_id=cb.meeting_id)
+
+
+def valid_grant_callback_data(cb: GrantCallbackData, handler_id: HandlerId) -> ValidGrantCallbackData:
+    """
+    Validates the grant callback `cb`. If the target user id or the tier rank cannot be set, or the
+    entity is unknown, a MalformedCallbackData exception is raised scoped to the `handler_id`
+    provided.
+
+    The output of the guard is a `ValidGrantCallbackData`.
+    """
+    if cb.id is None or cb.unknown() or cb.level is None:
+        raise MalformedCallbackData(handler_id, cb)
+    return ValidGrantCallbackData(entity=cb.entity, action=cb.action, id=cb.id, level=cb.level)
 
 
 def chat(update: Update) -> Chat:

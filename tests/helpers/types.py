@@ -62,3 +62,10 @@ class StashBotConfig(Protocol):
     """Factory-fixture callable that stashes a `BotConfig` into the app's bot_data."""
 
     def __call__(self, config: BotConfig) -> None: ...
+
+
+class RegisterGrantTarget(Protocol):
+    """Factory-fixture callable that seeds the grant flow's target-resolution queries with a MEMBER
+    row, for both the numeric-id and the username lookup."""
+
+    def __call__(self, target: User) -> None: ...

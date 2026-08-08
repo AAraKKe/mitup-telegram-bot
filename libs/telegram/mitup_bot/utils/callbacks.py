@@ -7,6 +7,7 @@ from mitup_bot.callback_data import (
     CallbackData,
     CodeCallbackData,
     DateCallbackData,
+    GrantCallbackData,
     MeetingCallbackData,
     PaginatedCallbackData,
 )
@@ -22,6 +23,13 @@ EMPTY = CallbackData(action="empty", entity="empty", id=0)
 # ----------------------------------------
 ADMIN_MENU = CallbackData(action="show", entity="admin")
 BROADCAST = CallbackData(action="start", entity="broadcast")
+# The supporter-grant flow: SET_GRANT_LEVEL and CONFIRM_GRANT carry the target user id plus the
+# picked tier rank (see GrantCallbackData). CANCEL_GRANT uses action="cancel" so the global
+# stale-cancel handler catches a tap that arrives outside the conversation.
+SUPPORTER_GRANT = CallbackData(action="start", entity="grant")
+SET_GRANT_LEVEL = GrantCallbackData(action="set", entity="grant")
+CONFIRM_GRANT = GrantCallbackData(action="confirm", entity="grant")
+CANCEL_GRANT = CallbackData(action="cancel", entity="grant")
 
 # ----------------------------------------
 # Meeting callbacks

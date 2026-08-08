@@ -341,9 +341,51 @@ async def test_due_lapsed_after_grace_revokes_to_none(mock_session: MockDbSessio
 
     assert outcome is supporter_check.DueOutcome.SUPPORT_LOST
     assert user.supporter_level is SupporterLevel.NONE
+    # The cleared runway takes the row out of the due sweep, so the revoke fires once instead of
+    # re-notifying on every following run.
+    assert subscription.support_expiration is None
     api.assert_send_message_to_user_called(
         user=user, view=SupporterNotificationMessages.SUPPORT_LOST.get(lang=user.lang)
     )
+
+
+async def test_due_lapsed_with_lower_grant_floor_drops_to_the_floor(mock_session: MockDbSession, api: MockApi):
+    """A lapsed patron with a manual grant keeps the granted tier instead of dropping to NONE, and
+    is told about the downgrade rather than about a full loss."""
+    subscription, user = make_subscription_user(
+        support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=True
+    )
+    user.supporter_level = SupporterLevel.HOST_2
+    user.granted_supporter_level = SupporterLevel.HOST_1
+    register_due(mock_session, subscription, user)
+
+    outcome = await supporter_check.process_due_subscription(subscription.db_id, {}, api)
+
+    assert outcome is supporter_check.DueOutcome.SUPPORT_LOST
+    assert user.supporter_level is SupporterLevel.HOST_1
+    assert subscription.support_expiration is None
+    api.assert_send_message_to_user_called(
+        user=user, view=SupporterNotificationMessages.downgraded_to(SupporterLevel.HOST_1).get(lang=user.lang)
+    )
+
+
+async def test_due_lapsed_with_covering_grant_floor_stays_silent(mock_session: MockDbSession, api: MockApi):
+    """When the granted floor already covers the tier the patronage paid for, the lapse changes
+    nothing the user can see: no DM, no hosts-group removal, level untouched."""
+    subscription, user = make_subscription_user(
+        support_expiration=dt.datetime.now(dt.UTC) - dt.timedelta(days=1), expiration_notified=True
+    )
+    user.supporter_level = SupporterLevel.HOST_2
+    user.granted_supporter_level = SupporterLevel.HOST_2
+    register_due(mock_session, subscription, user)
+
+    outcome = await supporter_check.process_due_subscription(subscription.db_id, {}, api)
+
+    assert outcome is supporter_check.DueOutcome.SUPPORT_LOST
+    assert user.supporter_level is SupporterLevel.HOST_2
+    assert subscription.support_expiration is None
+    api.assert_method_just_called("send_message_to_user", times=0)
+    api.assert_method_just_called("ban_chat_member", times=0)
 
 
 async def test_due_no_longer_due_is_skipped(mock_session: MockDbSession, api: MockApi):
@@ -506,6 +548,47 @@ async def test_sync_downgrades_between_tiers_notifies(mock_session: MockDbSessio
     api.assert_send_message_to_user_called(
         user=user, view=SupporterNotificationMessages.PATRON_TIER_SET.get(lang=user.lang)
     )
+
+
+async def test_sync_downgrade_clamps_to_the_grant_floor(
+    mock_session: MockDbSession, api: MockApi, config: PatreonConfig
+):
+    """An entitled amount below the granted floor settles the level on the floor, not on the
+    amount's tier."""
+    subscription, user = make_subscription_user()
+    user.supporter_level = SupporterLevel.HOST_3
+    user.granted_supporter_level = SupporterLevel.HOST_2
+    register_syncable(mock_session, subscription, user)
+
+    # The entitled amount only reaches the Brewer tier (300 cents), but the granted floor holds the
+    # level at Gamemaster.
+    outcome = await supporter_check.sync_subscription_level(subscription.db_id, {"patreon-1": 300}, config, api)
+
+    assert outcome is supporter_check.LevelSyncOutcome.DOWNGRADED
+    assert user.supporter_level is SupporterLevel.HOST_2
+    api.assert_send_message_to_user_called(
+        user=user, view=SupporterNotificationMessages.PATRON_TIER_SET.get(lang=user.lang)
+    )
+
+
+async def test_sync_unchanged_when_grant_floor_holds_the_level(
+    mock_session: MockDbSession, api: MockApi, config: PatreonConfig
+):
+    """A level fully propped up by the granted floor is checked and deliberately left alone, with
+    the reason naming the grant rather than the entitled amount."""
+    subscription, user = make_subscription_user()
+    user.supporter_level = SupporterLevel.HOST_3
+    user.granted_supporter_level = SupporterLevel.HOST_3
+    register_syncable(mock_session, subscription, user)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        outcome = await supporter_check.sync_subscription_level(subscription.db_id, {"patreon-1": 300}, config, api)
+
+    assert outcome is supporter_check.LevelSyncOutcome.UNCHANGED
+    assert user.supporter_level is SupporterLevel.HOST_3
+    unchanged = next(entry for entry in logs if entry["event"] == "Supporter level unchanged")
+    assert unchanged["reason"] == "level_held_by_grant"
+    api.assert_method_just_called("send_message_to_user", times=0)
 
 
 async def test_sync_unchanged_when_level_matches(mock_session: MockDbSession, api: MockApi, config: PatreonConfig):

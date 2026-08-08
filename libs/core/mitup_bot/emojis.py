@@ -62,6 +62,7 @@ class Emojis(Enum):
     PHONE = "📱"
     THINK = "🤔"
     UFO = "🛸"
+    GIFT = "🎁"
     BRAIN = "🧠"
     ROCKET = "🚀"
     START = "▶️"

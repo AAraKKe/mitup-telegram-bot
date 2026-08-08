@@ -1105,3 +1105,54 @@ msgstr "Limits und Host-Vorteile"
 
 msgid "CommonMessages.OLD_VERSION_MESSAGE"
 msgstr "Diese Nachricht stammt aus einer älteren Version von Mitup, deshalb funktionieren ihre Buttons nicht mehr. Dein Konto und deine Treffen sind sicher. Öffne das Hauptmenü, um weiterzumachen."
+
+msgid "AdminMessages.BUTTON_SUPPORTER_GRANTS"
+msgstr "🎁 Host-Zuweisungen"
+
+msgid "GrantOperatorMessages.TARGET_PROMPT"
+msgstr "<b>Host-Zuweisungen</b>\n\nSchicke die Telegram-Id oder den @Benutzernamen der Person, die du verwalten möchtest. Nur registrierte Mitglieder können eine Host-Stufe erhalten."
+
+msgid "GrantOperatorMessages.TARGET_NOT_FOUND"
+msgstr "🚫 Kein Mitglied passt zu <code>${identifier}</code>. Prüfe die Id oder den Benutzernamen und schicke sie erneut."
+
+msgid "GrantOperatorMessages.TARGET_SUMMARY"
+msgstr "<b>${name}</b>\nTelegram-Id: <code>${tg_user_id}</code>\nAktuelle Stufe: ${current_level}\nZugewiesene Stufe: ${granted_level}\nPatreon verknüpft: ${patreon_linked}\n\nWähle die Host-Stufe, die zugewiesen werden soll. Die zugewiesene Stufe ist eine Untergrenze: Patreon-Änderungen setzen die Person nie darunter."
+
+msgid "GrantOperatorMessages.CONFIRM_PROMPT"
+msgstr "Die zugewiesene Host-Stufe für <b>${name}</b> auf ${level} setzen?"
+
+msgid "GrantOperatorMessages.APPLIED_CONFIRMATION"
+msgstr "Die zugewiesene Host-Stufe für <b>${name}</b> ist jetzt ${level}."
+
+msgid "GrantOperatorMessages.CANCELLED_CONFIRMATION"
+msgstr "Zuweisung abgebrochen. Nichts wurde geändert."
+
+msgid "GrantOperatorMessages.LEVEL_NONE"
+msgstr "Keine"
+
+msgid "GrantOperatorMessages.LEVEL_HOST_1"
+msgstr "☕️ Brewer"
+
+msgid "GrantOperatorMessages.LEVEL_HOST_2"
+msgstr "🎲 Gamemaster"
+
+msgid "GrantOperatorMessages.LEVEL_HOST_3"
+msgstr "🏆 Commissioner"
+
+msgid "GrantOperatorMessages.BUTTON_REMOVE_GRANT"
+msgstr "🚫 Keine Zuweisung"
+
+msgid "GrantOperatorMessages.BUTTON_CANCEL"
+msgstr "❌ Abbrechen"
+
+msgid "SupporterNotificationMessages.HOST_1_GRANTED"
+msgstr "<b>☕️ Du bist ein Brewer</b>\n\nDir wurde die Host-Stufe Brewer geschenkt. Dein Brewer-Abzeichen wird jetzt in deinem Profil angezeigt."
+
+msgid "SupporterNotificationMessages.HOST_2_GRANTED"
+msgstr "<b>🎲 Du bist ein Gamemaster</b>\n\nDir wurde die Host-Stufe Gamemaster geschenkt. Dein Gamemaster-Abzeichen ist aktiv, und deine Limits wurden gerade erhöht: Führe mehr Treffen gleichzeitig durch, plane sie weiter im Voraus und lade zu jedem so viele Personen ein, wie du möchtest."
+
+msgid "SupporterNotificationMessages.HOST_3_GRANTED"
+msgstr "<b>🏆 Du bist ein Commissioner</b>\n\nDir wurde die Host-Stufe Commissioner geschenkt. Dein Commissioner-Abzeichen ist aktiv, und alle Limits sind aufgehoben: Führe so viele Treffen durch, wie du möchtest, plane sie so weit im Voraus, wie du brauchst, und lade zu jedem so viele Personen ein, wie du möchtest."
+
+msgid "SupporterNotificationMessages.GRANT_REMOVED"
+msgstr "<b>Deine geschenkten Host-Vorteile sind beendet</b>\n\nDie Host-Stufe, die dir geschenkt wurde, ist nicht mehr aktiv. Du kannst über das Mithelfen-Menü jederzeit ein Host werden."

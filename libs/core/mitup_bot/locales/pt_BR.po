@@ -1105,3 +1105,54 @@ msgstr "<b>Desconectar sua conta do Patreon?</b>\n\nVocê é um ${current_tier} 
 
 msgid "CommonMessages.OLD_VERSION_MESSAGE"
 msgstr "Esta mensagem é de uma versão antiga do Mitup, então seus botões não funcionam mais. Sua conta e seus eventos estão seguros. Abra o menu principal para continuar."
+
+msgid "AdminMessages.BUTTON_SUPPORTER_GRANTS"
+msgstr "🎁 Concessões de Host"
+
+msgid "GrantOperatorMessages.TARGET_PROMPT"
+msgstr "<b>Concessões de Host</b>\n\nEnvie o id do Telegram ou o @usuário da pessoa que você quer gerenciar. Apenas membros registrados podem receber um nível de Host."
+
+msgid "GrantOperatorMessages.TARGET_NOT_FOUND"
+msgstr "🚫 Nenhum membro corresponde a <code>${identifier}</code>. Verifique o id ou o nome de usuário e envie novamente."
+
+msgid "GrantOperatorMessages.TARGET_SUMMARY"
+msgstr "<b>${name}</b>\nId do Telegram: <code>${tg_user_id}</code>\nNível atual: ${current_level}\nNível concedido: ${granted_level}\nPatreon vinculado: ${patreon_linked}\n\nEscolha o nível de Host a conceder. O nível concedido é um piso: mudanças no Patreon nunca deixam a pessoa abaixo dele."
+
+msgid "GrantOperatorMessages.CONFIRM_PROMPT"
+msgstr "Definir o nível de Host concedido para <b>${name}</b> como ${level}?"
+
+msgid "GrantOperatorMessages.APPLIED_CONFIRMATION"
+msgstr "O nível de Host concedido para <b>${name}</b> agora é ${level}."
+
+msgid "GrantOperatorMessages.CANCELLED_CONFIRMATION"
+msgstr "Concessão abandonada. Nada foi alterado."
+
+msgid "GrantOperatorMessages.LEVEL_NONE"
+msgstr "Nenhum"
+
+msgid "GrantOperatorMessages.LEVEL_HOST_1"
+msgstr "☕️ Brewer"
+
+msgid "GrantOperatorMessages.LEVEL_HOST_2"
+msgstr "🎲 Gamemaster"
+
+msgid "GrantOperatorMessages.LEVEL_HOST_3"
+msgstr "🏆 Commissioner"
+
+msgid "GrantOperatorMessages.BUTTON_REMOVE_GRANT"
+msgstr "🚫 Sem concessão"
+
+msgid "GrantOperatorMessages.BUTTON_CANCEL"
+msgstr "❌ Cancelar"
+
+msgid "SupporterNotificationMessages.HOST_1_GRANTED"
+msgstr "<b>☕️ Você é um Brewer</b>\n\nVocê ganhou de presente o nível de Host Brewer. Seu selo de Brewer agora aparece no seu perfil."
+
+msgid "SupporterNotificationMessages.HOST_2_GRANTED"
+msgstr "<b>🎲 Você é um Gamemaster</b>\n\nVocê ganhou de presente o nível de Host Gamemaster. Seu selo de Gamemaster está ativo, e seus limites acabaram de aumentar: realize mais eventos ao mesmo tempo, agende-os com mais antecedência e convide quantas pessoas quiser para cada um."
+
+msgid "SupporterNotificationMessages.HOST_3_GRANTED"
+msgstr "<b>🏆 Você é um Commissioner</b>\n\nVocê ganhou de presente o nível de Host Commissioner. Seu selo de Commissioner está ativo, e todos os limites foram removidos: realize quantos eventos quiser, agende-os com toda a antecedência que precisar e convide quantas pessoas quiser para cada um."
+
+msgid "SupporterNotificationMessages.GRANT_REMOVED"
+msgstr "<b>Seus benefícios de Host presenteados terminaram</b>\n\nO nível de Host que você ganhou não está mais ativo. Você pode se tornar um Host a qualquer momento pelo menu Colabore."

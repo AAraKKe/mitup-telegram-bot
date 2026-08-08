@@ -7,6 +7,7 @@ from mitup_bot.callback_data import (
     CallbackData,
     CodeCallbackData,
     DateCallbackData,
+    GrantCallbackData,
     MeetingCallbackData,
     MeetingListSource,
     PaginatedCallbackData,
@@ -253,3 +254,47 @@ def test_a_full_length_pairing_code_fits_telegrams_callback_budget():
     # Telegram caps callback data at 64 bytes, and the code alone spends 32 of them.
     largest = CODE_CALLBACK.with_code(generate_pairing_code())
     assert len(str(largest).encode()) <= 64
+
+
+def test_grant_callback_data_pattern():
+    cb = GrantCallbackData(entity="grant", action="set", id=42, level=2)
+    assert cb.pattern == r"^(?P<action>set);(?P<entity>grant):(?P<id>\d*);lvl:(?P<level>\d*)$"
+
+
+@pytest.mark.parametrize(
+    "input_str, expected_id, expected_level",
+    [
+        ("set;grant:42;lvl:2", 42, 2),
+        ("set;grant:42;lvl:0", 42, 0),
+        ("set;grant:;lvl:2", None, 2),
+        ("set;grant:42;lvl:", 42, None),
+    ],
+    ids=["full_content", "rank_zero", "missing_id", "missing_level"],
+)
+def test_grant_callback_data_matches(input_str: str, expected_id: int | None, expected_level: int | None):
+    cb = GrantCallbackData(entity="grant", action="set")
+    match = re.match(cb.pattern, input_str)
+    assert cb.parse(match).id == expected_id
+    assert cb.parse(match).level == expected_level
+
+
+def test_grant_callback_data_with_level_round_trips():
+    cb = GrantCallbackData(entity="grant", action="set").with_level(42, 3)
+    assert str(cb) == "set;grant:42;lvl:3"
+    parsed = GrantCallbackData.parse(re.match(cb.pattern, str(cb)))
+    assert parsed.id == 42
+    assert parsed.level == 3
+
+
+@pytest.mark.parametrize(
+    "id, level, malformed",
+    [
+        (42, 2, False),
+        (42, 0, False),
+        (None, 2, True),
+        (42, None, True),
+    ],
+    ids=["well_formed", "rank_zero_well_formed", "missing_id", "missing_level"],
+)
+def test_grant_callback_data_malformed_shapes(id: int | None, level: int | None, malformed: bool):
+    assert GrantCallbackData(entity="grant", action="set", id=id, level=level).is_malformed() is malformed

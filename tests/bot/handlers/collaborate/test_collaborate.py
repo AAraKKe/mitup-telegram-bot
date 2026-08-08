@@ -425,6 +425,32 @@ async def test_confirming_unlink_removes_the_former_host_from_the_hosts_group(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_PATREON_UNLINK)], indirect=True)
+async def test_confirming_unlink_with_grant_floor_keeps_the_floor_and_the_group(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    patreon_config: PatreonConfig,
+    hosts_group_state: None,
+):
+    """Unlinking drops the level to the manually-granted floor, not to NONE, and a user the floor
+    keeps a supporter is neither ejected from the hosts group nor sent the removal DM."""
+    user_with_settings.supporter_level = SupporterLevel.HOST_2
+    user_with_settings.granted_supporter_level = SupporterLevel.HOST_1
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    subscription = create_supporter_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
+    mock_session.add_object(subscription, "user_id")
+    api = MockApi()
+
+    await call_handler(CollaborateHandlerId.UNLINK_CONFIRM, handler_context=handler_context, api=api)
+
+    mock_session.assert_deleted(subscription)
+    assert user_with_settings.supporter_level is SupporterLevel.HOST_1
+    api.assert_method_just_called("ban_chat_member", times=0)
+    api.assert_method_just_called("send_message_to_user", times=0)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_PATREON_UNLINK)], indirect=True)
 async def test_confirming_unlink_clears_the_ban_a_past_revoke_left(
     mock_session: MockDbSession,
     update: Update,

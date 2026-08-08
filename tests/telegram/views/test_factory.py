@@ -247,6 +247,10 @@ def test_admin_menu_view(lang: str):
         keyboard=[
             [
                 ButtonConfig(text=AdminMessages.BUTTON_BROADCAST.get_text(lang=lang), callback_data=cb.BROADCAST),
+                ButtonConfig(
+                    text=AdminMessages.BUTTON_SUPPORTER_GRANTS.get_text(lang=lang),
+                    callback_data=cb.SUPPORTER_GRANT,
+                ),
             ],
             [
                 ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU),

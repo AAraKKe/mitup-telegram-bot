@@ -549,6 +549,50 @@ def test_apply_transition_separates_the_two_unchanged_situations(
     assert transition.reason is reason
 
 
+def test_apply_transition_gain_below_the_grant_floor_changes_nothing():
+    # An event landing below a level fully propped up by the manual grant is a no-op, and the
+    # reason names the grant so the record does not read as "already entitled to this".
+    user = create_user(id=1, tg_user_id=1)
+    user.supporter_level = SupporterLevel.HOST_3
+    user.granted_supporter_level = SupporterLevel.HOST_3
+    subscription = create_supporter_subscription(user_id=1, patreon_user_id="p-1")
+
+    transition = apply_membership_transition(user, subscription, SupporterLevel.HOST_1)
+
+    assert transition.applied is WebhookApplied.UNCHANGED
+    assert transition.reason is ChangeReason.LEVEL_HELD_BY_GRANT
+    assert user.supporter_level is SupporterLevel.HOST_3
+
+
+def test_apply_transition_downgrade_clamps_to_the_grant_floor():
+    user = create_user(id=1, tg_user_id=1)
+    user.supporter_level = SupporterLevel.HOST_3
+    user.granted_supporter_level = SupporterLevel.HOST_2
+    subscription = create_supporter_subscription(user_id=1, patreon_user_id="p-1")
+
+    transition = apply_membership_transition(user, subscription, SupporterLevel.HOST_1)
+
+    assert transition.applied is WebhookApplied.DOWNGRADED
+    assert transition.reason is ChangeReason.TIER_DOWNGRADE
+    assert user.supporter_level is SupporterLevel.HOST_2
+
+
+def test_apply_transition_loss_with_covering_grant_floor_opens_no_grace():
+    # The granted floor covers everything the user holds, so a membership loss has nothing to take
+    # away: no grace window, no runway change, no revoke to schedule.
+    user = create_user(id=1, tg_user_id=1)
+    user.supporter_level = SupporterLevel.HOST_2
+    user.granted_supporter_level = SupporterLevel.HOST_2
+    subscription = create_supporter_subscription(user_id=1, patreon_user_id="p-1")
+
+    transition = apply_membership_transition(user, subscription, SupporterLevel.NONE)
+
+    assert transition.applied is WebhookApplied.UNCHANGED
+    assert transition.reason is ChangeReason.NOTHING_TO_LOSE
+    assert user.supporter_level is SupporterLevel.HOST_2
+    assert subscription.support_expiration is None
+
+
 # --- Hosts-only group re-admit on reactivation ---
 
 HOSTS_GROUP_CHAT_ID = -1001234567890

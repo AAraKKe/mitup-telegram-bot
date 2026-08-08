@@ -2,11 +2,10 @@ import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
-from mitup_bot import guards, patreon_link
+from mitup_bot import guards, patreon_link, supporter
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import CollaborateMessages
 from mitup_bot.views.collaborate import patreon_unlink_confirmation_view
@@ -69,7 +68,8 @@ async def callback_query_confirm_unlink_patreon(session: AsyncSession, update: U
     subscription = await subscription_for_user(session, user)
     if subscription is None:
         # The confirmation is shown either way, so nothing else would record that a user reached
-        # this screen with no row to delete; a level above NONE here is a real data inconsistency.
+        # this screen with no row to delete; a level above the granted floor here is a real data
+        # inconsistency.
         log.info(
             UNLINK_EVENT,
             user_id=user.db_id,
@@ -77,6 +77,7 @@ async def callback_query_confirm_unlink_patreon(session: AsyncSession, update: U
             outcome="noop",
             reason="no_subscription_row",
             supporter_level=user.supporter_level.value,
+            granted_level=user.granted_supporter_level.value,
         )
     else:
         # Read off the row before it is deleted: once the delete flushes, the instance is gone and
@@ -85,11 +86,13 @@ async def callback_query_confirm_unlink_patreon(session: AsyncSession, update: U
         patreon_user_id = subscription.patreon_user_id
         expiration = subscription.support_expiration
         await session.delete(subscription)
-        user.supporter_level = SupporterLevel.NONE
+        user.supporter_level = user.granted_supporter_level
         # Deleting the row removes this user from every daily sweep, so hosts-group membership has
-        # to be reconciled here or never: eject a member whose level just dropped to NONE, and
-        # clear any ban a past revoke left, since no sweep can ever lift it once the row is gone.
-        await patreon_link.withdraw_from_hosts_group(context.api, user)
+        # to be reconciled here or never: eject a member whose level just dropped below supporter,
+        # and clear any ban a past revoke left, since no sweep can ever lift it once the row is
+        # gone. A user whose granted floor keeps them a supporter keeps their group access.
+        if not supporter.is_supporter(user.supporter_level):
+            await patreon_link.withdraw_from_hosts_group(context.api, user)
         log.info(
             UNLINK_EVENT,
             user_id=user.db_id,
