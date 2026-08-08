@@ -180,7 +180,7 @@ msgid "ButtonMessages.DELETE_DURATION"
 msgstr "🗑️ Eliminar duración"
 
 msgid "ButtonMessages.MAKE_SEARCHABLE"
-msgstr "Hacer buscable"
+msgstr "Permite la búsqueda"
 
 msgid "ButtonMessages.LOAD_CHAT_MEETINGS"
 msgstr "🔍 Cargar quedadas"
@@ -213,14 +213,13 @@ msgid "ButtonMessages.UNLINK_PATREON"
 msgstr "Desvincular cuenta de Patreon"
 
 msgid "ButtonMessages.HOSTS_GROUP_JOIN"
-msgstr "👥 Unirse al Grupo solo para Hosts"
+msgstr "👥 Unirse al Grupo de Hosts"
 
 msgid "ButtonMessages.HOSTS_GROUP_OPEN"
-msgstr "👥 Abrir el Grupo solo para Hosts"
+msgstr "👥 Abrir el Grupo de Hosts"
 
 msgid "MainMenuMessages.DESCRIPTION"
 msgstr "¡Te damos la bienvenida a Mitup Bot!"
-"Elige una de las siguientes opciones:"
 
 msgid "SettingsMessages.DESCRIPTION"
 msgstr "Configura MitUp."
@@ -263,7 +262,7 @@ msgstr "Aquí puedes configurar las opciones predeterminadas cuando creas una nu
 "<b>Bloquear al iniciar</b>: cuando está habilitado y una quedada tiene una duración establecida, los participantes no pueden unirse o abandonar la quedada una vez que ha comenzado. Cuando está deshabilitado, los participantes aún pueden unirse o abandonar libremente."
 
 msgid "SettingsMessages.TIMEOUT_PROMPT"
-msgstr "El tiempo de prórroga define cuánto tiempo una quedada se mantiene activa después de que comience. Las quedadas sin una duración establecida se desactivan una vez que ha pasado este tiempo. Después de desactivar, puedes reactivar una quedada desde tu <b>Menú de quedadas pasadas</b>.\n\nEl tiempo de prórroga actual es <b>${timeout} minutos</b>\n\nEnvía el tiempo de prórroga (en minutos) que deseas usar o toca Cancelar para volver. El máximo es <b>${max_timeout} minutos</b>, que equivale a un día."
+msgstr "El tiempo de prórroga define cuánto tiempo una quedada se mantiene activa después de que comience. Las quedadas sin una duración establecida se desactivan una vez que ha pasado este tiempo. Después de desactivar una quedada, puedes reactivarla desde <b>Tus quedadas pasadas</b>.\n\nEl tiempo de prórroga actual es <b>${timeout} minutos</b>\n\nEnvía el tiempo de prórroga (en minutos) que deseas usar o toca Cancelar para volver. El máximo es <b>${max_timeout} minutos</b>, que equivale a un día."
 
 msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "¡Vaya! Parece que ese no es un número válido. Por favor, envíame un número entero positivo. ¡No se permiten decimales!"
@@ -280,7 +279,7 @@ msgid "SettingsMessages.NOTIFICATIONS_TIME_PROMPT"
 msgstr "Envíame cuánto tiempo antes de que empiece una quedada (en minutos) te gustaría recibir una notificación o toca Cancelar para volver."
 
 msgid "SettingsMessages.NOTIFICATIONS_TIME_SUCCESS"
-msgstr "El tiempo de las notificaciones se ha guardado como <b>${notifications_time} minutos</b>."
+msgstr "Listo. Recibirás una notificación <b>${notifications_time} minutos</b> antes de que comiencen las quedadas a las que te has unido."
 
 msgid "SettingsMessages.ENABLED"
 msgstr "Activado ✅"
@@ -301,16 +300,16 @@ msgid "PrivacyMessages.DELETE_LAST_CHANCE"
 msgstr "<b>Última oportunidad</b>\n\nSi confirmas ahora, tu cuenta dejará de funcionar inmediatamente y el borrado no se podrá detener.\n\n¿De verdad quieres borrar permanentemente todos tus datos?"
 
 msgid "PrivacyMessages.DELETION_MARKED"
-msgstr "Tu solicitud de borrado está confirmada y tu cuenta ha dejado de funcionar.\n\nTodo se eliminará permanentemente en el plazo de un día y recibirás un último mensaje confirmando el borrado. Para volver a usar Mitup después, envía el comando /start."
+msgstr "Tu solicitud de borrado está confirmada y tu cuenta ha dejado de funcionar.\n\nTodo se eliminará permanentemente en el plazo de un día y recibirás un último mensaje confirmando el borrado. Para volver a usar Mitup, envía el comando /start."
 
 msgid "PrivacyMessages.PENDING_DELETION_ALERT"
-msgstr "Tu cuenta está programada para borrarse y ya no funciona. Recibirás un último mensaje de confirmación. Para volver a usar Mitup después, envía el comando /start."
+msgstr "Tu cuenta está programada para borrarse y ya no funciona. Recibirás un último mensaje de confirmación. Para volver a usar Mitup, envía el comando /start."
 
 msgid "PrivacyMessages.DELETION_COMPLETE"
 msgstr "<b>Tus datos están borrados</b>\n\nTodo lo vinculado a tu cuenta ha desaparecido permanentemente: las quedadas que creaste, tu plaza en las quedadas a las que te uniste y tus ajustes. Los botones de los mensajes antiguos de este chat ya no hacen nada.\n\nPara volver a usar Mitup, envía el comando /start. Mitup ya no tiene ningún recuerdo de ti y te configurará desde cero."
 
 msgid "MeetingCreationMessages.PROMPT"
-msgstr "Vamos a crear una quedada. Dime cual será el título\n\n<i>Consejo: también puedes usar ${datetime_link} para incluir una fecha y hora directamente.</i>"
+msgstr "Vamos a crear una quedada. Dime cuál será el título\n\n<i>Consejo: también puedes usar ${datetime_link} para incluir una fecha y hora directamente.</i>"
 
 msgid "MeetingCreationMessages.SUCCESS"
 msgstr "Se ha creado una quedada con el título <b>${title}</b>.\n\n"
@@ -343,7 +342,7 @@ msgid "MeetingDisplayMessages.LOCATION_NOT_SET"
 msgstr "🚫 Sin lugar definido 🚫"
 
 msgid "MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY"
-msgstr "Vacío"
+msgstr "Sin participantes"
 
 msgid "MeetingDisplayMessages.PARTICIPANT_LABEL"
 msgstr "Participante"
@@ -367,7 +366,7 @@ msgid "MeetingJoinMessages.JOIN_ALREADY_JOINED"
 msgstr "Ya te habías unido a esta quedada"
 
 msgid "MeetingJoinMessages.JOIN_FULL"
-msgstr "¡Lo siento! La quedada ya está completa."
+msgstr "¡Lo siento! La quedada ya está completa"
 
 msgid "MeetingJoinMessages.JOIN_FULL_WAITING_LIST"
 msgstr "La quedada está completa. Se te ha añadido a la lista de espera."
@@ -388,7 +387,7 @@ msgid "MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST"
 msgstr "Hay un espacio libre en la quedada <b>${meeting_title}</b>. ¡Te has unido desde la lista de espera!"
 
 msgid "MeetingCreationMessages.INVALID_TITLE_ENTITY"
-msgstr "Solo entiendo un título o un título con una fecha 🤔.\n\nPor favor, envía solo el título de la quedada, o el título con una fecha formateada por Telegram. Haz clic en <b>Cancelar</b> para salir."
+msgstr "Solo entiendo un título o un título con una fecha 🤔.\n\nPor favor, envía solo el título de la quedada, o el título que incluye fecha formateada por Telegram. Haz clic en <b>Cancelar</b> para salir."
 
 msgid "MeetingCreationMessages.ON_EXIT"
 msgstr "Estabas creando una quedada. Envía el título de la quedada para continuar. Si no quieres continuar, toca Cancelar para salir."
@@ -418,7 +417,7 @@ msgid "MeetingInviteMessages.PROMPT"
 msgstr "<b>Añadir a la lista de invitados</b>\n\nPor favor, responde con el nombre de la persona que quieres añadir."
 
 msgid "MeetingInviteMessages.CONFIRMATION"
-msgstr "<b>Confirmar adición</b>\n\n¿Estás seguro de que quieres añadir <b>${name}</b> a la quedada <b>${meeting_title}</b>?"
+msgstr "<b>Confirmar invitado</b>\n\n¿Estás seguro de que quieres añadir <b>${name}</b> a la quedada <b>${meeting_title}</b>?"
 
 msgid "MeetingInviteMessages.OPEN_CHAT"
 msgstr "Abrir chat privado\n\nPara añadir participantes, necesitas abrir un chat conmigo primero."
@@ -433,7 +432,7 @@ msgid "MeetingInviteMessages.MEETING_FULL"
 msgstr "<b>Sin lugares disponibles</b>\n\nLa lista de invitados está llena. No puedes añadir a nadie más a menos que se libere un lugar."
 
 msgid "MeetingInviteMessages.INVITES_DISABLED"
-msgstr "<b>Lista de invitados cerrada</b>\n\nYa no se permiten nuevas adiciones para esta quedada. El organizador ha cerrado la lista."
+msgstr "<b>Lista de invitados cerrada</b>\n\nYa no se permiten más invitaciones para esta quedada. El organizador ha cerrado la lista."
 
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
 msgstr "<b>Quedada no encontrada</b>\n\nLa quedada a la que intentas invitar a alguien ya no existe."
@@ -464,14 +463,13 @@ msgid "MeetingEditContentMessages.DESCRIPTION_SUCCESS"
 msgstr "La descripción se ha guardado correctamente como <b>${description}</b>"
 
 msgid "MeetingEditLocationMessages.DESCRIPTION"
-msgstr "Una quedada puede tener una ubicación asociada. Puedes indicar solo su nombre o también añadir la locación. Escoge cualquiera de las dos opciones."
+msgstr "Una quedada puede tener una ubicación asociada. Puedes indicar solo su nombre o también añadir su localización. Escoge cualquiera de las dos opciones."
 
 msgid "MeetingEditLocationMessages.NAME_PROMPT"
 msgstr "Envíame el nombre del lugar donde será la quedada."
 
 msgid "MeetingEditLocationMessages.COORDINATES_PROMPT"
-msgstr "<i>Sólo desde el teléfono 📱</i>\n\n"
-"Envíame la localización de la quedada. Toca en el icono 📎 y selecciona Ubicación. Puedes escoger la localización que quieras, no solo tu ubicación actual."
+msgstr "<i>Solo desde el teléfono 📱</i>\n\nEnvíame la localización de la quedada. Toca en el icono 📎 y selecciona Ubicación. Puedes escoger la localización que quieras, no solo tu ubicación actual."
 
 msgid "MeetingEditLocationMessages.NAME_SUCCESS"
 msgstr "El lugar de la quedada ha sido guardado como: <b>${name}</b>"
@@ -486,7 +484,7 @@ msgid "MeetingEditParticipantsMessages.DESCRIPTION"
 msgstr "Aquí podrás gestionar los participantes de la quedada: puedes establecer el número máximo de personas que pueden asistir, así como expulsar a cualquiera de los participantes."
 
 msgid "MeetingEditParticipantsMessages.MAX_PROMPT"
-msgstr "Envíame el número máximo de miembros permitidos en la quedada (debe ser un número superior a 0) o selecciona <i>Sin límite</i> para permitir un número ilimitado de participantes."
+msgstr "Envíame el número máximo de participantes permitidos en la quedada (debe ser un número superior a 0) o selecciona <i>Sin límite</i> para permitir un número ilimitado de participantes."
 
 msgid "MeetingEditParticipantsMessages.MAX_PROMPT_CAPPED"
 msgstr "Envíame el número máximo de miembros permitidos en la quedada (debe ser un número mayor que 0) o pulsa <i>Máx. (${cap})</i> para permitir el máximo de tu plan, ${cap} participantes."
@@ -522,7 +520,7 @@ msgid "MeetingEditParticipantsMessages.KICK_OUT_SUCCESS_NO_MORE"
 msgstr "El participante <b>${participant}</b> ha sido expulsado correctamente. No hay más participantes para expulsar."
 
 msgid "MeetingEditLanguageMessages.DESCRIPTION"
-msgstr "Elige el idioma de tu quedada. Esto cambiará el idioma usado cuando compartas la quedada.\n\nIdioma actual: <b>${language}</b>."
+msgstr "Elige el idioma de tu quedada. Esto cambiará el idioma en el que se muestra la quedada cuando se comparte.\n\nIdioma actual: <b>${language}</b>."
 
 msgid "MeetingEditLanguageMessages.SUCCESS"
 msgstr "El idioma se ha configurado correctamente."
@@ -549,10 +547,10 @@ msgid "MeetingEditDateTimeMessages.DATE_ADD_PROMPT"
 msgstr "Selecciona la fecha."
 
 msgid "MeetingEditDateTimeMessages.DATE_ADDED_TIME_PROMPT"
-msgstr "La fecha se ha establecido en <b>${datetime}</b>. La hora se establece por defecto en 23:59, justo antes de medianoche.\n\nEnvía una hora distinta en formato <i>HH:MM</i>, o toca Hecho para mantener 23:59."
+msgstr "La fecha se ha establecido a <b>${datetime}</b>. La quedada será a las 23:59, por defecto, justo antes de medianoche.\n\nEnvía una hora distinta en formato <i>HH:MM</i>, o toca Hecho para mantener 23:59."
 
 msgid "MeetingEditDateTimeMessages.TIME_DATE_DEFAULT_NOTE"
-msgstr "La fecha se establece por defecto en hoy, pero puedes elegir otra."
+msgstr "La fecha de la quedada se ha establecido al día de hoy por defecto, pero puedes elegir otra."
 
 msgid "MeetingEditDurationMessages.END_DATE_ADDED_TIME_PROMPT"
 msgstr "La fecha de fin ha sido establecida a <b>${datetime}</b>. La hora se establece por defecto en 23:59.\n\nEnvía una hora en el formato <i>HH:MM</i> para cambiarla, o toca Hecho para mantener 23:59."
@@ -564,7 +562,7 @@ msgid "CommonMessages.TIME_PROMPT"
 msgstr "Enviarme la hora de la quedada usando el formato <i>HH:MM</i> (por ejemplo, 21:30)"
 
 msgid "MeetingEditDateTimeMessages.TIME_SUCCESS"
-msgstr "La hora de la quedada se ha establecido para el ${datetime}"
+msgstr "La hora de la quedada se ha guardado como ${datetime}"
 
 msgid "CommonMessages.TIME_INVALID_FORMAT"
 msgstr "No entiendo esa hora que me has enviado 🤔...\n\n"
@@ -588,16 +586,16 @@ msgstr "Puedes configurar diferentes opciones en tu quedada:\n\n"
 "<b>Incógnito</b>: cuando activas incógnito en una quedada los participantes no se mostrarán cuando la compartas. Solo el número de participantes será visible. Tú sí podrás ver los participantes de la quedada."
 
 msgid "MeetingAttachMessages.FOOTNOTE_INACTIVE"
-msgstr "🔍 Haz que esta quedada sea buscable en este chat."
+msgstr "🔍 Haz que esta quedada se pueda buscar en este chat."
 
 msgid "MeetingAttachMessages.FOOTNOTE_ACTIVE"
-msgstr "✅ Esta quedada ahora es buscable en este chat."
+msgstr "✅ Esta quedada ahora puede buscarse en este chat."
 
 msgid "MeetingAttachMessages.ENABLED_ALERT"
-msgstr "✅ ¡Ahora es buscable!\n\nEsta quedada está ahora vinculada a este chat. Se incluirá en tus resultados de búsqueda cuando busques quedadas usando el modo inline del bot."
+msgstr "✅ ¡Ya se puede buscar!\n\nEsta quedada está ahora vinculada a este chat. Se incluirá en tus resultados de búsqueda cuando busques quedadas usando el modo inline del bot."
 
 msgid "MeetingAttachMessages.ALREADY_ENABLED_ALERT"
-msgstr "✅ ¡Ya es buscable!\n\nEsta quedada fue vinculada a este chat en un compartir anterior. Ya está incluida en tus resultados de búsqueda."
+msgstr "✅ ¡Ya se puede buscar!\n\nEsta quedada fue vinculada a este chat en un momento anterior. Ya está incluida en tus resultados de búsqueda."
 
 msgid "MeetingListMessages.ACTIVE_EMPTY"
 msgstr "Aún no tienes ninguna quedada.\n\nSelecciona <b>${new_meeting_button}</b> en el menú principal para crear una."
@@ -633,10 +631,10 @@ msgid "CommonMessages.UNEXPECTED_ERROR"
 msgstr "¡Uy! Algo inesperado sucedió. Te he vuelto a llevar al menú principal. Por favor, inténtalo de nuevo."
 
 msgid "CommonMessages.UNEXPECTED_ERROR_ALERT"
-msgstr "Algo salió mal por nuestra parte. Por favor, inténtalo de nuevo. Si sigue pasando, escribe a support@mitup.social."
+msgstr "Algo salió mal en nuestro lado. Por favor, inténtalo de nuevo. Si sigue pasando, escribe a support@mitup.social."
 
 msgid "CommonMessages.ACCOUNT_NOT_FOUND"
-msgstr "No tienes una cuenta de Mitup en este momento. Envía /start y te lo preparo."
+msgstr "No tienes una cuenta de Mitup en este momento. Envía /start y me pondré a ello."
 
 msgid "InlineQueryMessages.CREATE_MEETING_BUTTON"
 msgstr "➕ Crear una nueva quedada"
@@ -675,7 +673,7 @@ msgid "InlineQueryMessages.MEETING_UNAVAILABLE_MESSAGE"
 msgstr "<i>Esta quedada ya no está disponible.</i>"
 
 msgid "NotificationMessages.DELETION_WARNING"
-msgstr "La quedada <b>${meeting_title}</b> será eliminada permanentemente en <b>${days_until_deletion} días</b>.\n\nPara evitar esto, puedes reactivar la quedada seleccionando el botón <b>${reactivate_meeting_button}</b> abajo.\n\nRecuerda que siempre puedes reactivar cualquier quedada pasada desde el botón <b>${past_meetings_button}</b> en el menú principal.\n\nSi no quieres reactivar la quedada, puedes ignorar este mensaje."
+msgstr "La quedada <b>${meeting_title}</b> será eliminada permanentemente en <b>${days_until_deletion} días</b>.\n\nPara evitalo, puedes reactivar la quedada seleccionando el botón <b>${reactivate_meeting_button}</b> abajo.\n\nRecuerda que siempre puedes reactivar cualquier quedada pasada desde el botón <b>${past_meetings_button}</b> en el menú principal.\n\nSi no quieres reactivar la quedada, puedes ignorar este mensaje."
 
 msgid "NotificationMessages.DELETED"
 msgstr "La quedada <b>${meeting_title}</b> ha sido eliminada permanentemente."
@@ -687,7 +685,7 @@ msgid "NotificationMessages.STARTED"
 msgstr "¡La quedada <b>${meeting_title}</b> ha comenzado!"
 
 msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Ayuda a mantener Mitup en marcha</b>\n\nMitup lo construyen un par de hermanos, no una gran empresa, y es gratis para todo el mundo. Tu apoyo es lo que paga los servidores, la base de datos y las noches de depuración. Toda ayuda cuenta: hablar de Mitup a tus amistades, traducir, avisar de errores o respaldar el proyecto. La página ${collaborate_page} de nuestra web repasa todas las formas de echar una mano.\n\nLa forma más directa de ayudar es hacerte Host de Mitup en Patreon. Como agradecimiento, los Hosts tienen una insignia junto a su nombre, un grupo exclusivo para miembros y límites ampliados según el nivel: Brewer, Gamemaster o Commissioner. La página ${limits_page} muestra lo que desbloquea cada nivel.\n\nVincula tu cuenta de Patreon para empezar, y gracias por estar aquí."
+msgstr "<b>Ayuda a mantener Mitup en marcha</b>\n\nMitup lo mantienen un par de hermanos, no una gran empresa, y es gratis para todo el mundo. Tu apoyo es lo que paga los servidores, la base de datos y las noches arreglando problemas. Toda ayuda cuenta: hablar de Mitup a tus amistades, traducir, avisar de errores o apoyar el proyecto. La página ${collaborate_page} de nuestra web repasa todas las formas de echar una mano.\n\nLa forma más directa de ayudar es hacerte Host de Mitup en Patreon. Como agradecimiento, los Hosts tienen una insignia junto a su nombre, un grupo exclusivo para miembros y límites ampliados según el nivel: Brewer, Gamemaster o Commissioner. La página ${limits_page} muestra lo que desbloquea cada nivel.\n\nVincula tu cuenta de Patreon para empezar, y gracias por estar aquí."
 
 msgid "CollaborateMessages.LINKED_NOT_PATRON"
 msgstr "<b>Cuenta de Patreon vinculada</b>\n\n¡Todo listo, gracias por dar el primer paso! Aún no eres Host, así que tus ventajas de Host siguen desactivadas.\n\nComo agradecimiento, los Hosts tienen una insignia junto a su nombre, un grupo exclusivo para miembros y límites ampliados según el nivel: Brewer, Gamemaster o Commissioner. La página ${limits_page} muestra lo que desbloquea cada nivel.\n\nHazte Host y tus ventajas se activarán automáticamente, sin necesidad de vincular nada más."
@@ -879,94 +877,94 @@ msgid "MeetingEditDurationMessages.END_MAX_DURATION"
 msgstr "Una quedada puede durar una semana como máximo. Establece un fin dentro de una semana del inicio."
 
 msgid "BroadcastOperatorMessages.UPLOAD_PROMPT"
-msgstr ""
+msgstr "<b>New broadcast</b>\n\nUpload a YAML file, or paste the YAML directly as a message.\n\nIt must be a list of entries, each with a <code>language</code> code and an HTML <code>message</code>. English (<code>en</code>) is required as the fallback."
 
 msgid "BroadcastOperatorMessages.ERROR_INVALID_YAML"
-msgstr ""
+msgstr "🚫 I could not parse that as YAML.\n\n<code>${detail}</code>\n\nFix it and send it again."
 
 msgid "BroadcastOperatorMessages.ERROR_NOT_A_LIST"
-msgstr ""
+msgstr "🚫 The content must be a list of entries, each with a language and a message."
 
 msgid "BroadcastOperatorMessages.ERROR_EMPTY_LIST"
-msgstr ""
+msgstr "🚫 The list is empty. Add at least an English entry."
 
 msgid "BroadcastOperatorMessages.ERROR_ENTRY_SHAPE"
-msgstr ""
+msgstr "🚫 Entry ${position} is not valid. Each entry needs exactly two fields: <code>language</code> and <code>message</code>, both text."
 
 msgid "BroadcastOperatorMessages.ERROR_DUPLICATE_LANGUAGE"
-msgstr ""
+msgstr "🚫 Language <b>${language}</b> appears more than once. Keep one entry per language."
 
 msgid "BroadcastOperatorMessages.ERROR_MISSING_ENGLISH"
-msgstr ""
+msgstr "🚫 English (<code>${language}</code>) is required as the fallback. Add an <code>en</code> entry."
 
 msgid "BroadcastOperatorMessages.ERROR_EMPTY_MESSAGE"
-msgstr ""
+msgstr "🚫 The message for <b>${language}</b> is empty."
 
 msgid "BroadcastOperatorMessages.ERROR_MESSAGE_TOO_LONG"
-msgstr ""
+msgstr "🚫 The message for <b>${language}</b> is ${length} characters, over the limit of ${limit}. Shorten it and resend."
 
 msgid "BroadcastOperatorMessages.ERROR_DOCUMENT_TOO_LARGE"
-msgstr ""
+msgstr "🚫 That file is too large. The limit is ${limit_kb} KB."
 
 msgid "BroadcastOperatorMessages.ERROR_DOCUMENT_DECODE"
-msgstr ""
+msgstr "🚫 I could not read that file as UTF-8 text. Save it as UTF-8 and resend."
 
 msgid "BroadcastOperatorMessages.PREVIEW_SUMMARY_HEADER"
-msgstr ""
+msgstr "<b>Summary</b>"
 
 msgid "BroadcastOperatorMessages.PREVIEW_SUMMARY_LINE"
-msgstr ""
+msgstr "<b>${language}</b>: ${char_count} chars, ${recipient_count} recipients"
 
 msgid "BroadcastOperatorMessages.PREVIEW_TOTAL_RECIPIENTS"
-msgstr ""
+msgstr "<b>Total recipients:</b> ${total}"
 
 msgid "BroadcastOperatorMessages.PREVIEW_WARNINGS_HEADER"
-msgstr ""
+msgstr "🤔 Skipped unknown languages:"
 
 msgid "BroadcastOperatorMessages.PREVIEW_WARNING_LINE"
-msgstr ""
+msgstr "- ${language}"
 
 msgid "BroadcastOperatorMessages.PREVIEW_FOOTER"
-msgstr ""
+msgstr "Confirm to queue this broadcast, or Cancel to discard it."
 
 msgid "BroadcastOperatorMessages.BUTTON_CONFIRM"
-msgstr ""
+msgstr "✅ Confirmar"
 
 msgid "BroadcastOperatorMessages.BUTTON_CANCEL"
-msgstr ""
+msgstr "❌ Cancelar"
 
 msgid "BroadcastOperatorMessages.QUEUED_CONFIRMATION"
-msgstr ""
+msgstr "✅ Broadcast <b>${name}</b> (<code>#${broadcast_id}</code>) is queued. It will start sending shortly."
 
 msgid "BroadcastOperatorMessages.CANCELLED_CONFIRMATION"
-msgstr ""
+msgstr "❌ Broadcast discarded. Nothing was sent."
 
 msgid "BroadcastOperatorMessages.DRAFT_NOT_FOUND"
-msgstr ""
+msgstr "🤔 This draft is no longer available. Send /broadcast to start again."
 
 msgid "BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY"
-msgstr ""
+msgstr "✅ Broadcast <b>${name}</b> (<code>#${broadcast_id}</code>) finished.\n\n<b>Total:</b> ${total} · <b>Sent:</b> ${sent} · <b>Failed:</b> ${failed} · <b>Skipped:</b> ${skipped}\n\n${breakdown}"
 
 msgid "BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE"
-msgstr ""
+msgstr "<b>${language}</b>: ${sent} sent, ${failed} failed, ${skipped} skipped"
 
 msgid "BroadcastOperatorMessages.SENDER_FAILED"
-msgstr ""
+msgstr "🚫 Broadcast <b>${name}</b> (<code>#${broadcast_id}</code>) failed after ${attempts} attempts.\n\n<b>Sent:</b> ${sent} · <b>Failed:</b> ${failed} · <b>Skipped:</b> ${skipped}\n\nCheck the logs for details."
 
 msgid "BroadcastOperatorMessages.PREVIEW_HEADER"
-msgstr ""
+msgstr "<b>Broadcast preview</b>\n\nHere is exactly what each language will receive."
 
 msgid "BroadcastOperatorMessages.PREVIEW_LANGUAGE_LABEL"
-msgstr ""
+msgstr "<b>${language}</b>"
 
 msgid "BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE_WITH_ORPHANED"
-msgstr ""
+msgstr "<b>${language}</b>: ${sent} sent, ${failed} failed, ${skipped} skipped, ${orphaned} orphaned"
 
 msgid "BroadcastOperatorMessages.SENDER_ORPHANED_WARNING"
-msgstr ""
+msgstr "🚫 <b>${orphaned}</b> deliveries were interrupted by a worker crash and their outcome is unknown. They will not be retried."
 
 msgid "CommonMessages.CONTEXT_LOST"
-msgstr "<b>¡Vaya, hemos perdido el hilo!</b>\n\nEl bot ha tenido una actualización interna rápida y ha olvidado en qué paso estabas. Todo lo que guardaste está a salvo. Por favor, vuelve a empezar lo que estabas haciendo desde el menú de abajo."
+msgstr "<b>¡Vaya, hemos perdido el hilo!</b>\n\nEl bot ha tenido una actualización interna y ha olvidado en qué paso estabas. Todo lo que guardaste está a salvo. Por favor, vuelve a empezar lo que estabas haciendo desde el menú de abajo."
 
 msgid "CommonMessages.RICH_MESSAGE_NOT_SUPPORTED"
 msgstr "<b>¡Ese es un mensaje enriquecido!</b>\n\nMe doy cuenta de que enviaste uno, pero no puedo trabajar con mensajes enriquecidos aún. El soporte llegará con la actualización v2.0, y te lo anunciaré aquí cuando llegue, así que estate atento. Por ahora, envía tu texto como un mensaje normal y seguiremos adelante."
@@ -1011,37 +1009,37 @@ msgid "SupporterNotificationMessages.PATRON_TIER_SET"
 msgstr "<b>🎲 Tu nivel ahora es Gamemaster</b>\n\nTu insignia de Gamemaster está activa y se aplican tus límites de Gamemaster: organiza más quedadas a la vez, prográmalas con más antelación e invita a cuanta gente quieras a cada una. Gracias por apoyar a Mitup."
 
 msgid "SupporterNotificationMessages.HOSTS_GROUP_REMOVED"
-msgstr "<b>Tu acceso al Hosts-Only Group ha terminado</b>\n\nTu apoyo como Host ha llegado a su fin, y te agradecemos el tiempo que has respaldado a Mitup. Por ahora te hemos quitado del Hosts-Only Group. Cuando vuelvas a ser Host, podrás unirte de nuevo desde el menú Colabora."
+msgstr "<b>Tu acceso al Grupo para Hosts ha terminado</b>\n\nTu apoyo como Host ha llegado a su fin, y te agradecemos el tiempo que has respaldado a Mitup. Por ahora te hemos quitado del Grupo para Hosts. Cuando vuelvas a ser Host, podrás unirte de nuevo desde el menú Colabora."
 
 msgid "SupporterNotificationMessages.HOSTS_GROUP_READMITTED"
-msgstr "<b>Tu acceso de Host ha vuelto</b>\n\nBienvenido de nuevo. Tus ventajas de Host están activas otra vez, y eres bienvenido en el Hosts-Only Group. Toca abajo para volver a unirte."
+msgstr "<b>Tu acceso de Host ha vuelto</b>\n\nBienvenido de nuevo. Tus ventajas de Host están activas otra vez, y eres bienvenido en Grupo de Hosts. Toca abajo para volver a unirte."
 
 msgid "AdminMessages.MENU_DESCRIPTION"
-msgstr ""
+msgstr "<b>Administrador</b>\n\nAcciones de operador para gestionar el bot."
 
 msgid "AdminMessages.BUTTON_ADMIN"
-msgstr ""
+msgstr "🛠️ Admin"
 
 msgid "AdminMessages.BUTTON_BROADCAST"
-msgstr ""
+msgstr "📨 Broadcast"
 
 msgid "ButtonMessages.OPEN_USER_GUIDE"
-msgstr "📖 Abrir la guía de uso"
+msgstr "📖 Abrir la guía de usuario"
 
 msgid "ButtonMessages.JOIN_COMMUNITY_GROUP"
 msgstr "👥 Unirse al grupo de la comunidad"
 
 msgid "HelpMessages.DESCRIPTION"
-msgstr "<b>Ayuda</b>\n\nTres formas de conseguir ayuda con Mitup:\n\n📖 La guía de uso repasa cada pantalla, página a página. El mejor sitio para empezar.\n\n👥 El grupo de la comunidad está abierto a cualquiera que use Mitup. Entra y pregunta lo que quieras.\n\n✉️ Para cualquier cosa privada, escribe a support@mitup.social. Lo lee una persona."
+msgstr "<b>Ayuda</b>\n\nTres formas de conseguir ayuda con Mitup:\n\n📖 La guía de usuario repasa cada pantalla, página a página. El mejor sitio para empezar.\n\n👥 El grupo de la comunidad está abierto a cualquiera que use Mitup. Entra y pregunta lo que quieras.\n\n✉️ Para cualquier consulta privada, escribe a support@mitup.social. Lo lee una persona."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE"
 msgstr "Esa fecha está a más de ${days} días, lo más lejos que puedes programar por ahora. Envía el título de tu quedada de nuevo con una fecha más cercana, o hazte Host de Mitup en Patreon para programar más lejos. Tienes todos los detalles en Colabora, justo debajo."
 
 msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE_PATRON"
-msgstr "Esa fecha está a más de ${days} días, lo más lejos que programa tu plan Gamemaster. Envía el título de tu quedada de nuevo con una fecha más cercana, o pásate a Commissioner en Patreon para programar tan lejos como quieras. Tienes todos los detalles en Colabora, justo debajo."
+msgstr "Esa fecha está a más de ${days} días, lo más lejos que programar una quedada con tu plan Gamemaster. Envía el título de tu quedada de nuevo con una fecha más cercana, o pásate a Commissioner en Patreon para programar tan lejos como quieras. Tienes todos los detalles en Colabora, justo debajo."
 
 msgid "RegistrationMessages.REGISTRATION_COMPLETE"
-msgstr "<b>¡Todo listo, te damos la bienvenida a Mitup!</b> Tu zona horaria es ${timezone} y el bot está preparado para ti.\n\nTodo lo que necesitas para crear quedadas y unirte a otras está en el menú de abajo, y la ${user_guide} explica cómo funciona todo.\n\nSi Mitup te ayuda a reunir a la gente, puedes apoyarlo cuando quieras desde Colabora."
+msgstr "<b>¡Todo listo, te damos la bienvenida a Mitup!</b> Tu zona horaria es ${timezone} y el bot está preparado para ti.\n\nTodo lo que necesitas para crear quedadas y unirte a otras está en el menú de abajo, y la ${user_guide} explica cómo funciona todo.\n\nSi Mitup te es de ayuda para reunirte con tu gente, puedes apoyarlo cuando quieras desde Colabora."
 
 msgid "RegistrationMessages.USER_GUIDE_LABEL"
 msgstr "guía de usuario"
@@ -1095,7 +1093,7 @@ msgid "CollaborateMessages.UNLINK_CONFIRM"
 msgstr "<b>¿Desvincular tu cuenta de Patreon?</b>\n\nEsto desconecta tu cuenta de Patreon de Mitup. No estás usando ninguna ventaja de Host ahora mismo, así que no renuncias a nada. Puedes vincular una cuenta cuando quieras desde Colabora."
 
 msgid "CollaborateMessages.UNLINK_CONFIRM_HOST"
-msgstr "<b>¿Desvincular tu cuenta de Patreon?</b>\n\nHoy eres ${current_tier}. Desvincularla apaga tu insignia de ${current_tier} y tus límites ampliados, y tu acceso al Hosts-Only Group termina.\n\nTu aportación en Patreon no se detiene por sí sola. Si quieres dejar de pagar, cancélala en Patreon. Si vuelves a vincular tu cuenta mientras tu aportación está activa, tus ventajas de Host vuelven."
+msgstr "<b>¿Desvincular tu cuenta de Patreon?</b>\n\nHoy eres ${current_tier}. Desvincularla elimina tu insignia de ${current_tier} y tus límites ampliados, y tu acceso al grupo para Hosts desaparece.\n\nTu aportación en Patreon no se detiene por sí sola. Si quieres dejar de pagar, cancélala en Patreon. Si vuelves a vincular tu cuenta mientras tu aportación está activa, tus ventajas de Host vuelven."
 
 msgid "SettingsMessages.TIMEOUT_INVALID"
 msgstr "¡Vaya! Ese no parece un tiempo de prórroga válido. Envíame un número entero positivo de minutos, hasta <b>${max_timeout}</b> (un día). ¡No se permiten decimales!"
@@ -1104,10 +1102,10 @@ msgid "CommonMessages.OLD_VERSION_MESSAGE"
 msgstr "Este mensaje es de una versión antigua de Mitup, así que sus botones ya no funcionan. Tu cuenta y tus quedadas están a salvo. Abre el menú principal para continuar."
 
 msgid "AdminMessages.BUTTON_SUPPORTER_GRANTS"
-msgstr "🎁 Concesiones de Host"
+msgstr "🎁 Ventajas de Host"
 
 msgid "GrantOperatorMessages.TARGET_PROMPT"
-msgstr "<b>Concesiones de Host</b>\n\nEnvía el id de Telegram o el @usuario de la persona que quieres gestionar. Solo los miembros registrados pueden recibir un nivel de Host."
+msgstr "<b>Ventajas de Host</b>\n\nEnvía el id de Telegram o el @usuario de la persona que quieres gestionar. Solo los miembros registrados pueden recibir un nivel de Host."
 
 msgid "GrantOperatorMessages.TARGET_NOT_FOUND"
 msgstr "🚫 Ningún miembro coincide con <code>${identifier}</code>. Revisa el id o el nombre de usuario y envíalo de nuevo."
