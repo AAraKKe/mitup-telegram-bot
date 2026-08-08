@@ -1,3 +1,4 @@
+import logging
 from contextlib import suppress
 from enum import Enum, auto
 from typing import Any, cast
@@ -51,6 +52,7 @@ from tests.helpers import (
     build_context,
     create_bot_config,
     create_member,
+    log_record,
     make_test_metrics_client,
 )
 from tests.helpers.constants import (
@@ -742,8 +744,11 @@ async def test_admin_only_command_runs_for_admin(update: Update, app: StubMitupA
     ClearableRegistry.clear()
 
 
-async def test_admin_only_command_dropped_for_non_admin(update: Update, app: StubMitupApp):
+async def test_admin_only_command_dropped_for_non_admin(
+    update: Update, app: StubMitupApp, caplog: pytest.LogCaptureFixture
+):
     called = mock.AsyncMock(return_value="RESULT")
+    caplog.set_level(logging.WARNING)
 
     @ClearableRegistry.register_command(HandlerTestId.SOME_COMMAND, command="admincmd", admin_only=True)
     async def command_admin(update: Update, context: StubMitupContext):
@@ -753,6 +758,14 @@ async def test_admin_only_command_dropped_for_non_admin(update: Update, app: Stu
 
     called.assert_not_awaited()
     assert result is None
+    # The event string, level and fields are alarm contract, pinned literally: a CloudWatch metric
+    # filter in the infra repo matches the event byte-for-byte to fire MitupAdminGateProbed on a
+    # single occurrence, and the fields are its triage path. The gate is shared by every register_*
+    # variant, so the line is pinned here once, not per handler type.
+    dropped = log_record(caplog, "Dropped update for admin-only handler from non-admin user")
+    assert dropped.levelname == "WARNING"
+    assert dropped.__dict__["handler"] == str(HandlerTestId.SOME_COMMAND)
+    assert dropped.__dict__["tg_user_id"] == DEFAULT_USER_ID
     ClearableRegistry.clear()
 
 

@@ -244,6 +244,10 @@ def guard_admin_only(handler_id: HandlerId, callback: HandlerCallback) -> Handle
     async def inner(update: Update, context: TMitupContext):
         if not guards.is_admin(update, context):
             tg_user_id = update.effective_user.id if update.effective_user else None
+            # The event string is alarm contract: a CloudWatch metric filter in the infra repo
+            # (aws_cloudwatch_log_metric_filter.admin_gate_drop) matches it byte-for-byte and fires
+            # the MitupAdminGateProbed alarm on a single occurrence. Rewording it here silently
+            # disarms that alarm.
             log.warning(
                 "Dropped update for admin-only handler from non-admin user",
                 handler=handler_id,
