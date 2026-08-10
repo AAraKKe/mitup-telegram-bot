@@ -898,7 +898,7 @@ async def test_shared_meeting_denied_keeps_the_card_untouched_in_the_bot_chat(
     await error_handler.handler(context, error, Env.PROD)
 
     context.api.assert_answer_callback_query_called(
-        context.telegram_update, text=MeetingDisplayMessages.DELETED_BANNER.get(lang="en"), show_alert=True
+        context.telegram_update, text=MeetingDisplayMessages.DELETED_BANNER.get_text(lang="en"), show_alert=True
     )
     context.api.assert_edit_message_not_called()
 
@@ -914,7 +914,7 @@ async def test_shared_meeting_denied_alerts_over_the_card_without_touching_it(
     await context.metrics.flush()
 
     context.api.assert_answer_callback_query_called(
-        context.telegram_update, text=MeetingDisplayMessages.DELETED_BANNER.get(lang="en"), show_alert=True
+        context.telegram_update, text=MeetingDisplayMessages.DELETED_BANNER.get_text(lang="en"), show_alert=True
     )
     context.api.assert_edit_message_not_called()
     metrics.assert_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)

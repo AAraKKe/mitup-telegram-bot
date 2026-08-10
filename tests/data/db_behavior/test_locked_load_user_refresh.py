@@ -82,7 +82,7 @@ async def test_owner_join_survives_locked_meeting_load(db_session: AsyncSession,
         assert owner.own_meeting(meeting.db_id) is not None
         assert owner.joined_meeting(meeting.db_id) is not None
         context.api.assert_answer_callback_query_called(
-            update, text=MeetingJoinMessages.JOIN_SUCCESS.get(lang=owner.lang), show_alert=False
+            update, text=MeetingJoinMessages.JOIN_SUCCESS.get_text(lang=owner.lang), show_alert=False
         )
         context.api.assert_method_just_called("update_meeting_messages")
 
@@ -114,7 +114,7 @@ async def test_participant_rejoin_survives_locked_meeting_load(db_session: Async
         assert acting_user.joined_meeting(meeting.db_id) is not None
         assert acting_user.own_meeting(meeting.db_id) is None
         context.api.assert_answer_callback_query_called(
-            update, text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get(lang=acting_user.lang), show_alert=False
+            update, text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get_text(lang=acting_user.lang), show_alert=False
         )
 
 

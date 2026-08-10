@@ -605,5 +605,5 @@ async def user_registered(
             raise CallbackQueryNotSet(update) from e
 
         await context.api.answer_callback_query(
-            update=update, text=alert_message.get(lang=user.language_code or "en"), show_alert=True
+            update=update, text=alert_message.get_text(lang=user.language_code or "en"), show_alert=True
         )

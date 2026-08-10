@@ -59,7 +59,7 @@ def assert_rejected(context: StubMitupContext, meeting: Meetup, user: User, metr
     context.api.assert_update_meeting_messages_not_called()
     context.api.assert_answer_callback_query_called(
         update=context.get_update(),
-        text=MeetingDisplayMessages.DELETED_BANNER.get(lang=user.lang),
+        text=MeetingDisplayMessages.DELETED_BANNER.get_text(lang=user.lang),
         show_alert=True,
     )
     metrics.assert_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)
@@ -143,7 +143,7 @@ async def test_join_on_shared_card_is_allowed(
     assert shared_card.chat_instance == "someinstance"
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.JOIN_SUCCESS.get(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.JOIN_SUCCESS.get_text(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -174,7 +174,7 @@ async def test_join_on_shared_card_is_allowed_from_the_stored_claim_alone(
     assert len(stranger_meeting.joined_links) == 1
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.JOIN_SUCCESS.get(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.JOIN_SUCCESS.get_text(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -268,7 +268,7 @@ async def test_participant_can_leave_from_bot_chat(
     assert stranger_meeting.joined_links == []
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.LEAVE_SUCCESS.get(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.LEAVE_SUCCESS.get_text(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -412,7 +412,7 @@ async def test_invite_with_forged_id_does_not_start_the_conversation(
     context.api.assert_send_message_not_called()
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
+        text=MeetingDisplayMessages.DELETED_BANNER.get_text(lang=user_with_settings.lang),
         show_alert=True,
     )
     metrics.assert_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)
@@ -439,7 +439,7 @@ async def test_invite_from_shared_card_is_allowed(
     assert state == ConversationInviteState.NAME
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingInviteMessages.GO_PRIVATE.get(lang=user_with_settings.lang),
+        text=MeetingInviteMessages.GO_PRIVATE.get_text(lang=user_with_settings.lang),
         show_alert=True,
     )
 
@@ -475,7 +475,7 @@ async def test_invite_confirm_cannot_be_redirected_to_another_meeting(
     assert own_meeting.joined_links == [], "the authorized meeting must not be invited into either"
     confirm_context.api.assert_answer_callback_query_called(
         update=confirm_context.get_update(),
-        text=MeetingInviteMessages.MEETING_NOT_FOUND.get(lang=user_with_settings.lang),
+        text=MeetingInviteMessages.MEETING_NOT_FOUND.get_text(lang=user_with_settings.lang),
         show_alert=True,
     )
     # Each conversation step runs with its own metrics client, so assert on the confirm step's.

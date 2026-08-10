@@ -1024,7 +1024,7 @@ async def test_context_manager_for_registered_user(
         else:
             context.api.assert_answer_callback_query_called(
                 update,
-                MeetingInviteMessages.OPEN_CHAT.get(lang="en"),
+                MeetingInviteMessages.OPEN_CHAT.get_text(lang="en"),
                 show_alert=True,
             )
 

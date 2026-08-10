@@ -1,9 +1,11 @@
+import logging
 from collections.abc import Callable
 from functools import partial
 
 import pytest
 
 from mitup_bot import views
+from mitup_bot.api_wrapper import CALLBACK_QUERY_TEXT_LIMIT
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.enums import ConversationInviteState, MeetingHandlerId
 from mitup_bot.models import Meetup, User
@@ -28,6 +30,7 @@ from tests.helpers import (
 )
 from tests.helpers.conversation import ConversationStep, ConversationTester
 from tests.helpers.handler_context import HandlerContext
+from tests.helpers.logs import log_record
 from tests.helpers.monitoring import MetricAssertions
 
 MEETING_ID = 999
@@ -95,7 +98,7 @@ async def test_invite_users_by_registered_user(
     if external_chat:
         context.api.assert_answer_callback_query_called(
             handler_context.update,
-            text=MeetingInviteMessages.GO_PRIVATE.get(lang=user_with_settings.lang),
+            text=MeetingInviteMessages.GO_PRIVATE.get_text(lang=user_with_settings.lang),
             show_alert=True,
         )
     context.api.assert_send_message_to_user_called(user_with_settings, expected_view)
@@ -121,7 +124,7 @@ async def test_invite_users_by_unregistered_user(
 
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingInviteMessages.OPEN_CHAT.get(lang=user_with_settings.lang),
+        text=MeetingInviteMessages.OPEN_CHAT.get_text(lang=user_with_settings.lang),
         show_alert=True,
     )
 
@@ -353,7 +356,7 @@ async def test_concurrent_duplicate_invitation_is_idempotent_noop(
     # The inviter is told the user is already joined, and the conversation ends.
     confirm_context.api.assert_answer_callback_query_called(
         update=confirm_context.get_update(),
-        text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get_text(lang=user_with_settings.lang),
         show_alert=True,
     )
     assert result.last_state is None
@@ -548,7 +551,7 @@ async def test_meeting_does_not_accept_invitations_after_conversation_started(
 
     final_context.api.assert_answer_callback_query_called(
         update=final_context.get_update(),
-        text=expected_message.get(lang=user_with_settings.lang),
+        text=expected_message.get_text(lang=user_with_settings.lang),
         show_alert=True,
     )
 
@@ -683,9 +686,85 @@ async def test_meeting_not_allowing_invitations_on_callback_query(
 
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=expected_message.get(lang=user_with_settings.lang),
+        text=expected_message.get_text(lang=user_with_settings.lang),
         show_alert=True,
     )
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        MeetingInviteMessages.INVITES_DISABLED,
+        MeetingInviteMessages.MEETING_FULL,
+        MeetingInviteMessages.MEETING_NOT_FOUND,
+        MeetingInviteMessages.OPEN_CHAT,
+        MeetingInviteMessages.GO_PRIVATE,
+    ],
+    ids=["invitations_disabled", "meeting_full", "meeting_not_found", "open_chat", "go_private"],
+)
+def test_invite_alert_copy_renders_as_plain_text(lang: str, message: MeetingInviteMessages):
+    """These five invite messages are only ever shown as callback-query alerts.
+
+    Telegram renders an alert as plain text and caps it at 200 characters, and the api wrapper
+    refuses to send one carrying entities, so a formatting tag here reaches the caller as a fault
+    instead of the alert. Both properties come from whichever translation is rendered, so they are
+    asserted per language: a tag or an overlong string in a single catalog breaks that language
+    alone and nothing in English would show it.
+    """
+    rendered = message.get(lang=lang)
+
+    assert rendered.entities == []
+    assert len(rendered.text) <= CALLBACK_QUERY_TEXT_LIMIT
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        UpdateRequest(callback_query=cb.INVITE.with_id(MEETING_ID), from_bot_chat=False),
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "meeting_modifier, expected_message, expected_reason",
+    [
+        [disable_invitations, MeetingInviteMessages.INVITES_DISABLED, "invitations_disabled"],
+        [fill_meeting, MeetingInviteMessages.MEETING_FULL, "meeting_full"],
+    ],
+    ids=["invitations_disabled", "meeting_full"],
+)
+async def test_invite_rejection_alert_is_sendable_plain_text(
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    meeting: Meetup,
+    caplog: pytest.LogCaptureFixture,
+    meeting_modifier: Callable[[Meetup], None],
+    expected_message: MeetingInviteMessages,
+    expected_reason: str,
+):
+    """The rejection reaches `answer_callback_query` as a `str`, which is what makes it sendable.
+
+    `MockApi` stands in for the api wrapper here, so it accepts whatever the handler hands it; the
+    wrapper itself rejects a `FormattedText` with entities. Asserting the argument's type is what
+    ties the two together, since a plain `str` cannot trip that check whatever the copy says.
+
+    The line naming why the invitation was blocked is asserted alongside it: the alert tells the
+    caller, and `reason` is the only thing that tells us which of the two rules stopped them.
+    """
+    caplog.set_level(logging.INFO)
+    setup_db(mock_session, user_with_settings, meeting)
+    meeting_modifier(meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.INVITE_USERS_CONVERSATION, handler_context=handler_context)
+
+    answered = context.api.call_args("answer_callback_query").kwargs
+    assert isinstance(answered["text"], str)
+    assert answered["text"] == expected_message.get_text(lang=user_with_settings.lang)
+    assert answered["show_alert"] is True
+
+    record = log_record(caplog, "Meeting invitation blocked")
+    assert record.__dict__["reason"] == expected_reason
+    assert record.__dict__["step"] == "entry"
 
 
 @pytest.mark.parametrize(

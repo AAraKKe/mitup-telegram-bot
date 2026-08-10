@@ -553,20 +553,22 @@ class MeetingInviteMessages(MessageBase):
     OPEN_CHAT = "Start Private Chat\n\nTo add participants, you need to open a chat with me first."
     GO_PRIVATE = "Continue in Private\n\nPlease switch to our private chat to send me the name."
     SUCCESS = "<b>List Updated</b>\n\nUser <b>${name}</b> has been added to the meeting <b>${meeting_title}</b>."
+    # The three rejections below are shown only as plain callback-query alerts (max 200 characters),
+    # like OPEN_CHAT and GO_PRIVATE above, so they must stay entity-free: Telegram renders no
+    # formatting in an alert, and an inline-formatting tag here reaches the caller as a fault instead
+    # of the alert. Their headings are plain lines for that reason. Every catalog has to keep them
+    # tag-free too, since the entities come from whichever translation is rendered.
     MEETING_FULL = (
-        "<b>No Spots Left</b>\n\nThe guest list is currently full. You cannot add anyone else unless a spot opens up."
+        "No Spots Left\n\nThe guest list is currently full. You cannot add anyone else unless a spot opens up."
     )
     INVITES_DISABLED = (
-        "<b>Guest List Closed</b>\n\n"
-        "New additions are no longer allowed for this meeting. The organizer has closed the list."
+        "Guest List Closed\n\nNew additions are no longer allowed for this meeting. The organizer has closed the list."
     )
     # Naming the action ("the meeting you are trying to invite someone to") is deliberate: the invite
     # flow is entered from a card that may sit in any chat and answered in the bot chat, so its copy
     # has to reconnect the reader to what they were doing. It is not interchangeable with the generic
     # deleted-meeting copy.
-    MEETING_NOT_FOUND = (
-        "<b>Meeting Not Found</b>\n\nThe meeting you are trying to invite someone to does not exist anymore."
-    )
+    MEETING_NOT_FOUND = "Meeting Not Found\n\nThe meeting you are trying to invite someone to does not exist anymore."
     # Appended to the rejection screen when the invite flow's mid-flow guard stops the caller, so the
     # screen that replaces their prompt says which flow it ended.
     FLOW_CONTEXT = "You were in the middle of inviting someone."

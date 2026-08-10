@@ -414,13 +414,13 @@ msgid "MeetingInviteMessages.SUCCESS"
 msgstr "<b>Lista actualizada</b>\n\nSe ha añadido a <b>${name}</b> a la quedada <b>${meeting_title}</b>."
 
 msgid "MeetingInviteMessages.MEETING_FULL"
-msgstr "<b>No quedan plazas</b>\n\nLa lista de invitados está completa. No puedes añadir a nadie más a menos que se libere una plaza."
+msgstr "No quedan plazas\n\nLa lista de invitados está completa. No puedes añadir a nadie más a menos que se libere una plaza."
 
 msgid "MeetingInviteMessages.INVITES_DISABLED"
-msgstr "<b>Lista de invitados cerrada</b>\n\nYa no se permiten más invitaciones para esta quedada. El organizador ha cerrado la lista."
+msgstr "Lista de invitados cerrada\n\nYa no se permiten más invitaciones para esta quedada. El organizador ha cerrado la lista."
 
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
-msgstr "<b>Quedada no encontrada</b>\n\nLa quedada a la que intentas invitar a alguien ya no existe."
+msgstr "Quedada no encontrada\n\nLa quedada a la que intentas invitar a alguien ya no existe."
 
 msgid "MeetingInviteMessages.FLOW_CONTEXT"
 msgstr "Estabas invitando a alguien."

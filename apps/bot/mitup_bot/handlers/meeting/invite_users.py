@@ -36,7 +36,7 @@ async def handle_invite_from_external_chat(
     """
     await send_request_for_invite_name(context, user, meeting_id)
     await context.api.answer_callback_query(
-        update, text=MeetingInviteMessages.GO_PRIVATE.get(lang=user.lang), show_alert=True
+        update, text=MeetingInviteMessages.GO_PRIVATE.get_text(lang=user.lang), show_alert=True
     )
 
 
@@ -80,7 +80,9 @@ async def ensure_invitations_open(context: TMitupContext, user: User, meeting: M
         step=step,
         conversation_state_cleared=True,
     )
-    await context.api.answer_callback_query(context.get_update(), text=message.get(lang=user.lang), show_alert=True)
+    await context.api.answer_callback_query(
+        context.get_update(), text=message.get_text(lang=user.lang), show_alert=True
+    )
     context.clean_user_data([ContextId.INVITE_USERS])
     return False
 
@@ -257,7 +259,7 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             # still names the meeting authorized when this conversation was entered. Without this the
             # conversation state of any meeting could be redirected onto an arbitrary one.
             await context.api.answer_callback_query(
-                update, text=MeetingInviteMessages.MEETING_NOT_FOUND.get(lang=user.lang), show_alert=True
+                update, text=MeetingInviteMessages.MEETING_NOT_FOUND.get_text(lang=user.lang), show_alert=True
             )
             # The counter this emits is a security series; without a line beside it there is no way
             # to tell which meeting was aimed at from which conversation. Neither id is trusted, and
@@ -309,7 +311,7 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             )
             await context.api.answer_callback_query(
                 update,
-                text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get(lang=user.lang),
+                text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get_text(lang=user.lang),
                 show_alert=True,
             )
             context.clean_user_data([ContextId.INVITE_USERS])

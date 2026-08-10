@@ -55,7 +55,7 @@ async def test_attach_to_chat_new_message(
     # The alert should be the "now searchable" one
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingAttachMessages.ENABLED_ALERT.get(),
+        text=MeetingAttachMessages.ENABLED_ALERT.get_text(),
         show_alert=True,
     )
 
@@ -97,7 +97,7 @@ async def test_attach_to_chat_existing_message_without_chat_instance(
 
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingAttachMessages.ENABLED_ALERT.get(),
+        text=MeetingAttachMessages.ENABLED_ALERT.get_text(),
         show_alert=True,
     )
 
@@ -142,7 +142,7 @@ async def test_attach_to_chat_already_attached_in_other_chat(
     # The alert should be "now searchable" (not "already searchable")
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingAttachMessages.ENABLED_ALERT.get(),
+        text=MeetingAttachMessages.ENABLED_ALERT.get_text(),
         show_alert=True,
     )
 
@@ -178,7 +178,7 @@ async def test_attach_to_chat_already_attached_in_same_chat(
     # The "already searchable" alert should be shown
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingAttachMessages.ALREADY_ENABLED_ALERT.get(),
+        text=MeetingAttachMessages.ALREADY_ENABLED_ALERT.get_text(),
         show_alert=True,
     )
 
@@ -288,7 +288,7 @@ async def test_attach_to_chat_by_unregistered_user(
     assert shared_card.chat_instance == "someinstance"
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingAttachMessages.ENABLED_ALERT.get(),
+        text=MeetingAttachMessages.ENABLED_ALERT.get_text(),
         show_alert=True,
     )
     context.api.assert_update_meeting_messages_called(meeting=meeting, current_message=shared_card)
@@ -322,7 +322,7 @@ async def test_attach_to_chat_by_unregistered_user_on_unclaimed_card_is_rejected
     context.api.assert_update_meeting_messages_not_called()
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingDisplayMessages.DELETED_BANNER.get(lang=TranslationEngine.FALLBACK_LANG),
+        text=MeetingDisplayMessages.DELETED_BANNER.get_text(lang=TranslationEngine.FALLBACK_LANG),
         show_alert=True,
     )
     metrics.assert_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)
@@ -352,7 +352,7 @@ async def test_attach_to_chat_by_pending_deletion_user(
     assert shared_card.chat_instance == "someinstance"
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingAttachMessages.ENABLED_ALERT.get(),
+        text=MeetingAttachMessages.ENABLED_ALERT.get_text(),
         show_alert=True,
     )
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
@@ -381,7 +381,7 @@ async def test_attach_to_chat_by_pending_deletion_owner_is_rejected(
     context.api.assert_update_meeting_messages_not_called()
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingDisplayMessages.DELETED_BANNER.get(lang=TranslationEngine.FALLBACK_LANG),
+        text=MeetingDisplayMessages.DELETED_BANNER.get_text(lang=TranslationEngine.FALLBACK_LANG),
         show_alert=True,
     )
     metrics.assert_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)

@@ -399,13 +399,13 @@ msgid "MeetingInviteMessages.SUCCESS"
 msgstr "<b>Lista aggiornata</b>\n\nAbbiamo aggiunto <b>${name}</b> all'incontro <b>${meeting_title}</b>."
 
 msgid "MeetingInviteMessages.MEETING_FULL"
-msgstr "<b>Nessun posto libero</b>\n\nLa lista degli ospiti è attualmente piena. Non puoi aggiungere nessun altro a meno che non si liberi un posto."
+msgstr "Nessun posto libero\n\nLa lista degli ospiti è attualmente piena. Non puoi aggiungere nessun altro a meno che non si liberi un posto."
 
 msgid "MeetingInviteMessages.INVITES_DISABLED"
-msgstr "<b>Lista degli ospiti chiusa</b>\n\nNon si possono più aggiungere persone a questo incontro. L'organizzatore ha chiuso la lista."
+msgstr "Lista degli ospiti chiusa\n\nNon si possono più aggiungere persone a questo incontro. L'organizzatore ha chiuso la lista."
 
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
-msgstr "<b>Incontro non trovato</b>\n\nL'incontro a cui stai cercando di invitare qualcuno non esiste più."
+msgstr "Incontro non trovato\n\nL'incontro a cui stai cercando di invitare qualcuno non esiste più."
 
 msgid "MeetingInviteMessages.FLOW_CONTEXT"
 msgstr "Stavi invitando qualcuno."

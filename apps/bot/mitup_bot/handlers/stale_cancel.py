@@ -32,7 +32,7 @@ async def callback_query_stale_cancel(session: AsyncSession, update: Update, con
     # Only reads `user.lang` for the alert text; never traverses the meetups/joined_links collections.
     user = await guards.current_user(update, session)
 
-    alert_text = CommonMessages.STALE_CANCEL_ALERT.get(lang=user.lang)
+    alert_text = CommonMessages.STALE_CANCEL_ALERT.get_text(lang=user.lang)
     await context.api.answer_callback_query(update, text=alert_text, show_alert=True)
 
     await context.api.clear_reply_markup(update)

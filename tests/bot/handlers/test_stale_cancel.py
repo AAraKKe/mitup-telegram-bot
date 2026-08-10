@@ -40,7 +40,7 @@ async def test_stale_cancel_answers_callback_with_show_alert(
 
     context, _ = await call_handler(StaleCancelHandlerId.STALE_CANCEL_CALLBACK, handler_context=handler_context)
 
-    expected_text = CommonMessages.STALE_CANCEL_ALERT.get(lang=user_with_settings.lang)
+    expected_text = CommonMessages.STALE_CANCEL_ALERT.get_text(lang=user_with_settings.lang)
     # show_alert=True so the user sees a popup, not just a toast
     context.api.assert_answer_callback_query_called(update, text=expected_text, show_alert=True)
 
@@ -80,7 +80,7 @@ async def test_stale_cancel_matches_any_cancel_action_callback(
 
     context, _ = await call_handler(StaleCancelHandlerId.STALE_CANCEL_CALLBACK, handler_context=handler_context)
 
-    expected_text = CommonMessages.STALE_CANCEL_ALERT.get(lang=user_with_settings.lang)
+    expected_text = CommonMessages.STALE_CANCEL_ALERT.get_text(lang=user_with_settings.lang)
     context.api.assert_answer_callback_query_called(update, text=expected_text, show_alert=True)
 
 
@@ -105,7 +105,7 @@ async def test_stale_cancel_answer_callback_query_called_even_when_clear_markup_
     # The alert must have been sent before clear_reply_markup was attempted. The raised failure then
     # reaches the global error handler, whose best-effort fault notification acknowledges the query a
     # second time with an empty answer — hence two awaits, of which the alert is one.
-    expected_text = CommonMessages.STALE_CANCEL_ALERT.get(lang=user_with_settings.lang)
+    expected_text = CommonMessages.STALE_CANCEL_ALERT.get_text(lang=user_with_settings.lang)
     context.api.assert_answer_callback_query_called(update, text=expected_text, show_alert=True, times=2)
 
 
@@ -128,6 +128,6 @@ async def test_stale_cancel_fires_for_all_cancel_callbacks(
 
     context, _ = await call_handler(StaleCancelHandlerId.STALE_CANCEL_CALLBACK, handler_context=handler_context)
 
-    expected_text = CommonMessages.STALE_CANCEL_ALERT.get(lang=user_with_settings.lang)
+    expected_text = CommonMessages.STALE_CANCEL_ALERT.get_text(lang=user_with_settings.lang)
     context.api.assert_answer_callback_query_called(update, text=expected_text, show_alert=True)
     context.api.assert_method_just_called("clear_reply_markup")

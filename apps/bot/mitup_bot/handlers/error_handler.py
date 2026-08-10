@@ -299,7 +299,7 @@ async def deliver_shared_meeting_answer(context: TMitupContext, update: Update, 
     if isinstance(error, SharedMeetingDeniedError):
         await context.api.answer_callback_query(
             update=update,
-            text=MeetingDisplayMessages.DELETED_BANNER.get(lang=error.lang),
+            text=MeetingDisplayMessages.DELETED_BANNER.get_text(lang=error.lang),
             show_alert=True,
         )
         return

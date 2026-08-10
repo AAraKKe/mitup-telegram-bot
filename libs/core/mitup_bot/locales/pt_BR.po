@@ -384,13 +384,13 @@ msgid "MeetingInviteMessages.SUCCESS"
 msgstr "<b>Lista atualizada</b>\n\nAdicionamos <b>${name}</b> ao evento <b>${meeting_title}</b>."
 
 msgid "MeetingInviteMessages.MEETING_FULL"
-msgstr "<b>Sem vagas</b>\n\nA lista de convidados está cheia. Você não pode adicionar mais ninguém, a menos que uma vaga abra."
+msgstr "Sem vagas\n\nA lista de convidados está cheia. Você não pode adicionar mais ninguém, a menos que uma vaga abra."
 
 msgid "MeetingInviteMessages.INVITES_DISABLED"
-msgstr "<b>Lista de convidados fechada</b>\n\nNão é mais possível adicionar convidados a este evento. O organizador fechou a lista."
+msgstr "Lista de convidados fechada\n\nNão é mais possível adicionar convidados a este evento. O organizador fechou a lista."
 
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
-msgstr "<b>Evento não encontrado</b>\n\nO evento para o qual você está tentando convidar alguém não existe mais."
+msgstr "Evento não encontrado\n\nO evento para o qual você está tentando convidar alguém não existe mais."
 
 msgid "MeetingInviteMessages.FLOW_CONTEXT"
 msgstr "Você estava no meio do processo de convidar alguém."

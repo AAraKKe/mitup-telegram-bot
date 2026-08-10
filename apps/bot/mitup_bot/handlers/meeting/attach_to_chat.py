@@ -99,7 +99,7 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
     alert = MeetingAttachMessages.ALREADY_ENABLED_ALERT if already_attached else MeetingAttachMessages.ENABLED_ALERT
     await context.api.answer_callback_query(
         update=update,
-        text=alert.get(),
+        text=alert.get_text(),
         show_alert=True,
     )
 

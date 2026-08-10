@@ -714,13 +714,13 @@ msgid "MeetingInviteMessages.GO_PRIVATE"
 msgstr "Weiter im privaten Chat\n\nBitte wechsle in unseren privaten Chat, um mir den Namen zu senden."
 
 msgid "MeetingInviteMessages.INVITES_DISABLED"
-msgstr "<b>Gästeliste geschlossen</b>\n\nFür dieses Treffen können keine Gäste mehr hinzugefügt werden. Der Veranstalter hat die Liste geschlossen."
+msgstr "Gästeliste geschlossen\n\nFür dieses Treffen können keine Gäste mehr hinzugefügt werden. Der Veranstalter hat die Liste geschlossen."
 
 msgid "MeetingInviteMessages.MEETING_FULL"
-msgstr "<b>Keine Plätze mehr</b>\n\nDie Gästeliste ist derzeit voll. Du kannst niemanden hinzufügen, es sei denn, es wird ein Platz frei."
+msgstr "Keine Plätze mehr\n\nDie Gästeliste ist derzeit voll. Du kannst niemanden hinzufügen, es sei denn, es wird ein Platz frei."
 
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
-msgstr "<b>Treffen nicht gefunden</b>\n\nDas Treffen, zu dem du jemanden einladen möchtest, existiert nicht mehr."
+msgstr "Treffen nicht gefunden\n\nDas Treffen, zu dem du jemanden einladen möchtest, existiert nicht mehr."
 
 msgid "MeetingInviteMessages.FLOW_CONTEXT"
 msgstr "Du warst gerade dabei, jemanden einzuladen."
