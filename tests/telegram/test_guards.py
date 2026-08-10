@@ -10,7 +10,7 @@ from structlog.testing import capture_logs
 from telegram import Chat, Message, Update
 
 from mitup_bot import guards
-from mitup_bot.callback_data import CallbackData, MeetingListSource, PaginatedCallbackData
+from mitup_bot.callback_data import CallbackData, MeetingListSource
 from mitup_bot.custom_context import BOT_CONFIG_KEY
 from mitup_bot.exceptions import (
     CallbackQueryNotSet,
@@ -949,7 +949,7 @@ async def test_meeting_leaves_the_flow_context_unset_when_the_caller_passes_none
 )
 def test_valid_callback_data_failed_states(match: re.Match | None):
     with pytest.raises(MalformedCallbackData):
-        valid_callback_data(CallbackData.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
+        valid_callback_data(cb.SHOW_MEETING.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
 
 
 @pytest.mark.parametrize(
@@ -957,7 +957,7 @@ def test_valid_callback_data_failed_states(match: re.Match | None):
 )
 def test_valid_paginated_callback_data_failed_states(match: re.Match | None):
     with pytest.raises(MalformedCallbackData):
-        valid_paginated_callback_data(PaginatedCallbackData.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
+        valid_paginated_callback_data(cb.SHOW_PAST_MEETING.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
 
 
 @pytest.mark.parametrize(
@@ -992,7 +992,7 @@ def test_valid_paginated_callback_data_page(wire: str, expected_page: int, expec
 )
 def test_valid_date_callback_data_failed_states(match: re.Match | None):
     with pytest.raises(MalformedCallbackData):
-        valid_callback_data(CallbackData.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
+        valid_callback_data(cb.EDIT_MEETING_DATE.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
 
 
 @pytest.mark.parametrize(

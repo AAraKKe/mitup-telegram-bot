@@ -3,9 +3,17 @@ import re
 from enum import StrEnum
 from typing import Self, override
 
+import structlog
 from pydantic import BaseModel, Field, field_validator
 
+log = structlog.get_logger(__name__)
+
 UNKNOWN_ENTITY = "unknown"
+
+
+def regex_alternation(*forms: str) -> str:
+    """Regex alternation over *forms*, dropping repeats and keeping first-seen order."""
+    return "|".join(dict.fromkeys(forms))
 
 
 class MeetingListSource(StrEnum):
@@ -43,15 +51,29 @@ class CallbackData(BaseModel):
     entity: str
     action: str = "show"
     id: int | None = Field(default=None, ge=0)
+    # Retired `(action, entity)` wire pairs this callback still accepts. Keyboards on already-sent
+    # messages keep the wire string they were built with, so a renamed callback has to keep
+    # answering the form sitting in Telegram's history. Only a declaration carries the table:
+    # rendering and `parse` both produce the primary form, so derived callbacks have none.
+    # Excluded from serialization: keyboards are persisted as message JSON, and that stored wire
+    # format carries data only — a row must not embed a matching table that the declaration owns.
+    aliases: tuple[tuple[str, str], ...] = Field(default=(), exclude=True)
 
     def __str__(self):
         return f"{self.action};{self.entity}:{'' if self.id is None else self.id}"
 
-    @classmethod
-    def parse[T: BaseModel](cls: type[T], match: re.Match | None) -> T:
+    def parse(self, match: re.Match | None) -> Self:
         if match is None:
-            return cls.model_validate({"entity": UNKNOWN_ENTITY})
-        return cls.model_validate(match.groupdict())
+            return self.model_validate({"entity": UNKNOWN_ENTITY})
+
+        parsed = self.model_validate(match.groupdict())
+        if (parsed.action, parsed.entity) != (self.action, self.entity):
+            log.info(
+                "Aliased callback wire form used",
+                wire_form=f"{parsed.action};{parsed.entity}",
+                primary_form=f"{self.action};{self.entity}",
+            )
+        return parsed
 
     @field_validator("id", mode="before")
     @classmethod
@@ -67,7 +89,14 @@ class CallbackData(BaseModel):
         Subclasses extend the wire format by appending their own suffix to
         `super().pattern_body`; `pattern` anchors the composed body exactly once.
         """
-        return f"(?P<action>{self.action});(?P<entity>{self.entity}):(?P<id>\\d*)"
+        # Alternation is per part because `re` rejects a duplicate group name, which rules out
+        # alternating whole bodies. The accepted language therefore also contains the crossbreeds of
+        # a primary part with an alias part. Callback data is client-forgeable and is trusted no
+        # further than the re-authorized id, and a crossbreed routes to the same handler as the real
+        # forms, so accepting them costs nothing.
+        actions = regex_alternation(self.action, *(action for action, _ in self.aliases))
+        entities = regex_alternation(self.entity, *(entity for _, entity in self.aliases))
+        return f"(?P<action>{actions});(?P<entity>{entities}):(?P<id>\\d*)"
 
     @property
     def pattern(self) -> str:
