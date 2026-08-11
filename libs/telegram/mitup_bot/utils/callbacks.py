@@ -71,11 +71,6 @@ CANCEL_INVITE_USER = CallbackData(action="cancel", entity="invite")
 # ---- Title and description
 EDIT_MEETING_DESCRIPTION = CallbackData(action="edit", entity="meet_desc")
 EDIT_MEETING_TITLE = CallbackData(action="edit", entity="meet_title")
-# ---- Datetime
-EDIT_MEETING_DATE = DateCallbackData(action="edit", entity="meet_date")
-# This callback is part of the calendar view, the one above is part of the menu
-SET_MEETING_DATE = DateCallbackData(action="set", entity="md")
-EDIT_MEETING_TIME = CallbackData(action="edit", entity="meet_time")
 # ---- Participants
 EDIT_MEETING_PARTICIPANTS = CallbackData(action="edit", entity="meet_part")
 EDIT_MEETING_MAX_PARTICIPANTS = CallbackData(action="edit", entity="meet_max_part")
@@ -98,22 +93,34 @@ SET_MEETING_WAITING_LIST = CallbackData(action="set", entity="meet_wait")
 SET_MEETING_PUBLIC = CallbackData(action="set", entity="meet_pub")
 SET_MEETING_ALLOW_INVITATIONS = CallbackData(action="set", entity="meet_inv")
 SET_MEETING_INCOGNITO = CallbackData(action="set", entity="meet_inc")
-# ---- When / Start & End datetime
+# ---- When: the meeting's start and end, each with a date and a time
+# The two halves are wire-symmetric: one entity per half, and the same six gestures on each. The
+# `aliases` on a gesture are the retired forms it still answers — a keyboard already sitting in a
+# chat sends the string it was built with, and nothing on the tap says which form it is.
 EDIT_MEETING_WHEN = CallbackData(action="edit", entity="meet_when")
-SET_MEETING_START_TIME = CallbackData(action="set", entity="meet_st")
-SET_MEETING_END_TIME = CallbackData(action="set", entity="meet_et")
 DELETE_MEETING_TIMES = CallbackData(action="delete", entity="meet_times")
 CONFIRM_DELETE_MEETING_TIMES = CallbackData(action="confirm_delete", entity="meet_times")
 DECLINE_DELETE_MEETING_TIMES = CallbackData(action="decline_delete", entity="meet_times")
-CANCEL_EDIT_START_TIME = CallbackData(action="cancel", entity="meet_st")
-CANCEL_EDIT_MEETING_DURATION = CallbackData(action="cancel", entity="meet_dur")
 SET_MEETING_LOCK_ON_START = CallbackData(action="set", entity="meet_lock")
-# End datetime within duration conversation
-EDIT_MEETING_END_DATE_TIME = CallbackData(action="edit", entity="meet_edt")
-EDIT_MEETING_END_DATE = DateCallbackData(action="edit", entity="meet_ed")
-SET_MEETING_END_DATE = DateCallbackData(action="set", entity="med")
-EDIT_MEETING_END_TIME = CallbackData(action="edit", entity="meet_et")
-CANCEL_EDIT_MEETING_END_DATETIME = CallbackData(action="cancel", entity="meet_edt")
+# Start half
+OPEN_START_EDITOR = CallbackData(action="open", entity="meet_start", aliases=(("set", "meet_st"),))
+# The one gesture of either half with no alias, and it must stay that way. The retired form here
+# would be `edit;meeting`, which is the Edit screen's own wire, and this callback's handler is an
+# entry point of the start conversation. A conversation's entry points are matched ahead of plain
+# handlers, so accepting that form would divert every Edit-button tap in the bot into the start-time
+# flow. A button carrying it reaches the Edit screen, which is where it visibly goes.
+REOPEN_START_EDITOR = CallbackData(action="reopen", entity="meet_start")
+NAVIGATE_START_CALENDAR = DateCallbackData(action="nav", entity="meet_start", aliases=(("edit", "meet_date"),))
+PICK_START_DATE = DateCallbackData(action="pick", entity="meet_start", aliases=(("set", "md"),))
+OPEN_START_TIME_PROMPT = CallbackData(action="ask_time", entity="meet_start", aliases=(("edit", "meet_time"),))
+CANCEL_START_EDIT = CallbackData(action="cancel", entity="meet_start", aliases=(("cancel", "meet_st"),))
+# End half
+OPEN_END_EDITOR = CallbackData(action="open", entity="meet_end", aliases=(("set", "meet_et"),))
+REOPEN_END_EDITOR = CallbackData(action="reopen", entity="meet_end", aliases=(("edit", "meet_edt"),))
+NAVIGATE_END_CALENDAR = DateCallbackData(action="nav", entity="meet_end", aliases=(("edit", "meet_ed"),))
+PICK_END_DATE = DateCallbackData(action="pick", entity="meet_end", aliases=(("set", "med"),))
+OPEN_END_TIME_PROMPT = CallbackData(action="ask_time", entity="meet_end", aliases=(("edit", "meet_et"),))
+CANCEL_END_EDIT = CallbackData(action="cancel", entity="meet_end", aliases=(("cancel", "meet_dur"),))
 # ---- General
 EDIT_MEETING_CANCEL = CallbackData(action="cancel", entity="meet_edit")
 

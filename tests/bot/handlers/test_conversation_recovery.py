@@ -1,13 +1,21 @@
-"""What a guard rejection leaves behind, driven through ``Application.process_update``.
+"""What a conversation leaves behind, driven through ``Application.process_update``.
+
+Two kinds of remnant are covered here, and both need the real routing to show themselves.
 
 A rejection raised from a conversation's message step is answered by the registry's error handling,
 which leaves the user on a screen that navigates elsewhere. The conversation it interrupted must not
 survive that: a live state keeps claiming the user's next messages, and the sibling conversations
-that read plain text are shadowed by it. These tests drive a real application with the production
-registry bound, so the interaction between two conversations is exercised as in production rather
-than handler-by-handler.
+that read plain text are shadowed by it.
+
+The other remnant is a message: a flow that answers in a message of its own leaves that message, and
+its buttons, in the chat after the flow is over. Tapping one has to land somewhere — a button no
+handler claims reaches the registry's callback fallback, which raises rather than answering.
+
+These tests drive a real application with the production registry bound, so routing between the
+conversations is exercised as in production rather than handler-by-handler.
 """
 
+import datetime as dt
 from collections.abc import AsyncGenerator
 from typing import ClassVar, cast
 from unittest import mock
@@ -23,6 +31,7 @@ from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState as EditMeetingState
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
+from mitup_bot.handlers.meeting.edit.when import screens
 from mitup_bot.handlers.meeting.enums import ConversationMeetingState, MeetingHandlerId
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import CommonMessages, MeetingCreationMessages
@@ -209,3 +218,109 @@ async def test_second_title_after_rejection_never_shows_the_context_lost_screen(
     second_title = await process(routing_app, UpdateRequest(message_text="Another title"), tg_chat, tg_user)
 
     assert context_lost_view(user_with_settings.lang) not in views_sent_for(second_title)
+
+
+MEETING_START = dt.datetime(2099, 7, 16, 18, 0, tzinfo=dt.UTC)
+
+
+def meeting_with_start_time(mock_session: MockDbSession, user: User) -> Meetup:
+    """Register the user's meeting with a start time, which either editor needs to open at all."""
+    meeting = user.meetups[0]
+    meeting.datetime = MEETING_START
+    mock_session.add_object(user, "tg_user_id")
+    mock_session.add_object(meeting)
+    return meeting
+
+
+async def test_end_editor_button_taps_reopen_the_flow(
+    routing_app: Application,
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    tg_chat: Chat,
+    tg_user: TgUser,
+):
+    """The end editor's button works with no conversation live behind it.
+
+    The beyond-horizon upsell is a message of its own, so its back button stays tappable once the
+    flow has ended — by finishing, by being cancelled, or by a deploy dropping in-memory state. The
+    tap has to reopen the flow: the screen it draws is answered by handlers that only exist inside
+    the conversation, and unclaimed it would reach the fallback, which raises.
+    """
+    meeting = meeting_with_start_time(mock_session, user_with_settings)
+    conversation = conversation_for(EditMeetingHandlerId.END_EDITOR_CONVERSATION)
+    assert conversation._conversations.get(CONVERSATION_KEY) is None
+
+    tapped = await process(
+        routing_app,
+        UpdateRequest(callback_query=cb.REOPEN_END_EDITOR.with_id(meeting.db_id)),
+        tg_chat,
+        tg_user,
+    )
+
+    assert views_sent_for(tapped) == [screens.end_editor_view(meeting, user_with_settings.lang)]
+    assert conversation._conversations.get(CONVERSATION_KEY) == EditMeetingState.END_EDITOR
+
+
+async def test_end_editor_button_returns_from_the_calendar_mid_flow(
+    routing_app: Application,
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    tg_chat: Chat,
+    tg_user: TgUser,
+):
+    """The same button taken mid-flow goes back to the editor instead of restarting anything.
+
+    It is the calendar's back button there, and the flow it returns to is the one already running:
+    reentry at the entry point resolves to the state the owner would have reached anyway.
+    """
+    meeting = meeting_with_start_time(mock_session, user_with_settings)
+    conversation = conversation_for(EditMeetingHandlerId.END_EDITOR_CONVERSATION)
+
+    await process(
+        routing_app, UpdateRequest(callback_query=cb.OPEN_END_EDITOR.with_id(meeting.db_id)), tg_chat, tg_user
+    )
+    await process(
+        routing_app,
+        UpdateRequest(callback_query=cb.NAVIGATE_END_CALENDAR.with_id(meeting.db_id).with_date(MEETING_START.date())),
+        tg_chat,
+        tg_user,
+    )
+    assert conversation._conversations.get(CONVERSATION_KEY) == EditMeetingState.END_CALENDAR
+
+    went_back = await process(
+        routing_app,
+        UpdateRequest(callback_query=cb.REOPEN_END_EDITOR.with_id(meeting.db_id)),
+        tg_chat,
+        tg_user,
+    )
+
+    assert views_sent_for(went_back) == [screens.end_editor_view(meeting, user_with_settings.lang)]
+    assert conversation._conversations.get(CONVERSATION_KEY) == EditMeetingState.END_EDITOR
+
+
+async def test_start_editor_button_taps_reopen_the_flow(
+    routing_app: Application,
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    tg_chat: Chat,
+    tg_user: TgUser,
+):
+    """The start editor's button behaves like the end's: a tap with no live flow reopens one.
+
+    The start half's upsell reply carries the same kind of orphaned back button, and the editor it
+    draws is likewise only answerable from inside the conversation.
+    """
+    meeting = meeting_with_start_time(mock_session, user_with_settings)
+    conversation = conversation_for(EditMeetingHandlerId.START_EDITOR_CONVERSATION)
+    assert conversation._conversations.get(CONVERSATION_KEY) is None
+
+    tapped = await process(
+        routing_app,
+        UpdateRequest(callback_query=cb.REOPEN_START_EDITOR.with_id(meeting.db_id)),
+        tg_chat,
+        tg_user,
+    )
+
+    today = meeting.owner.now_in_tz().date()
+    assert views_sent_for(tapped) == [screens.start_editor_view(meeting, user_with_settings.lang, today)]
+    assert conversation._conversations.get(CONVERSATION_KEY) == EditMeetingState.START_EDITOR

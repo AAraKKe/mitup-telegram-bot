@@ -61,11 +61,11 @@ existing one across producers. The name says *what was decided*; `reason` says *
 
 Three worked examples from this codebase:
 
-- **`"Meeting datetime input rejected"`** (`handlers/meeting/edit/edit_meeting_datetime.py`,
-  `edit_meeting_duration.py`) — six call sites, one name, `reason` ∈ `invalid_time_value`,
-  `wrong_time_format`, `wrong_datetime_format`, crossed with `field` ∈ `start`/`end`. Before this
-  collapse each branch minted its own metric series; now one filter covers every rejection and
-  `stats count() by reason, field` breaks it down for free.
+- **`"Meeting datetime input rejected"`** (`handlers/meeting/edit/when/start.py`,
+  `when/end.py`) — six call sites, one name, `reason` ∈ `invalid_time_value`,
+  `wrong_time_format`, `wrong_datetime_format`, crossed with `field` ∈ `start`/`end`. One filter
+  covers every rejection and `stats count() by reason, field` breaks it down for free, where a
+  metric series per branch would answer neither question.
 - **`"Hosts-only group join request gated"`** (`handlers/hosts_group/entry.py`) — one name for the
   gate decision, `reason` ∈ `active_supporter`, `not_a_supporter`, `unknown_telegram_user`, crossed
   with `outcome` ∈ `approved`, `declined`, `approve_failed`, `decline_failed`. The pair is the

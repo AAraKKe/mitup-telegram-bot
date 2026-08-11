@@ -16,9 +16,9 @@ ALL_CANCEL_CALLBACKS: list[CallbackData] = [
     cb.CANCEL_CREATE_MEETING,  # cancel;meeting:
     cb.CANCEL_EDIT_MEETING_PARTICIPANS,  # cancel;meet_part:
     cb.CANCEL_EDIT_MEETING_LOCATION,  # cancel;meet_loc:
-    cb.CANCEL_EDIT_MEETING_DURATION,  # cancel;meet_dur:
+    cb.CANCEL_END_EDIT,  # cancel;meet_end:
     cb.EDIT_MEETING_CANCEL,  # cancel;meet_edit:
-    cb.CANCEL_EDIT_START_TIME,  # cancel;meet_st:
+    cb.CANCEL_START_EDIT,  # cancel;meet_start:
     cb.CANCEL_SETTINGS,  # cancel;settings:
     cb.CANCEL_INVITE_USER,  # cancel;invite:
 ]

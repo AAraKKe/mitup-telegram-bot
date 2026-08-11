@@ -9,12 +9,8 @@ from telegram.ext import ConversationHandler
 from mitup_bot import supporter
 from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
-from mitup_bot.handlers.meeting.edit.edit_meeting_duration import (
-    build_end_datetime_entry_view,
-    build_end_time_prompt_view,
-)
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
-from mitup_bot.handlers.meeting.edit.utils import safe_anchor_date
+from mitup_bot.handlers.meeting.edit.when import rules, screens
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, Settings, User
 from mitup_bot.monitoring import Feature, MetricKey
@@ -22,7 +18,7 @@ from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import build_datetime_link
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingEditDurationMessages, SupporterMessages
-from mitup_bot.views import MitupView, RenderContext, factory
+from mitup_bot.views import MitupView, RenderContext
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.collaborate import supporter_upsell_view
 from tests.helpers import (
@@ -97,39 +93,39 @@ def wide_scheduling_horizon(monkeypatch: pytest.MonkeyPatch):
 
 
 # ---------------------------------------------------------------------------
-# DURATION_INPUT_CALLBACK — conversation entry:
+# OPEN_END_EDITOR — conversation entry:
 #   meeting.datetime is None → stale alert + END
-#   meeting.datetime is set → EDIT_END_DATETIME state
+#   meeting.datetime is set → END_EDITOR state
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_TIME.with_id(1))],
+    [UpdateRequest(callback_query=cb.OPEN_END_EDITOR.with_id(1))],
     indirect=True,
 )
-async def test_duration_input_entry_with_start_datetime_enters_end_datetime_state(
+async def test_open_end_editor_with_a_start_enters_the_editor_state(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
 ):
-    """When meeting already has a start datetime, the conversation skips to EDIT_END_DATETIME."""
+    """When meeting already has a start datetime, the conversation skips to END_EDITOR."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, state = await call_handler(EditMeetingHandlerId.DURATION_INPUT_CALLBACK, handler_context=handler_context)
+    context, state = await call_handler(EditMeetingHandlerId.OPEN_END_EDITOR, handler_context=handler_context)
 
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
 
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_TIME.with_id(1))],
+    [UpdateRequest(callback_query=cb.OPEN_END_EDITOR.with_id(1))],
     indirect=True,
 )
-async def test_set_end_time_without_start_shows_alert(
+async def test_open_end_editor_without_start_shows_alert(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
@@ -139,7 +135,7 @@ async def test_set_end_time_without_start_shows_alert(
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, state = await call_handler(EditMeetingHandlerId.DURATION_INPUT_CALLBACK, handler_context=handler_context)
+    context, state = await call_handler(EditMeetingHandlerId.OPEN_END_EDITOR, handler_context=handler_context)
 
     assert state == ConversationHandler.END
     context.api.assert_answer_callback_query_called(
@@ -152,16 +148,16 @@ async def test_set_end_time_without_start_shows_alert(
 
 
 # ---------------------------------------------------------------------------
-# DURATION_CANCEL_CALLBACK — cancel returns to when_view, exits conversation
+# CANCEL_END_EDIT — cancel returns to when_view, exits conversation
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.CANCEL_EDIT_MEETING_DURATION.with_id(1))],
+    [UpdateRequest(callback_query=cb.CANCEL_END_EDIT.with_id(1))],
     indirect=True,
 )
-async def test_cancel_during_duration_input_returns_to_view(
+async def test_cancel_end_edit_returns_to_when_view(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
@@ -173,9 +169,9 @@ async def test_cancel_during_duration_input_returns_to_view(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_CANCEL_CALLBACK,
+        EditMeetingHandlerId.CANCEL_END_EDIT,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_DURATION: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     # end_datetime must not have changed
@@ -186,7 +182,7 @@ async def test_cancel_during_duration_input_returns_to_view(
 
 
 # ---------------------------------------------------------------------------
-# End datetime validation: end <= start is rejected, stays in EDIT_END_DATETIME
+# End datetime validation: end <= start is rejected, stays in END_EDITOR
 # ---------------------------------------------------------------------------
 
 
@@ -202,7 +198,7 @@ async def test_end_time_before_start_shows_error_and_stays_in_state(
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
 ):
-    """When the proposed end time is before the start datetime, an error is shown and state stays in EDIT_END_TIME.
+    """When the proposed end time is before the start datetime, an error is shown and state stays in END_TIME_PROMPT.
 
     The handler derives the end date from meeting.end_datetime (if set). We pre-populate
     end_datetime with a placeholder on the same day as start so the time combination
@@ -222,9 +218,9 @@ async def test_end_time_before_start_shows_error_and_stays_in_state(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_TIME_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_TIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     # end_datetime must NOT have been updated — proposed 09:00 is before start 10:00
@@ -232,12 +228,12 @@ async def test_end_time_before_start_shows_error_and_stays_in_state(
 
     # Error message was sent
     context.api.assert_method_just_called("send_message", times=1)
-    # Conversation stays in EDIT_END_TIME state
-    assert state == ConversationMeetingState.EDIT_END_TIME
+    # Conversation stays in END_TIME_PROMPT state
+    assert state == ConversationMeetingState.END_TIME_PROMPT
 
 
 # ---------------------------------------------------------------------------
-# DURATION_END_SET_TIME_MESSAGE — valid end time saves end_datetime and exits
+# TYPE_END_TIME — valid end time saves end_datetime and exits
 # ---------------------------------------------------------------------------
 
 
@@ -260,9 +256,9 @@ async def test_valid_end_time_saves_end_datetime_and_exits_conversation(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_TIME_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_TIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     # end_datetime must have been saved (the exact value depends on user TZ, check it is set)
@@ -276,13 +272,13 @@ async def test_valid_end_time_saves_end_datetime_and_exits_conversation(
 
 
 # ---------------------------------------------------------------------------
-# DURATION_END_SET_DATE_CALLBACK — selecting an end date
+# PICK_END_DATE — selecting an end date
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 15)))],
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 6, 15)))],
     indirect=True,
 )
 @freeze_time("2026-06-15 08:00:00", tz_offset=0)
@@ -298,19 +294,19 @@ async def test_set_end_date_first_time_defaults_to_2359(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        EditMeetingHandlerId.PICK_END_DATE,
         handler_context=handler_context,
     )
 
     # The UTC owner picks Jun 15, so the default end lands at 23:59 UTC that day.
     assert meeting.end_datetime == dt.datetime(2026, 6, 15, 23, 59, tzinfo=dt.UTC)
-    assert state == ConversationMeetingState.EDIT_END_TIME
+    assert state == ConversationMeetingState.END_TIME_PROMPT
 
 
 @pytest.mark.parametrize(
     "update",
     # Pick a date BEFORE the start date (2026-06-15) so 23:59 on Jun 14 < start at 10:00 on Jun 15
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 14)))],
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 6, 14)))],
     indirect=True,
 )
 # Freeze before Jun 14 so the Jun 14 23:59 end is still in the future — isolates END_BEFORE_START
@@ -328,12 +324,12 @@ async def test_set_end_date_before_start_shows_alert(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        EditMeetingHandlerId.PICK_END_DATE,
         handler_context=handler_context,
     )
 
     assert meeting.end_datetime is None
-    assert state == ConversationMeetingState.EDIT_END_DATE
+    assert state == ConversationMeetingState.END_CALENDAR
     context.api.assert_answer_callback_query_called(
         update=update,
         text=MeetingEditDurationMessages.END_BEFORE_START.get_text(lang=user.lang),
@@ -343,7 +339,7 @@ async def test_set_end_date_before_start_shows_alert(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 16)))],
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 6, 16)))],
     indirect=True,
 )
 @freeze_time("2026-06-15 08:00:00", tz_offset=0)
@@ -360,20 +356,20 @@ async def test_update_existing_end_date_valid(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        EditMeetingHandlerId.PICK_END_DATE,
         handler_context=handler_context,
     )
 
     # UTC owner (no DST): changing only the date is a no-op on the local time-of-day, so the
     # existing 11:30 end time is kept and only the date moves to Jun 16.
     assert meeting.end_datetime == dt.datetime(2026, 6, 16, 11, 30, tzinfo=dt.UTC)
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
 
 
 @pytest.mark.parametrize(
     "update",
     # Move end date to Jun 14 — with existing end time 11:30 UTC, that's before start (Jun 15 10:00)
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 14)))],
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 6, 14)))],
     indirect=True,
 )
 # Freeze before Jun 14 so the Jun 14 11:30 end is still future — isolates END_BEFORE_START.
@@ -391,13 +387,13 @@ async def test_update_existing_end_date_before_start_shows_alert(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        EditMeetingHandlerId.PICK_END_DATE,
         handler_context=handler_context,
     )
 
     # end_datetime should NOT have changed
     assert meeting.end_datetime == end_datetime
-    assert state == ConversationMeetingState.EDIT_END_DATE
+    assert state == ConversationMeetingState.END_CALENDAR
     context.api.assert_answer_callback_query_called(
         update=update,
         text=MeetingEditDurationMessages.END_BEFORE_START.get_text(lang=user.lang),
@@ -406,7 +402,7 @@ async def test_update_existing_end_date_before_start_shows_alert(
 
 
 # ---------------------------------------------------------------------------
-# DURATION_END_DATETIME_ENTITY_MESSAGE — entity with end < start rejected
+# TYPE_END_DATETIME — entity with end < start rejected
 # ---------------------------------------------------------------------------
 
 
@@ -430,78 +426,103 @@ async def test_end_datetime_entity_before_start_shows_error_and_stays_in_state(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_DATETIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     # end_datetime must NOT have been saved
     assert meeting.end_datetime is None
 
     context.api.assert_method_just_called("send_message", times=1)
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
 
 
 # ---------------------------------------------------------------------------
-# DURATION_END_ENTRY_CALLBACK — re-enter end datetime view via callback
-# (lines 193-198)
+# REOPEN_END_EDITOR — the conversation's entry on the end editor, tapped from the
+# in-flow back buttons or from a message left behind
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME.with_id(1))],
+    [UpdateRequest(callback_query=cb.REOPEN_END_EDITOR.with_id(1))],
     indirect=True,
 )
-async def test_end_datetime_entry_callback_shows_end_datetime_view(
+async def test_reopen_end_editor_shows_the_editor(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
     end_datetime: dt.datetime,
 ):
-    """DURATION_END_ENTRY_CALLBACK shows the end datetime entry view with edit_message."""
+    """REOPEN_END_EDITOR shows the end datetime entry view with edit_message."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime, end_datetime=end_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_ENTRY_CALLBACK, handler_context=handler_context
-    )
+    context, state = await call_handler(EditMeetingHandlerId.REOPEN_END_EDITOR, handler_context=handler_context)
 
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
-    # edit_message (not send_message) was used since use_send defaults to False
+    assert state == ConversationMeetingState.END_EDITOR
+    # The editor replaces the tapped screen rather than arriving as a new message.
     context.api.assert_method_just_called("edit_message", times=1)
     context.api.assert_method_just_called("send_message", times=0)
 
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME.with_id(999))],
+    [UpdateRequest(callback_query=cb.REOPEN_END_EDITOR.with_id(999))],
     indirect=True,
 )
-async def test_end_datetime_entry_callback_meeting_not_accessible_ends_conversation(
+async def test_reopen_end_editor_meeting_not_accessible_ends_conversation(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
 ):
-    """DURATION_END_ENTRY_CALLBACK returns None when meeting is not accessible."""
+    """REOPEN_END_EDITOR ends the conversation when the meeting is not accessible."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_ENTRY_CALLBACK, handler_context=handler_context
-    )
+    context, state = await call_handler(EditMeetingHandlerId.REOPEN_END_EDITOR, handler_context=handler_context)
 
     # The guard rejection ends the conversation (id 999 is not the user's meeting id 1)
     assert state == ConversationHandler.END
 
 
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.REOPEN_END_EDITOR.with_id(1))],
+    indirect=True,
+)
+async def test_reopen_end_editor_without_start_shows_alert(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+):
+    """A start time cleared after the button was drawn is answered with the alert, not the editor.
+
+    The button can be tapped long after the flow it belongs to, so the meeting may have lost the
+    start time the end is measured from in between.
+    """
+    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=None)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(EditMeetingHandlerId.REOPEN_END_EDITOR, handler_context=handler_context)
+
+    assert state == ConversationHandler.END
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=MeetingEditDurationMessages.END_STALE_ALERT.get_text(lang=user.lang),
+        show_alert=True,
+    )
+    context.api.assert_method_just_called("edit_message", times=0)
+
+
 # ---------------------------------------------------------------------------
-# show_end_datetime_entry with use_send=True path (through save_end_datetime_and_finish)
-# Line 265 — save_end_datetime via entity uses use_send=True
+# A saved end answers in a message of its own, since the owner typed it rather than tapping
 # ---------------------------------------------------------------------------
 
 
@@ -520,15 +541,15 @@ async def test_end_datetime_entity_valid_saves_and_sends(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_DATETIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     # end_datetime saved
     assert meeting.end_datetime == after_start
 
-    # send_message was used (use_send=True path)
+    # The confirmation arrives as a reply: there is no tapped screen to replace.
     context.api.assert_method_just_called("send_message", times=1)
     context.api.assert_update_meeting_messages_called(meeting=meeting)
 
@@ -536,14 +557,13 @@ async def test_end_datetime_entity_valid_saves_and_sends(
 
 
 # ---------------------------------------------------------------------------
-# save_end_datetime_and_finish with use_send=False path (edit_message branch)
-# Line 229 — triggered via set_end_date when end_datetime already exists, updating date
+# Moving an existing end date replaces the calendar screen in place
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 16)))],
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 6, 16)))],
     indirect=True,
 )
 @freeze_time("2026-06-15 08:00:00", tz_offset=0)
@@ -554,26 +574,25 @@ async def test_update_existing_end_date_goes_back_to_entry_using_edit_message(
     start_datetime: dt.datetime,
     end_datetime: dt.datetime,
 ):
-    """When updating an existing end date, show_end_datetime_entry uses edit_message (use_send=False)."""
+    """Updating an existing end date redraws the editor over the calendar the owner tapped."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime, end_datetime=end_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        EditMeetingHandlerId.PICK_END_DATE,
         handler_context=handler_context,
     )
 
-    # Goes back to EDIT_END_DATETIME after setting the date
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    # Goes back to END_EDITOR after setting the date
+    assert state == ConversationMeetingState.END_EDITOR
     # edit_message was used (not send_message)
     context.api.assert_method_just_called("edit_message", times=1)
     context.api.assert_method_just_called("send_message", times=0)
 
 
 # ---------------------------------------------------------------------------
-# DURATION_END_WRONG_INPUT — wrong input in EDIT_END_DATETIME state
-# (lines 280-286)
+# REJECT_END_DATETIME — wrong input in END_EDITOR state
 # ---------------------------------------------------------------------------
 
 
@@ -582,29 +601,29 @@ async def test_update_existing_end_date_goes_back_to_entry_using_edit_message(
     [UpdateRequest(message_text="random text here")],
     indirect=True,
 )
-async def test_duration_end_wrong_input_shows_error_and_stays_in_state(
+async def test_reject_end_datetime_shows_error_and_stays_in_state(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
     metrics: MetricAssertions,
 ):
-    """Wrong input in EDIT_END_DATETIME state resends the entry prompt (with the invalid-format
+    """Wrong input in END_EDITOR state resends the entry prompt (with the invalid-format
     notice on top and the Date/Time buttons) and stays in state, so the user is not stranded."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_WRONG_INPUT,
+        EditMeetingHandlerId.REJECT_END_DATETIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
     context.api.assert_send_message_called(
         update,
-        build_end_datetime_entry_view(
+        screens.end_editor_view(
             meeting,
             user.lang,
             error=CommonMessages.DATETIME_INVALID.get(lang=user.lang, datetime_link=build_datetime_link()),
@@ -619,170 +638,102 @@ async def test_duration_end_wrong_input_shows_error_and_stays_in_state(
 
 
 # ---------------------------------------------------------------------------
-# DURATION_END_DATE_NAV_CALLBACK — calendar navigation for end date
-# (lines 309-327)
+# NAVIGATE_END_CALENDAR — calendar navigation for end date
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE.with_id(1).with_date(dt.date(2024, 6, 15)))],
+    [UpdateRequest(callback_query=cb.NAVIGATE_END_CALENDAR.with_id(1).with_date(dt.date(2024, 6, 15)))],
     indirect=True,
 )
-async def test_duration_end_date_nav_shows_calendar(
+async def test_navigate_end_calendar_shows_calendar(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
     end_datetime: dt.datetime,
 ):
-    """DURATION_END_DATE_NAV_CALLBACK shows a calendar view for end date selection."""
+    """NAVIGATE_END_CALENDAR shows a calendar view for end date selection."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime, end_datetime=end_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_DATE_NAV_CALLBACK, handler_context=handler_context
-    )
+    context, state = await call_handler(EditMeetingHandlerId.NAVIGATE_END_CALENDAR, handler_context=handler_context)
 
-    assert state == ConversationMeetingState.EDIT_END_DATE
+    assert state == ConversationMeetingState.END_CALENDAR
 
     # Use meeting.owner.now_in_tz().date() to get the same "today" the handler used; the callback
     # date (2024-06-15) is always in the past, so current_date resolves to today.
     now_in_owner_tz = meeting.owner.now_in_tz()
     today = now_in_owner_tz.date()
-    anchor_date = safe_anchor_date(meeting.end_datetime, now_in_owner_tz)
+    anchor_date = rules.safe_anchor_date(meeting.end_datetime, now_in_owner_tz)
 
-    # Issue #173: this calendar's back button routes to the End Date & Time sub-hub, so it must
-    # be labeled END_DATE_TIME — not the old hardcoded "≪ ✏️ Edit".
     context.api.assert_edit_message_called(
         update,
-        factory.edit_meeting_date_view(
+        screens.end_calendar_view(
             RenderContext(lang=meeting.lang),
             meeting_id=1,
             anchor_date=anchor_date,
             current_date=today,
             new=meeting.end_datetime is None,
-            set_date_callback=cb.SET_MEETING_END_DATE,
-            nav_callback=cb.EDIT_MEETING_END_DATE,
-            back_callback=cb.EDIT_MEETING_END_DATE_TIME,
-            back_button_text=ButtonMessages.END_DATE_TIME,
         ),
     )
 
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE.with_id(999).with_date(dt.date(2024, 6, 15)))],
+    [UpdateRequest(callback_query=cb.NAVIGATE_END_CALENDAR.with_id(999).with_date(dt.date(2024, 6, 15)))],
     indirect=True,
 )
-async def test_duration_end_date_nav_meeting_not_accessible(
+async def test_navigate_end_calendar_meeting_not_accessible(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
 ):
-    """DURATION_END_DATE_NAV_CALLBACK returns None when meeting is not accessible."""
+    """NAVIGATE_END_CALENDAR returns None when meeting is not accessible."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_DATE_NAV_CALLBACK, handler_context=handler_context
-    )
+    context, state = await call_handler(EditMeetingHandlerId.NAVIGATE_END_CALENDAR, handler_context=handler_context)
 
     assert state == ConversationHandler.END
 
 
 # ---------------------------------------------------------------------------
-# DURATION_BACK_TO_END_DATETIME_CALLBACK — back button to end datetime entry
-# (lines 345-350)
+# OPEN_END_TIME_PROMPT — shows time input prompt for end time
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME.with_id(1))],
+    [UpdateRequest(callback_query=cb.OPEN_END_TIME_PROMPT.with_id(1))],
     indirect=True,
 )
-async def test_back_to_end_datetime_shows_entry_view(
+async def test_open_end_time_prompt_shows_time_prompt(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
     end_datetime: dt.datetime,
 ):
-    """DURATION_BACK_TO_END_DATETIME_CALLBACK re-shows the end datetime entry view."""
+    """OPEN_END_TIME_PROMPT shows edit time prompt and returns END_TIME_PROMPT state."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime, end_datetime=end_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_BACK_TO_END_DATETIME_CALLBACK, handler_context=handler_context
-    )
+    context, state = await call_handler(EditMeetingHandlerId.OPEN_END_TIME_PROMPT, handler_context=handler_context)
 
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
-    context.api.assert_method_just_called("edit_message", times=1)
-
-
-@pytest.mark.parametrize(
-    "update",
-    [UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME.with_id(999))],
-    indirect=True,
-)
-async def test_back_to_end_datetime_meeting_not_accessible(
-    mock_session: MockDbSession,
-    update: Update,
-    handler_context: HandlerContext,
-    start_datetime: dt.datetime,
-):
-    """DURATION_BACK_TO_END_DATETIME_CALLBACK returns None when meeting is not accessible."""
-    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime)
-    mock_session.add_object(user, query_field="tg_user_id")
-    mock_session.add_object(meeting)
-
-    context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_BACK_TO_END_DATETIME_CALLBACK, handler_context=handler_context
-    )
-
-    assert state == ConversationHandler.END
-
-
-# ---------------------------------------------------------------------------
-# DURATION_END_TIME_CALLBACK — shows time input prompt for end time
-# (lines 449-461)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "update",
-    [UpdateRequest(callback_query=cb.EDIT_MEETING_END_TIME.with_id(1))],
-    indirect=True,
-)
-async def test_duration_end_time_callback_shows_time_prompt(
-    mock_session: MockDbSession,
-    update: Update,
-    handler_context: HandlerContext,
-    start_datetime: dt.datetime,
-    end_datetime: dt.datetime,
-):
-    """DURATION_END_TIME_CALLBACK shows edit time prompt and returns EDIT_END_TIME state."""
-    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime, end_datetime=end_datetime)
-    mock_session.add_object(user, query_field="tg_user_id")
-    mock_session.add_object(meeting)
-
-    context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_TIME_CALLBACK, handler_context=handler_context
-    )
-
-    assert state == ConversationMeetingState.EDIT_END_TIME
+    assert state == ConversationMeetingState.END_TIME_PROMPT
     expected_view = MitupView(
         description=CommonMessages.TIME_PROMPT.get(lang=user.lang),
         keyboard=[
             [
                 ButtonConfig(
                     text=ButtonMessages.CANCEL.get_text(lang=user.lang),
-                    callback_data=cb.CANCEL_EDIT_MEETING_DURATION.with_id(1),
+                    callback_data=cb.CANCEL_END_EDIT.with_id(1),
                 )
             ]
         ],
@@ -792,30 +743,27 @@ async def test_duration_end_time_callback_shows_time_prompt(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.EDIT_MEETING_END_TIME.with_id(999))],
+    [UpdateRequest(callback_query=cb.OPEN_END_TIME_PROMPT.with_id(999))],
     indirect=True,
 )
-async def test_duration_end_time_callback_meeting_not_accessible(
+async def test_open_end_time_prompt_meeting_not_accessible(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
 ):
-    """DURATION_END_TIME_CALLBACK is aborted by the guard when the meeting is not accessible."""
+    """OPEN_END_TIME_PROMPT is aborted by the guard when the meeting is not accessible."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
-    context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_TIME_CALLBACK, handler_context=handler_context
-    )
+    context, state = await call_handler(EditMeetingHandlerId.OPEN_END_TIME_PROMPT, handler_context=handler_context)
 
     assert state == ConversationHandler.END
 
 
 # ---------------------------------------------------------------------------
-# DURATION_END_SET_TIME_MESSAGE — invalid time branch
-# (lines 478-481)
+# TYPE_END_TIME — invalid time branch
 # ---------------------------------------------------------------------------
 
 
@@ -824,7 +772,7 @@ async def test_duration_end_time_callback_meeting_not_accessible(
     [UpdateRequest(message_text="49:20")],
     indirect=True,
 )
-async def test_duration_end_set_time_invalid_time_shows_error(
+async def test_type_end_time_invalid_value_shows_error(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
@@ -832,21 +780,21 @@ async def test_duration_end_set_time_invalid_time_shows_error(
     end_datetime: dt.datetime,
     metrics: MetricAssertions,
 ):
-    """When an invalid time like 49:20 is entered for end time, an error is shown and state stays in EDIT_END_TIME."""
+    """When an invalid time like 49:20 is entered for end time, an error is shown and state stays in END_TIME_PROMPT."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime, end_datetime=end_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_TIME_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_TIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
-    assert state == ConversationMeetingState.EDIT_END_TIME
+    assert state == ConversationMeetingState.END_TIME_PROMPT
     context.api.assert_send_message_called(
         update,
-        build_end_time_prompt_view(meeting, user.lang, error=CommonMessages.TIME_INVALID_VALUE.get(lang=user.lang)),
+        screens.end_time_prompt_view(meeting, user.lang, error=CommonMessages.TIME_INVALID_VALUE.get(lang=user.lang)),
     )
     metrics.assert_emitted(
         name=MetricKey.ERROR,
@@ -857,8 +805,7 @@ async def test_duration_end_set_time_invalid_time_shows_error(
 
 
 # ---------------------------------------------------------------------------
-# DURATION_END_TIME_WRONG_INPUT — wrong time format for end time
-# (lines 513-515)
+# REJECT_END_TIME — wrong time format for end time
 # ---------------------------------------------------------------------------
 
 
@@ -867,29 +814,29 @@ async def test_duration_end_set_time_invalid_time_shows_error(
     [UpdateRequest(message_text="not a time")],
     indirect=True,
 )
-async def test_duration_end_time_wrong_input_shows_error_and_stays_in_state(
+async def test_reject_end_time_shows_error_and_stays_in_state(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
     start_datetime: dt.datetime,
     metrics: MetricAssertions,
 ):
-    """Wrong time format in EDIT_END_TIME state resends the time prompt (with the invalid-format
+    """Wrong time format in END_TIME_PROMPT state resends the time prompt (with the invalid-format
     notice on top and the Cancel button) and stays in state, so the user is not stranded."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start_datetime)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_TIME_WRONG_INPUT,
+        EditMeetingHandlerId.REJECT_END_TIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
-    assert state == ConversationMeetingState.EDIT_END_TIME
+    assert state == ConversationMeetingState.END_TIME_PROMPT
     context.api.assert_send_message_called(
         update,
-        build_end_time_prompt_view(meeting, user.lang, error=CommonMessages.TIME_INVALID_FORMAT.get(lang=user.lang)),
+        screens.end_time_prompt_view(meeting, user.lang, error=CommonMessages.TIME_INVALID_FORMAT.get(lang=user.lang)),
     )
     metrics.assert_emitted(
         name=MetricKey.ERROR,
@@ -918,7 +865,7 @@ async def test_end_datetime_entity_in_past_shows_error_and_stays_in_state(
     mock_session: MockDbSession,
     handler_context: HandlerContext,
 ):
-    """A datetime entity whose end is in the past returns END_IN_PAST and stays in EDIT_END_DATETIME."""
+    """A datetime entity whose end is in the past returns END_IN_PAST and stays in END_EDITOR."""
     # End is one hour before now (2026-06-15 11:00 UTC) but after a far-past start, so only the
     # past check applies.
     past_end = dt.datetime(2026, 6, 15, 11, 0, tzinfo=dt.UTC)
@@ -929,16 +876,16 @@ async def test_end_datetime_entity_in_past_shows_error_and_stays_in_state(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_DATETIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     assert meeting.end_datetime is None  # not saved
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
     context.api.assert_send_message_called(
         handler_context.update,
-        build_end_datetime_entry_view(
+        screens.end_editor_view(
             meeting, user.lang, error=MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang)
         ),
     )
@@ -956,7 +903,7 @@ async def test_end_time_in_past_shows_error_and_stays_in_state(
     update: Update,
     handler_context: HandlerContext,
 ):
-    """An HH:MM end time that resolves to the past returns END_IN_PAST and stays in EDIT_END_TIME."""
+    """An HH:MM end time that resolves to the past returns END_IN_PAST and stays in END_TIME_PROMPT."""
     # Existing end_datetime carries the date used when combining the typed time, so 10:00 lands on
     # the frozen day (2026-06-15 10:00 UTC), two hours before now.
     user, meeting = owner_with_meeting(
@@ -969,16 +916,16 @@ async def test_end_time_in_past_shows_error_and_stays_in_state(
     end_before = meeting.end_datetime
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_TIME_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_TIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     assert meeting.end_datetime == end_before  # unchanged
-    assert state == ConversationMeetingState.EDIT_END_TIME
+    assert state == ConversationMeetingState.END_TIME_PROMPT
     context.api.assert_send_message_called(
         update,
-        build_end_time_prompt_view(
+        screens.end_time_prompt_view(
             meeting, user.lang, error=MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang)
         ),
     )
@@ -987,7 +934,7 @@ async def test_end_time_in_past_shows_error_and_stays_in_state(
 @pytest.mark.parametrize(
     "update",
     # First end-date selection on a past day → 23:59 on that day is still before now.
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 14)))],
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 6, 14)))],
     indirect=True,
 )
 @freeze_time(FROZEN_NOW, tz_offset=0)
@@ -1003,12 +950,12 @@ async def test_set_end_date_in_past_shows_alert(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        EditMeetingHandlerId.PICK_END_DATE,
         handler_context=handler_context,
     )
 
     assert meeting.end_datetime is None
-    assert state == ConversationMeetingState.EDIT_END_DATE
+    assert state == ConversationMeetingState.END_CALENDAR
     context.api.assert_answer_callback_query_called(
         update=update,
         text=MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang),
@@ -1031,17 +978,17 @@ async def test_end_in_past_takes_precedence_over_before_start(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_DATETIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     assert meeting.end_datetime is None
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
     # END_IN_PAST wins over END_BEFORE_START because the past check runs first.
     context.api.assert_send_message_called(
         handler_context.update,
-        build_end_datetime_entry_view(
+        screens.end_editor_view(
             meeting, user.lang, error=MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang)
         ),
     )
@@ -1061,16 +1008,16 @@ async def test_end_exactly_now_is_rejected(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_DATETIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     assert meeting.end_datetime is None
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
     context.api.assert_send_message_called(
         handler_context.update,
-        build_end_datetime_entry_view(
+        screens.end_editor_view(
             meeting, user.lang, error=MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang)
         ),
     )
@@ -1093,23 +1040,23 @@ async def test_past_end_with_naive_stored_start_does_not_raise(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_DATETIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     assert meeting.end_datetime is None
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
     context.api.assert_send_message_called(
         handler_context.update,
-        build_end_datetime_entry_view(
+        screens.end_editor_view(
             meeting, user.lang, error=MeetingEditDurationMessages.END_IN_PAST.get_text(lang=user.lang)
         ),
     )
 
 
 # ---------------------------------------------------------------------------
-# callback_query_duration_end_set_date — "end already set" branch is DST-safe:
+# callback_query_pick_end_date — "end already set" branch is DST-safe:
 # changing only the date preserves the owner-LOCAL wall clock of the end time.
 # ---------------------------------------------------------------------------
 
@@ -1131,7 +1078,7 @@ def madrid_owner_with_meeting(
     "update",
     # Move the end date across the spring DST boundary (Madrid springs forward 2026-03-29), staying
     # within the one-week duration cap relative to the Mar 26 start.
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 4, 1)))],
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 4, 1)))],
     indirect=True,
 )
 @freeze_time("2026-01-01 00:00:00", tz_offset=0)
@@ -1153,11 +1100,11 @@ async def test_update_existing_end_date_preserves_local_time_across_dst(
     assert user.datetime_in_tz(existing_end).time() == dt.time(10, 0)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        EditMeetingHandlerId.PICK_END_DATE,
         handler_context=handler_context,
     )
 
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
     # 2026-04-01 is summer time (Madrid UTC+2), so 10:00 local == 08:00 UTC — the UTC time-of-day
     # shifted by one hour relative to the winter value (09:00 UTC).
     assert meeting.end_datetime == dt.datetime(2026, 4, 1, 8, 0, tzinfo=dt.UTC)
@@ -1168,7 +1115,7 @@ async def test_update_existing_end_date_preserves_local_time_across_dst(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 25)))],
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 6, 25)))],
     indirect=True,
 )
 @freeze_time("2026-01-01 00:00:00", tz_offset=0)
@@ -1188,11 +1135,11 @@ async def test_update_existing_end_date_with_naive_stored_datetime_treats_it_as_
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        EditMeetingHandlerId.PICK_END_DATE,
         handler_context=handler_context,
     )
 
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
     # 10:00 UTC == 12:00 Madrid (summer, UTC+2); preserved on 2026-06-25 that local 12:00 == 10:00 UTC.
     assert meeting.end_datetime == dt.datetime(2026, 6, 25, 10, 0, tzinfo=dt.UTC)
 
@@ -1221,9 +1168,9 @@ async def test_end_exactly_one_week_after_start_is_accepted(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_DATETIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     assert meeting.end_datetime == one_week_after
@@ -1245,16 +1192,16 @@ async def test_end_one_minute_beyond_one_week_is_rejected(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_DATETIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     assert meeting.end_datetime is None  # not saved
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
     context.api.assert_send_message_called(
         handler_context.update,
-        build_end_datetime_entry_view(
+        screens.end_editor_view(
             meeting, user.lang, error=MeetingEditDurationMessages.END_MAX_DURATION.get_text(lang=user.lang)
         ),
     )
@@ -1275,16 +1222,16 @@ async def test_organizer_still_hits_the_one_week_duration_cap(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_DATETIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     assert meeting.end_datetime is None  # not saved
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
     context.api.assert_send_message_called(
         handler_context.update,
-        build_end_datetime_entry_view(
+        screens.end_editor_view(
             meeting, user.lang, error=MeetingEditDurationMessages.END_MAX_DURATION.get_text(lang=user.lang)
         ),
     )
@@ -1316,7 +1263,7 @@ def end_horizon_upsell_view(user: User) -> MitupView:
     """The upsell view sent as a reply when an end is beyond the free horizon."""
     back_button = ButtonConfig(
         text=ButtonMessages.END_DATE_TIME.back(lang=user.lang),
-        callback_data=cb.EDIT_MEETING_END_DATE_TIME.with_id(1),
+        callback_data=cb.REOPEN_END_EDITOR.with_id(1),
     )
     return supporter_upsell_view(
         SupporterMessages.SCHEDULING_HORIZON.get_text(lang=user.lang, days=5),
@@ -1327,7 +1274,7 @@ def end_horizon_upsell_view(user: User) -> MitupView:
 @pytest.mark.parametrize(
     "update",
     # First end-date pick on Jun 21: within the 7-day cap (6 days out) but past the 5-day horizon.
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 21)))],
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 6, 21)))],
     indirect=True,
 )
 @freeze_time(HORIZON_FROZEN_NOW, tz_offset=0)
@@ -1337,22 +1284,22 @@ async def test_set_end_date_beyond_horizon_shows_upsell_in_place(
     handler_context: HandlerContext,
     narrow_horizon: None,
 ):
-    """A calendar end date beyond the horizon edits the message into the upsell and stays in EDIT_END_DATE."""
+    """A calendar end date beyond the horizon edits the message into the upsell and stays in END_CALENDAR."""
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=HORIZON_START)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        EditMeetingHandlerId.PICK_END_DATE,
         handler_context=handler_context,
     )
 
     assert meeting.end_datetime is None  # not saved
-    assert state == ConversationMeetingState.EDIT_END_DATE
+    assert state == ConversationMeetingState.END_CALENDAR
     context.api.assert_method_just_called("answer_callback_query", times=0)
     calendar_button = ButtonConfig(
         text=ButtonMessages.DATE.back(lang=user.lang),
-        callback_data=cb.EDIT_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 15)),
+        callback_data=cb.NAVIGATE_END_CALENDAR.with_id(1).with_date(dt.date(2026, 6, 15)),
     )
     context.api.assert_edit_message_called(
         update,
@@ -1369,7 +1316,7 @@ async def test_end_datetime_entity_beyond_horizon_sends_upsell(
     handler_context: HandlerContext,
     narrow_horizon: None,
 ):
-    """A sent end entity beyond the horizon replies with the upsell and stays in EDIT_END_DATETIME."""
+    """A sent end entity beyond the horizon replies with the upsell and stays in END_EDITOR."""
     beyond_horizon = dt.datetime(2026, 6, 21, 12, 0, tzinfo=dt.UTC)  # 6 days out, past the 5-day horizon
     handler_context.update = date_time_entity_update(beyond_horizon)
 
@@ -1378,13 +1325,13 @@ async def test_end_datetime_entity_beyond_horizon_sends_upsell(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_DATETIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     assert meeting.end_datetime is None  # not saved
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
     context.api.assert_send_message_called(handler_context.update, end_horizon_upsell_view(user))
 
 
@@ -1409,20 +1356,20 @@ async def test_end_time_edit_keeping_beyond_horizon_date_sends_upsell(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_TIME_MESSAGE,
+        EditMeetingHandlerId.TYPE_END_TIME,
         handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 1},
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
     )
 
     assert meeting.end_datetime == grandfathered_end  # unchanged
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
     context.api.assert_send_message_called(update, end_horizon_upsell_view(user))
 
 
 @pytest.mark.parametrize(
     "update",
     # First end-date pick exactly on the horizon boundary (Jun 20): accepted.
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 20)))],
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 6, 20)))],
     indirect=True,
 )
 @freeze_time(HORIZON_FROZEN_NOW, tz_offset=0)
@@ -1438,20 +1385,20 @@ async def test_set_end_date_exactly_on_horizon_is_accepted(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        EditMeetingHandlerId.PICK_END_DATE,
         handler_context=handler_context,
     )
 
     assert meeting.end_datetime is not None  # saved (23:59 on the boundary date)
     assert user.datetime_in_tz(meeting.end_datetime).date() == dt.date(2026, 6, 20)
-    assert state == ConversationMeetingState.EDIT_END_TIME
+    assert state == ConversationMeetingState.END_TIME_PROMPT
     context.api.assert_method_just_called("answer_callback_query", times=0)
 
 
 @pytest.mark.parametrize(
     "update",
     # Move a grandfathered far-future end onto Jun 18 — within both the cap and the 5-day horizon.
-    [UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_id(1).with_date(dt.date(2026, 6, 18)))],
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 6, 18)))],
     indirect=True,
 )
 @freeze_time(HORIZON_FROZEN_NOW, tz_offset=0)
@@ -1472,11 +1419,11 @@ async def test_grandfathered_far_future_end_can_be_moved_to_a_valid_nearer_date(
     mock_session.add_object(meeting)
 
     context, state = await call_handler(
-        EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        EditMeetingHandlerId.PICK_END_DATE,
         handler_context=handler_context,
     )
 
     # UTC owner: updating only the date preserves the 15:00 local time-of-day on Jun 18.
     assert meeting.end_datetime == dt.datetime(2026, 6, 18, 15, 0, tzinfo=dt.UTC)
-    assert state == ConversationMeetingState.EDIT_END_DATETIME
+    assert state == ConversationMeetingState.END_EDITOR
     context.api.assert_method_just_called("answer_callback_query", times=0)

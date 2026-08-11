@@ -49,20 +49,31 @@ class EditMeetingHandlerId(HandlerId):
     DECLINE_CLEAR_TIMES_CALLBACK = auto()
     LOCK_ON_START_CALLBACK = auto()
 
-    # Edit meeting date and time
-    DATE_TIME_ENTRY_CALLBACK = auto()
-    DATE_CALLBACK = auto()
-    SET_DATE_CALLBACK = auto()
-    BACK_TO_EDIT_DATETIME_CALLBACK = auto()
-    EDIT_TIME_CALLBACK = auto()
-    EDIT_DATETIME_CONVERSATION = auto()
-    SET_TIME_MESSAGE = auto()
-    WRONG_TIME_FORMAT = auto()
-    WRONG_TIME_MESSAGE = auto()
-    DATE_TIME_ENTITY_MESSAGE = auto()
-    DATETIME_WRONG_TEXT_FORMAT = auto()
-    DATETIME_WRONG_MESSAGE = auto()
-    CANCEL_START_TIME_CALLBACK = auto()
+    # When — the meeting's start
+    OPEN_START_EDITOR = auto()
+    REOPEN_START_EDITOR = auto()
+    NAVIGATE_START_CALENDAR = auto()
+    PICK_START_DATE = auto()
+    OPEN_START_TIME_PROMPT = auto()
+    TYPE_START_DATETIME = auto()
+    TYPE_START_TIME = auto()
+    REJECT_START_DATETIME = auto()
+    REJECT_START_TIME = auto()
+    CANCEL_START_EDIT = auto()
+    START_EDITOR_CONVERSATION = auto()
+
+    # When — the meeting's end
+    OPEN_END_EDITOR = auto()
+    REOPEN_END_EDITOR = auto()
+    NAVIGATE_END_CALENDAR = auto()
+    PICK_END_DATE = auto()
+    OPEN_END_TIME_PROMPT = auto()
+    TYPE_END_DATETIME = auto()
+    TYPE_END_TIME = auto()
+    REJECT_END_DATETIME = auto()
+    REJECT_END_TIME = auto()
+    CANCEL_END_EDIT = auto()
+    END_EDITOR_CONVERSATION = auto()
 
     # Edit meeting language
     LANGUAGE_CALLBACK = auto()
@@ -75,22 +86,6 @@ class EditMeetingHandlerId(HandlerId):
     SET_MEETING_ALLOW_INVITATIONS_CALLBACK = auto()
     SET_MEETING_INCOGNITO_CALLBACK = auto()
 
-    # Edit meeting duration
-    DURATION_INPUT_CALLBACK = auto()
-    DURATION_CANCEL_CALLBACK = auto()
-    DURATION_CONVERSATION = auto()
-
-    # Duration — set end datetime sub-flow
-    DURATION_END_ENTRY_CALLBACK = auto()
-    DURATION_END_DATE_NAV_CALLBACK = auto()
-    DURATION_END_SET_DATE_CALLBACK = auto()
-    DURATION_END_TIME_CALLBACK = auto()
-    DURATION_END_DATETIME_ENTITY_MESSAGE = auto()
-    DURATION_END_WRONG_INPUT = auto()
-    DURATION_END_SET_TIME_MESSAGE = auto()
-    DURATION_END_TIME_WRONG_INPUT = auto()
-    DURATION_BACK_TO_END_DATETIME_CALLBACK = auto()
-
     # Cancel button during edit
     CANCEL = auto()
 
@@ -101,11 +96,11 @@ class ConversationMeetingState(Enum):
     EDIT_MAX_PARTICIPANTS = auto()
     EDIT_LOCATION_NAME = auto()
     EDIT_LOCATION_COORDIANTES = auto()
-    EDIT_DATETIME = auto()
-    EDIT_DATE = auto()
-    EDIT_TIME = auto()
 
-    # Duration conversation states
-    EDIT_END_DATETIME = auto()
-    EDIT_END_DATE = auto()
-    EDIT_END_TIME = auto()
+    # When — each state is named after the screen the owner is looking at
+    START_EDITOR = auto()
+    START_CALENDAR = auto()
+    START_TIME_PROMPT = auto()
+    END_EDITOR = auto()
+    END_CALENDAR = auto()
+    END_TIME_PROMPT = auto()

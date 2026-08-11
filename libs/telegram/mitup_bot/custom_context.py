@@ -41,9 +41,8 @@ class ContextId(CamelCaseStrEnum):
     EDIT_MEETING_LOCATION_COORDINATES = auto()
     EDIT_MEETING_MAX_PARTICIPANTS = auto()
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = auto()
-    EDIT_MEETING_TIME = auto()
-    EDIT_MEETING_DURATION = auto()
-    EDIT_MEETING_END_DATETIME = auto()
+    EDIT_MEETING_START = auto()
+    EDIT_MEETING_END = auto()
 
     # Create Meeting
     CREATE_MEETING = auto()

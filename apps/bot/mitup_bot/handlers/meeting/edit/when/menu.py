@@ -12,7 +12,7 @@ from mitup_bot.utils.messages import MeetingEditWhenMessages
 from mitup_bot.views import factory
 from mitup_bot.views import meeting as meeting_views
 
-from .enums import EditMeetingHandlerId
+from ..enums import EditMeetingHandlerId
 
 log = structlog.get_logger(__name__)
 

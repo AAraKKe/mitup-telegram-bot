@@ -984,15 +984,15 @@ def test_valid_paginated_callback_data_page(wire: str, expected_page: int, expec
 @pytest.mark.parametrize(
     "match",
     [
-        re.match(cb.EDIT_MEETING_DATE.pattern, "edit;meet_date:;date:2024-12-02"),
-        re.match(cb.EDIT_MEETING_DATE.pattern, "edit;meet_date:12;date:"),
+        re.match(cb.NAVIGATE_START_CALENDAR.pattern, "edit;meet_date:;date:2024-12-02"),
+        re.match(cb.NAVIGATE_START_CALENDAR.pattern, "edit;meet_date:12;date:"),
         None,
     ],
     ids=["no_id", "no_date", "none_match"],
 )
 def test_valid_date_callback_data_failed_states(match: re.Match | None):
     with pytest.raises(MalformedCallbackData):
-        valid_callback_data(cb.EDIT_MEETING_DATE.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
+        valid_callback_data(cb.NAVIGATE_START_CALENDAR.parse(match), MainMenuHandlerId.MAIN_MENU_CALLBACK)
 
 
 @pytest.mark.parametrize(

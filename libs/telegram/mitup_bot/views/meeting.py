@@ -209,11 +209,11 @@ def when_view_with_start(meeting: Meetup) -> tuple[str | FormattedText, Keyboard
     )
     set_start_button = ButtonConfig(
         text=ButtonMessages.SET_START_TIME.get_text(lang=meeting.user_language),
-        callback_data=cb.SET_MEETING_START_TIME.with_id(meeting.db_id),
+        callback_data=cb.OPEN_START_EDITOR.with_id(meeting.db_id),
     )
     set_end_button = ButtonConfig(
         text=ButtonMessages.SET_END_TIME.get_text(lang=meeting.user_language),
-        callback_data=cb.SET_MEETING_END_TIME.with_id(meeting.db_id),
+        callback_data=cb.OPEN_END_EDITOR.with_id(meeting.db_id),
     )
     lock_toggle = options_button(
         cb.SET_MEETING_LOCK_ON_START.with_id(meeting.db_id),
@@ -255,7 +255,7 @@ def when_view(meeting: Meetup) -> MitupView:
             [
                 ButtonConfig(
                     text=ButtonMessages.SET_START_TIME.get_text(lang=meeting.user_language),
-                    callback_data=cb.SET_MEETING_START_TIME.with_id(meeting.db_id),
+                    callback_data=cb.OPEN_START_EDITOR.with_id(meeting.db_id),
                 ),
             ],
         ]

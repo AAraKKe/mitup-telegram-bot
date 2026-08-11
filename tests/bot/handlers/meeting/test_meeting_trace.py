@@ -12,9 +12,8 @@ from structlog.testing import capture_logs
 from structlog.typing import EventDict
 from telegram import Update
 
-from mitup_bot.handlers.meeting.edit.edit_meeting_datetime import apply_start_datetime
-from mitup_bot.handlers.meeting.edit.edit_meeting_duration import apply_end_datetime
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
+from mitup_bot.handlers.meeting.edit.when.rules import apply_end_datetime, apply_start_datetime
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.handlers.meeting.utils import (
     active_meetings_cap_reached,

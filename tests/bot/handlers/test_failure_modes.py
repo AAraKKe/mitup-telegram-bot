@@ -135,101 +135,101 @@ def make_admin_if_gated(handler_context: HandlerContext, test_context: Context):
 
 CONTEXTS = [
     Context(
-        handler_id=EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_START_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        handler_id=EditMeetingHandlerId.OPEN_START_EDITOR,
+        update_request=UpdateRequest(callback_query=cb.OPEN_START_EDITOR.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="edit_meeting_date_time_entry",
+        id="open_start_editor",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DATE_CALLBACK,
+        handler_id=EditMeetingHandlerId.NAVIGATE_START_CALENDAR,
         update_request=UpdateRequest(
-            callback_query=cb.EDIT_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED).with_date(dt.date(2024, 12, 21))
+            callback_query=cb.NAVIGATE_START_CALENDAR.with_id(MEETING_ID_NOT_OWNED).with_date(dt.date(2024, 12, 21))
         ),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="edit_meeting_date",
+        id="navigate_start_calendar",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.SET_DATE_CALLBACK,
+        handler_id=EditMeetingHandlerId.PICK_START_DATE,
         update_request=UpdateRequest(
-            callback_query=cb.SET_MEETING_DATE.with_id(MEETING_ID_NOT_OWNED).with_date(dt.date(2024, 12, 21))
+            callback_query=cb.PICK_START_DATE.with_id(MEETING_ID_NOT_OWNED).with_date(dt.date(2024, 12, 21))
         ),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="set_meeting_date",
+        id="pick_start_date",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.EDIT_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        handler_id=EditMeetingHandlerId.OPEN_START_TIME_PROMPT,
+        update_request=UpdateRequest(callback_query=cb.OPEN_START_TIME_PROMPT.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="edit_meeting_time",
+        id="open_start_time_prompt",
     ),
     # CANCEL_START_TIME: calls cleanup_states when meeting is not accessible (not when user not found).
     Context(
-        handler_id=EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_START_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        handler_id=EditMeetingHandlerId.CANCEL_START_EDIT,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_START_EDIT.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED},
-        id="cancel_start_time",
+        id="cancel_start_edit",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_START_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        handler_id=EditMeetingHandlerId.CANCEL_START_EDIT,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_START_EDIT.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.USER_NOT_FOUND},
-        id="cancel_start_time",
+        id="cancel_start_edit",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        handler_id=EditMeetingHandlerId.REOPEN_START_EDITOR,
+        update_request=UpdateRequest(callback_query=cb.REOPEN_START_EDITOR.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="back_to_edit_datetime_from_calendar",
+        id="reopen_start_editor",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.SET_TIME_MESSAGE,
+        handler_id=EditMeetingHandlerId.TYPE_START_TIME,
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="set_meeting_time_message",
-        meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+        id="type_start_time",
+        meeting_id={ContextId.EDIT_MEETING_START: 99},
     ),
     Context(
-        handler_id=EditMeetingHandlerId.WRONG_TIME_FORMAT,
+        handler_id=EditMeetingHandlerId.REJECT_START_TIME,
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="wrong_time_format",
-        meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+        id="reject_start_time_text",
+        meeting_id={ContextId.EDIT_MEETING_START: 99},
     ),
     Context(
-        handler_id=EditMeetingHandlerId.WRONG_TIME_FORMAT,
+        handler_id=EditMeetingHandlerId.REJECT_START_TIME,
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.MISSING_USER_DATA},
-        id="wrong_time_format",
+        id="reject_start_time_text",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DATETIME_WRONG_TEXT_FORMAT,
+        handler_id=EditMeetingHandlerId.REJECT_START_DATETIME,
         update_request=UpdateRequest(message_text="some text"),
         error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="datetime_wrong_text_format",
-        meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+        id="reject_start_datetime_text",
+        meeting_id={ContextId.EDIT_MEETING_START: 99},
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DATETIME_WRONG_TEXT_FORMAT,
+        handler_id=EditMeetingHandlerId.REJECT_START_DATETIME,
         update_request=UpdateRequest(message_text="some text"),
         error_modes={ErrorMode.MISSING_USER_DATA},
-        id="datetime_wrong_text_format",
+        id="reject_start_datetime_text",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DATETIME_WRONG_MESSAGE,
+        handler_id=EditMeetingHandlerId.REJECT_START_DATETIME,
         update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
         error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="datetime_wrong_message",
-        meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+        id="reject_start_datetime_media",
+        meeting_id={ContextId.EDIT_MEETING_START: 99},
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DATETIME_WRONG_MESSAGE,
+        handler_id=EditMeetingHandlerId.REJECT_START_DATETIME,
         update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
         error_modes={ErrorMode.MISSING_USER_DATA},
-        id="datetime_wrong_message",
+        id="reject_start_datetime_media",
     ),
-    # DATE_TIME_ENTITY_MESSAGE — requires a message with a date_time entity and a stored meeting id
+    # TYPE_START_DATETIME — requires a message with a date_time entity and a stored meeting id
     Context(
-        handler_id=EditMeetingHandlerId.DATE_TIME_ENTITY_MESSAGE,
+        handler_id=EditMeetingHandlerId.TYPE_START_DATETIME,
         update_request=UpdateRequest(
             message_text="Tomorrow at noon",
             entities=[
@@ -242,11 +242,11 @@ CONTEXTS = [
             ],
         ),
         error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="date_time_entity_message",
-        meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+        id="type_start_datetime",
+        meeting_id={ContextId.EDIT_MEETING_START: 99},
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DATE_TIME_ENTITY_MESSAGE,
+        handler_id=EditMeetingHandlerId.TYPE_START_DATETIME,
         update_request=UpdateRequest(
             message_text="Tomorrow at noon",
             entities=[
@@ -259,7 +259,7 @@ CONTEXTS = [
             ],
         ),
         error_modes={ErrorMode.MISSING_USER_DATA},
-        id="date_time_entity_message",
+        id="type_start_datetime",
     ),
     Context(
         handler_id=MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE,
@@ -286,46 +286,46 @@ CONTEXTS = [
         id="user_not_found_set_default_lock_on_start",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.SET_TIME_MESSAGE,
+        handler_id=EditMeetingHandlerId.TYPE_START_TIME,
         update_request=UpdateRequest(message_text="12:00"),
         error_modes={ErrorMode.MISSING_USER_DATA},
-        id="set_meeting_time_message",
+        id="type_start_time",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_START_TIME),
+        handler_id=EditMeetingHandlerId.OPEN_START_EDITOR,
+        update_request=UpdateRequest(callback_query=cb.OPEN_START_EDITOR),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="edit_meeting_date_time_entry",
+        id="open_start_editor",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DATE_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DATE.with_date(dt.date(2024, 12, 21))),
+        handler_id=EditMeetingHandlerId.NAVIGATE_START_CALENDAR,
+        update_request=UpdateRequest(callback_query=cb.NAVIGATE_START_CALENDAR.with_date(dt.date(2024, 12, 21))),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="edit_meeting_date",
+        id="navigate_start_calendar",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.SET_DATE_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_DATE.with_date(dt.date(2024, 12, 21))),
+        handler_id=EditMeetingHandlerId.PICK_START_DATE,
+        update_request=UpdateRequest(callback_query=cb.PICK_START_DATE.with_date(dt.date(2024, 12, 21))),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="set_meeting_date",
+        id="pick_start_date",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.EDIT_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_TIME),
+        handler_id=EditMeetingHandlerId.OPEN_START_TIME_PROMPT,
+        update_request=UpdateRequest(callback_query=cb.OPEN_START_TIME_PROMPT),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="edit_meeting_time",
+        id="open_start_time_prompt",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_START_TIME),
+        handler_id=EditMeetingHandlerId.CANCEL_START_EDIT,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_START_EDIT),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="cancel_start_time_malformed",
+        id="cancel_start_edit_malformed",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING),
+        handler_id=EditMeetingHandlerId.REOPEN_START_EDITOR,
+        update_request=UpdateRequest(callback_query=cb.REOPEN_START_EDITOR),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="back_to_edit_datetime_from_calendar_malformed",
+        id="reopen_start_editor_malformed",
     ),
     Context(
         handler_id=EditMeetingHandlerId.MEETING_SETTINGS_CALLBACK,
@@ -544,44 +544,44 @@ CONTEXTS = [
         id="edit_inactive_meeting_settings",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DATE_TIME_ENTRY_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_START_TIME.with_id(MEETING_ID_INACTIVE)),
+        handler_id=EditMeetingHandlerId.OPEN_START_EDITOR,
+        update_request=UpdateRequest(callback_query=cb.OPEN_START_EDITOR.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
-        id="edit_inactive_meeting_date_time_entry",
+        id="open_start_editor_inactive",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DATE_CALLBACK,
+        handler_id=EditMeetingHandlerId.NAVIGATE_START_CALENDAR,
         update_request=UpdateRequest(
-            callback_query=cb.EDIT_MEETING_DATE.with_id(MEETING_ID_INACTIVE).with_date(dt.date(2024, 12, 21))
+            callback_query=cb.NAVIGATE_START_CALENDAR.with_id(MEETING_ID_INACTIVE).with_date(dt.date(2024, 12, 21))
         ),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
-        id="edit_inactive_meeting_date",
+        id="navigate_start_calendar_inactive",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.SET_DATE_CALLBACK,
+        handler_id=EditMeetingHandlerId.PICK_START_DATE,
         update_request=UpdateRequest(
-            callback_query=cb.SET_MEETING_DATE.with_id(MEETING_ID_INACTIVE).with_date(dt.date(2024, 12, 21))
+            callback_query=cb.PICK_START_DATE.with_id(MEETING_ID_INACTIVE).with_date(dt.date(2024, 12, 21))
         ),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
-        id="set_inactive_meeting_date",
+        id="pick_start_date_inactive",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.EDIT_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_TIME.with_id(MEETING_ID_INACTIVE)),
+        handler_id=EditMeetingHandlerId.OPEN_START_TIME_PROMPT,
+        update_request=UpdateRequest(callback_query=cb.OPEN_START_TIME_PROMPT.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
-        id="edit_inactive_meeting_time",
+        id="open_start_time_prompt_inactive",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.CANCEL_START_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_START_TIME.with_id(MEETING_ID_INACTIVE)),
+        handler_id=EditMeetingHandlerId.CANCEL_START_EDIT,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_START_EDIT.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
-        id="cancel_start_time_inactive",
+        id="cancel_start_edit_inactive",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.BACK_TO_EDIT_DATETIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING.with_id(MEETING_ID_INACTIVE)),
+        handler_id=EditMeetingHandlerId.REOPEN_START_EDITOR,
+        update_request=UpdateRequest(callback_query=cb.REOPEN_START_EDITOR.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
-        id="back_to_edit_datetime_from_calendar_inactive",
+        id="reopen_start_editor_inactive",
     ),
     Context(
         handler_id=EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK,
@@ -604,10 +604,10 @@ CONTEXTS = [
         id="set_inactive_meeting_public",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_INPUT_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_END_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        handler_id=EditMeetingHandlerId.OPEN_END_EDITOR,
+        update_request=UpdateRequest(callback_query=cb.OPEN_END_EDITOR.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="set_meeting_end_time",
+        id="open_end_editor",
     ),
     Context(
         handler_id=EditMeetingHandlerId.LOCK_ON_START_CALLBACK,
@@ -616,126 +616,114 @@ CONTEXTS = [
         id="set_meeting_lock_on_start",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_CANCEL_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_MEETING_DURATION.with_id(MEETING_ID_NOT_OWNED)),
+        handler_id=EditMeetingHandlerId.CANCEL_END_EDIT,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_END_EDIT.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="cancel_edit_meeting_duration",
+        id="cancel_end_edit",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_CANCEL_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.CANCEL_EDIT_MEETING_DURATION),
+        handler_id=EditMeetingHandlerId.CANCEL_END_EDIT,
+        update_request=UpdateRequest(callback_query=cb.CANCEL_END_EDIT),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="cancel_edit_meeting_duration_malformed",
+        id="cancel_end_edit_malformed",
     ),
     # New end-datetime conversation handlers
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_DATE_NAV_CALLBACK,
+        handler_id=EditMeetingHandlerId.NAVIGATE_END_CALENDAR,
         update_request=UpdateRequest(
-            callback_query=cb.EDIT_MEETING_END_DATE.with_id(MEETING_ID_NOT_OWNED).with_date(dt.date(2024, 12, 21))
+            callback_query=cb.NAVIGATE_END_CALENDAR.with_id(MEETING_ID_NOT_OWNED).with_date(dt.date(2024, 12, 21))
         ),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="duration_end_date_nav",
+        id="navigate_end_calendar",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
+        handler_id=EditMeetingHandlerId.PICK_END_DATE,
         update_request=UpdateRequest(
-            callback_query=cb.SET_MEETING_END_DATE.with_id(MEETING_ID_NOT_OWNED).with_date(dt.date(2024, 12, 21))
+            callback_query=cb.PICK_END_DATE.with_id(MEETING_ID_NOT_OWNED).with_date(dt.date(2024, 12, 21))
         ),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="duration_end_set_date",
+        id="pick_end_date",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_END_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        handler_id=EditMeetingHandlerId.OPEN_END_TIME_PROMPT,
+        update_request=UpdateRequest(callback_query=cb.OPEN_END_TIME_PROMPT.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="duration_end_time",
+        id="open_end_time_prompt",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_DATE_NAV_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE.with_date(dt.date(2024, 12, 21))),
+        handler_id=EditMeetingHandlerId.NAVIGATE_END_CALENDAR,
+        update_request=UpdateRequest(callback_query=cb.NAVIGATE_END_CALENDAR.with_date(dt.date(2024, 12, 21))),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="duration_end_date_nav_malformed",
+        id="navigate_end_calendar_malformed",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_SET_DATE_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.SET_MEETING_END_DATE.with_date(dt.date(2024, 12, 21))),
+        handler_id=EditMeetingHandlerId.PICK_END_DATE,
+        update_request=UpdateRequest(callback_query=cb.PICK_END_DATE.with_date(dt.date(2024, 12, 21))),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="duration_end_set_date_malformed",
+        id="pick_end_date_malformed",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_TIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_END_TIME),
+        handler_id=EditMeetingHandlerId.OPEN_END_TIME_PROMPT,
+        update_request=UpdateRequest(callback_query=cb.OPEN_END_TIME_PROMPT),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="duration_end_time_malformed",
+        id="open_end_time_prompt_malformed",
     ),
-    # Duration end-datetime entry / back navigation (both keyed on EDIT_MEETING_END_DATE_TIME)
+    # The end editor, reached from the in-flow back buttons and from a stale upsell
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_ENTRY_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        handler_id=EditMeetingHandlerId.REOPEN_END_EDITOR,
+        update_request=UpdateRequest(callback_query=cb.REOPEN_END_EDITOR.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="duration_end_entry",
+        id="reopen_end_editor",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_ENTRY_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME),
+        handler_id=EditMeetingHandlerId.REOPEN_END_EDITOR,
+        update_request=UpdateRequest(callback_query=cb.REOPEN_END_EDITOR),
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="duration_end_entry_malformed",
+        id="reopen_end_editor_malformed",
     ),
+    # End-half message handlers
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_BACK_TO_END_DATETIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME.with_id(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
-        id="duration_back_to_end_datetime",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_BACK_TO_END_DATETIME_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_END_DATE_TIME),
-        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
-        id="duration_back_to_end_datetime_malformed",
-    ),
-    # Duration end sub-flow message handlers
-    Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_SET_TIME_MESSAGE,
+        handler_id=EditMeetingHandlerId.TYPE_END_TIME,
         update_request=UpdateRequest(message_text="11:30"),
         error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="duration_end_set_time_message",
-        meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 99},
+        id="type_end_time",
+        meeting_id={ContextId.EDIT_MEETING_END: 99},
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_SET_TIME_MESSAGE,
+        handler_id=EditMeetingHandlerId.TYPE_END_TIME,
         update_request=UpdateRequest(message_text="11:30"),
         error_modes={ErrorMode.MISSING_USER_DATA},
-        id="duration_end_set_time_message",
+        id="type_end_time",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_WRONG_INPUT,
+        handler_id=EditMeetingHandlerId.REJECT_END_DATETIME,
         update_request=UpdateRequest(message_text="some text"),
         error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="duration_end_wrong_input",
-        meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 99},
+        id="reject_end_datetime",
+        meeting_id={ContextId.EDIT_MEETING_END: 99},
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_WRONG_INPUT,
+        handler_id=EditMeetingHandlerId.REJECT_END_DATETIME,
         update_request=UpdateRequest(message_text="some text"),
         error_modes={ErrorMode.MISSING_USER_DATA},
-        id="duration_end_wrong_input",
+        id="reject_end_datetime",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_TIME_WRONG_INPUT,
+        handler_id=EditMeetingHandlerId.REJECT_END_TIME,
         update_request=UpdateRequest(message_text="bad time"),
         error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="duration_end_time_wrong_input",
-        meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 99},
+        id="reject_end_time",
+        meeting_id={ContextId.EDIT_MEETING_END: 99},
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_TIME_WRONG_INPUT,
+        handler_id=EditMeetingHandlerId.REJECT_END_TIME,
         update_request=UpdateRequest(message_text="bad time"),
         error_modes={ErrorMode.MISSING_USER_DATA},
-        id="duration_end_time_wrong_input",
+        id="reject_end_time",
     ),
-    # Duration entity message handlers — require a message with a date_time entity
+    # End-half entity message handlers — require a message with a date_time entity
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        handler_id=EditMeetingHandlerId.TYPE_END_DATETIME,
         update_request=UpdateRequest(
             message_text="Tomorrow at noon",
             entities=[
@@ -748,11 +736,11 @@ CONTEXTS = [
             ],
         ),
         error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="duration_end_datetime_entity_message",
-        meeting_id={ContextId.EDIT_MEETING_END_DATETIME: 99},
+        id="type_end_datetime",
+        meeting_id={ContextId.EDIT_MEETING_END: 99},
     ),
     Context(
-        handler_id=EditMeetingHandlerId.DURATION_END_DATETIME_ENTITY_MESSAGE,
+        handler_id=EditMeetingHandlerId.TYPE_END_DATETIME,
         update_request=UpdateRequest(
             message_text="Tomorrow at noon",
             entities=[
@@ -765,7 +753,7 @@ CONTEXTS = [
             ],
         ),
         error_modes={ErrorMode.MISSING_USER_DATA},
-        id="duration_end_datetime_entity_message",
+        id="type_end_datetime",
     ),
     # --- When screen handlers ---
     Context(
@@ -1237,17 +1225,17 @@ CONTEXTS = [
         id="edit_meeting_description",
     ),
     Context(
-        handler_id=EditMeetingHandlerId.WRONG_TIME_MESSAGE,
+        handler_id=EditMeetingHandlerId.REJECT_START_TIME,
         update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
         error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="wrong_time_message",
-        meeting_id={ContextId.EDIT_MEETING_TIME: 99},
+        id="reject_start_time_media",
+        meeting_id={ContextId.EDIT_MEETING_START: 99},
     ),
     Context(
-        handler_id=EditMeetingHandlerId.WRONG_TIME_MESSAGE,
+        handler_id=EditMeetingHandlerId.REJECT_START_TIME,
         update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
         error_modes={ErrorMode.MISSING_USER_DATA},
-        id="wrong_time_message",
+        id="reject_start_time_media",
     ),
     # --- Inline query ---
     # Registered-sharer coverage only: the unregistered sharer is a valid case here, not a fault

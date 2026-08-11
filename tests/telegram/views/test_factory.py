@@ -3,6 +3,7 @@ import datetime as dt
 import pytest
 
 from mitup_bot import docs_links
+from mitup_bot.callback_data import CallbackData
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.utils import Emojis
 from mitup_bot.utils import callbacks as cb
@@ -87,11 +88,23 @@ def test_edit_meeting_property_view_with_custom_back_button(lang: str):
     assert expected_view == view
 
 
-def test_edit_meeting_date_view_defaults_back_button_to_date_time_hub(lang: str):
-    # Issue #173: the calendar back button used to hardcode ButtonMessages.EDIT ("≪ ✏️ Edit"),
-    # but tapping it lands on the Date & Time sub-hub (cb.EDIT_MEETING re-shows the entry view
-    # within the EDIT_DATE conversation state), never the main Edit menu. With no override the
-    # label must name that real destination — DATE_TIME — not EDIT.
+@pytest.mark.parametrize(
+    "back_callback,back_button_text",
+    [
+        (cb.REOPEN_START_EDITOR, ButtonMessages.DATE_TIME),
+        (cb.REOPEN_END_EDITOR, ButtonMessages.END_DATE_TIME),
+    ],
+    ids=["start", "end"],
+)
+def test_edit_meeting_date_view_back_button_names_the_screen_it_returns_to(
+    lang: str, back_callback: CallbackData, back_button_text: ButtonMessages
+):
+    """The back button's label must name the editor the callback actually reopens.
+
+    The same calendar serves the start and the end of a meeting, and each returns to its own
+    editor — a label naming anything else (the Edit menu, say) describes a screen the tap never
+    reaches.
+    """
     meeting_id = 7
     view = factory.edit_meeting_date_view(
         RenderContext(lang=lang),
@@ -99,35 +112,16 @@ def test_edit_meeting_date_view_defaults_back_button_to_date_time_hub(lang: str)
         anchor_date=dt.date(2024, 11, 15),
         current_date=dt.date(2024, 11, 15),
         new=False,
+        set_date_callback=cb.PICK_START_DATE,
+        nav_callback=cb.NAVIGATE_START_CALENDAR,
+        back_callback=back_callback,
+        back_button_text=back_button_text,
     )
 
     back_button = view.keyboard[-1][0]
     assert back_button == ButtonConfig(
-        text=ButtonMessages.DATE_TIME.back(lang=lang),
-        callback_data=cb.EDIT_MEETING.with_id(meeting_id),
-    )
-
-
-def test_edit_meeting_date_view_end_date_back_button_names_end_hub(lang: str):
-    # Issue #173: the duration flow opens the same calendar but overrides back_callback to the
-    # End Date & Time hub. The back button label must follow with END_DATE_TIME, not "Edit".
-    meeting_id = 7
-    view = factory.edit_meeting_date_view(
-        RenderContext(lang=lang),
-        meeting_id=meeting_id,
-        anchor_date=dt.date(2024, 11, 15),
-        current_date=dt.date(2024, 11, 15),
-        new=False,
-        set_date_callback=cb.SET_MEETING_END_DATE,
-        nav_callback=cb.EDIT_MEETING_END_DATE,
-        back_callback=cb.EDIT_MEETING_END_DATE_TIME,
-        back_button_text=ButtonMessages.END_DATE_TIME,
-    )
-
-    back_button = view.keyboard[-1][0]
-    assert back_button == ButtonConfig(
-        text=ButtonMessages.END_DATE_TIME.back(lang=lang),
-        callback_data=cb.EDIT_MEETING_END_DATE_TIME.with_id(meeting_id),
+        text=back_button_text.back(lang=lang),
+        callback_data=back_callback.with_id(meeting_id),
     )
 
 
