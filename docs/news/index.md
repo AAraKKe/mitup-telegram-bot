@@ -10,6 +10,15 @@ Announcements, milestones, and notes on where Mitup is headed. Newest first.
 
 <div class="grid cards" markdown>
 
+- :fontawesome-solid-newspaper: **Does Telegram have events like WhatsApp?**
+
+    ---
+    <span class="news-card__date">14 August 2026</span>
+
+    WhatsApp added events in 2024 and keeps polishing them. Telegram groups have had this since 2015. The side-by-side, with dates and receipts.
+
+    [Read the post →](does_telegram_have_events_like_whatsapp.md)
+
 - :fontawesome-solid-newspaper: **One week in**
 
     ---

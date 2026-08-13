@@ -60,6 +60,7 @@ nav = [
   ] },
   { "News" = [
     { "What's new" = "news/index.md" },
+    { "Does Telegram have events like WhatsApp?" = "news/does_telegram_have_events_like_whatsapp.md" },
     { "One week in" = "news/one_week_in.md" },
     { "Welcome to the new Mitup" = "news/welcome_to_the_new_mitup.md" },
   ] },

@@ -4,6 +4,8 @@
 
 ## Docs
 
+- [Does Telegram have events like WhatsApp?](https://mitup.social/news/does_telegram_have_events_like_whatsapp/): Telegram has no built-in events feature; Mitup has organized events in Telegram groups since 2015, with a waiting list, timezone reminders, and guests by name.
+
 - [Home](https://mitup.social/): What Mitup does, in one page, with a video of the whole meeting flow.
 - [User guide](https://mitup.social/user-guide/): Index of every screen the bot shows you, page by page.
 - [Getting started](https://mitup.social/user-guide/getting_started/): Open the bot, set your timezone, reach the main menu.
