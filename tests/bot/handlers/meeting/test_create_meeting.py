@@ -1,4 +1,5 @@
 import datetime as dt
+import logging
 from typing import cast
 
 import pytest
@@ -7,7 +8,7 @@ from telegram import Chat, Message, MessageEntity, Update
 from telegram import User as TelegramUser
 from telegram.ext import Application, ConversationHandler
 
-from mitup_bot import supporter
+from mitup_bot import limits, supporter
 from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.create_meeting import ValidTitleFilter, callback_query_create_meeting
@@ -15,7 +16,7 @@ from mitup_bot.handlers.meeting.enums import ConversationMeetingState, MeetingHa
 from mitup_bot.handlers.meeting.utils import main_menu_back_button
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricsClient
-from mitup_bot.utils import CommonMessages, MeetingCreationMessages, SupporterMessages
+from mitup_bot.utils import CommonMessages, MeetingCreationMessages, MeetingEditContentMessages, SupporterMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import build_datetime_link
 from mitup_bot.views import RenderContext
@@ -31,6 +32,7 @@ from tests.helpers import (
     StubMitupContext,
     UpdateRequest,
     call_handler,
+    log_record,
 )
 from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID, DEFAULT_TEST_DATE, DEFAULT_TG_USER_PARAMS
 
@@ -615,3 +617,74 @@ async def test_create_meeting_title_date_within_horizon_is_created(
     assert len(mock_session.objects_added) == 1
     new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
     assert new_meeting.datetime == on_horizon
+
+
+# ---------------------------------------------------------------------------
+# create_meeting_message_handler — the title character cap
+# ---------------------------------------------------------------------------
+
+
+OVER_CAP_TITLE = "t" * (limits.TITLE_MAX_CHARS + 1)
+
+
+async def test_over_cap_title_creates_nothing_and_keeps_the_user_in_the_title_step(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    app: Application,
+    metrics_client: MetricsClient,
+    caplog: pytest.LogCaptureFixture,
+):
+    """A title past the cap is refused at the door, so the oversized value never reaches storage.
+
+    The user stays in TITLE with the creation prompt re-sent, so a shorter title still creates the
+    meeting without restarting the flow.
+    """
+    caplog.set_level(logging.INFO)
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    title_update = make_message_update(OVER_CAP_TITLE)
+    ctx = HandlerContext(update=title_update, app=app, metrics_client=metrics_client)
+    context, state = await call_handler(MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE, handler_context=ctx)
+
+    assert mock_session.objects_added == []
+    assert state == ConversationMeetingState.TITLE
+
+    error_msg = MeetingEditContentMessages.TITLE_TOO_LONG.get(
+        lang=user_with_settings.lang, length=len(OVER_CAP_TITLE), limit=limits.TITLE_MAX_CHARS
+    )
+    # Both numbers reach the reader: a message still carrying `${length}` would leave them guessing.
+    assert str(len(OVER_CAP_TITLE)) in error_msg.text
+    assert str(limits.TITLE_MAX_CHARS) in error_msg.text
+    assert "${" not in error_msg.text
+    context.api.assert_send_message_called(
+        title_update, views_factory.create_meeting_view(RenderContext(lang=user_with_settings.lang), message=error_msg)
+    )
+
+    record = log_record(caplog, "Meeting creation step rejected")
+    assert record.levelname == "INFO"
+    assert record.__dict__["step"] == "title"
+    assert record.__dict__["reason"] == "too_long"
+    assert record.__dict__["input_length"] == len(OVER_CAP_TITLE)
+    assert record.__dict__["limit"] == limits.TITLE_MAX_CHARS
+    # The refused title is the user's own text and never travels onto the line.
+    assert OVER_CAP_TITLE not in caplog.text
+
+
+async def test_title_at_the_cap_creates_the_meeting(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    app: Application,
+    metrics_client: MetricsClient,
+):
+    """The cap is inclusive: a title of exactly the maximum length is a normal creation."""
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    at_cap = "t" * limits.TITLE_MAX_CHARS
+    title_update = make_message_update(at_cap)
+    ctx = HandlerContext(update=title_update, app=app, metrics_client=metrics_client)
+    _, state = await call_handler(MeetingHandlerId.CREATE_MEETING_TITLE_MESSAGE, handler_context=ctx)
+
+    assert state == ConversationHandler.END
+    assert len(mock_session.objects_added) == 1
+    new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
+    assert new_meeting.title == at_cap

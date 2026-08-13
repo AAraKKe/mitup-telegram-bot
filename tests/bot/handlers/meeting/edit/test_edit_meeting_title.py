@@ -1,9 +1,11 @@
+import logging
 import re
 
 import pytest
 from telegram import MessageEntity, Update
 from telegram.ext import ConversationHandler
 
+from mitup_bot import limits
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData, MeetingNotOwnedError
 from mitup_bot.handlers.meeting.edit.edit_meeting_title import (
@@ -29,6 +31,7 @@ from tests.helpers import (
     UpdateRequest,
     call_handler,
     create_meetup,
+    log_record,
 )
 from tests.helpers.stub_db import MockDbSession
 
@@ -52,7 +55,9 @@ async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store
     assert context.user_data.registry[ContextId.EDIT_MEETING_TITLE].meeting_id == 1
 
     view = MitupView(
-        description=MeetingEditContentMessages.TITLE_PROMPT.get(title=user_with_settings.meetups[0].title),
+        description=MeetingEditContentMessages.TITLE_PROMPT.get(
+            lang=user_with_settings.lang, title=user_with_settings.meetups[0].title
+        ),
         keyboard=[
             [
                 ButtonConfig(
@@ -167,4 +172,90 @@ async def test_edit_title_message_stores_tagged_title_and_renders_rich_success(
         MeetingEditContentMessages.TITLE_SUCCESS.get(title=rich_title(meeting))
     )
     context.api.assert_send_message_called(update, view)
+    assert state == ConversationHandler.END
+
+
+# ---------------------------------------------------------------------------
+# TITLE_MESSAGE — the title character cap
+# ---------------------------------------------------------------------------
+
+
+OVER_CAP_TITLE = "t" * (limits.TITLE_MAX_CHARS + 1)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text=OVER_CAP_TITLE)], indirect=True)
+async def test_over_cap_title_leaves_the_meeting_untouched_and_reprompts(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    caplog: pytest.LogCaptureFixture,
+    metrics: MetricAssertions,
+):
+    """A title past the cap never reaches the meeting, and the prompt comes back with the error on
+    top so the buttons stay reachable.
+
+    This is the one place the shared rejection line and its metric are pinned in full; the other
+    capped fields only prove they name themselves on it.
+    """
+    caplog.set_level(logging.INFO)
+    meeting = user_with_settings.meetups[0]
+    stored_title = meeting.title
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.TITLE_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_TITLE: meeting.db_id},
+    )
+
+    assert meeting.title == stored_title
+    assert state == ConversationMeetingState.EDIT_TITLE
+    # The meeting id survives the refusal, so a shorter retry edits this same meeting.
+    assert context.has_meeting_id(ContextId.EDIT_MEETING_TITLE)
+    # Nothing was published: the cards in other chats still show the stored title.
+    context.api.assert_method_just_called("update_meeting_messages", times=0)
+
+    error = MeetingEditContentMessages.TITLE_TOO_LONG.get(
+        lang=user_with_settings.lang, length=len(OVER_CAP_TITLE), limit=limits.TITLE_MAX_CHARS
+    )
+    # Both numbers reach the reader: a message still carrying `${length}` would leave them guessing.
+    assert str(len(OVER_CAP_TITLE)) in error.text
+    assert str(limits.TITLE_MAX_CHARS) in error.text
+    assert "${" not in error.text
+    context.api.assert_send_message_called(
+        update, edit_title_prompt_view(meeting, user_with_settings.lang, error=error)
+    )
+
+    record = log_record(caplog, "Meeting edit input rejected")
+    assert record.levelname == "INFO"
+    assert record.__dict__["field"] == "title"
+    assert record.__dict__["reason"] == "too_long"
+    assert record.__dict__["input_length"] == len(OVER_CAP_TITLE)
+    assert record.__dict__["limit"] == limits.TITLE_MAX_CHARS
+    # The refused title is the user's own text and never travels onto the line.
+    assert OVER_CAP_TITLE not in caplog.text
+    metrics.assert_emitted(name=MetricKey.ERROR, dimensions={"Feature": str(Feature.EDIT_MEETING)}, times=1)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="t" * limits.TITLE_MAX_CHARS)], indirect=True)
+async def test_title_at_the_cap_is_stored(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """The cap is inclusive: a title of exactly the maximum length is a normal edit."""
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(meeting)
+
+    _, state = await call_handler(
+        EditMeetingHandlerId.TITLE_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_TITLE: meeting.db_id},
+    )
+
+    assert meeting.title == "t" * limits.TITLE_MAX_CHARS
     assert state == ConversationHandler.END

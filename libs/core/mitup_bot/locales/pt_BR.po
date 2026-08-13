@@ -317,6 +317,9 @@ msgstr "<i>convite de ${user}</i>"
 msgid "MeetingDisplayMessages.DESCRIPTION_EMPTY"
 msgstr "<i>Este evento ainda não tem descrição</i>"
 
+msgid "MeetingDisplayMessages.PARTICIPANTS_TRUNCATED"
+msgstr "${count} nomes não mostrados"
+
 msgid "MeetingJoinMessages.JOIN_SUCCESS"
 msgstr "Participação confirmada!"
 
@@ -413,6 +416,12 @@ msgstr "Título atualizado para: <b>${title}</b>"
 msgid "MeetingEditContentMessages.DESCRIPTION_SUCCESS"
 msgstr "Descrição atualizada para: <b>${description}</b>"
 
+msgid "MeetingEditContentMessages.TITLE_TOO_LONG"
+msgstr "Esse título tem ${length} caracteres, acima do limite de ${limit}. Envie um título mais curto."
+
+msgid "MeetingEditContentMessages.DESCRIPTION_TOO_LONG"
+msgstr "Essa descrição tem ${length} caracteres, acima do limite de ${limit}. Envie uma descrição mais curta."
+
 msgid "MeetingEditLocationMessages.DESCRIPTION"
 msgstr "Um evento pode ter um local associado. Você pode simplesmente definir o nome do lugar ou anexar a localização. Escolha qualquer uma das duas opções."
 
@@ -430,6 +439,9 @@ msgstr "Localização salva."
 
 msgid "MeetingEditLocationMessages.COORDINATES_INVALID"
 msgstr "Envie-me a localização novamente. Lembre-se de tocar no ícone de clipe e escolher localização."
+
+msgid "MeetingEditLocationMessages.LOCATION_NAME_TOO_LONG"
+msgstr "Esse nome do local tem ${length} caracteres, acima do limite de ${limit}. Envie um nome mais curto."
 
 msgid "MeetingEditParticipantsMessages.DESCRIPTION"
 msgstr "Aqui você pode gerenciar os participantes do evento: você pode definir o número máximo de pessoas que podem participar, bem como remover qualquer um dos participantes."

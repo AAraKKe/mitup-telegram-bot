@@ -1126,3 +1126,15 @@ msgstr "<b>🏆 Xa es Commissioner</b>\n\nRegaláronche o nivel de Host Commissi
 
 msgid "SupporterNotificationMessages.GRANT_REMOVED"
 msgstr "<b>As túas vantaxes de Host regaladas remataron</b>\n\nO nivel de Host que che regalaron xa non está activo. Podes facerte Host cando queiras desde o menú Colabora."
+
+msgid "MeetingDisplayMessages.PARTICIPANTS_TRUNCATED"
+msgstr "${count} nomes non mostrados"
+
+msgid "MeetingEditContentMessages.TITLE_TOO_LONG"
+msgstr "Ese título ten ${length} caracteres, por enriba do límite de ${limit}. Envíame un máis curto."
+
+msgid "MeetingEditContentMessages.DESCRIPTION_TOO_LONG"
+msgstr "Esa descrición ten ${length} caracteres, por enriba do límite de ${limit}. Envíame unha máis curta."
+
+msgid "MeetingEditLocationMessages.LOCATION_NAME_TOO_LONG"
+msgstr "Ese nome do lugar ten ${length} caracteres, por enriba do límite de ${limit}. Envíame un máis curto."

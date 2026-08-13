@@ -3,7 +3,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler, filters
 
-from mitup_bot import guards
+from mitup_bot import guards, limits
 from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_session
 from mitup_bot.handlers.messages import MessagesId
@@ -12,23 +12,33 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.handlers.utils import reply_rich_message_not_supported
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import Meetup
+from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import ButtonMessages, MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import capture_tagged_text
+from mitup_bot.utils.entities import FormattedText, capture_tagged_text
 from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.meeting_text import rich_title
 
 from .enums import ConversationMeetingState, EditMeetingHandlerId
+from .utils import log_length_rejection, prepend_error
 
 log = structlog.get_logger(__name__)
 
 
-def edit_title_prompt_view(meeting: Meetup, lang: str) -> MitupView:
+def edit_title_prompt_view(meeting: Meetup, lang: str, *, error: str | FormattedText | None = None) -> MitupView:
+    """Build the title entry view.
+
+    When ``error`` is given it is prepended as a leading paragraph, so a title that failed
+    validation can be answered by resending this prompt with the error on top rather than a bare,
+    button-less error.
+    """
+    description: str | FormattedText = MeetingEditContentMessages.TITLE_PROMPT.get(lang=lang, title=rich_title(meeting))
+    if error is not None:
+        description = prepend_error(description, error)
     return MitupView(
-        description=MeetingEditContentMessages.TITLE_PROMPT.get(title=rich_title(meeting)),
+        description=description,
         keyboard=[
             [
                 ButtonConfig(
@@ -38,6 +48,24 @@ def edit_title_prompt_view(meeting: Meetup, lang: str) -> MitupView:
             ]
         ],
     )
+
+
+async def reject_long_title(
+    session: AsyncSession, update: Update, context: TMitupContext, user: User, length: int
+) -> ConversationMeetingState:
+    """Answer an over-long title with the prompt again, keeping the user in the edit state.
+
+    The stored meeting id survives (``ensure_clean=False``) because the user is expected to resend a
+    shorter title into this same conversation.
+    """
+    with context.meeting_id(ContextId.EDIT_MEETING_TITLE, ensure_clean=False) as meeting_id:
+        meeting = await guards.meeting(session, user, meeting_id, "Edit title", context)
+
+    log_length_rejection(context, user, field="title", length=length, limit=limits.TITLE_MAX_CHARS)
+
+    error = MeetingEditContentMessages.TITLE_TOO_LONG.get(lang=user.lang, length=length, limit=limits.TITLE_MAX_CHARS)
+    await context.api.send_message(update=update, view=edit_title_prompt_view(meeting, user.lang, error=error))
+    return ConversationMeetingState.EDIT_TITLE
 
 
 @HandlersRegistry.register_callback_query(
@@ -77,6 +105,10 @@ async def edit_title_meeting_message_handler(session: AsyncSession, update: Upda
     assert message.text is not None, "the TEXT filter this handler is registered with guarantees the text"
 
     user = await guards.current_user(update, session)
+
+    length = len(message.text)
+    if length > limits.TITLE_MAX_CHARS:
+        return await reject_long_title(session, update, context, user, length)
 
     with context.meeting_id(ContextId.EDIT_MEETING_TITLE) as meeting_id:
         meeting = await guards.meeting(session, user, meeting_id, "Edit title", context)

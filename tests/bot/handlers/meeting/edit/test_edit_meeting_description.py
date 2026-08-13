@@ -1,3 +1,4 @@
+import logging
 import re
 from collections.abc import Callable
 from typing import cast
@@ -6,6 +7,7 @@ import pytest
 from telegram import CallbackQuery, MessageEntity, Update
 from telegram.ext import ConversationHandler
 
+from mitup_bot import limits
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData, MeetingGoneError
 from mitup_bot.handlers.meeting.edit.edit_meeting_description import (
@@ -19,6 +21,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils import CommonMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import MAX_MESSAGE_UTF16_LENGTH, utf16_len
 from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages, MeetingEditContentMessages
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.meeting_text import rich_description
@@ -30,6 +33,7 @@ from tests.helpers import (
     StubMitupContext,
     UpdateRequest,
     call_handler,
+    log_record,
 )
 from tests.helpers.stub_db import MockDbSession
 
@@ -182,3 +186,87 @@ async def test_edit_description_message_stores_tagged_description_and_renders_ri
     )
     context.api.assert_send_message_called(update, view)
     assert state == ConversationHandler.END
+
+
+# ---------------------------------------------------------------------------
+# DESCRIPTION_MESSAGE — the description character cap
+# ---------------------------------------------------------------------------
+
+
+OVER_CAP_DESCRIPTION = "d" * (limits.DESCRIPTION_MAX_CHARS + 1)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text=OVER_CAP_DESCRIPTION)], indirect=True)
+async def test_over_cap_description_leaves_the_meeting_untouched_and_reprompts(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    caplog: pytest.LogCaptureFixture,
+):
+    """A description past the cap never reaches the meeting, and the prompt comes back with the
+    error on top so the buttons stay reachable."""
+    caplog.set_level(logging.INFO)
+    meeting = user_with_settings.meetups[0]
+    stored_description = meeting.description
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.DESCRIPTION_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_DESCRIPTION: meeting.db_id},
+    )
+
+    assert meeting.description == stored_description
+    assert state == ConversationMeetingState.EDIT_DESCRIPTION
+    # The meeting id survives the refusal, so a shorter retry edits this same meeting.
+    assert context.has_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION)
+    context.api.assert_method_just_called("update_meeting_messages", times=0)
+
+    error = MeetingEditContentMessages.DESCRIPTION_TOO_LONG.get(
+        lang=user_with_settings.lang, length=len(OVER_CAP_DESCRIPTION), limit=limits.DESCRIPTION_MAX_CHARS
+    )
+    assert str(len(OVER_CAP_DESCRIPTION)) in error.text
+    assert str(limits.DESCRIPTION_MAX_CHARS) in error.text
+    assert "${" not in error.text
+    context.api.assert_send_message_called(
+        update, edit_description_prompt_view(meeting, user_with_settings.lang, error=error)
+    )
+
+    # The shared line is pinned in full by the title test; this only proves it names this field.
+    record = log_record(caplog, "Meeting edit input rejected")
+    assert record.__dict__["field"] == "description"
+    assert record.__dict__["reason"] == "too_long"
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="d" * limits.DESCRIPTION_MAX_CHARS)], indirect=True)
+async def test_description_at_the_cap_is_stored(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """The cap is inclusive: a description of exactly the maximum length is a normal edit.
+
+    The confirmation echoes the new description above a card that already contains it, so the
+    longest storable description is also the case where the two together must still fit one
+    Telegram message — otherwise the edit commits and the owner never sees it land.
+    """
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.DESCRIPTION_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_DESCRIPTION: meeting.db_id},
+    )
+
+    assert meeting.description == "d" * limits.DESCRIPTION_MAX_CHARS
+    assert state == ConversationHandler.END
+
+    confirmation = cast(MitupView, context.api.call_args("send_message").kwargs["view"])
+    assert utf16_len(confirmation.description.text) <= MAX_MESSAGE_UTF16_LENGTH
+    # The card is what the owner acts on, so the echo above it is the part that gave way.
+    assert confirmation.description.text.endswith(meeting_views.edit_view(meeting).description.text)

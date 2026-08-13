@@ -5,6 +5,7 @@ from structlog.testing import capture_logs
 from telegram import Location, Update
 from telegram.ext import ConversationHandler
 
+from mitup_bot import limits
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
@@ -30,6 +31,7 @@ from tests.helpers import (
     call_handler,
     create_meetup,
     create_member,
+    log_record,
     owner_with_meeting,
 )
 from tests.helpers.monitoring import MetricAssertions
@@ -756,3 +758,76 @@ async def test_edit_location_name_rich_message_reprompts_and_keeps_state(
     assert state == ConversationMeetingState.EDIT_LOCATION_NAME
     assert context.user_data.registry[ContextId.EDIT_MEETING_LOCATION_NAME].meeting_id == 1
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.RICH_MESSAGE)})
+
+
+# ---------------------------------------------------------------------------
+# LOCATION_NAME_MESSAGE — the place-name character cap
+# ---------------------------------------------------------------------------
+
+
+OVER_CAP_LOCATION_NAME = "l" * (limits.LOCATION_NAME_MAX_CHARS + 1)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text=OVER_CAP_LOCATION_NAME)], indirect=True)
+async def test_over_cap_location_name_leaves_the_venue_untouched_and_reprompts(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    caplog: pytest.LogCaptureFixture,
+):
+    """A place name past the cap never reaches the meeting, and the prompt comes back with the
+    error on top so the Cancel button stays reachable."""
+    caplog.set_level(logging.INFO)
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.LOCATION_NAME_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 1},
+    )
+
+    assert meeting.location.name is None
+    assert state == ConversationMeetingState.EDIT_LOCATION_NAME
+    # The meeting id survives the refusal, so a shorter retry edits this same meeting.
+    assert context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
+    context.api.assert_method_just_called("update_meeting_messages", times=0)
+
+    error = MeetingEditLocationMessages.LOCATION_NAME_TOO_LONG.get(
+        lang=user_with_settings.lang, length=len(OVER_CAP_LOCATION_NAME), limit=limits.LOCATION_NAME_MAX_CHARS
+    )
+    assert str(len(OVER_CAP_LOCATION_NAME)) in error.text
+    assert str(limits.LOCATION_NAME_MAX_CHARS) in error.text
+    assert "${" not in error.text
+    context.api.assert_send_message_called(
+        update, edit_location_name_prompt_view(1, user_with_settings.lang, error=error)
+    )
+
+    # The shared line is pinned in full by the title test; this only proves it names this field.
+    record = log_record(caplog, "Meeting edit input rejected")
+    assert record.__dict__["field"] == "location_name"
+    assert record.__dict__["reason"] == "too_long"
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="l" * limits.LOCATION_NAME_MAX_CHARS)], indirect=True)
+async def test_location_name_at_the_cap_is_stored(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """The cap is inclusive: a place name of exactly the maximum length is a normal edit."""
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(meeting)
+
+    _, state = await call_handler(
+        EditMeetingHandlerId.LOCATION_NAME_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 1},
+    )
+
+    assert meeting.location.name == "l" * limits.LOCATION_NAME_MAX_CHARS
+    assert state == ConversationHandler.END

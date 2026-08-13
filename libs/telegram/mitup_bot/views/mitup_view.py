@@ -10,7 +10,10 @@ from mitup_bot.callback_data import CallbackData
 from mitup_bot.keyboards import ButtonConfig, ButtonRow, Keyboard
 from mitup_bot.utils import ButtonMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import FormattedText
+from mitup_bot.utils.entities import MAX_MESSAGE_UTF16_LENGTH, FormattedText, ellipsize, utf16_len
+
+# What `with_context` puts between the context and the description it comments on.
+CONTEXT_SEPARATOR = "\n\n"
 
 
 def to_inline_keyboard_button(config: ButtonConfig) -> InlineKeyboardButton:
@@ -46,9 +49,23 @@ class MitupView:
         return self.keyboard_to_markup(self.keyboard) if self.keyboard else None
 
     def with_context(self, message: str | FormattedText) -> Self:
-        """Prepend *message* to the description, adjusting entity offsets when needed."""
+        """Prepend *message* to the description, adjusting entity offsets when needed.
+
+        The context is transient status about the description below it, and several callers echo
+        back free text the user just typed, so the two together can exceed what Telegram accepts in
+        one message. The context is the part that gives way: it is ellipsized to the room the
+        description leaves, and dropped entirely when the description leaves none.
+        """
         ftext = message if isinstance(message, FormattedText) else FormattedText(message)
-        self.description = self.description.prepend(ftext.append("\n\n"))
+        room = MAX_MESSAGE_UTF16_LENGTH - utf16_len(self.description.text) - utf16_len(CONTEXT_SEPARATOR)
+        if room <= 0:
+            return self
+        fitted = ellipsize(ftext, room)
+        # A room narrower than the ellipsis fits no context at all; prepending would leave a bare
+        # separator floating above the description.
+        if not fitted.text:
+            return self
+        self.description = self.description.prepend(fitted.append(CONTEXT_SEPARATOR))
         return self
 
     def with_footnote(self, text: str | FormattedText) -> Self:

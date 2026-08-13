@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-08-10 23:31\n"
+"PO-Revision-Date: 2026-08-13 07:03\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -464,6 +464,9 @@ msgstr "Participants"
 msgid "MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL"
 msgstr "(Max: ${max_participants})"
 
+msgid "MeetingDisplayMessages.PARTICIPANTS_TRUNCATED"
+msgstr "${count} names not shown"
+
 msgid "MeetingDisplayMessages.INVITED_BY"
 msgstr "<i>invited by ${user}</i>"
 
@@ -584,6 +587,9 @@ msgstr "Title updated to: <b>${title}</b>"
 msgid "MeetingEditContentMessages.TITLE_ON_EXIT"
 msgstr "Sorry, I was expecting the title of your meeting. Would you like to send it? If not, tap Cancel to exit."
 
+msgid "MeetingEditContentMessages.TITLE_TOO_LONG"
+msgstr "That title is ${length} characters, over the limit of ${limit}. Send me a shorter one."
+
 msgid "MeetingEditContentMessages.DESCRIPTION_PROMPT"
 msgstr "This is the current description of your meeting:\n${description}\n\nSend me the new one"
 
@@ -592,6 +598,9 @@ msgstr "Description updated to: <b>${description}</b>"
 
 msgid "MeetingEditContentMessages.DESCRIPTION_ON_EXIT"
 msgstr "Sorry, I was expecting the description of your meeting. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingEditContentMessages.DESCRIPTION_TOO_LONG"
+msgstr "That description is ${length} characters, over the limit of ${limit}. Send me a shorter one."
 
 msgid "MeetingEditLocationMessages.DESCRIPTION"
 msgstr "A meeting can have a location associated. You can just set the name of the place or you can also attach the location. Choose any of the two options."
@@ -613,6 +622,9 @@ msgstr "Send me the location again. Remember to touch on the clip icon and choos
 
 msgid "MeetingEditLocationMessages.NAME_ON_EXIT"
 msgstr "Sorry, I was expecting the name of the location. Would you like to send it? If not, tap Cancel to exit."
+
+msgid "MeetingEditLocationMessages.LOCATION_NAME_TOO_LONG"
+msgstr "That place name is ${length} characters, over the limit of ${limit}. Send me a shorter one."
 
 msgid "MeetingEditLocationMessages.COORDINATES_ON_EXIT"
 msgstr "Sorry, I was expecting the location of your meeting. Would you like to send it? If not, tap Cancel to exit."

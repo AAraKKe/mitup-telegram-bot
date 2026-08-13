@@ -499,6 +499,11 @@ class MeetingDisplayMessages(MessageBase):
     PARTICIPANT_LABEL = "Participant"
     PARTICIPANTS_LABEL = "Participants"
     MAX_PARTICIPANTS_LABEL = "(Max: ${max_participants})"
+    # Closes a participants list the card had to cut short. The list can collapse with no name left
+    # above it, so this line reads on its own rather than referring back to the names above, and its
+    # count covers hidden waiting-list entries as well as confirmed participants, which is why it
+    # says names: calling them participants would overstate what the number represents.
+    PARTICIPANTS_TRUNCATED = "${count} names not shown"
     INVITED_BY = "<i>invited by ${user}</i>"
     # Shared-view empty-state sentences
     DESCRIPTION_EMPTY = "<i>This meeting has no description yet</i>"
@@ -611,12 +616,16 @@ class MeetingEditContentMessages(MessageBase):
     TITLE_ON_EXIT = (
         "Sorry, I was expecting the title of your meeting. Would you like to send it? If not, tap Cancel to exit."
     )
+    TITLE_TOO_LONG = "That title is ${length} characters, over the limit of ${limit}. Send me a shorter one."
     DESCRIPTION_PROMPT = "This is the current description of your meeting:\n${description}\n\nSend me the new one"
     # The user-supplied description is intentionally wrapped in bold so the newly set value
     # is visually highlighted in the confirmation message.
     DESCRIPTION_SUCCESS = "Description updated to: <b>${description}</b>"
     DESCRIPTION_ON_EXIT = (
         "Sorry, I was expecting the description of your meeting. Would you like to send it? If not, tap Cancel to exit."
+    )
+    DESCRIPTION_TOO_LONG = (
+        "That description is ${length} characters, over the limit of ${limit}. Send me a shorter one."
     )
 
 
@@ -640,6 +649,9 @@ class MeetingEditLocationMessages(MessageBase):
     COORDINATES_INVALID = "Send me the location again. Remember to touch on the clip icon and choose location."
     NAME_ON_EXIT = (
         "Sorry, I was expecting the name of the location. Would you like to send it? If not, tap Cancel to exit."
+    )
+    LOCATION_NAME_TOO_LONG = (
+        "That place name is ${length} characters, over the limit of ${limit}. Send me a shorter one."
     )
     COORDINATES_ON_EXIT = (
         "Sorry, I was expecting the location of your meeting. Would you like to send it? If not, tap Cancel to exit."

@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Message, MessageEntity, Update
 from telegram.ext import ConversationHandler, filters
 
-from mitup_bot import guards, views
+from mitup_bot import guards, limits, views
 from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_session
 from mitup_bot.handlers import HandlersRegistry
@@ -13,9 +13,9 @@ from mitup_bot.handlers.messages import MessagesId
 from mitup_bot.handlers.personal_filters import RichMessageFilter
 from mitup_bot.handlers.utils import reply_rich_message_not_supported
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import Meetup
+from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring.metric_keys import Feature, MetricKey
-from mitup_bot.utils import MeetingCreationMessages
+from mitup_bot.utils import MeetingCreationMessages, MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.entities import build_datetime_link, capture_tagged_text
 from mitup_bot.views import meeting as meeting_views
@@ -43,6 +43,26 @@ class ValidTitleFilter(filters.MessageFilter):
         if not entities:
             return True
         return sum(e.type == MessageEntity.DATE_TIME for e in entities) <= 1
+
+
+async def reject_long_title(
+    update: Update, context: TMitupContext, user: User, length: int
+) -> ConversationMeetingState:
+    """Answer an over-long title with the creation prompt again, keeping the user in the title step."""
+    log.info(
+        "Meeting creation step rejected",
+        user_id=user.db_id,
+        step="title",
+        reason="too_long",
+        input_length=length,
+        limit=limits.TITLE_MAX_CHARS,
+    )
+    error_msg = MeetingEditContentMessages.TITLE_TOO_LONG.get(
+        lang=user.lang, length=length, limit=limits.TITLE_MAX_CHARS
+    )
+    view = views.factory.create_meeting_view(guards.render_context(user, update, context), message=error_msg)
+    await context.api.send_message(update=update, view=view)
+    return ConversationMeetingState.TITLE
 
 
 @HandlersRegistry.register_callback_query(
@@ -94,6 +114,9 @@ async def create_meeting_message_handler(
     message = guards.message(update)
     title = message.text
     assert title is not None, "TEXT filter ensures this is set"
+
+    if len(title) > limits.TITLE_MAX_CHARS:
+        return await reject_long_title(update, context, user, len(title))
 
     meeting_datetime: dt.datetime | None = None
 

@@ -43,7 +43,7 @@ from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils import MeetingDisplayMessages, MeetingJoinMessages
-from mitup_bot.utils.entities import FormattedText
+from mitup_bot.utils.entities import MAX_MESSAGE_UTF16_LENGTH, FormattedText, ellipsize, utf16_len
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.meeting_text import rich_title
@@ -322,12 +322,32 @@ def meeting_edit_log_payload(edit: MeetingMessageEdit) -> dict[str, Any]:
     }
 
 
-def resolve_view(view: MitupView | FormattedText | str) -> MitupView:
-    if isinstance(view, MitupView):
-        return view
-    if isinstance(view, FormattedText):
-        return MitupView(view, keyboard=[])
-    return MitupView(view, keyboard=[])
+def cap_outbound_text(text: FormattedText, api_method: str) -> FormattedText:
+    """Return *text* within Telegram's message-text cap, saying so when it had to be cut.
+
+    Every surface that renders a message is expected to arrive here already fitted — a meeting card
+    to its budget, a context line to the room its description leaves. A cut here therefore means one
+    of them let an unbounded value through, and Telegram would have rejected the whole call: the
+    warning is the only signal that a surface escaped its own budget. The text itself never reaches
+    the log line.
+    """
+    overflow = utf16_len(text.text) - MAX_MESSAGE_UTF16_LENGTH
+    if overflow <= 0:
+        return text
+    log.warning("Message text over the Telegram cap, ellipsized", api_method=api_method, overflow=overflow)
+    return ellipsize(text, MAX_MESSAGE_UTF16_LENGTH)
+
+
+def resolve_view(view: MitupView | FormattedText | str, api_method: str) -> MitupView:
+    """Normalize a send/edit argument into a view whose text Telegram will accept.
+
+    Every method taking a `MitupView | FormattedText | str` passes through here, which makes it the
+    one place the outbound cap is enforced for them. An over-long view is capped in place, so the
+    failure logs and the persisted buttons describe what actually went out.
+    """
+    resolved = view if isinstance(view, MitupView) else MitupView(view, keyboard=[])
+    resolved.description = cap_outbound_text(resolved.description, api_method)
+    return resolved
 
 
 def chat_member_is_present(member: ChatMember) -> bool:
@@ -638,7 +658,7 @@ class TelegramApi:
 
     async def send_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | None:
         chat_id = get_update_guards().chat(update).id
-        resolved = resolve_view(view)
+        resolved = resolve_view(view, "send_message")
         return await self._call_or_enqueue(
             "send_message",
             partial(self._send_chat_message_now, chat_id, resolved),
@@ -699,7 +719,7 @@ class TelegramApi:
         )
 
     async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None:
-        resolved = resolve_view(view)
+        resolved = resolve_view(view, "send_message_to_user")
         return await self._call_or_enqueue(
             "send_message_to_user",
             partial(self._send_user_message_now, user.tg_user_id, resolved),
@@ -781,7 +801,7 @@ class TelegramApi:
             # be silently lost. Callers that need them must opt into pre-commit execution.
             raise ValueError("Result callbacks cannot run after commit; use context.api.immediate instead")
         for user, view in zip(users, views, strict=True):
-            resolved = resolve_view(view)
+            resolved = resolve_view(view, "send_messages_to_users")
             self._enqueue(
                 "send_messages_to_users",
                 partial(self._send_user_message_now, user.tg_user_id, resolved),
@@ -807,7 +827,7 @@ class TelegramApi:
         )
 
     async def edit_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | bool:
-        resolved = resolve_view(view)
+        resolved = resolve_view(view, "edit_message")
         target = edit_target(update)
         return await self._call_or_enqueue(
             "edit_message",
@@ -846,7 +866,7 @@ class TelegramApi:
         for out-of-band callers (e.g. the Patreon OAuth web callback refreshing the tapped Collaborate
         message). Routes through the same ``_edit_message_now`` suppression as update-based edits.
         """
-        resolved = resolve_view(view)
+        resolved = resolve_view(view, "edit_message_for_user")
         target: tuple[int | None, int | None, str | None] = (user.tg_user_id, message_id, None)
         return await self._call_or_enqueue(
             "edit_message_for_user",
@@ -970,9 +990,7 @@ class TelegramApi:
 
         # Determine the text, entities and markup based on meeting state
         if was_deleted:
-            ftext = MeetingDisplayMessages.DELETED_BANNER.get(lang=meeting.lang)
-            text = ftext.text
-            entities = ftext.entities or None
+            body = MeetingDisplayMessages.DELETED_BANNER.get(lang=meeting.lang)
             reply_markup = None
         elif has_finished:
             finished_message = (
@@ -985,22 +1003,22 @@ class TelegramApi:
                 if meeting.end_datetime is not None
                 else MeetingDisplayMessages.FINISHED_BANNER.get(lang=meeting.lang)
             )
-            finished_view = view.with_context(finished_message)
-            text = finished_view.description.text
-            entities = finished_view.description.entities or None
+            body = view.with_context(finished_message).description
             reply_markup = None
         else:
-            text = view.description.text
-            entities = view.description.entities or None
+            body = view.description
             reply_markup = view.markup
 
+        # This path renders its own text instead of taking a view argument, so it is outside
+        # `resolve_view` and carries the outbound cap itself.
+        body = cap_outbound_text(body, "update_meeting_message")
         return MeetingMessageEdit(
             message_db_id=message.id,
             chat_id=message.chat_id,
             message_id=message.message_id,
             inline_message_id=message.inline_message_id,
-            text=text,
-            entities=entities,
+            text=body.text,
+            entities=body.entities or None,
             reply_markup=reply_markup,
         )
 

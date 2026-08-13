@@ -5,6 +5,11 @@ These helpers bridge a user/meeting to the `mitup_bot.supporter` policy: they re
 meetings, the picked date, the requested capacity). The level -> cap mapping and the tier ordering
 live in `supporter`; nothing here compares levels itself. A `None` cap from the policy means the tier
 is uncapped for that dimension (Organizer everywhere, Patron for participant capacity).
+
+The character caps on a meeting's free-text fields also live here, each paired with the length the
+meeting card guarantees that field on screen: between the two a field is wrappable, and the card
+ellipsizes it rather than giving up a field with no room left to trade. No tier lifts either number,
+so they are plain constants rather than policy lookups.
 """
 
 import datetime as dt
@@ -15,6 +20,47 @@ from mitup_bot.lifecycle import LifecyclePolicy
 
 if TYPE_CHECKING:
     from mitup_bot.models import User
+
+
+TITLE_MAX_CHARS = 200
+"""Longest meeting title accepted from its owner.
+
+A meeting card renders every field into a single Telegram message, which the Bot API caps at 4096
+characters. The title also heads every list row, notification and inline result, so it is held far
+tighter than the card budget alone would require.
+"""
+
+DESCRIPTION_MAX_CHARS = 3500
+"""Longest meeting description accepted from its owner.
+
+Deliberately generous: a description may legitimately take up most of the card, which renders into a
+single Telegram message capped at 4096 characters. A description this long combined with the other
+fields is left to the card's own render budget rather than refused here.
+"""
+
+DESCRIPTION_GUARANTEED_CHARS = 500
+"""Description length a meeting card never renders below.
+
+The description is the first thing an over-budget card gives up, because it is the only field long
+enough to pay for the overrun on its own. This floor is what stops that from emptying it: enough
+prose to still say what the meeting is. Measured in UTF-16 code units, as the card measures
+everything.
+"""
+
+LOCATION_NAME_MAX_CHARS = 256
+"""Longest place name accepted for a meeting's location.
+
+The venue is one line of the card, and the card renders into a single Telegram message capped at
+4096 characters.
+"""
+
+LOCATION_NAME_GUARANTEED_CHARS = 128
+"""Place-name length a meeting card never renders below.
+
+A card that is still over budget with its description at the floor above ellipsizes the place name
+next, down to this: enough to leave the venue recognizable to someone who has to find it. Measured
+in UTF-16 code units, as the card measures everything.
+"""
 
 
 def active_meetings_cap(user: User) -> int | None:

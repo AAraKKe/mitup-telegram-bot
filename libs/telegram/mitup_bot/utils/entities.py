@@ -13,6 +13,7 @@ from string.templatelib import Interpolation, Template
 
 import structlog
 from telegram import MessageEntity
+from telegram.constants import MessageLimit
 
 from mitup_bot.format_tags import TOKEN_RE
 
@@ -161,6 +162,80 @@ def utf16_len(s: str) -> int:
     code points. Characters outside the BMP (e.g. emoji) occupy two units.
     """
     return len(s.encode("utf-16-le")) // 2
+
+
+# --- Truncation ---
+
+# Telegram rejects a sendMessage/editMessageText body longer than this, measured in UTF-16 code
+# units on the rendered text.
+# Telegram's message-text cap, in the same UTF-16 units entity offsets use. Aliased from PTB so
+# the number tracks the Bot API rather than being asserted here.
+MAX_MESSAGE_UTF16_LENGTH = int(MessageLimit.MAX_TEXT_LENGTH)
+
+ELLIPSIS = "…"
+
+
+def is_high_surrogate(unit: bytes) -> bool:
+    """Whether *unit*, one little-endian UTF-16 code unit, is the leading half of a surrogate pair."""
+    return len(unit) == 2 and 0xD800 <= int.from_bytes(unit, "little") <= 0xDBFF
+
+
+def utf16_cut(text: str, limit: int) -> str:
+    """Return the longest prefix of *text* that fits in *limit* UTF-16 code units.
+
+    A character outside the BMP (an emoji, say) occupies two units, so a cut at an arbitrary unit
+    can land between the halves of one character and leave a lone surrogate, which is not
+    decodable text. Such a cut moves back one unit and drops that character whole.
+    """
+    if limit <= 0:
+        return ""
+    encoded = text.encode("utf-16-le")[: limit * 2]
+    if is_high_surrogate(encoded[-2:]):
+        encoded = encoded[:-2]
+    return encoded.decode("utf-16-le")
+
+
+def resize_entity(entity: MessageEntity, length: int) -> MessageEntity:
+    """Return a copy of *entity* covering *length* UTF-16 code units instead of its own.
+
+    The copy round-trips through the wire representation so every field the entity carries
+    survives — `user` on a text_mention and `language` on a pre block included. A field-by-field
+    constructor call silently drops any field it does not name.
+    """
+    return MessageEntity.de_json({**entity.to_dict(), "length": length})
+
+
+def clamp_entity(entity: MessageEntity, limit: int) -> MessageEntity | None:
+    """Return *entity* confined to the first *limit* UTF-16 code units, or None when it starts past them."""
+    if entity.offset >= limit:
+        return None
+    if entity.offset + entity.length <= limit:
+        return entity
+    return resize_entity(entity, limit - entity.offset)
+
+
+def truncate(text: FormattedText, limit: int) -> FormattedText:
+    """Return *text* cut to at most *limit* UTF-16 code units, keeping its entities valid.
+
+    Telegram expresses entity offsets in UTF-16 code units and rejects the whole message when any
+    entity reaches past the end of the text, so cutting the text alone is not enough: an entity
+    starting past the cut is dropped and one spanning the cut is clamped to it.
+    """
+    if utf16_len(text.text) <= limit:
+        return text
+    cut = utf16_cut(text.text, limit)
+    kept = utf16_len(cut)
+    clamped = (clamp_entity(entity, kept) for entity in text.entities)
+    return FormattedText(cut, [entity for entity in clamped if entity is not None])
+
+
+def ellipsize(text: FormattedText, limit: int) -> FormattedText:
+    """Return *text* cut to at most *limit* UTF-16 code units, marking a cut with an ellipsis."""
+    if utf16_len(text.text) <= limit:
+        return text
+    if limit < utf16_len(ELLIPSIS):
+        return FormattedText("")
+    return truncate(text, limit - utf16_len(ELLIPSIS)).append(ELLIPSIS)
 
 
 # --- render() ---

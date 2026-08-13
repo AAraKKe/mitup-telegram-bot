@@ -1,9 +1,16 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+import pytest
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, MessageEntity
 
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.keyboards import ButtonConfig
+from mitup_bot.utils.entities import MAX_MESSAGE_UTF16_LENGTH, FormattedText, utf16_len
 from mitup_bot.views import MitupView, ViewDocument
-from mitup_bot.views.mitup_view import MitupInlineView, PaginatedMitupView, PaginatedViewPosition
+from mitup_bot.views.mitup_view import (
+    CONTEXT_SEPARATOR,
+    MitupInlineView,
+    PaginatedMitupView,
+    PaginatedViewPosition,
+)
 
 
 def test_mitup_view_markup():
@@ -80,6 +87,63 @@ def test_mitup_inline_view_eq_returns_not_implemented_for_non_inline_view():
     result = inline_view.__eq__(plain_view)
     # Comparing MitupInlineView to a plain MitupView must return NotImplemented
     assert result is NotImplemented
+
+
+# ---------------------------------------------------------------------------
+# with_context — budgeting the context against the message cap
+# ---------------------------------------------------------------------------
+
+
+def test_with_context_under_the_cap_prepends_the_context_unchanged():
+    """Regression pin: a context that fits is prepended exactly as before, entities and all."""
+    description = FormattedText("Meeting card", [MessageEntity(type=MessageEntity.BOLD, offset=0, length=7)])
+    context = FormattedText("Description updated", [MessageEntity(type=MessageEntity.ITALIC, offset=0, length=11)])
+
+    view = MitupView(description, keyboard=[]).with_context(context)
+
+    assert view.description == FormattedText(
+        "Description updated\n\nMeeting card",
+        [
+            MessageEntity(type=MessageEntity.ITALIC, offset=0, length=11),
+            MessageEntity(type=MessageEntity.BOLD, offset=21, length=7),
+        ],
+    )
+
+
+def test_with_context_ellipsizes_the_context_to_the_room_the_description_leaves():
+    """The card is the content and the context is a transient echo of it, so the echo is what is
+    cut — and the entities on both sides stay inside the text Telegram is handed."""
+    card = FormattedText(
+        "D" * (MAX_MESSAGE_UTF16_LENGTH - 104) + "TAIL",
+        [MessageEntity(type=MessageEntity.BOLD, offset=0, length=4)],
+    )
+    echo = FormattedText("C" * 500, [MessageEntity(type=MessageEntity.ITALIC, offset=0, length=500)])
+
+    view = MitupView(card, keyboard=[]).with_context(echo)
+
+    room = 98  # the cap, less the card, less the two-newline separator
+    assert utf16_len(view.description.text) == MAX_MESSAGE_UTF16_LENGTH
+    assert view.description.text.startswith("C" * (room - 1) + "…" + CONTEXT_SEPARATOR)
+    # The card survives whole: its tail is the part a cut in the wrong direction would eat.
+    assert view.description.text.endswith("TAIL")
+    assert view.description.entities == [
+        MessageEntity(type=MessageEntity.ITALIC, offset=0, length=room - 1),
+        MessageEntity(type=MessageEntity.BOLD, offset=room + utf16_len(CONTEXT_SEPARATOR), length=4),
+    ]
+
+
+@pytest.mark.parametrize(
+    "card_length",
+    [MAX_MESSAGE_UTF16_LENGTH, MAX_MESSAGE_UTF16_LENGTH - utf16_len(CONTEXT_SEPARATOR)],
+    ids=["description_at_the_cap", "description_leaving_only_the_separator"],
+)
+def test_with_context_drops_the_context_when_the_description_leaves_no_room(card_length: int):
+    """With no room the context collapses to nothing — the separator alone would still overflow."""
+    card = FormattedText("D" * card_length)
+
+    view = MitupView(card, keyboard=[]).with_context("Description updated")
+
+    assert view.description == card
 
 
 def test_paginated_view_unique_position_navigation_row_is_empty():

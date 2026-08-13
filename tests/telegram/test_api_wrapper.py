@@ -38,7 +38,7 @@ from mitup_bot.models import Message as MessageModel
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.protocols import ContextOrBotAdapter
-from mitup_bot.utils.entities import FormattedText
+from mitup_bot.utils.entities import MAX_MESSAGE_UTF16_LENGTH, FormattedText, utf16_len
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView, ViewDocument
 from tests.helpers import log_record, make_test_metrics_client
 from tests.helpers.fixtures import create_joined_link, create_meetup, create_message, create_user
@@ -148,6 +148,93 @@ async def test_send_message_with_mitup_view(telegram_api: TelegramApi, bot: Asyn
         chat_id=99, text="view text", entities=None, reply_markup=view.markup, disable_web_page_preview=True
     )
     assert result is sentinel
+
+
+# ---------------------------------------------------------------------------
+# The outbound message cap
+# ---------------------------------------------------------------------------
+
+OVER_CAP_CHARS = 250
+OVER_CAP_TEXT = "x" * (MAX_MESSAGE_UTF16_LENGTH + OVER_CAP_CHARS)
+OVER_CAP_EVENT = "Message text over the Telegram cap, ellipsized"
+
+
+def assert_over_cap_warning(caplog: pytest.LogCaptureFixture, api_method: str):
+    record = log_record(caplog, OVER_CAP_EVENT)
+    assert record.levelname == "WARNING"
+    assert record.__dict__["api_method"] == api_method
+    assert record.__dict__["overflow"] == OVER_CAP_CHARS
+    # The message text is the user's; only its overflow is reportable.
+    assert "xxxxxxxxxx" not in caplog.text
+
+
+async def test_send_message_ellipsizes_a_view_over_the_telegram_cap(
+    telegram_api: TelegramApi,
+    bot: AsyncMock,
+    caplog: pytest.LogCaptureFixture,
+):
+    """The last-resort guard: a surface that escaped its own budget still sends, cut to the cap,
+    and says so once."""
+    caplog.set_level(logging.WARNING)
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = 42
+
+    await telegram_api.send_message(update, MitupView(OVER_CAP_TEXT, keyboard=[]))
+
+    sent_text = bot.send_message.await_args.kwargs["text"]
+    assert utf16_len(sent_text) == MAX_MESSAGE_UTF16_LENGTH
+    assert sent_text.endswith("…")
+    assert_over_cap_warning(caplog, "send_message")
+
+
+async def test_edit_message_ellipsizes_a_view_over_the_telegram_cap(
+    telegram_api: TelegramApi,
+    bot: AsyncMock,
+    caplog: pytest.LogCaptureFixture,
+):
+    caplog.set_level(logging.WARNING)
+    update = MagicMock(spec=Update)
+    update.effective_message.chat.id = 123
+    update.effective_message.id = 456
+
+    await telegram_api.edit_message(update, MitupView(OVER_CAP_TEXT, keyboard=[]))
+
+    assert utf16_len(bot.edit_message_text.await_args.kwargs["text"]) == MAX_MESSAGE_UTF16_LENGTH
+    assert_over_cap_warning(caplog, "edit_message")
+
+
+async def test_over_cap_ellipsis_keeps_the_entities_inside_the_text(
+    telegram_api: TelegramApi,
+    bot: AsyncMock,
+    caplog: pytest.LogCaptureFixture,
+):
+    """Telegram rejects the whole call when an entity reaches past the end of the text, so the cut
+    has to take the entities with it."""
+    caplog.set_level(logging.WARNING)
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = 42
+    spanning = MessageEntity(type=MessageEntity.BOLD, offset=0, length=utf16_len(OVER_CAP_TEXT))
+
+    await telegram_api.send_message(update, MitupView(FormattedText(OVER_CAP_TEXT, [spanning]), keyboard=[]))
+
+    sent_entities = bot.send_message.await_args.kwargs["entities"]
+    assert sent_entities == [MessageEntity(type=MessageEntity.BOLD, offset=0, length=MAX_MESSAGE_UTF16_LENGTH - 1)]
+
+
+async def test_a_view_within_the_cap_sends_unchanged_and_logs_nothing(
+    telegram_api: TelegramApi,
+    bot: AsyncMock,
+    caplog: pytest.LogCaptureFixture,
+):
+    caplog.set_level(logging.WARNING)
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = 42
+    at_the_cap = "x" * MAX_MESSAGE_UTF16_LENGTH
+
+    await telegram_api.send_message(update, MitupView(at_the_cap, keyboard=[]))
+
+    assert bot.send_message.await_args.kwargs["text"] == at_the_cap
+    assert OVER_CAP_EVENT not in caplog.text
 
 
 # ---------------------------------------------------------------------------
