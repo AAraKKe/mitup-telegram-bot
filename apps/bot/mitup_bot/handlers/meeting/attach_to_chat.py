@@ -80,9 +80,9 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
         else:
             outcome = "message_linked"
 
-    # Not defensive: the broadcast payload snapshots message.id at enqueue time, and a
-    # freshly appended Message only gets one from this flush (needed for the dead-message
-    # reconcile if Telegram reports the message gone during the fan-out).
+    # Not defensive: the queued edit snapshots message.id at enqueue time, and a freshly
+    # appended Message only gets one from this flush (needed for the dead-message reconcile
+    # if Telegram reports the card gone).
     await session.flush()
 
     # What the tap decided is whether the meeting is findable in this chat, and only the stored
@@ -103,5 +103,8 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
         show_alert=True,
     )
 
-    await context.api.update_meeting_messages(meeting=meeting, current_message=current_message)
+    # Only the tapped card changes: a card's searchable footnote and keyboard are rendered from
+    # its own chat_instance, so every other card of the meeting would edit to identical content.
+    # Cards whose chat has since died are cleaned up by the next fan-out over a real content change.
+    await context.api.update_single_meeting_message(current_message, meeting)
     context.put_feature_metric(Feature.ATTACH_TO_CHAT)

@@ -66,6 +66,21 @@ class MockApi(TelegramApi):
     def edit_message_for_user(self, user: User, message_id: int, view: MitupView | FormattedText | str):
         return self.call_mock("edit_message_for_user", user=user, message_id=message_id, view=view)
 
+    def update_single_meeting_message(
+        self,
+        message: Message,
+        meeting: Meetup,
+        was_deleted: bool = DEFAULT_FALSE,  # type: ignore
+        has_finished: bool = DEFAULT_FALSE,  # type: ignore
+    ):
+        return self.call_mock(
+            "update_single_meeting_message",
+            message=message,
+            meeting=meeting,
+            was_deleted=was_deleted,
+            has_finished=has_finished,
+        )
+
     def update_meeting_messages(
         self,
         *,
@@ -221,6 +236,31 @@ class MockApi(TelegramApi):
             assert_awaited_once_with_diff(self.mock_method("answer_inline_query"), **kwargs)
         else:
             assert_awaited_with_diff(self.mock_method("answer_inline_query"), times, **kwargs)
+
+    def assert_update_single_meeting_message_called(
+        self,
+        message: Message,
+        meeting: Meetup,
+        was_deleted: bool | None = None,
+        has_finished: bool | None = None,
+        times: int = 1,
+    ):
+        arguments: dict[str, Any] = {
+            "message": message,
+            "meeting": meeting,
+        }
+        if was_deleted is not None:
+            arguments["was_deleted"] = was_deleted
+        if has_finished is not None:
+            arguments["has_finished"] = has_finished
+
+        if times == 1:
+            assert_awaited_once_with_diff(self.mock_method("update_single_meeting_message"), **arguments)
+        else:
+            assert_awaited_with_diff(self.mock_method("update_single_meeting_message"), times, **arguments)
+
+    def assert_update_single_meeting_message_not_called(self):
+        self.assert_method_just_called("update_single_meeting_message", times=0)
 
     def assert_update_meeting_messages_called(
         self,

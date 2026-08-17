@@ -62,11 +62,8 @@ async def test_attach_to_chat_new_message(
     # Feature metric emitted
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
 
-    # All messages have been updated
-    context.api.assert_update_meeting_messages_called(
-        meeting=meeting,
-        current_message=meeting.messages[0],
-    )
+    # The card that was tapped is re-rendered so its searchable footnote and keyboard match
+    context.api.assert_update_single_meeting_message_called(message=meeting.messages[0], meeting=meeting)
 
 
 @pytest.mark.parametrize(
@@ -100,6 +97,9 @@ async def test_attach_to_chat_existing_message_without_chat_instance(
         text=MeetingAttachMessages.ENABLED_ALERT.get_text(),
         show_alert=True,
     )
+
+    # The backfilled card is re-rendered so it shows the searchable footnote
+    context.api.assert_update_single_meeting_message_called(message=existing_message, meeting=meeting)
 
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
 
@@ -182,6 +182,10 @@ async def test_attach_to_chat_already_attached_in_same_chat(
         show_alert=True,
     )
 
+    # The tap still linked a second card in that chat, and only that card is rendered
+    context.api.assert_update_single_meeting_message_called(message=meeting.messages[-1], meeting=meeting)
+    assert meeting.messages[-1] is not existing_message
+
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
 
 
@@ -247,6 +251,44 @@ async def test_attach_to_chat_existing_message_with_chat_instance_unchanged(
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
 
 
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.ATTACH_TO_CHAT.with_id(1), from_bot_chat=False)],
+    indirect=True,
+)
+async def test_attach_to_chat_edits_only_the_tapped_card(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    """Attaching re-renders the tapped card alone — the meeting's cards in other chats are untouched.
+
+    Whether a card advertises itself as searchable is decided by its own chat_instance, so the other
+    cards would be edited to the content they already show.
+    """
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+    meeting = user_with_settings.meetups[0]
+
+    card_in_another_chat = create_message(
+        id=2,
+        inline_message_id="card_in_another_chat",
+        chat_instance="another_chat",
+        meetup_id=meeting.db_id,
+    )
+    bot_chat_card = create_message(id=3, inline_message_id=None, message_id=77, chat_id=555, meetup_id=meeting.db_id)
+    # The tapped card carries the update's default inline_message_id, which is how the handler finds it.
+    tapped_card = create_message(meetup_id=meeting.db_id)
+    meeting.messages.extend((card_in_another_chat, bot_chat_card, tapped_card))
+
+    context, _ = await call_handler(MeetingHandlerId.ATTACH_TO_CHAT, handler_context=handler_context)
+
+    assert tapped_card.chat_instance == "someinstance"
+    # A single edit, carrying the tapped card: the other two stored cards were never rendered.
+    context.api.assert_update_single_meeting_message_called(message=tapped_card, meeting=meeting)
+    context.api.assert_update_meeting_messages_not_called()
+
+
 # --- Callers without an account ------------------------------------------------------------------
 
 
@@ -291,7 +333,7 @@ async def test_attach_to_chat_by_unregistered_user(
         text=MeetingAttachMessages.ENABLED_ALERT.get_text(),
         show_alert=True,
     )
-    context.api.assert_update_meeting_messages_called(meeting=meeting, current_message=shared_card)
+    context.api.assert_update_single_meeting_message_called(message=shared_card, meeting=meeting)
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
     # Attaching without an account is a normal interaction: nothing faults, and a discovery tap is
     # too low an intent to create a profile from.
@@ -319,6 +361,7 @@ async def test_attach_to_chat_by_unregistered_user_on_unclaimed_card_is_rejected
     context, _ = await call_handler(MeetingHandlerId.ATTACH_TO_CHAT, handler_context=handler_context)
 
     assert meeting.messages == []
+    context.api.assert_update_single_meeting_message_not_called()
     context.api.assert_update_meeting_messages_not_called()
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
@@ -378,6 +421,7 @@ async def test_attach_to_chat_by_pending_deletion_owner_is_rejected(
     context, _ = await call_handler(MeetingHandlerId.ATTACH_TO_CHAT, handler_context=handler_context)
 
     assert meeting.messages == []
+    context.api.assert_update_single_meeting_message_not_called()
     context.api.assert_update_meeting_messages_not_called()
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
