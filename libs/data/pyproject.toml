@@ -7,7 +7,7 @@ dependencies = [
     "sqlmodel==0.0.39",
     "sqlalchemy[asyncio]==2.0.51",
     "psycopg[binary]==3.3.4",
-    "alembic==1.19.0",
+    "alembic==1.19.1",
     "pydantic==2.13.4",
     "structlog==26.1.0",
     "cryptography==50.0.0",
