@@ -14,7 +14,7 @@
 > Please open issues and merge requests on GitLab — issues and pull requests on the mirror
 > are not watched.
 
-A Telegram bot that brings people together. Mitup lives in a private DM with you, never in your group chat. Create a meeting, share one message, and let Mitup handle RSVPs, reminders, and timezones for you.
+A Telegram bot that brings people together. Mitup lives in a private DM with you, never in your group chat. Create a meeting, share one message, and let Mitup handle RSVPs, reminders, and timezones for you. It works for any event your group organizes: a brunch, a hike, a board game night, birthday drinks.
 
 [Open @mitupbot on Telegram →](https://t.me/mitupbot?start=src_web)
 
