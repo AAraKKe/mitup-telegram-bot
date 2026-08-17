@@ -18,6 +18,7 @@ __all__ = (
     "privacy",
     "hosts_group",
     "chat_member",
+    "empty_callback",
     "stale_cancel",
 )
 
@@ -44,7 +45,7 @@ from . import (
 )
 
 # Flat handler modules registered directly on the registry
-from . import chat_member
+from . import chat_member, empty_callback
 
 # Global catch-all handlers (must be imported after conversation handlers so
 # PTB conversation handlers claim matching callbacks first)
