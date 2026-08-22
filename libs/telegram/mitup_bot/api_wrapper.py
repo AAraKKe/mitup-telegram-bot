@@ -147,6 +147,9 @@ class MeetingRefresh:
     """One meeting's cards to re-render in the background, optionally leaving a single card alone.
 
     `skip_message_db_id` names the card the submitting invocation already rendered itself.
+    `message_db_ids` is the scope: the cards this refresh covers, or None for every card the
+    meeting still tracks. It travels with the job so the render at execution time draws the set the
+    submitter reasoned about rather than whatever the meeting holds by then.
     `origin_update_id` names the update whose commit queued the refresh: the worker runs under no
     update of its own, so this is the only way its lines pivot back to the interaction behind them.
     `coalesced` counts the later submits that merged into this job and `attempt` numbers the
@@ -155,6 +158,7 @@ class MeetingRefresh:
 
     meeting_id: int
     skip_message_db_id: int | None = None
+    message_db_ids: frozenset[int] | None = None
     origin_update_id: int | None = None
     coalesced: int = 0
     attempt: int = 1
@@ -533,6 +537,7 @@ class TelegramApiWrapper(Protocol):
         skip_current: bool = False,
         was_deleted: bool = False,
         has_finished: bool = False,
+        only_message_db_ids: frozenset[int] | None = None,
     ): ...
     async def notify_users_promoted_from_waiting_list(
         self,
@@ -1235,14 +1240,19 @@ class TelegramApi:
             payload,
         )
 
-    def defer_meeting_refresh(self, meeting: Meetup, current_message: MessageModel | None) -> bool:
+    def defer_meeting_refresh(
+        self,
+        meeting: Meetup,
+        current_message: MessageModel | None,
+        message_db_ids: frozenset[int] | None = None,
+    ) -> bool:
         """Record a refresh of *meeting* on the outbox instead of drawing the rest of its cards
         here, answering whether it was recorded.
 
         Recording is all that happens inside the transaction; `execute_queued` submits the refresh
         to the queue once that transaction has committed, because the job re-reads the meeting.
         Only a capture-mode fan-out can defer, since the outbox is what carries it across that
-        boundary.
+        boundary. *message_db_ids* is the scope the job inherits, None meaning every card.
         """
         queue = self.refresh_queue
         if self._outbox is None or queue is None or not queue.accepts_fanout or meeting.id is None:
@@ -1251,6 +1261,7 @@ class TelegramApi:
             MeetingRefresh(
                 meeting_id=meeting.id,
                 skip_message_db_id=current_message.id if current_message is not None else None,
+                message_db_ids=message_db_ids,
                 origin_update_id=ambient_update_id(),
             )
         )
@@ -1264,16 +1275,24 @@ class TelegramApi:
         skip_current: bool = False,
         was_deleted: bool = False,
         has_finished: bool = False,
+        only_message_db_ids: frozenset[int] | None = None,
     ):
         """
         Updates all tracked messages for a meeting, `current_message` first for immediate
         feedback (`skip_current` when the caller already handles it separately).
+
+        `only_message_db_ids` narrows the cards behind the current one to the ones the caller knows
+        its change can reach, None meaning every card. The scope rides the deferral, so a job draws
+        the same set whenever the worker gets to it, and a scope that matches no card ends the
+        fan-out here rather than queueing a job with nothing to draw.
 
         Every card behind the current one goes to the background worker where a queue accepts it,
         so the invocation ends once the card the user is looking at is drawn. A deletion or a
         finish is the exception and always draws every card here: both render rows that die in the
         same transaction, so a job reading the meeting afterwards would find nothing to draw.
         """
+        terminal = was_deleted or has_finished
+        assert not (terminal and only_message_db_ids is not None), "A deletion or a finish draws every card"
         # First lets update the current message for a better user experience
         if current_message and not skip_current:
             await self.update_single_meeting_message(
@@ -1282,11 +1301,16 @@ class TelegramApi:
                 was_deleted=was_deleted,
                 has_finished=has_finished,
             )
-        if not (was_deleted or has_finished) and self.defer_meeting_refresh(meeting, current_message):
+        editable = [
+            message
+            for message in meeting.messages
+            if message != current_message and (only_message_db_ids is None or message.id in only_message_db_ids)
+        ]
+        if not editable:
             return
-        for message in meeting.messages:
-            if message == current_message:
-                continue
+        if not terminal and self.defer_meeting_refresh(meeting, current_message, only_message_db_ids):
+            return
+        for message in editable:
             await self.update_single_meeting_message(
                 message,
                 meeting,

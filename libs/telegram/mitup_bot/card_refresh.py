@@ -176,16 +176,29 @@ def merge_skip(waiting: int | None, incoming: int | None) -> int | None:
     return waiting if waiting == incoming else None
 
 
+def merge_scopes(waiting: frozenset[int] | None, incoming: frozenset[int] | None) -> frozenset[int] | None:
+    """The cards two coalescing jobs cover between them: their union, and every card as soon as
+    either of them asks for every card.
+
+    One job stands in for both submits, so it may never draw less than either of them asked for.
+    """
+    if waiting is None or incoming is None:
+        return None
+    return waiting | incoming
+
+
 def coalesce(waiting: MeetingRefresh, incoming: MeetingRefresh) -> MeetingRefresh:
     """Merge *incoming* into the job already waiting for the same meeting.
 
     Everything identifying the waiting job survives the merge — its origin update, its enqueue
     time, its attempt — because that is the submit whose wait `queue_wait_ms` measures and whose
-    user has been looking at a stale card the longest. Only the skip narrows and the count grows.
+    user has been looking at a stale card the longest. Only the skip narrows, the scope widens, and
+    the count grows.
     """
     return replace(
         waiting,
         skip_message_db_id=merge_skip(waiting.skip_message_db_id, incoming.skip_message_db_id),
+        message_db_ids=merge_scopes(waiting.message_db_ids, incoming.message_db_ids),
         coalesced=waiting.coalesced + 1,
     )
 
@@ -344,6 +357,7 @@ class RefreshQueue:
                 meeting=meeting,
                 current_message=skipped,
                 skip_current=skipped is not None,
+                only_message_db_ids=job.message_db_ids,
             )
         return JobOutcome.REFRESHED
 

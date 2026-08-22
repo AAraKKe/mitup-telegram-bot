@@ -25,6 +25,23 @@ def is_already_attached(meeting: Meetup, chat_instance: str | None) -> bool:
     return any(m.chat_instance == chat_instance for m in meeting.messages)
 
 
+def same_chat_siblings(meeting: Meetup, current_message: Message) -> list[Message]:
+    """The meeting's other cards living in the chat `current_message` was tapped in.
+
+    The tapped card is excluded by identity: `Message.__eq__` is value-based over the whole row, so
+    it cannot tell two cards apart, and an id comparison reads None on a card linked by this same
+    tap until a flush assigns one. A card with no captured chat_instance has never been tapped
+    anywhere, so nothing places it in this chat.
+    """
+    if current_message.chat_instance is None:
+        return []
+    return [
+        message
+        for message in meeting.messages
+        if message is not current_message and message.chat_instance == current_message.chat_instance
+    ]
+
+
 @HandlersRegistry.register_callback_query(MeetingHandlerId.ATTACH_TO_CHAT, callback_data=cb.ATTACH_TO_CHAT)
 @with_session(write=True)
 async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupContext):
@@ -103,8 +120,13 @@ async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupC
         show_alert=True,
     )
 
-    # Only the tapped card changes: a card's searchable footnote and keyboard are rendered from
-    # its own chat_instance, so every other card of the meeting would edit to identical content.
-    # Cards whose chat has since died are cleaned up by the next fan-out over a real content change.
-    await context.api.update_single_meeting_message(current_message, meeting)
+    # A card's searchable footnote and keyboard render from its own chat_instance, so the scope of
+    # an attachment is known before anything is rendered: the tapped chat and nowhere else. The
+    # tapped card is drawn here for immediate feedback and the siblings become one scoped refresh,
+    # where the render digest is what spares a sibling already showing the current content.
+    await context.api.update_meeting_messages(
+        meeting=meeting,
+        current_message=current_message,
+        only_message_db_ids=frozenset(sibling.id for sibling in same_chat_siblings(meeting, current_message)),
+    )
     context.put_feature_metric(Feature.ATTACH_TO_CHAT)

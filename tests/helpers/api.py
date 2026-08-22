@@ -1,3 +1,4 @@
+from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Any
 from unittest import mock
@@ -89,6 +90,7 @@ class MockApi(TelegramApi):
         skip_current: bool = DEFAULT_FALSE,  # type: ignore
         was_deleted: bool = DEFAULT_FALSE,  # type: ignore
         has_finished: bool = DEFAULT_FALSE,  # type: ignore
+        only_message_db_ids: Collection[int] | None = DEFAULT_NONE,  # type: ignore
     ):
         return self.call_mock(
             "update_meeting_messages",
@@ -97,6 +99,7 @@ class MockApi(TelegramApi):
             skip_current=skip_current,
             was_deleted=was_deleted,
             has_finished=has_finished,
+            only_message_db_ids=only_message_db_ids,
         )
 
     def answer_callback_query(
@@ -268,6 +271,7 @@ class MockApi(TelegramApi):
         current_message: Message | None = DEFAULT_CURRENT_MESSAGE,
         skip_current: bool | None = None,
         was_deleted: bool | None = None,
+        only_message_db_ids: Collection[int] | None = None,
         times: int = 1,
     ):
         arguments: dict[str, Any] = {
@@ -279,6 +283,8 @@ class MockApi(TelegramApi):
             arguments["skip_current"] = skip_current
         if was_deleted is not None:
             arguments["was_deleted"] = was_deleted
+        if only_message_db_ids is not None:
+            arguments["only_message_db_ids"] = only_message_db_ids
 
         if times == 1:
             assert_awaited_once_with_diff(self.mock_method("update_meeting_messages"), **arguments)

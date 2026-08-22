@@ -1730,6 +1730,35 @@ async def test_immediate_mode_edits_a_card_whose_digest_matches(telegram_api: Te
     bot.edit_message_text.assert_awaited_once()
 
 
+async def test_capture_of_a_card_series_reaches_telegram_only_for_the_ones_that_drifted(
+    telegram_api: TelegramApi, bot: AsyncMock
+):
+    """The attach flow walks its same-chat cards through `update_single_meeting_message` one by one
+    rather than refreshing the meeting, so the per-card digest is what keeps an already-current
+    card off the wire."""
+    meeting = create_meetup(id=10, title="Test Meeting", language="en")
+    create_user(id=1, tg_user_id=100, owned_meetings=[meeting])
+    up_to_date = create_message(id=1, inline_message_id="up_to_date", chat_instance="chat_c", meetup_id=10)
+    never_confirmed = create_message(id=2, inline_message_id="never_confirmed", chat_instance="chat_c", meetup_id=10)
+    meeting.messages.extend((up_to_date, never_confirmed))
+
+    settled = telegram_api.begin_capture()
+    await telegram_api.update_single_meeting_message(up_to_date, meeting)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(settled)
+    apply_confirmed_digests(settled, up_to_date)
+    bot.edit_message_text.reset_mock()
+
+    attach = telegram_api.begin_capture()
+    for card in (up_to_date, never_confirmed):
+        await telegram_api.update_single_meeting_message(card, meeting)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(attach)
+
+    edited = [call.kwargs["inline_message_id"] for call in bot.edit_message_text.call_args_list]
+    assert edited == ["never_confirmed"]
+
+
 # ---------------------------------------------------------------------------
 # Deferring the fan-out to the card-refresh queue
 # ---------------------------------------------------------------------------
@@ -1842,6 +1871,88 @@ async def test_the_fanout_draws_every_card_where_no_queue_is_attached(telegram_a
 
     assert len(outbox.calls) == 2
     assert bot.edit_message_text.await_count == 2
+
+
+# --- Scoping a fan-out to the cards the caller's change can reach ---
+
+
+def make_meeting_with_two_shared_cards() -> tuple[Meetup, MessageModel, MessageModel, MessageModel]:
+    """The owner's card and two shared ones, so a scope can name one and leave the other out."""
+    meeting, current, shared = make_shared_meeting()
+    other = create_message(
+        id=3, inline_message_id="inline_third", chat_instance="ci_other", chat_id=None, message_id=None, meetup_id=10
+    )
+    meeting.messages.append(other)
+    return meeting, current, shared, other
+
+
+async def test_a_scoped_fanout_defers_one_job_naming_the_cards_it_covers(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue
+):
+    """A caller that knows which cards its change can reach hands the worker that set, and the job
+    carries it so the render at execution time leaves the rest of the meeting alone."""
+    meeting, current, shared, _other = make_meeting_with_two_shared_cards()
+
+    await run_fanout(telegram_api, meeting, current_message=current, only_message_db_ids={shared.id})
+
+    assert deferring_queue.pending[10] == MeetingRefresh(
+        meeting_id=10, skip_message_db_id=1, message_db_ids=frozenset({shared.id})
+    )
+
+
+async def test_an_unscoped_fanout_defers_a_job_covering_every_card(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue
+):
+    """No scope means the worker draws whatever the meeting still tracks when it gets there."""
+    meeting, current, _shared, _other = make_meeting_with_two_shared_cards()
+
+    await run_fanout(telegram_api, meeting, current_message=current)
+
+    assert deferring_queue.pending[10].message_db_ids is None
+
+
+async def test_a_scope_matching_no_card_queues_no_job_at_all(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue
+):
+    """The card in front of the user is still drawn, but a scope nothing matches would leave the
+    worker a job with nothing to draw, so none is recorded."""
+    meeting, current, _shared, _other = make_meeting_with_two_shared_cards()
+
+    outbox = await run_fanout(telegram_api, meeting, current_message=current, only_message_db_ids=set())
+
+    bot.edit_message_text.assert_awaited_once()
+    assert outbox.meeting_refreshes == []
+    assert deferring_queue.pending == {}
+
+
+async def test_a_scoped_fanout_draws_only_its_cards_where_the_queue_takes_no_deferrals(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue
+):
+    """The scope is the caller's statement about which cards its change can reach, so it holds
+    just as well on the invocation's own timeline."""
+    deferring_queue.accepts_fanout = False
+    meeting, current, shared, _other = make_meeting_with_two_shared_cards()
+
+    await run_fanout(telegram_api, meeting, current_message=current, only_message_db_ids={shared.id})
+
+    assert bot.edit_message_text.await_count == 2
+    assert bot.edit_message_text.call_args.kwargs["inline_message_id"] == shared.inline_message_id
+
+
+@pytest.mark.parametrize("state_flag", ["was_deleted", "has_finished"])
+async def test_a_terminal_fanout_refuses_a_scope(telegram_api: TelegramApi, state_flag: str):
+    """A deletion and a finish have to reach every card: the rows die in this transaction, so a
+    card left out of a scope would keep showing a meeting that no longer exists."""
+    meeting, current, shared, _other = make_meeting_with_two_shared_cards()
+
+    with pytest.raises(AssertionError):
+        await run_fanout(
+            telegram_api,
+            meeting,
+            current_message=current,
+            only_message_db_ids={shared.id},
+            **{state_flag: True},
+        )
 
 
 async def test_an_immediate_fanout_never_defers(

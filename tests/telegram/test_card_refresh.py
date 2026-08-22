@@ -126,6 +126,30 @@ def test_conflicting_skips_coalesce_to_no_skip(
     assert queue.pending[7] == MeetingRefresh(meeting_id=7, skip_message_db_id=merged_skip, coalesced=1)
 
 
+@pytest.mark.parametrize(
+    "waiting_scope, incoming_scope, merged_scope",
+    [
+        (frozenset({41}), frozenset({42}), frozenset({41, 42})),
+        (frozenset({41}), frozenset({41}), frozenset({41})),
+        (frozenset({41}), None, None),
+        (None, frozenset({41}), None),
+    ],
+    ids=["disjoint", "same_cards", "incoming_covers_everything", "waiting_covers_everything"],
+)
+def test_coalescing_scopes_cover_every_card_either_submit_asked_for(
+    queue: RefreshQueue,
+    waiting_scope: frozenset[int] | None,
+    incoming_scope: frozenset[int] | None,
+    merged_scope: frozenset[int] | None,
+):
+    """One job stands in for both submits, so the merged scope is their union — and a submit that
+    named no scope meant every card, which is what the merge has to keep covering."""
+    queue.submit(MeetingRefresh(meeting_id=7, message_db_ids=waiting_scope))
+    queue.submit(MeetingRefresh(meeting_id=7, message_db_ids=incoming_scope))
+
+    assert queue.pending[7].message_db_ids == merged_scope
+
+
 def test_a_merged_job_keeps_the_origin_and_the_wait_of_the_submit_it_merged_into(queue: RefreshQueue):
     """The merged job answers for the change that has been waiting longest, so it keeps that
     submit's update and enqueue time: `queue_wait_ms` measures the oldest unrendered change, and
@@ -293,6 +317,24 @@ async def test_execute_passes_over_the_card_the_submitter_already_rendered(
     owner_card, shared_card = meeting_with_two_cards.messages
 
     await queue.execute(MeetingRefresh(meeting_id=7, skip_message_db_id=owner_card.id))
+
+    bot.edit_message_text.assert_awaited_once()
+    assert bot.edit_message_text.call_args.kwargs["inline_message_id"] == shared_card.inline_message_id
+
+
+async def test_execute_draws_only_the_cards_the_job_is_scoped_to(
+    queue: RefreshQueue,
+    mock_session: MockDbSession,
+    registered_reconciler: None,
+    bot: mock.AsyncMock,
+    meeting_with_two_cards: Meetup,
+):
+    """The scope the submitter reasoned about is what the render honours, so a card outside it is
+    not drawn even though the freshly loaded meeting still tracks it."""
+    mock_session.add_object(meeting_with_two_cards)
+    shared_card = meeting_with_two_cards.messages[1]
+
+    await queue.execute(MeetingRefresh(meeting_id=7, message_db_ids=frozenset({shared_card.id})))
 
     bot.edit_message_text.assert_awaited_once()
     assert bot.edit_message_text.call_args.kwargs["inline_message_id"] == shared_card.inline_message_id
