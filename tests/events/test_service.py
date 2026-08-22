@@ -1,4 +1,6 @@
+import asyncio
 import json
+import signal
 from asyncio import CancelledError
 from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -21,10 +23,13 @@ from mitup_bot.events.service import (
     DEFAULT_USER_CLEANUP_INTERVAL,
     EventType,
     IntervalsConfiguration,
+    ShutdownRequest,
+    StopReason,
     build_bot,
     build_broadcast_bot,
     dispatch_event,
     handle_maintainance,
+    request_shutdown,
     run_all_tasks,
     run_periodic,
     select_bot,
@@ -311,6 +316,20 @@ async def test_handle_maintainance_finish_line_reports_a_faulted_run():
     assert finished["outcome"] == "failed"
 
 
+async def test_handle_maintainance_finish_line_reports_a_run_the_shutdown_interrupted():
+    """A run cancelled by a stop signal still closes its bracket, but must not read as a completed
+    one — a rolling deploy would otherwise look like a clean tick of every job it cut short."""
+    client = make_test_metrics_client()
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        with patch("mitup_bot.events.service.dispatch_event", new_callable=AsyncMock, side_effect=CancelledError):
+            with pytest.raises(CancelledError):
+                await run_maintainance_with_mocked_db(EventType.USER_CLEANUP, client)
+
+    finished = next(log for log in logs if log["event"] == "Recurrent event run finished")
+    assert finished["outcome"] == "interrupted"
+
+
 async def test_run_all_tasks_logs_a_registration_line_per_event():
     """Each scheduled task announces its event type, interval and which bot it runs on, so the
     schedule a container is actually running is readable from its own log."""
@@ -363,6 +382,109 @@ async def test_run_all_tasks_logs_why_scheduling_stopped():
     stopped = next(log for log in logs if log["event"] == "Recurrent event scheduling stopped")
     assert stopped["log_level"] == "error"
     assert stopped["reason"] == "task_group_aborted"
+
+
+def make_intervals() -> IntervalsConfiguration:
+    return IntervalsConfiguration(
+        user_cleanup=10,
+        notify_start_meeting=20,
+        notify_meeting_started=25,
+        generate_stats=30,
+        deactivate_meetings=40,
+        meetups_cleanup=50,
+        send_broadcasts=60,
+        supporter_check=70,
+    )
+
+
+@pytest.mark.parametrize(
+    "stop_signal, expected_reason",
+    [(signal.SIGTERM, "sigterm"), (signal.SIGINT, "sigint")],
+    ids=["sigterm", "sigint"],
+)
+async def test_a_stop_signal_drains_every_job_and_returns_cleanly(stop_signal: signal.Signals, expected_reason: str):
+    """ECS stops the container with SIGTERM. On the default disposition the process dies where it
+    stands, so an in-flight job's `finally` never runs; the handler has to turn the signal into a
+    task-group cancellation every job's teardown observes, then return instead of raising so the
+    container exits 0."""
+    started = asyncio.Event()
+    drained: list[EventType] = []
+
+    async def job_that_drains(
+        _interval: int,
+        event_type: EventType,
+        bot: object,
+        admin_tg_ids: list[int],
+        time_before_start: float | None = None,
+    ):
+        started.set()
+        try:
+            await asyncio.sleep(3600)
+        finally:
+            drained.append(event_type)
+
+    with capture_logs() as logs:
+        with patch("mitup_bot.events.service.run_periodic", side_effect=job_that_drains):
+            service = asyncio.create_task(run_all_tasks(make_intervals(), MagicMock(), MagicMock(), [], start_time=0.0))
+            await started.wait()
+            signal.raise_signal(stop_signal)
+            # A drain that outlives this bound would outlive the ECS stop window too.
+            await asyncio.wait_for(service, timeout=5)
+
+    assert set(drained) == set(EventType)
+    requested = next(log for log in logs if log["event"] == "Events shutdown requested")
+    assert requested["reason"] == expected_reason
+    assert requested["outcome"] == "cancelling"
+    stopped = next(log for log in logs if log["event"] == "Recurrent event scheduling stopped")
+    assert stopped["log_level"] == "info"
+    assert stopped["reason"] == expected_reason
+    finished = next(log for log in logs if log["event"] == "Events service stopped")
+    assert finished["reason"] == expected_reason
+    # The drain duration is what an operator compares against `stopTimeout`, so the line must carry it.
+    assert "duration_ms" in finished
+
+
+async def test_run_all_tasks_reports_a_cancellation_nobody_signalled():
+    """A cancellation with no signal behind it is an abort, not a deploy: it keeps the error level
+    and still propagates, so the container never exits 0 on a stop nobody asked for."""
+    started = asyncio.Event()
+
+    async def job_that_waits(*_args: object, **_kwargs: object):
+        started.set()
+        await asyncio.sleep(3600)
+
+    with capture_logs() as logs:
+        with patch("mitup_bot.events.service.run_periodic", side_effect=job_that_waits):
+            service = asyncio.create_task(run_all_tasks(make_intervals(), MagicMock(), MagicMock(), [], start_time=0.0))
+            await started.wait()
+            service.cancel()
+            with pytest.raises(CancelledError):
+                await service
+
+    stopped = next(log for log in logs if log["event"] == "Recurrent event scheduling stopped")
+    assert stopped["log_level"] == "error"
+    assert stopped["reason"] == "cancelled"
+    finished = next(log for log in logs if log["event"] == "Events service stopped")
+    assert finished["reason"] == "cancelled"
+
+
+def test_a_repeated_stop_signal_escalates_without_restarting_the_drain_clock():
+    """A second SIGTERM arriving mid-drain is an escalation of the shutdown already in flight.
+    Re-stamping `requested_at` would understate every drain that needed a nudge, which is exactly
+    the drain an operator is measuring against `stopTimeout`."""
+    shutdown = ShutdownRequest()
+    main_task = MagicMock()
+
+    request_shutdown(shutdown, StopReason.SIGTERM, main_task)
+    first_requested_at = shutdown.requested_at
+    with capture_logs() as logs:
+        request_shutdown(shutdown, StopReason.SIGTERM, main_task)
+
+    assert shutdown.requested_at == first_requested_at
+    assert main_task.cancel.call_count == 2
+    requested = next(log for log in logs if log["event"] == "Events shutdown requested")
+    assert requested["reason"] == "sigterm"
+    assert requested["outcome"] == "already_stopping"
 
 
 MAINTAINANCE_PARAMS = [

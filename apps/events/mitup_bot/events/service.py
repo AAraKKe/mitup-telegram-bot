@@ -1,6 +1,8 @@
 import asyncio
+import signal
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
+from functools import partial
 from random import uniform
 from time import perf_counter
 from typing import assert_never
@@ -184,6 +186,7 @@ async def handle_maintainance(
 
     start_time = perf_counter()
     fault = False
+    outcome = "completed"
     # `flow` names the business unit across every service in the log plane, so one query reads the
     # bot and events lines together; the metric plane carries the same value as the EventType
     # dimension. A second log key holding it would be redundant on every line the plane emits.
@@ -200,12 +203,18 @@ async def handle_maintainance(
         try:
             db.set_connection_context(event_type.value)
             await dispatch_event(event_type, api, client, admin_tg_ids)
+        except asyncio.CancelledError:
+            # A shutdown cancels the run where it stands: it neither completed nor faulted, and
+            # recording it either way would misreport every job a rolling deploy interrupts.
+            outcome = "interrupted"
+            raise
         except Exception as error:
             fault = True
+            outcome = "failed"
             client.emit(MetricKey.FAULT, 1, MetricUnit.COUNT, emit_global=True)
             log.exception(
                 "Recurrent event run failed",
-                outcome="failed",
+                outcome=outcome,
                 error_type=error_type_name(error),
                 duration_ms=round((perf_counter() - start_time) * 1000),
             )
@@ -219,7 +228,7 @@ async def handle_maintainance(
             leaked_connections = db.get_open_connections(event_type.value)
             log.info(
                 "Recurrent event run finished",
-                outcome="failed" if fault else "completed",
+                outcome=outcome,
                 duration_ms=round((perf_counter() - start_time) * 1000),
                 db_connections_leaked=leaked_connections,
             )
@@ -243,6 +252,104 @@ async def run_periodic(
         await asyncio.sleep(interval)
 
 
+class StopReason(StrEnum):
+    SIGTERM = "sigterm"
+    SIGINT = "sigint"
+    CANCELLED = "cancelled"
+    TASK_GROUP_ABORTED = "task_group_aborted"
+    SCHEDULING_ENDED = "scheduling_ended"
+
+
+SHUTDOWN_SIGNALS = {
+    signal.SIGTERM: StopReason.SIGTERM,
+    signal.SIGINT: StopReason.SIGINT,
+}
+
+
+@dataclass
+class ShutdownRequest:
+    """Which signal asked this process to stop, and when it landed.
+
+    A cancelled task group on its own cannot say whether an orchestrator asked us to stop or the
+    process is aborting, and the two need a different level, a different reason and a different
+    exit code.
+    """
+
+    reason: StopReason | None = None
+    requested_at: float = 0.0
+
+    def drain_ms(self) -> int:
+        """Milliseconds between the signal landing and the teardown finishing, or 0 if no signal
+        arrived. This is the number the ECS `stopTimeout` is compared against."""
+        return round((perf_counter() - self.requested_at) * 1000) if self.reason else 0
+
+
+def request_shutdown(shutdown: ShutdownRequest, reason: StopReason, main_task: asyncio.Task):
+    """Cancel the task owning the event task group so every job's `finally` runs before exit."""
+    repeated = shutdown.reason is not None
+    if not repeated:
+        shutdown.requested_at = perf_counter()
+    shutdown.reason = reason
+    log.info(
+        "Events shutdown requested",
+        reason=reason.value,
+        outcome="already_stopping" if repeated else "cancelling",
+    )
+    main_task.cancel()
+
+
+def install_shutdown_handlers(shutdown: ShutdownRequest, main_task: asyncio.Task):
+    loop = asyncio.get_running_loop()
+    for stop_signal, reason in SHUTDOWN_SIGNALS.items():
+        loop.add_signal_handler(stop_signal, partial(request_shutdown, shutdown, reason, main_task))
+
+
+def remove_shutdown_handlers():
+    """Drop the handlers before draining: past this point a repeated signal must not interrupt the
+    teardown it is waiting for, and SIGKILL remains the escape hatch."""
+    loop = asyncio.get_running_loop()
+    for stop_signal in SHUTDOWN_SIGNALS:
+        loop.remove_signal_handler(stop_signal)
+
+
+def log_scheduling_aborted(reason: StopReason, error: BaseException):
+    """`handle_maintainance` swallows Exception, so the loops can only stop on a BaseException that
+    takes every recurrent event down at once — the one failure mode with no per-run trace."""
+    log.error(
+        "Recurrent event scheduling stopped",
+        reason=reason.value,
+        error_type=error_type_name(error),
+        exc_info=error,
+    )
+
+
+async def schedule_recurrent_events(
+    intervals: IntervalsConfiguration,
+    bot: ExtBot,
+    broadcast_bot: ExtBot,
+    admin_tg_ids: list[int],
+    start_time: float,
+):
+    async with asyncio.TaskGroup() as task_group:
+        for event_type in EventType:
+            selected_bot = select_bot(event_type, bot, broadcast_bot)
+            log.info(
+                "Registered recurrent event",
+                flow=event_type.value,
+                interval_seconds=intervals.get(event_type),
+                bot="broadcast" if selected_bot is broadcast_bot else "shared",
+            )
+            task_group.create_task(
+                run_periodic(
+                    intervals.get(event_type),
+                    time_before_start=start_time,
+                    event_type=event_type,
+                    bot=selected_bot,
+                    admin_tg_ids=admin_tg_ids,
+                )
+            )
+
+
 async def run_all_tasks(
     intervals: IntervalsConfiguration,
     bot: ExtBot,
@@ -250,35 +357,31 @@ async def run_all_tasks(
     admin_tg_ids: list[int],
     start_time: float,
 ):
+    """Schedule every recurrent event and drain cleanly when a signal or an abort stops the group."""
+    main_task = asyncio.current_task()
+    assert main_task is not None, "asyncio.run always drives this coroutine inside a task"
+    shutdown = ShutdownRequest()
+    install_shutdown_handlers(shutdown, main_task)
+    stop_reason = StopReason.SCHEDULING_ENDED
     try:
-        async with asyncio.TaskGroup() as task_group:
-            for event_type in EventType:
-                selected_bot = select_bot(event_type, bot, broadcast_bot)
-                log.info(
-                    "Registered recurrent event",
-                    flow=event_type.value,
-                    interval_seconds=intervals.get(event_type),
-                    bot="broadcast" if selected_bot is broadcast_bot else "shared",
-                )
-                task_group.create_task(
-                    run_periodic(
-                        intervals.get(event_type),
-                        time_before_start=start_time,
-                        event_type=event_type,
-                        bot=selected_bot,
-                        admin_tg_ids=admin_tg_ids,
-                    )
-                )
+        await schedule_recurrent_events(intervals, bot, broadcast_bot, admin_tg_ids, start_time)
+    except asyncio.CancelledError as error:
+        if shutdown.reason is None:
+            stop_reason = StopReason.CANCELLED
+            log_scheduling_aborted(stop_reason, error)
+            raise
+        stop_reason = shutdown.reason
+        # Balancing the cancellation we swallow keeps `cancelling()` truthful for any await the
+        # teardown below still has to make, and lets the process exit 0 instead of on a traceback.
+        main_task.uncancel()
+        log.info("Recurrent event scheduling stopped", reason=stop_reason.value)
     except BaseException as error:
-        # handle_maintainance swallows Exception, so the loops can only stop on a BaseException that
-        # takes every recurrent event down at once — the one failure mode with no per-run trace.
-        log.error(
-            "Recurrent event scheduling stopped",
-            reason="cancelled" if isinstance(error, asyncio.CancelledError) else "task_group_aborted",
-            error_type=error_type_name(error),
-            exc_info=error,
-        )
+        stop_reason = StopReason.TASK_GROUP_ABORTED
+        log_scheduling_aborted(stop_reason, error)
         raise
+    finally:
+        remove_shutdown_handlers()
+        log.info("Events service stopped", reason=stop_reason.value, duration_ms=shutdown.drain_ms())
 
 
 def run_events(env: Env, intervals: IntervalsConfiguration, start_time: float):
