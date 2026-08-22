@@ -11,7 +11,7 @@ from pydantic import SecretStr
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
 from telegram.ext import Application, ConversationHandler
 
-from mitup_bot import api_guards, db, reconcile
+from mitup_bot import api_guards, card_refresh, db, reconcile
 from mitup_bot.bot_cli import cli as bot_cli
 from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
 from mitup_bot.handlers import HandlersRegistry
@@ -191,6 +191,20 @@ def update_guards():
     """Mirror the startup wiring both process entry points perform: the api refuses to resolve
     a chat or query off an Update without the guards-backed validators registered."""
     api_guards.register_update_guards()
+
+
+@pytest.fixture(autouse=True)
+def process_refresh_queue() -> Generator[None]:
+    """Keep the process-wide refresh queue from crossing test boundaries.
+
+    Any test that runs a real startup — a lifespan, the events scheduler — publishes a queue that
+    stays installed for the rest of the session, and a submit is meant to be a no-op wherever no
+    runtime configured one. Clearing on both sides makes either expectation independent of the
+    order tests run in.
+    """
+    card_refresh.__queue = None
+    yield
+    card_refresh.__queue = None
 
 
 @pytest.fixture

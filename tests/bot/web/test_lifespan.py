@@ -1,8 +1,10 @@
 import logging
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from mitup_bot import card_refresh
+from mitup_bot.card_refresh import JobOutcome, MeetingRefresh
 from mitup_bot.config import RunModes
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from tests.helpers import MetricAssertions, build_test_web_app, lifespan_runner
@@ -224,7 +226,7 @@ async def test_webhook_lifespan_brackets_the_run(metrics_client: MetricsClient, 
     assert messages.index("Stopping the bot application") < messages.index("Bot application stopped")
     # Each isolated step reports its own completion, so a partial teardown is legible as one.
     completed = [record.__dict__["label"] for record in caplog.records if record.message == "Completed shutdown step"]
-    assert completed == ["ptb_app.stop", "ptb_app.shutdown"]
+    assert completed == ["ptb_app.stop", "card_refresh.stop_worker", "ptb_app.shutdown"]
 
 
 # --- Polling lifespan ---
@@ -462,3 +464,68 @@ async def test_polling_startup_failure_emits_metric_flushes_and_propagates(
             pytest.fail("Lifespan startup should have raised")
 
     metrics.assert_emitted(name=MetricKey.LIFESPAN_STARTUP_FAILED, value=1)
+
+
+# --- The card refresh worker ---
+
+
+@pytest.mark.parametrize(
+    "run_mode, expected",
+    [
+        (RunModes.WEBHOOK, ["ptb_app.stop", "card_refresh.stop_worker", "ptb_app.shutdown"]),
+        (RunModes.POLLING, ["ptb_app.updater.stop", "ptb_app.stop", "card_refresh.stop_worker", "ptb_app.shutdown"]),
+    ],
+    ids=["webhook", "polling"],
+)
+async def test_the_refresh_drain_runs_between_stopping_and_shutting_down_ptb(
+    run_mode: RunModes, expected: list[str], metrics_client: MetricsClient, caplog: pytest.LogCaptureFixture
+):
+    """The position is the whole design of the step. After `stop`, because that is what guarantees
+    no update is still running to submit into the queue; before `shutdown`, because that is what
+    closes the pool the drained edits go out through."""
+    caplog.set_level(logging.INFO)
+    web_app = build_test_web_app(
+        secret_token=SECRET if run_mode is RunModes.WEBHOOK else None,
+        metrics_client=metrics_client,
+        run_mode=run_mode,
+        webhook_url=WEBHOOK_URL if run_mode is RunModes.WEBHOOK else None,
+        max_connections=MAX_CONNECTIONS if run_mode is RunModes.WEBHOOK else None,
+    )
+
+    async with lifespan_runner(web_app):
+        ...
+
+    completed = [record.__dict__["label"] for record in caplog.records if record.message == "Completed shutdown step"]
+    assert completed == expected
+
+
+@pytest.mark.parametrize(
+    "run_mode",
+    [RunModes.WEBHOOK, RunModes.POLLING],
+    ids=["webhook", "polling"],
+)
+async def test_the_lifespan_runs_a_refresh_worker_that_outlives_the_last_update(
+    run_mode: RunModes, metrics_client: MetricsClient
+):
+    """The queue has to be in service for the whole time updates are served, and a refresh an
+    update queued has to be drawn before the process goes — whether the worker reaches it while
+    running or the shutdown step drains it."""
+    execute = AsyncMock(return_value=JobOutcome.REFRESHED)
+    web_app = build_test_web_app(
+        secret_token=SECRET if run_mode is RunModes.WEBHOOK else None,
+        metrics_client=metrics_client,
+        run_mode=run_mode,
+        webhook_url=WEBHOOK_URL if run_mode is RunModes.WEBHOOK else None,
+        max_connections=MAX_CONNECTIONS if run_mode is RunModes.WEBHOOK else None,
+    )
+
+    with patch.object(card_refresh.RefreshQueue, "execute", execute):
+        async with lifespan_runner(web_app):
+            queue = card_refresh.current_queue()
+            assert queue is not None
+            assert queue.submit(MeetingRefresh(meeting_id=7)) is True
+
+    execute.assert_awaited_once_with(MeetingRefresh(meeting_id=7))
+    assert queue.pending == {}
+    # The process is going away, so nothing may be taken on after the drain has been spent.
+    assert queue.submit(MeetingRefresh(meeting_id=8)) is False

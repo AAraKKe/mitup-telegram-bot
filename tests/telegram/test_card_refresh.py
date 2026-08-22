@@ -1,5 +1,4 @@
 import asyncio
-from collections.abc import Generator
 from contextlib import suppress
 from time import perf_counter
 from typing import cast
@@ -13,7 +12,8 @@ from telegram.ext import ExtBot
 
 from mitup_bot import card_refresh, reconcile
 from mitup_bot.api_wrapper import BotAdapter, TelegramApi
-from mitup_bot.card_refresh import JobOutcome, MeetingRefresh, RefreshQueue, RunningJob
+from mitup_bot.card_refresh import JobOutcome, MeetingRefresh, RefreshQueue, RunningJob, WorkerLimits
+from mitup_bot.config import AppConfig, RunModes
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.protocols import ContextOrBotAdapter
@@ -29,6 +29,9 @@ TICK_INTERVAL = 0.05
 # returning never hits it. Only the test about the timeout uses it: everywhere else a job is
 # allowed to block for as long as the test needs, so the timeout never lands mid-assertion.
 JOB_TIMEOUT = 0.1
+# What a stopping queue spends on the jobs it still holds. Short enough that a test whose job never
+# finishes waits it out for nothing, long enough for one that does to be reached.
+DRAIN_DEADLINE = 0.2
 
 
 @pytest.fixture
@@ -47,7 +50,13 @@ def refresh_api(bot: mock.AsyncMock, metrics_client: MetricsClient) -> TelegramA
 
 @pytest.fixture
 def queue(refresh_api: TelegramApi, metrics_client: MetricsClient) -> RefreshQueue:
-    return RefreshQueue(refresh_api, metrics_client, report_interval=TICK_INTERVAL, job_timeout=WORKER_TIMEOUT)
+    return RefreshQueue(
+        refresh_api,
+        metrics_client,
+        report_interval=TICK_INTERVAL,
+        job_timeout=WORKER_TIMEOUT,
+        drain_deadline=DRAIN_DEADLINE,
+    )
 
 
 def mark_in_flight(queue: RefreshQueue, meeting_id: int):
@@ -58,12 +67,6 @@ def mark_in_flight(queue: RefreshQueue, meeting_id: int):
 def emitted_values(client: MetricsClient, name: MetricKey) -> list[float]:
     """Every value recorded under *name*, in emission order, for assertions about how one moves."""
     return [record.value for record in client.records if record.name == str(name)]
-
-
-@pytest.fixture(autouse=True)
-def process_queue_isolation() -> Generator[None]:
-    yield
-    card_refresh.__queue = None
 
 
 @pytest.fixture
@@ -594,7 +597,8 @@ def test_only_a_queue_with_work_left_reports_an_abandonment(queue: RefreshQueue)
 
 async def test_a_cancelled_worker_reports_what_it_leaves_behind(queue: RefreshQueue, metrics: MetricAssertions):
     """Cancellation is how the process stops the worker, so the report has to survive it rather
-    than sit on a return path a cancelled task never reaches."""
+    than sit on a return path a cancelled task never reaches. A job the drain could not finish
+    counts among the ones left behind exactly like one it never started."""
     running = asyncio.Event()
 
     async def block(_job: MeetingRefresh) -> JobOutcome:
@@ -609,17 +613,162 @@ async def test_a_cancelled_worker_reports_what_it_leaves_behind(queue: RefreshQu
         worker = asyncio.create_task(queue.run_worker())
         async with asyncio.timeout(WORKER_TIMEOUT):
             await running.wait()
-        worker.cancel()
-        with suppress(asyncio.CancelledError):
-            await worker
+        await card_refresh.stop_worker(worker)
 
     abandoned = [entry for entry in logs if entry["event"] == "Background jobs abandoned at shutdown"]
     assert len(abandoned) == 1
-    assert abandoned[0]["abandoned"] == 1
-    # The interrupted job reached no outcome, so it reports none: a deploy cancels every worker in
-    # the fleet at once, and a sample per cancelled job would read as a burst of faults on the
-    # alarm the rolling deploy is watching.
+    assert abandoned[0]["abandoned"] == 2
+    # No job reached an outcome, so none reports one: a deploy cancels every worker in the fleet at
+    # once, and a sample per cancelled job would read as a burst of faults on the alarm the rolling
+    # deploy is watching.
     metrics.assert_not_emitted(name=MetricKey.FAULT)
+
+
+# --- Stopping the worker ---
+
+
+async def test_the_shutdown_drain_finishes_the_jobs_already_queued(queue: RefreshQueue, metrics: MetricAssertions):
+    """The queue lives in this process only, so a job still waiting when the worker stops is a
+    committed change no card will ever show. Stopping therefore spends the deadline on them
+    instead of dropping them where they stand, and the jobs it draws are counted and sampled like
+    any other — on the window the drain itself closes, since the reporter died with the group."""
+    executed: list[int] = []
+    running = asyncio.Event()
+    # Longer than the test, so the drain's publication is the only one and the counts it carries
+    # are unambiguously the interrupted window's.
+    queue.report_interval = WORKER_TIMEOUT
+
+    async def execute(job: MeetingRefresh) -> JobOutcome:
+        executed.append(job.meeting_id)
+        if job.meeting_id == 7 and job.attempt == 1:
+            running.set()
+            await asyncio.sleep(WORKER_TIMEOUT)
+        return JobOutcome.REFRESHED
+
+    with mock.patch.object(queue, "execute", side_effect=execute), capture_logs() as logs:
+        worker = asyncio.create_task(queue.run_worker())
+        queue.submit(MeetingRefresh(meeting_id=7))
+        async with asyncio.timeout(WORKER_TIMEOUT):
+            await running.wait()
+        # The drain loop is held inside meeting 7, so these two can only be reached by the stop.
+        queue.submit(MeetingRefresh(meeting_id=8))
+        queue.submit(MeetingRefresh(meeting_id=9))
+        await card_refresh.stop_worker(worker)
+
+    assert executed == [7, 8, 9, 7]
+    assert queue.pending == {}
+    # Nothing was left over, so the shutdown must not claim any change died with the process.
+    assert [entry for entry in logs if entry["event"] == "Background jobs abandoned at shutdown"] == []
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=3)
+    metrics.assert_emitted(name=MetricKey.JOBS_SUCCEEDED, value=3, times=1)
+
+
+async def test_the_job_the_stop_interrupts_is_attempted_again_by_the_drain(queue: RefreshQueue):
+    """Its cards were left half drawn or not drawn at all, so the change is still outstanding and
+    the drain has to reach it. The attempt number is what tells the retry from a fresh submit on
+    the line the second run writes."""
+    attempts: list[int] = []
+    running = asyncio.Event()
+
+    async def execute(job: MeetingRefresh) -> JobOutcome:
+        attempts.append(job.attempt)
+        if job.attempt == 1:
+            running.set()
+            await asyncio.sleep(WORKER_TIMEOUT)
+        return JobOutcome.REFRESHED
+
+    with mock.patch.object(queue, "execute", side_effect=execute):
+        worker = asyncio.create_task(queue.run_worker())
+        queue.submit(MeetingRefresh(meeting_id=7))
+        async with asyncio.timeout(WORKER_TIMEOUT):
+            await running.wait()
+        await card_refresh.stop_worker(worker)
+
+    assert attempts == [1, 2]
+    assert queue.pending == {}
+    assert queue.in_flight == {}
+
+
+async def test_the_shutdown_drain_gives_up_at_the_deadline(queue: RefreshQueue):
+    """The orchestrator's kill timer is running while the drain spends its deadline, so a job that
+    will not finish has to be given up on rather than take the teardown down with it."""
+    running = asyncio.Event()
+
+    async def block(_job: MeetingRefresh) -> JobOutcome:
+        running.set()
+        await asyncio.sleep(WORKER_TIMEOUT)
+        return JobOutcome.REFRESHED
+
+    with mock.patch.object(queue, "execute", side_effect=block), capture_logs() as logs:
+        worker = asyncio.create_task(queue.run_worker())
+        queue.submit(MeetingRefresh(meeting_id=7))
+        async with asyncio.timeout(WORKER_TIMEOUT):
+            await running.wait()
+        started = perf_counter()
+        await card_refresh.stop_worker(worker)
+
+    # The wait is the deadline's, not the blocked job's, which would have run for far longer.
+    assert perf_counter() - started < WORKER_TIMEOUT
+    abandoned = [entry for entry in logs if entry["event"] == "Background jobs abandoned at shutdown"]
+    assert len(abandoned) == 1
+    assert abandoned[0]["abandoned"] == 1
+
+
+async def test_a_stopping_queue_takes_no_more_work(queue: RefreshQueue):
+    """Anything accepted during the drain could only lengthen what the shutdown abandons, and the
+    refusal is a warning because a card the submitter counted on stays stale."""
+    worker = asyncio.create_task(queue.run_worker())
+    await asyncio.sleep(0)
+    await card_refresh.stop_worker(worker)
+
+    with capture_logs() as logs:
+        accepted = queue.submit(MeetingRefresh(meeting_id=7))
+
+    assert accepted is False
+    assert queue.pending == {}
+    dropped = [entry for entry in logs if entry["event"] == "Meeting card refresh dropped"]
+    assert len(dropped) == 1
+    assert dropped[0]["log_level"] == "warning"
+    assert dropped[0]["reason"] == "shutting_down"
+    assert dropped[0]["meeting_id"] == 7
+
+
+async def test_the_drain_publishes_the_window_the_stop_interrupted(queue: RefreshQueue, metrics: MetricAssertions):
+    """The reporter is cancelled with the group, so the window it was going to close would
+    otherwise take its accounting with it: the jobs it ran counted nowhere and every series ending
+    on a stale sample right when the process went away."""
+    running = asyncio.Event()
+    # Longer than the test, so the drain's publication is the only one and the counts it carries
+    # are unambiguously the interrupted window's.
+    queue.report_interval = WORKER_TIMEOUT
+
+    async def execute(_job: MeetingRefresh) -> JobOutcome:
+        running.set()
+        return JobOutcome.REFRESHED
+
+    with mock.patch.object(queue, "execute", side_effect=execute), capture_logs(processors=[merge_contextvars]) as logs:
+        worker = asyncio.create_task(queue.run_worker())
+        queue.submit(MeetingRefresh(meeting_id=7))
+        async with asyncio.timeout(WORKER_TIMEOUT):
+            await running.wait()
+        await card_refresh.stop_worker(worker)
+
+    drains = [entry for entry in logs if entry["event"] == "Background job drain finished"]
+    assert len(drains) == 1
+    assert drains[0]["succeeded"] == 1
+    metrics.assert_emitted(name=MetricKey.JOBS_SUCCEEDED, value=1, properties={"run_id": drains[0]["run_id"]})
+
+
+async def test_the_worker_names_the_database_sessions_it_holds(queue: RefreshQueue):
+    """Sessions are counted per connection context, so without one of its own everything the worker
+    holds falls into the unknown bucket, where a session it never returned cannot be told from
+    anyone else's."""
+    with mock.patch.object(card_refresh.db, "set_connection_context") as set_context:
+        worker = asyncio.create_task(queue.run_worker())
+        await asyncio.sleep(0)
+        await card_refresh.stop_worker(worker)
+
+    set_context.assert_called_once_with("BackgroundJobs")
 
 
 # --- The reporting window ---
@@ -779,6 +928,31 @@ def test_configure_publishes_the_queue_to_current_queue(refresh_api: TelegramApi
     assert configured.api is refresh_api
     assert configured.metrics is metrics_client
     assert configured.max_pending == 3
+
+
+def test_configure_worker_gives_the_queue_an_api_and_a_client_of_its_own(
+    bot: mock.AsyncMock, metrics_client: MetricsClient
+):
+    """Capture mode is per-instance state on the api and the client is flushed at the end of every
+    window, so a worker sharing either with a handler or a recurrent event would collide with it."""
+    configured = card_refresh.configure_worker(cast(ExtBot, bot), WorkerLimits(job_timeout=7.5, drain_deadline=3.5))
+
+    assert card_refresh.current_queue() is configured
+    assert configured.metrics is not metrics_client
+    assert configured.job_timeout == 7.5
+    assert configured.drain_deadline == 3.5
+    # The queue takes the card text off its own lines, which it may only do to an api nobody shares.
+    assert configured.api.log_card_text is False
+
+
+def test_worker_limits_come_from_the_deployed_configuration():
+    """Both bounds are what a teardown has to fit inside, so a process must run the deployed values
+    rather than the library defaults it would silently fall back to."""
+    app_config = AppConfig(run_mode=RunModes.POLLING, background_job_timeout_seconds=42.0, background_drain_seconds=4.0)
+
+    limits = WorkerLimits.from_config(app_config)
+
+    assert limits == WorkerLimits(job_timeout=42.0, drain_deadline=4.0)
 
 
 def test_current_queue_is_none_where_no_runtime_configured_one():

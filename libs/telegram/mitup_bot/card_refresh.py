@@ -15,9 +15,15 @@ stops flowing. Each job also runs under its own timeout, so the hang ends by its
 cancelled, counted failed, and the loop moves to the next meeting. Every window mints a `run_id`,
 bound on the lines of the jobs that run under it and carried by the records that close it, which is
 how a count pivots to the lines of the jobs behind it.
+
+Stopping the worker is cancelling it. Because the queue lives in this process only, a job still
+waiting at that point is a committed change no card will ever show, so a cancelled worker leaves
+service, spends a bounded deadline draining what it holds, publishes the window the stop
+interrupted, and names whatever the deadline cut short.
 """
 
 import asyncio
+from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from enum import StrEnum, auto
 from time import perf_counter
@@ -25,12 +31,14 @@ from typing import Any
 from uuid import uuid4
 
 import structlog
+from telegram.ext import ExtBot
 
 from mitup_bot import db
-from mitup_bot.api_wrapper import TelegramApiWrapper
+from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
+from mitup_bot.config import AppConfig
 from mitup_bot.models import Meetup
 from mitup_bot.models import Message as MessageModel
-from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit, bound_metrics_client
+from mitup_bot.monitoring import EmfBackend, MetricKey, MetricsClient, MetricUnit, bound_metrics_client
 from mitup_bot.monitoring.outbound import qualified_type
 
 log = structlog.get_logger(__name__)
@@ -47,6 +55,15 @@ REPORT_INTERVAL_SECONDS = 60
 # How long one job may run before it is cancelled and counted as failed. The default a process
 # overrides from `AppConfig.background_job_timeout_seconds`, which documents the bound it sets.
 JOB_TIMEOUT_SECONDS = 60.0
+
+# How long a stopping worker spends on the jobs it is still holding. The default a process overrides
+# from `AppConfig.background_drain_seconds`, which documents the bound it has to fit inside.
+DRAIN_DEADLINE_SECONDS = 10.0
+
+# The name the worker's database sessions are counted under. Sessions are attributed per context, so
+# without it everything the worker holds falls into the unknown bucket of the leak counter, where a
+# session the background jobs never returned cannot be told from anyone else's.
+CONNECTION_CONTEXT = "BackgroundJobs"
 
 
 class JobOutcome(StrEnum):
@@ -75,6 +92,31 @@ class JobState(StrEnum):
 
     PENDING = auto()
     IN_FLIGHT = auto()
+
+
+class DropReason(StrEnum):
+    """Why a submitted refresh was refused outright."""
+
+    QUEUE_FULL = auto()
+    SHUTTING_DOWN = auto()
+
+
+@dataclass(frozen=True)
+class WorkerLimits:
+    """The two clocks a process runs its background worker against.
+
+    They travel together because neither reads on its own: `job_timeout` bounds one job and
+    `drain_deadline` bounds every job left when the process stops, and it is the pair that says how
+    long a teardown can take. A process takes both from its `AppConfig` so the two cannot drift
+    between the runtimes that host the worker.
+    """
+
+    job_timeout: float = JOB_TIMEOUT_SECONDS
+    drain_deadline: float = DRAIN_DEADLINE_SECONDS
+
+    @classmethod
+    def from_config(cls, app: AppConfig) -> WorkerLimits:
+        return cls(job_timeout=app.background_job_timeout_seconds, drain_deadline=app.background_drain_seconds)
 
 
 @dataclass(frozen=True)
@@ -223,6 +265,7 @@ class RefreshQueue:
         max_pending: int = MAX_PENDING,
         report_interval: float = REPORT_INTERVAL_SECONDS,
         job_timeout: float = JOB_TIMEOUT_SECONDS,
+        drain_deadline: float = DRAIN_DEADLINE_SECONDS,
     ):
         self.api = api
         self.api.log_card_text = False
@@ -230,17 +273,24 @@ class RefreshQueue:
         self.max_pending = max_pending
         self.report_interval = report_interval
         self.job_timeout = job_timeout
+        self.drain_deadline = drain_deadline
         self.pending: dict[int, MeetingRefresh] = {}
         self.in_flight: dict[int, RunningJob] = {}
         self.counters = TickCounters()
         self.work_available = asyncio.Event()
+        self.accepting = True
         # The reporting window currently open. A job binds whichever one is open when it starts and
         # the reporter mints the next one as it publishes, so an id names a window, never a job.
         self.run_id = uuid4().hex
 
     def submit(self, job: MeetingRefresh) -> bool:
         """Queue a refresh, coalescing it onto any job already waiting for the same meeting.
-        Answers whether it was accepted; a queue at its cap drops it."""
+        Answers whether it was accepted; a queue at its cap or one already stopping drops it."""
+        if not self.accepting:
+            # Nothing taken now could still be drawn: the worker is spending its last seconds on the
+            # jobs it already holds, so accepting this one would only lengthen what it abandons.
+            log.warning("Meeting card refresh dropped", meeting_id=job.meeting_id, reason=DropReason.SHUTTING_DOWN)
+            return False
         if job.meeting_id in self.in_flight:
             # The running job read the meeting before this change committed, so it may still put a
             # stale render over the card the submitter drew: nothing may be passed over.
@@ -249,7 +299,7 @@ class RefreshQueue:
         if waiting is not None:
             job = coalesce(waiting, job)
         elif len(self.pending) >= self.max_pending:
-            log.warning("Meeting card refresh dropped", meeting_id=job.meeting_id, reason="queue_full")
+            log.warning("Meeting card refresh dropped", meeting_id=job.meeting_id, reason=DropReason.QUEUE_FULL)
             return False
         self.pending[job.meeting_id] = job
         self.counters.record_depth(len(self.pending))
@@ -282,6 +332,17 @@ class RefreshQueue:
         if not self.pending:
             self.work_available.clear()
         return running
+
+    def requeue(self, job: MeetingRefresh):
+        """Put an interrupted job back among the waiting ones, counting the attempt against it.
+
+        Its cards were left half drawn or not drawn at all, so the change stays outstanding —
+        whether the drain that follows still reaches it or the shutdown has to name it among the
+        ones nobody will. A refresh submitted for this meeting meanwhile is left alone: it already
+        covers every card this one would have drawn.
+        """
+        self.pending.setdefault(job.meeting_id, replace(job, attempt=job.attempt + 1))
+        self.work_available.set()
 
     async def execute(self, job: MeetingRefresh) -> JobOutcome:
         """Re-render one meeting's cards in its own write-mode critical section.
@@ -333,14 +394,21 @@ class RefreshQueue:
         return outcome
 
     async def run_next(self):
-        """Run one job to completion, holding its meeting in flight throughout. A failure ends
-        that job only: the drain loop behind it must outlive any one meeting's refresh."""
+        """Run one job to completion, holding its meeting in flight throughout.
+
+        A failure ends that job only: the drain loop behind it must outlive any one meeting's
+        refresh. A cancellation ends the loop as well, and puts the job it interrupted back among
+        the waiting ones for the shutdown drain to attempt again.
+        """
         running = self.take()
         if running is None:
             return
         with structlog.contextvars.bound_contextvars(run_id=self.run_id):
             try:
                 outcome = await self.run_job(running)
+            except asyncio.CancelledError:
+                self.requeue(running.job)
+                raise
             finally:
                 del self.in_flight[running.job.meeting_id]
                 self.metrics.emit(MetricKey.JOB_PROCESSING_TIME, elapsed_ms(running.started), MetricUnit.MILLISECONDS)
@@ -445,17 +513,41 @@ class RefreshQueue:
                 await self.work_available.wait()
                 await self.run_next()
 
+    async def drain_pending(self):
+        """Run what the queue is still holding, for at most `drain_deadline` seconds, then close
+        the window the stop interrupted.
+
+        The queue lives in this process only, so a job left waiting is a committed change no card
+        will ever show — worth finishing, but only against a clock: the orchestrator that asked us
+        to stop is running its own kill timer, and a drain that outlasts it takes the teardown and
+        the line explaining the loss down with it. The reporter was cancelled with the group, so
+        this publication is what carries out the counts and samples of every job in the window,
+        the ones this drain just ran included.
+        """
+        self.accepting = False
+        with bound_metrics_client(self.metrics):
+            with suppress(TimeoutError):
+                async with asyncio.timeout(self.drain_deadline):
+                    while self.pending:
+                        await self.run_next()
+        await self.publish()
+
     async def run_worker(self):
-        """Drain the queue and report on it for as long as the task lives; cancel it to stop.
+        """Drain the queue and report on it until cancelled; the cancellation is the stop request.
 
         The drain and the reporter are siblings under one group, so cancelling the worker cancels
         both, and neither can outlive the other as half a worker — draining with nothing reporting,
-        or reporting on a drain that stopped.
+        or reporting on a drain that stopped. Stopping then takes the queue out of service and
+        spends the drain deadline on the jobs it still holds, the interrupted one included.
         """
+        db.set_connection_context(CONNECTION_CONTEXT)
         try:
             async with asyncio.TaskGroup() as workers:
                 workers.create_task(self.run_drain())
                 workers.create_task(self.run_reporter())
+        except asyncio.CancelledError:
+            await self.drain_pending()
+            raise
         finally:
             self.report_abandoned()
 
@@ -479,6 +571,7 @@ def configure(
     metrics: MetricsClient,
     max_pending: int = MAX_PENDING,
     job_timeout: float = JOB_TIMEOUT_SECONDS,
+    drain_deadline: float = DRAIN_DEADLINE_SECONDS,
 ) -> RefreshQueue:
     """Build the process's refresh queue and publish it to `current_queue`.
 
@@ -487,8 +580,39 @@ def configure(
     through, so everything one job produces reaches CloudWatch in the window that counts the job.
     """
     global __queue
-    __queue = RefreshQueue(api, metrics, max_pending=max_pending, job_timeout=job_timeout)
+    __queue = RefreshQueue(
+        api, metrics, max_pending=max_pending, job_timeout=job_timeout, drain_deadline=drain_deadline
+    )
     return __queue
+
+
+def configure_worker(bot: ExtBot, limits: WorkerLimits) -> RefreshQueue:
+    """Build the process's refresh queue over an api and a metrics client of its own.
+
+    Both are the worker's alone. Capture mode is per-instance state on the api, so one shared with a
+    handler or a recurrent event would collide mid-invocation; and the client is flushed at the end
+    of every window, which is a cadence nothing else in the process shares — a client borrowed from
+    a request or a run would carry the worker's samples out on somebody else's flush and vice versa.
+    """
+    metrics = MetricsClient(EmfBackend())
+    return configure(
+        build_api(BotAdapter(bot, metrics)),
+        metrics,
+        job_timeout=limits.job_timeout,
+        drain_deadline=limits.drain_deadline,
+    )
+
+
+async def stop_worker(worker: asyncio.Task[None]):
+    """Stop *worker* and wait out the drain its cancellation runs.
+
+    Cancelling is how the worker is asked to stop and awaiting it is what holds the caller until the
+    jobs it drains are drawn, so this must run while the resources those edits need are still up.
+    The `CancelledError` the task ends on is the stop we asked for, not a failure of the caller.
+    """
+    worker.cancel()
+    with suppress(asyncio.CancelledError):
+        await worker
 
 
 def current_queue() -> RefreshQueue | None:

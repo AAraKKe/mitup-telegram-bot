@@ -197,6 +197,12 @@ class AppConfig(BaseModel):
     # healthy card refresh, so only a job that will never finish reaches it, and the OldestJobAge
     # alarm's threshold sits above this value so it fires only when the cancellation itself failed.
     background_job_timeout_seconds: float = Field(default=60.0, gt=0)
+    # How long a stopping process spends finishing the background jobs it is still holding before it
+    # drops them and says so. Everything a shutdown does must fit inside the orchestrator's kill
+    # timer: the ECS task definitions leave `stopTimeout` unset, so AWS's 30 s default is the whole
+    # budget, and this drain shares it with the rest of the teardown. Ten seconds is comfortably
+    # under it while still covering a queue of ordinary card edits.
+    background_drain_seconds: float = Field(default=10.0, gt=0)
 
     @field_validator("log_level")
     @classmethod

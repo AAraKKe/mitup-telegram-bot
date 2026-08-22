@@ -6,6 +6,7 @@ from telegram.ext import AIORateLimiter, Application, ContextTypes
 
 from mitup_bot import api_guards, db, docs_links, hosts_group, patreon, reconcile, supporter, timezone_api
 from mitup_bot.bootstrap import load_config
+from mitup_bot.card_refresh import WorkerLimits
 from mitup_bot.config import Env, RunModes
 from mitup_bot.custom_context import BOT_CONFIG_KEY, MitupContext, MitupUserData
 from mitup_bot.handlers import HandlersRegistry
@@ -178,6 +179,7 @@ class MitupRuntime:
             secret_token=None,
             metrics_client=metrics_client,
             run_mode=RunModes.POLLING,
+            worker_limits=WorkerLimits.from_config(self.config.app),
         )
 
     def __build_webhook_fastapi_app(self, metrics_client: MetricsClient) -> FastAPI:
@@ -201,6 +203,7 @@ class MitupRuntime:
             secret_token=self.config.bot.secret_token.get_secret_value(),
             metrics_client=metrics_client,
             run_mode=RunModes.WEBHOOK,
+            worker_limits=WorkerLimits.from_config(self.config.app),
             webhook_url=f"https://{self.config.bot.domain}:{self.config.bot.port}/telegram",
             max_connections=self.config.bot.max_connections,
             patreon_webhook_url=patreon_webhook_url,

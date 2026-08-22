@@ -6,9 +6,14 @@ import httpx
 from asgi_lifespan import LifespanManager
 from fastapi import FastAPI
 
+from mitup_bot.card_refresh import WorkerLimits
 from mitup_bot.config import RunModes
 from mitup_bot.monitoring import MetricsClient, NullBackend
 from mitup_bot.web import create_app
+
+# The two bounds cap a job and the shutdown drain respectively. Both finish at once unless a test
+# queues a job that blocks, so short values keep a stuck one from hanging the suite.
+TEST_WORKER_LIMITS = WorkerLimits(job_timeout=1.0, drain_deadline=1.0)
 
 
 def build_ptb_app_mock() -> MagicMock:
@@ -48,6 +53,7 @@ def build_test_web_app(
     webhook_url: str | None = "https://example.com/telegram",
     max_connections: int | None = 100,
     patreon_webhook_url: str | None = None,
+    worker_limits: WorkerLimits = TEST_WORKER_LIMITS,
 ) -> FastAPI:
     """Build a FastAPI app via the real factory with safe defaults.
 
@@ -55,6 +61,8 @@ def build_test_web_app(
     tests that exercise lifespan or argument forwarding should pass their own
     mocks so they can introspect them. ``patreon_webhook_url`` defaults to None,
     so the Patreon webhook registration is skipped unless a test opts in.
+    ``worker_limits`` defaults to the short test bounds; a test that wants to
+    watch a job outrun one passes its own.
     """
     if ptb_app is None:
         ptb_app = build_ptb_app_mock()
@@ -66,6 +74,7 @@ def build_test_web_app(
         secret_token=secret_token,
         metrics_client=metrics_client,
         run_mode=run_mode,
+        worker_limits=worker_limits,
         webhook_url=webhook_url,
         max_connections=max_connections,
         patreon_webhook_url=patreon_webhook_url,
