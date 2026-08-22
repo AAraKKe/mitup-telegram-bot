@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
+from structlog.contextvars import bound_contextvars
 from structlog.testing import capture_logs
 from telegram import (
     ChatMember,
@@ -27,6 +28,7 @@ from mitup_bot.api_wrapper import (
     ApiOutbox,
     BotAdapter,
     MeetingMessageEdit,
+    MeetingRefresh,
     QueuedApiCall,
     TelegramApi,
     build_api,
@@ -35,6 +37,7 @@ from mitup_bot.api_wrapper import (
     chat_member_is_present,
     handle_edit_errors,
 )
+from mitup_bot.card_refresh import RefreshQueue
 from mitup_bot.exceptions import (
     AnswerInlineQueryError,
     CallbackQueryTextTooLong,
@@ -1086,6 +1089,7 @@ async def test_immediate_bypasses_capture_and_restores_it(telegram_api: Telegram
 
 
 async def test_update_meeting_messages_current_first_order_survives_capture(telegram_api: TelegramApi, bot: AsyncMock):
+    """No queue is in service here, so the whole fan-out drains in the order it was captured in."""
     meeting = create_meetup(id=10, title="Meeting", language="en")
     create_user(id=1, tg_user_id=100, owned_meetings=[meeting])
     current_msg = create_message(id=1, inline_message_id=None, chat_id=100, message_id=501, meetup_id=10)
@@ -1724,6 +1728,167 @@ async def test_immediate_mode_edits_a_card_whose_digest_matches(telegram_api: Te
     await telegram_api.update_single_meeting_message(msg, meeting)
 
     bot.edit_message_text.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# Deferring the fan-out to the card-refresh queue
+# ---------------------------------------------------------------------------
+
+ORIGIN_UPDATE_ID = 4242
+
+
+@pytest.fixture
+def deferring_queue(telegram_api: TelegramApi, api_metrics_client: MetricsClient) -> RefreshQueue:
+    """A queue attached to the api under test, the way `MitupContext.from_update` attaches the
+    process's queue to the api it builds for a handler. The queue drains through an api of its
+    own, which is what a worker in service has."""
+    queue = RefreshQueue(TelegramApi(), api_metrics_client)
+    telegram_api.refresh_queue = queue
+    return queue
+
+
+def make_shared_meeting() -> tuple[Meetup, MessageModel, MessageModel]:
+    """A meeting the owner has open, also tracked by a card shared into another chat."""
+    meeting = create_meetup(id=10, title="Test Meeting", language="en")
+    create_user(id=1, tg_user_id=100, owned_meetings=[meeting])
+    current = create_message(id=1, inline_message_id=None, chat_id=100, message_id=501, meetup_id=10)
+    shared = create_message(
+        id=2, inline_message_id="inline_other", chat_instance="ci", chat_id=None, message_id=None, meetup_id=10
+    )
+    meeting.messages = [current, shared]
+    return meeting, current, shared
+
+
+async def run_fanout(api: TelegramApi, meeting: Meetup, **kwargs: Any) -> ApiOutbox:
+    """One write-mode fan-out: capture, then the post-commit drain the write lifecycle runs."""
+    outbox = api.begin_capture()
+    await api.update_meeting_messages(meeting=meeting, **kwargs)
+    api.end_capture()
+    await api.execute_queued(outbox)
+    return outbox
+
+
+async def test_the_fanout_defers_every_card_but_the_current_one(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue
+):
+    """The user gets the card in front of them on the invocation's own timeline; the rest become
+    one job, naming the card already drawn so the worker leaves it alone."""
+    meeting, current, _ = make_shared_meeting()
+
+    with bound_contextvars(update_id=ORIGIN_UPDATE_ID):
+        outbox = await run_fanout(telegram_api, meeting, current_message=current)
+
+    bot.edit_message_text.assert_awaited_once()
+    assert bot.edit_message_text.call_args.kwargs["message_id"] == 501
+    assert len(outbox.calls) == 1
+    assert deferring_queue.pending[10] == MeetingRefresh(
+        meeting_id=10, skip_message_db_id=1, origin_update_id=ORIGIN_UPDATE_ID
+    )
+
+
+async def test_a_fanout_with_no_current_card_defers_all_of_them(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue
+):
+    """Where the caller renders no card at all its feedback is the reply it sends, so the whole
+    fan-out goes to the worker and the job may pass over nothing."""
+    meeting, _, _ = make_shared_meeting()
+
+    outbox = await run_fanout(telegram_api, meeting)
+
+    bot.edit_message_text.assert_not_called()
+    assert outbox.calls == []
+    assert deferring_queue.pending[10] == MeetingRefresh(meeting_id=10, skip_message_db_id=None)
+
+
+@pytest.mark.parametrize(
+    "state_flag",
+    ["was_deleted", "has_finished"],
+)
+async def test_a_terminal_fanout_draws_every_card_itself(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue, state_flag: str
+):
+    """A deletion and a finish render rows that die in the same transaction, so a job reading the
+    meeting afterwards would find nothing to draw and the card would never get its banner."""
+    meeting, current, _ = make_shared_meeting()
+
+    outbox = await run_fanout(telegram_api, meeting, current_message=current, **{state_flag: True})
+
+    assert len(outbox.calls) == 2
+    assert bot.edit_message_text.await_count == 2
+    assert deferring_queue.pending == {}
+
+
+async def test_the_fanout_draws_every_card_where_the_queue_takes_no_deferrals(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue
+):
+    """The deployed switch is off: every card is back on the invocation's own timeline."""
+    deferring_queue.accepts_fanout = False
+    meeting, current, _ = make_shared_meeting()
+
+    outbox = await run_fanout(telegram_api, meeting, current_message=current)
+
+    assert len(outbox.calls) == 2
+    assert bot.edit_message_text.await_count == 2
+    assert deferring_queue.pending == {}
+
+
+async def test_the_fanout_draws_every_card_where_no_queue_is_attached(telegram_api: TelegramApi, bot: AsyncMock):
+    """A CLI job and a recurrent event build their api through `build_api`, which attaches none:
+    nothing would ever pick a deferral up."""
+    assert telegram_api.refresh_queue is None
+    meeting, current, _ = make_shared_meeting()
+
+    outbox = await run_fanout(telegram_api, meeting, current_message=current)
+
+    assert len(outbox.calls) == 2
+    assert bot.edit_message_text.await_count == 2
+
+
+async def test_an_immediate_fanout_never_defers(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue
+):
+    """Outside capture mode there is no post-commit moment to submit from, and a job submitted
+    from inside an open transaction would read a meeting the caller may still roll back."""
+    meeting, current, _ = make_shared_meeting()
+
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=current)
+
+    assert bot.edit_message_text.await_count == 2
+    assert deferring_queue.pending == {}
+
+
+async def test_a_refresh_only_outbox_still_reaches_the_queue(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue
+):
+    """An outbox can hold a refresh and no calls at all — the one card this fan-out rendered was
+    skipped as unchanged — and the deferred cards were never rendered here, so an outbox dropped
+    for holding no calls loses them with nothing to say so."""
+    meeting, current, _ = make_shared_meeting()
+    confirming = await run_fanout(telegram_api, meeting, current_message=current)
+    apply_confirmed_digests(confirming, current)
+    # That pass queued a refresh of its own; the assertions below are about the second one.
+    deferring_queue.pending.clear()
+    bot.edit_message_text.reset_mock()
+
+    outbox = await run_fanout(telegram_api, meeting, current_message=current)
+
+    assert outbox.calls == []
+    bot.edit_message_text.assert_not_called()
+    assert deferring_queue.pending[10] == MeetingRefresh(meeting_id=10, skip_message_db_id=1)
+
+
+async def test_a_refused_submit_loses_the_fanout_without_failing_the_invocation(
+    telegram_api: TelegramApi, deferring_queue: RefreshQueue
+):
+    """The user's action is already committed, so a queue at its cap or on its way down costs
+    the deferred cards their refresh and nothing else."""
+    deferring_queue.accepting = False
+    meeting, current, _ = make_shared_meeting()
+
+    outbox = await run_fanout(telegram_api, meeting, current_message=current)
+
+    assert len(outbox.meeting_refreshes) == 1
+    assert deferring_queue.pending == {}
 
 
 # ---------------------------------------------------------------------------

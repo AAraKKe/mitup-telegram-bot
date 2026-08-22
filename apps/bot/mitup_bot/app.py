@@ -180,6 +180,7 @@ class MitupRuntime:
             metrics_client=metrics_client,
             run_mode=RunModes.POLLING,
             worker_limits=WorkerLimits.from_config(self.config.app),
+            accepts_fanout=self.config.bot.deferred_card_refresh,
         )
 
     def __build_webhook_fastapi_app(self, metrics_client: MetricsClient) -> FastAPI:
@@ -204,6 +205,7 @@ class MitupRuntime:
             metrics_client=metrics_client,
             run_mode=RunModes.WEBHOOK,
             worker_limits=WorkerLimits.from_config(self.config.app),
+            accepts_fanout=self.config.bot.deferred_card_refresh,
             webhook_url=f"https://{self.config.bot.domain}:{self.config.bot.port}/telegram",
             max_connections=self.config.bot.max_connections,
             patreon_webhook_url=patreon_webhook_url,

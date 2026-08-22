@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import partial
 from hashlib import sha256
+from time import perf_counter
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import httpx
@@ -80,7 +81,7 @@ CONNECT_FAILURE_CAUSES = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTi
 
 
 if TYPE_CHECKING:
-    ...
+    from mitup_bot.card_refresh import RefreshQueue
 
 
 @dataclass(frozen=True)
@@ -141,6 +142,27 @@ class QueuedApiCall:
     idempotent: bool = False
 
 
+@dataclass(frozen=True)
+class MeetingRefresh:
+    """One meeting's cards to re-render in the background, optionally leaving a single card alone.
+
+    `skip_message_db_id` names the card the submitting invocation already rendered itself.
+    `origin_update_id` names the update whose commit queued the refresh: the worker runs under no
+    update of its own, so this is the only way its lines pivot back to the interaction behind them.
+    `coalesced` counts the later submits that merged into this job and `attempt` numbers the
+    executions of it.
+    """
+
+    meeting_id: int
+    skip_message_db_id: int | None = None
+    origin_update_id: int | None = None
+    coalesced: int = 0
+    attempt: int = 1
+    # Monotonic, so the wait it measures survives a clock adjustment. Out of the equality because
+    # two refreshes naming the same cards are the same job whenever either of them was made.
+    enqueued_at: float = field(default_factory=perf_counter, compare=False)
+
+
 @dataclass
 class ApiOutbox:
     """Queued Telegram calls plus the DB fix-ups their execution discovers.
@@ -152,12 +174,17 @@ class ApiOutbox:
     `confirmed_render_digests` maps a `Message` row id to the digest of the payload Telegram
     accepted for it. Only a confirmed delivery lands here, which is what lets a card whose edit
     failed keep the digest of what is actually on Telegram and be repaired by the next render.
+
+    `meeting_refreshes` holds the fan-outs this invocation handed to the background worker rather
+    than drawing itself. They are recorded inside the transaction and submitted by
+    `execute_queued` strictly after it commits, because the job re-reads the meeting.
     """
 
     calls: list[QueuedApiCall] = field(default_factory=list)
     dead_message_ids: list[int] = field(default_factory=list)
     inactive_tg_user_ids: list[int] = field(default_factory=list)
     confirmed_render_digests: dict[int, str] = field(default_factory=dict)
+    meeting_refreshes: list[MeetingRefresh] = field(default_factory=list)
 
 
 class DrainOutcome(Enum):
@@ -277,6 +304,9 @@ def build_api(adapter_or_bot: ContextOrBotAdapter | ExtBot) -> TelegramApiWrappe
 
     When an ExtBot is passed directly, it is wrapped in a BotAdapter with a NullBackend.
     Prefer constructing BotAdapter(bot, metrics_client) explicitly for real metric emission.
+
+    The api comes back with no refresh queue, which is what makes an out-of-band caller — a CLI
+    job, a recurrent event, the background worker itself — draw every meeting card inline.
     """
     from mitup_bot.monitoring.backend import NullBackend
 
@@ -437,9 +467,23 @@ def edit_target(update: Update) -> tuple[int | None, int | None, str | None]:
     raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
 
 
+def ambient_update_id() -> int | None:
+    """The update this invocation runs under, bound once by the handler entry point.
+
+    Anything the bot does outside an update — a recurrent event, a web callback, a CLI job — has
+    none, and a refresh queued from there simply carries no origin.
+    """
+    update_id = structlog.contextvars.get_contextvars().get("update_id")
+    return update_id if isinstance(update_id, int) else None
+
+
 class TelegramApiWrapper(Protocol):
     # Whether a failed meeting-card edit reports the rendered card or only its size.
     log_card_text: bool
+    # The process's card-refresh queue, attached where the api is built for a handler and left
+    # None everywhere else — a CLI job, a recurrent event, and the worker's own api, which is what
+    # keeps a background job from handing its fan-out back to the queue running it.
+    refresh_queue: RefreshQueue | None
 
     @property
     def adapter(self) -> ContextOrBotAdapter: ...
@@ -542,6 +586,8 @@ class TelegramApi:
     # what it tried to deliver. A background fanout multiplies that same line by every card tracking
     # the meeting, so the queue turns this off on the api it owns and the size fields stand in.
     log_card_text: bool = True
+    # Attached at construction by whoever builds an api for a handler; see the protocol.
+    refresh_queue: RefreshQueue | None = None
 
     def __init__(self):
         self._adapter: ContextOrBotAdapter | None = None
@@ -577,6 +623,23 @@ class TelegramApi:
         self._outbox = None
 
     async def execute_queued(self, outbox: ApiOutbox):
+        """Drain the queued calls, then submit the fan-outs `defer_meeting_refresh` recorded.
+
+        This is the after-commit end of that hand-off, which is the only point a job may be
+        submitted from: it re-reads the meeting, so it must not start against a transaction still
+        open. The submission also sits outside the drain because an outbox can carry a refresh and
+        no calls at all — every card the invocation rendered may have matched what Telegram already
+        shows — and that refresh still has to reach the queue. A queue at its cap or already
+        stopping refuses one and records the drop; the cards then keep what they show until the
+        meeting changes again.
+        """
+        await self._drain_outbox(outbox)
+        if self.refresh_queue is None:
+            return
+        for refresh in outbox.meeting_refreshes:
+            self.refresh_queue.submit(refresh)
+
+    async def _drain_outbox(self, outbox: ApiOutbox):
         """Execute the queued calls in order, after the handler's transaction committed.
 
         The action the user took has already landed, so nothing here is reported back to them:
@@ -1172,6 +1235,27 @@ class TelegramApi:
             payload,
         )
 
+    def defer_meeting_refresh(self, meeting: Meetup, current_message: MessageModel | None) -> bool:
+        """Record a refresh of *meeting* on the outbox instead of drawing the rest of its cards
+        here, answering whether it was recorded.
+
+        Recording is all that happens inside the transaction; `execute_queued` submits the refresh
+        to the queue once that transaction has committed, because the job re-reads the meeting.
+        Only a capture-mode fan-out can defer, since the outbox is what carries it across that
+        boundary.
+        """
+        queue = self.refresh_queue
+        if self._outbox is None or queue is None or not queue.accepts_fanout or meeting.id is None:
+            return False
+        self._outbox.meeting_refreshes.append(
+            MeetingRefresh(
+                meeting_id=meeting.id,
+                skip_message_db_id=current_message.id if current_message is not None else None,
+                origin_update_id=ambient_update_id(),
+            )
+        )
+        return True
+
     async def update_meeting_messages(
         self,
         *,
@@ -1184,6 +1268,11 @@ class TelegramApi:
         """
         Updates all tracked messages for a meeting, `current_message` first for immediate
         feedback (`skip_current` when the caller already handles it separately).
+
+        Every card behind the current one goes to the background worker where a queue accepts it,
+        so the invocation ends once the card the user is looking at is drawn. A deletion or a
+        finish is the exception and always draws every card here: both render rows that die in the
+        same transaction, so a job reading the meeting afterwards would find nothing to draw.
         """
         # First lets update the current message for a better user experience
         if current_message and not skip_current:
@@ -1193,6 +1282,8 @@ class TelegramApi:
                 was_deleted=was_deleted,
                 has_finished=has_finished,
             )
+        if not (was_deleted or has_finished) and self.defer_meeting_refresh(meeting, current_message):
+            return
         for message in meeting.messages:
             if message == current_message:
                 continue

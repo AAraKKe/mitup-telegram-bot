@@ -8,6 +8,7 @@ import structlog
 from telegram import Update
 from telegram.ext import Application, CallbackContext, ExtBot
 
+from mitup_bot import card_refresh
 from mitup_bot.api_wrapper import TelegramApi, TelegramApiWrapper
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import BotConfig
@@ -395,5 +396,7 @@ class MitupContext(
         assert isinstance(update, Update), "This should never happen, type is always Update in Mitupbot"
 
         metrics = MetricsClient(EmfBackend())
+        api = TelegramApi()
+        api.refresh_queue = card_refresh.current_queue()
 
-        return MitupContext(application, update=update, metrics=metrics, api=TelegramApi())
+        return MitupContext(application, update=update, metrics=metrics, api=api)

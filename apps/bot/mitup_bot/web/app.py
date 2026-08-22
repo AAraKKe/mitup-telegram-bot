@@ -35,19 +35,20 @@ async def run_shutdown_step(step: Callable[[], Awaitable[None]], metrics_client:
     log.info("Completed shutdown step", label=label)
 
 
-def start_refresh_worker(ptb_app: Application, worker_limits: WorkerLimits) -> asyncio.Task[None]:
+def start_refresh_worker(ptb_app: Application, worker_limits: WorkerLimits, accepts_fanout: bool) -> asyncio.Task[None]:
     """Put the process's card-refresh queue in service and spawn the worker draining it.
 
     It has to be running before the lifespan yields: from that point uvicorn serves requests, and an
     update handled under one can submit a refresh that nothing would otherwise pick up.
     """
-    queue = card_refresh.configure_worker(ptb_app.bot, worker_limits)
+    queue = card_refresh.configure_worker(ptb_app.bot, worker_limits, accepts_fanout=accepts_fanout)
     worker = asyncio.create_task(queue.run_worker())
     log.info(
         "Started the card refresh worker",
         job_timeout_seconds=worker_limits.job_timeout,
         drain_deadline_seconds=worker_limits.drain_deadline,
         max_pending=queue.max_pending,
+        accepts_fanout=accepts_fanout,
     )
     return worker
 
@@ -61,6 +62,7 @@ def build_webhook_lifespan(
     patreon_webhook_url: str | None,
     unrouted: UnroutedRequests,
     worker_limits: WorkerLimits,
+    accepts_fanout: bool,
 ) -> Lifespan:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -68,7 +70,7 @@ def build_webhook_lifespan(
         try:
             await ptb_app.initialize()
             await ptb_app.start()
-            worker = start_refresh_worker(ptb_app, worker_limits)
+            worker = start_refresh_worker(ptb_app, worker_limits, accepts_fanout)
             await ptb_app.bot.set_webhook(
                 url=webhook_url,
                 secret_token=secret_token,
@@ -126,6 +128,7 @@ def build_polling_lifespan(
     metrics_client: MetricsClient,
     unrouted: UnroutedRequests,
     worker_limits: WorkerLimits,
+    accepts_fanout: bool,
 ) -> Lifespan:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -136,7 +139,7 @@ def build_polling_lifespan(
             await ptb_app.updater.start_polling()
             log.info("Started polling for updates")
             await ptb_app.start()
-            worker = start_refresh_worker(ptb_app, worker_limits)
+            worker = start_refresh_worker(ptb_app, worker_limits, accepts_fanout)
         except Exception:
             metrics_client.emit(MetricKey.LIFESPAN_STARTUP_FAILED)
             log.exception("Lifespan startup failed in polling mode")
@@ -175,6 +178,7 @@ def create_app(
     metrics_client: MetricsClient,
     run_mode: RunModes,
     worker_limits: WorkerLimits,
+    accepts_fanout: bool = True,
     webhook_url: str | None = None,
     max_connections: int | None = None,
     patreon_webhook_url: str | None = None,
@@ -198,9 +202,10 @@ def create_app(
                 patreon_webhook_url,
                 unrouted,
                 worker_limits,
+                accepts_fanout,
             )
         case RunModes.POLLING:
-            lifespan = build_polling_lifespan(ptb_app, metrics_client, unrouted, worker_limits)
+            lifespan = build_polling_lifespan(ptb_app, metrics_client, unrouted, worker_limits, accepts_fanout)
         case _ as unreachable:
             assert_never(unreachable)
 

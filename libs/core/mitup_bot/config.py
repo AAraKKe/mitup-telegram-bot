@@ -251,6 +251,11 @@ class BotConfig(BaseModel):
     # strictly sequential; raising it is the deliberate concurrency flip, done via
     # env var override at rollout time so the revert stays config-only.
     concurrent_updates: int = Field(default=1, ge=1)
+    # Whether a committed meeting fan-out hands every card but the one the user is looking at to
+    # the process's refresh queue instead of drawing them inline. On by default; turning it off
+    # via MITUPBOT__BOT__DEFERRED_CARD_REFRESH puts every card back on the invocation's own
+    # timeline, so the revert stays config-only.
+    deferred_card_refresh: bool = True
     # Telegram user ids allowed to operate the mass-broadcast feature. Empty by default, which
     # keeps the feature dormant until ids are set. In production it is set via env var override
     # (MITUPBOT__BOT__ADMIN_TG_IDS) so the allowlist stays out of the checked-in TOML.

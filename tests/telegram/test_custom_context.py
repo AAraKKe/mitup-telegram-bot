@@ -1,17 +1,22 @@
 import datetime as dt
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from telegram import Chat, Location, Message, Update
 from telegram import User as TgUser
+from telegram.ext import Application
 
+from mitup_bot import card_refresh
+from mitup_bot.api_wrapper import TelegramApi
 from mitup_bot.custom_context import (
     ContextData,
     ContextId,
+    MitupContext,
     fault_fields_from_update,
 )
 from mitup_bot.exceptions import ContextPropertyConversionError, ContextPropertyNotSetError
-from mitup_bot.monitoring import Feature
+from mitup_bot.monitoring import Feature, MetricsClient
 from tests.helpers import StubMitupContext
 from tests.helpers.monitoring import MetricAssertions
 
@@ -257,3 +262,28 @@ def test_fault_fields_carry_a_location_trigger():
 
     assert fields["location"] == {"latitude": 41.2, "longitude": 1.5}
     assert fields["trigger_text"] is None
+
+
+def make_update() -> Update:
+    chat = Chat(id=7, type=Chat.PRIVATE)
+    user = TgUser(id=42, first_name="Ada", is_bot=False)
+    message = Message(message_id=99, date=dt.datetime.now(dt.UTC), chat=chat, from_user=user, text="hi")
+    return Update(update_id=5, message=message)
+
+
+def test_from_update_hands_the_api_the_queue_in_service(metrics_client: MetricsClient):
+    """A handler's fan-out defers only through the queue on its own api, so the update that builds
+    that api is where the process's queue reaches it."""
+    queue = card_refresh.configure(TelegramApi(), metrics_client)
+
+    context = MitupContext.from_update(make_update(), MagicMock(spec=Application))
+
+    assert context.api.refresh_queue is queue
+
+
+def test_from_update_hands_the_api_no_queue_where_none_is_in_service():
+    """A runtime that configured none — a test, a process still starting — leaves the api drawing
+    every card inline rather than recording a deferral nothing would pick up."""
+    context = MitupContext.from_update(make_update(), MagicMock(spec=Application))
+
+    assert context.api.refresh_queue is None

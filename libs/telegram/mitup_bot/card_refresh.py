@@ -24,7 +24,7 @@ interrupted, and names whatever the deadline cut short.
 
 import asyncio
 from contextlib import suppress
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from enum import StrEnum, auto
 from time import perf_counter
 from typing import Any
@@ -34,7 +34,7 @@ import structlog
 from telegram.ext import ExtBot
 
 from mitup_bot import db
-from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
+from mitup_bot.api_wrapper import BotAdapter, MeetingRefresh, TelegramApiWrapper, build_api
 from mitup_bot.config import AppConfig
 from mitup_bot.models import Meetup
 from mitup_bot.models import Message as MessageModel
@@ -117,27 +117,6 @@ class WorkerLimits:
     @classmethod
     def from_config(cls, app: AppConfig) -> WorkerLimits:
         return cls(job_timeout=app.background_job_timeout_seconds, drain_deadline=app.background_drain_seconds)
-
-
-@dataclass(frozen=True)
-class MeetingRefresh:
-    """One meeting's cards to re-render, optionally leaving a single card alone.
-
-    `skip_message_db_id` names the card the submitting invocation already rendered itself.
-    `origin_update_id` names the update whose commit queued the refresh: the worker runs under no
-    update of its own, so this is the only way its lines pivot back to the interaction behind them.
-    `coalesced` counts the later submits that merged into this job and `attempt` numbers the
-    executions of it.
-    """
-
-    meeting_id: int
-    skip_message_db_id: int | None = None
-    origin_update_id: int | None = None
-    coalesced: int = 0
-    attempt: int = 1
-    # Monotonic, so the wait it measures survives a clock adjustment. Out of the equality because
-    # two refreshes naming the same cards are the same job whenever either of them was made.
-    enqueued_at: float = field(default_factory=perf_counter, compare=False)
 
 
 @dataclass(frozen=True)
@@ -256,6 +235,9 @@ class RefreshQueue:
     outright is also what lets the queue take the card text off its failure lines. *metrics* is the
     client that api emits through, which is what lands a job's outbound timings and its post-commit
     faults in the same window that publishes the job's counts.
+
+    *accepts_fanout* is the deployed switch behind the deferral: with it off a committed fan-out
+    draws every card on its own timeline and nothing is submitted here.
     """
 
     def __init__(
@@ -266,6 +248,7 @@ class RefreshQueue:
         report_interval: float = REPORT_INTERVAL_SECONDS,
         job_timeout: float = JOB_TIMEOUT_SECONDS,
         drain_deadline: float = DRAIN_DEADLINE_SECONDS,
+        accepts_fanout: bool = True,
     ):
         self.api = api
         self.api.log_card_text = False
@@ -274,6 +257,7 @@ class RefreshQueue:
         self.report_interval = report_interval
         self.job_timeout = job_timeout
         self.drain_deadline = drain_deadline
+        self.accepts_fanout = accepts_fanout
         self.pending: dict[int, MeetingRefresh] = {}
         self.in_flight: dict[int, RunningJob] = {}
         self.counters = TickCounters()
@@ -572,6 +556,7 @@ def configure(
     max_pending: int = MAX_PENDING,
     job_timeout: float = JOB_TIMEOUT_SECONDS,
     drain_deadline: float = DRAIN_DEADLINE_SECONDS,
+    accepts_fanout: bool = True,
 ) -> RefreshQueue:
     """Build the process's refresh queue and publish it to `current_queue`.
 
@@ -581,12 +566,17 @@ def configure(
     """
     global __queue
     __queue = RefreshQueue(
-        api, metrics, max_pending=max_pending, job_timeout=job_timeout, drain_deadline=drain_deadline
+        api,
+        metrics,
+        max_pending=max_pending,
+        job_timeout=job_timeout,
+        drain_deadline=drain_deadline,
+        accepts_fanout=accepts_fanout,
     )
     return __queue
 
 
-def configure_worker(bot: ExtBot, limits: WorkerLimits) -> RefreshQueue:
+def configure_worker(bot: ExtBot, limits: WorkerLimits, accepts_fanout: bool = True) -> RefreshQueue:
     """Build the process's refresh queue over an api and a metrics client of its own.
 
     Both are the worker's alone. Capture mode is per-instance state on the api, so one shared with a
@@ -600,6 +590,7 @@ def configure_worker(bot: ExtBot, limits: WorkerLimits) -> RefreshQueue:
         metrics,
         job_timeout=limits.job_timeout,
         drain_deadline=limits.drain_deadline,
+        accepts_fanout=accepts_fanout,
     )
 
 

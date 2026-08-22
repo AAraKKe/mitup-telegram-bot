@@ -11,8 +11,8 @@ from telegram.error import BadRequest
 from telegram.ext import ExtBot
 
 from mitup_bot import card_refresh, reconcile
-from mitup_bot.api_wrapper import BotAdapter, TelegramApi
-from mitup_bot.card_refresh import JobOutcome, MeetingRefresh, RefreshQueue, RunningJob, WorkerLimits
+from mitup_bot.api_wrapper import BotAdapter, MeetingRefresh, TelegramApi
+from mitup_bot.card_refresh import JobOutcome, RefreshQueue, RunningJob, WorkerLimits
 from mitup_bot.config import AppConfig, RunModes
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
@@ -324,6 +324,24 @@ async def test_execute_is_a_no_op_when_the_meeting_is_gone(
     assert await queue.execute(MeetingRefresh(meeting_id=7)) is JobOutcome.SKIPPED
 
     bot.edit_message_text.assert_not_awaited()
+
+
+async def test_a_job_draws_its_own_cards_rather_than_queueing_the_meeting_again(
+    queue: RefreshQueue,
+    mock_session: MockDbSession,
+    registered_reconciler: None,
+    bot: mock.AsyncMock,
+    meeting_with_two_cards: Meetup,
+):
+    """The worker's api carries no queue, so a job cannot defer its fan-out back to the queue
+    running it — which it would then do again on every execution, for the life of the process."""
+    mock_session.add_object(meeting_with_two_cards)
+    assert queue.api.refresh_queue is None
+
+    await queue.execute(MeetingRefresh(meeting_id=7))
+
+    assert bot.edit_message_text.await_count == 2
+    assert queue.pending == {}
 
 
 async def test_a_failed_card_edit_reports_the_card_by_size(
@@ -943,6 +961,8 @@ def test_configure_worker_gives_the_queue_an_api_and_a_client_of_its_own(
     assert configured.drain_deadline == 3.5
     # The queue takes the card text off its own lines, which it may only do to an api nobody shares.
     assert configured.api.log_card_text is False
+    # And that api is handed no queue, which is what keeps a job's fan-out off the queue running it.
+    assert configured.api.refresh_queue is None
 
 
 def test_worker_limits_come_from_the_deployed_configuration():
