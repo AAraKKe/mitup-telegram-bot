@@ -1233,6 +1233,12 @@ class TelegramApi:
                     payload,
                     idempotent=True,
                 )
+            else:
+                log.info(
+                    "Meeting card edit skipped",
+                    message_db_id=message.id,
+                    reason="digest_unchanged",
+                )
             return
         await self._invoke_logging_failure(
             "update_meeting_message",

@@ -1656,20 +1656,32 @@ async def test_capture_skips_the_card_whose_confirmed_digest_still_matches(teleg
     meeting, msg = make_bot_chat_meeting()
 
     first = telegram_api.begin_capture()
-    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    with capture_logs() as first_logs:
+        await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
     telegram_api.end_capture()
     await telegram_api.execute_queued(first)
     apply_confirmed_digests(first, msg)
     bot.edit_message_text.reset_mock()
 
+    # A card whose edit is queued is narrated by the call itself, never by a skip line.
+    assert not [entry for entry in first_logs if entry["event"] == "Meeting card edit skipped"]
+
     second = telegram_api.begin_capture()
-    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    with capture_logs() as second_logs:
+        await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
     telegram_api.end_capture()
     await telegram_api.execute_queued(second)
 
     # Nothing about the card changed, so the refresh costs no Telegram round trip at all.
     assert second.calls == []
     bot.edit_message_text.assert_not_called()
+
+    # The skipped card no longer appears as a Telegram API call line, so the skip line is the
+    # only record of the decision.
+    skipped = next(entry for entry in second_logs if entry["event"] == "Meeting card edit skipped")
+    assert skipped["log_level"] == "info"
+    assert skipped["reason"] == "digest_unchanged"
+    assert skipped["message_db_id"] == msg.id
 
 
 async def test_capture_queues_the_edit_again_once_the_card_changes(telegram_api: TelegramApi, bot: AsyncMock):
