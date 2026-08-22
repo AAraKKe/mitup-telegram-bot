@@ -193,6 +193,10 @@ class AppConfig(BaseModel):
     # on every line beside `component`. A process started any other way — a local run, a
     # terraform-registered task definition — reports the unknown-release marker instead.
     release: str | None = None
+    # How long one background job may run before it is cancelled and counted as failed. Far above a
+    # healthy card refresh, so only a job that will never finish reaches it, and the OldestJobAge
+    # alarm's threshold sits above this value so it fires only when the cancellation itself failed.
+    background_job_timeout_seconds: float = Field(default=60.0, gt=0)
 
     @field_validator("log_level")
     @classmethod

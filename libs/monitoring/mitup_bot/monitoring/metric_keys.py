@@ -30,11 +30,12 @@ class MetricKey(CamelCaseStrEnum):
     """This is a metric to be emitted when there is a processing error, user input error, etc."""
     FAULT = auto()
     """This is a metric to be emitted when there is a system fault, something that is not expected to happen.
-    It is the outcome of one invocation, written exactly once per logger per flush window by the
-    wrapper that owns the invocation (`callback_with_metrics`, `handle_maintainance`) — plus
-    `registry.process_update_error` for a failure no wrapped callback owned — and by nothing else.
-    EMF appends repeated values under the same name, so a second writer turns the datapoint into an
-    array that the fault alarms and the `filter Fault = 1` triage query both stop matching."""
+    It is the outcome of one unit of work — a handler invocation, an events run, a background job —
+    written exactly once per unit by the framework wrapper that owns it (`callback_with_metrics`,
+    `handle_maintainance`, `registry.process_update_error`, `RefreshQueue.run_next`) and by nothing
+    else. Every one of those emits on success too: the fault-rate alarm reads SampleCount as its
+    denominator, so a unit that returns without emitting inflates the rate instead of reporting no
+    fault."""
     POST_COMMIT_API_FAULT = auto()
     """A queued Telegram call failed while the outbox drained after the transaction committed. This is
     a partial rendering failure, not the invocation outcome — the DB is already correct and the handler
@@ -174,6 +175,26 @@ class MetricKey(CamelCaseStrEnum):
     so none of them reaches this record — the bounded per-interval summary log line beside this
     emission (`Unrouted request sweep summary`) is where the top targets land. A spike is a scan,
     not a bug."""
+    JOBS_QUEUED = auto()
+    """High-water card-refresh queue depth since the last worker window, reset each window; read
+    with `stat = "Maximum"` by the mitup-infra#35 backlog widget. Emitted every window including
+    the zeros, so the widget charts a backlog rather than whichever submits happened to arrive."""
+    JOBS_SUCCEEDED = auto()
+    """Card-refresh jobs completed in the published window, zeros included, so the mitup-infra#35
+    processed widget draws an unbroken line."""
+    JOBS_FAILED = auto()
+    """Card-refresh jobs whose execution raised or outran the per-job timeout, counted as a unit
+    (meeting read, render, session); per window, zeros included. A card Telegram refused counts on
+    `POST_COMMIT_API_FAULT` instead — never here, or the mitup-infra#35 processed widget would
+    double-count it."""
+    JOB_PROCESSING_TIME = auto()
+    """Milliseconds per executed card-refresh job, failures included. An idle window emits no
+    sample: a synthetic zero would drag the p90 the mitup-infra#35 latency widget reads."""
+    OLDEST_JOB_AGE = auto()
+    """Milliseconds the longest-outstanding card-refresh job has been running or waiting, 0 when
+    the queue is idle; emitted every window. Read by mitup-infra#35, whose alarm threshold sits
+    above the per-job timeout: a slow or failing job self-clears when that timeout cancels it, so
+    the series crosses the threshold only when a job outlived its own cancellation."""
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"

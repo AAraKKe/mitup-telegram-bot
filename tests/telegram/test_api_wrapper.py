@@ -1798,6 +1798,29 @@ async def test_blocked_user_send_is_not_logged_as_telegram_call_failure(telegram
     assert not [entry for entry in logs if entry["event"] == "Telegram call failed"]
 
 
+@pytest.mark.parametrize(
+    "log_card_text, card_fields",
+    [(True, {"text", "markup"}), (False, {"text_len", "entity_count"})],
+    ids=["handler_api", "background_api"],
+)
+async def test_a_meeting_card_payload_carries_its_text_only_where_it_is_wanted(
+    telegram_api: TelegramApi, log_card_text: bool, card_fields: set[str]
+):
+    """A handler edits the few cards of the meeting in front of it and its failure line has to
+    show what it tried to deliver. A background fanout repeats that line for every card tracking
+    the meeting, and the card is prose its users wrote, so the api the refresh queue owns
+    describes it by size instead."""
+    meeting, card = make_bot_chat_meeting()
+    telegram_api.log_card_text = log_card_text
+    outbox = telegram_api.begin_capture()
+
+    await telegram_api.update_single_meeting_message(card, meeting)
+
+    telegram_api.end_capture()
+    payload = outbox.calls[0].payload
+    assert set(payload) == {"chat_id", "message_id", "inline_message_id"} | card_fields
+
+
 async def test_capture_mode_enqueues_the_payload_snapshot(telegram_api: TelegramApi):
     update = MagicMock(spec=Update)
     update.effective_chat.id = 42

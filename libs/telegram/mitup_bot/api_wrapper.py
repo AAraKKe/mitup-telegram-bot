@@ -322,6 +322,22 @@ def meeting_edit_log_payload(edit: MeetingMessageEdit) -> dict[str, Any]:
     }
 
 
+def meeting_edit_log_facts(edit: MeetingMessageEdit) -> dict[str, Any]:
+    """Loggable identifiers of a meeting-message edit, describing the card by size only.
+
+    A background refresh fans one meeting out over every card tracking it, so an outage multiplies
+    whatever a failure line carries by the number of cards; the rendered card is the title, the
+    description and the participants the users wrote, which is why its size stands in for it here.
+    """
+    return {
+        "chat_id": edit.chat_id,
+        "message_id": edit.message_id,
+        "inline_message_id": edit.inline_message_id,
+        "text_len": len(edit.text),
+        "entity_count": len(edit.entities or []),
+    }
+
+
 def cap_outbound_text(text: FormattedText, api_method: str) -> FormattedText:
     """Return *text* within Telegram's message-text cap, saying so when it had to be cut.
 
@@ -391,6 +407,9 @@ def edit_target(update: Update) -> tuple[int | None, int | None, str | None]:
 
 
 class TelegramApiWrapper(Protocol):
+    # Whether a failed meeting-card edit reports the rendered card or only its size.
+    log_card_text: bool
+
     @property
     def adapter(self) -> ContextOrBotAdapter: ...
     @adapter.setter
@@ -488,6 +507,10 @@ class TelegramApi:
     # Class-level default so subclasses that skip __init__ (the test MockApi) still start
     # in immediate mode.
     _outbox: ApiOutbox | None = None
+    # A handler edits the few cards of the meeting in front of it, and a failure there has to show
+    # what it tried to deliver. A background fanout multiplies that same line by every card tracking
+    # the meeting, so the queue turns this off on the api it owns and the size fields stand in.
+    log_card_text: bool = True
 
     def __init__(self):
         self._adapter: ContextOrBotAdapter | None = None
@@ -1085,18 +1108,19 @@ class TelegramApi:
         only emits its metric — the stale row is picked up by the next write-mode fan-out.
         """
         edit = self._render_meeting_message_edit(message, meeting, was_deleted, has_finished)
+        payload = meeting_edit_log_payload(edit) if self.log_card_text else meeting_edit_log_facts(edit)
         if self._outbox is not None:
             self._enqueue(
                 "update_meeting_message",
                 partial(self._queued_meeting_message_edit, edit, self._outbox),
-                meeting_edit_log_payload(edit),
+                payload,
                 idempotent=True,
             )
             return
         await self._invoke_logging_failure(
             "update_meeting_message",
             partial(self._edit_meeting_message_now, edit),
-            meeting_edit_log_payload(edit),
+            payload,
         )
 
     async def update_meeting_messages(

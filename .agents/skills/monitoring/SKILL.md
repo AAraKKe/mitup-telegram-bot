@@ -117,7 +117,7 @@ context.emit_metric(MetricKey.ERROR, 1)
 
 # A shared-surface counter, emitted without the handler identity because the series is about the
 # surface rather than the callback that reached it. Dimensions stay a closed enum — see below.
-context.emit_metric(MetricKey.STALE_MEETING_MESSAGE, 0, include_handler_properties=False)
+context.emit_metric(MetricKey.UNAUTHORIZED_MEETING_CALLBACK, include_handler_properties=False)
 ```
 
 Key parameters:
@@ -185,11 +185,11 @@ client — `timezone_api`, which has the context in hand — passes it explicitl
 Each is emitted as a single **dimensionless** series. The handler identity (`Handler`, `HandlerType`) is attached as EMF **properties** — set automatically via `context.prepare_handler_metrics()` — so per-handler drill-down happens in CloudWatch Logs Insights, not via a billed dimension.
 
 <critical_rules>
-`Fault` has a single writer, and writes **exactly once — not at most once**. It is the outcome of one invocation, emitted once per logger per flush window by the wrapper that owns the invocation (`callback_with_metrics`, `handle_maintainance`) and by nothing else — not a handler, not a helper, not `error_handler.handler`, not the post-commit outbox drain.
+`Fault` has a single writer, and writes **exactly once — not at most once**. It is the outcome of one unit of work, emitted once per unit by the wrapper that owns it (`callback_with_metrics` per handler invocation, `handle_maintainance` per events run, `RefreshQueue.run_next` per background job) and by nothing else — not a handler, not a helper, not `error_handler.handler`, not the post-commit outbox drain.
 
 The one addition to that list covers the invocations that never started: `registry.process_update_error`, registered on PTB via `add_error_handler`, samples a failure that reached PTB's error plane without any wrapped callback owning it. When the update's trace (`update_trace.UPDATE_TRACE`) already carries a fault it skips the update entirely — no sample and no line — so a re-raise from an invocation that already closed itself is recorded once, by the invocation.
 
-*Single* writer, because EMF **appends** repeated values under one metric name: a second writer serialises `"Fault": [1, 0]`, Logs Insights flattens the array to `Fault.0`/`Fault.1` so the `filter Fault = 1` triage queries stop matching, and the fault-rate alarm (Average + SampleCount, wired into the ECS rollback bakes) reads half the value on twice the samples.
+*Single* writer, because EMF **appends** repeated values under one metric name: a second writer serialises `"Fault": [1, 0]`, Logs Insights flattens the array to `Fault.0`/`Fault.1` so the `filter Fault = 1` triage queries stop matching, and the fault-rate alarm (Average + SampleCount, wired into the ECS rollback bakes) reads half the value on twice the samples. A window covering several units of work carries the array by construction — the refresh worker's does, and the `observability` skill states what that costs it.
 
 *Exactly* once, because that same alarm uses `Fault`'s **SampleCount as its request denominator**. An exit path that returns without emitting does not report "no fault" — it removes the invocation from the denominator, inflating the fault rate. The classifications that end an interaction benignly (a suppressed Telegram error, an inactive user, a pending deletion, a meeting-guard rejection, a lost conversation context) are the ones most likely to arrive in a burst during a rolling deploy, which is exactly when a bake is reading the alarm. So the error handler **returns** its classification (`FaultOutcome`) to `callback_with_metrics`, which emits the one sample from its `finally`.
 

@@ -102,7 +102,7 @@ Use the registry below; do not invent a synonym for a field that already exists.
 | `phase`, `committed` | where in the write lifecycle a failure happened, and whether the transaction landed |
 | `previous_status`, `status`, `supporter_level`, `window_days` | state-transition and lifecycle facts |
 | `api_method`, `duration_ms`, `status_code` | outbound-call facts |
-| `stage`, `step`, `field`, `setting`, `list`, `check` | facets of a shared event name |
+| `stage`, `step`, `state`, `field`, `setting`, `list`, `check` | facets of a shared event name |
 | `callback_data`, `command` | what the user pressed or typed, on the bot's handler lines only — see [The interaction-input carve-out](#the-interaction-input-carve-out) |
 
 Order: ids first, then decision inputs, then `reason`/`outcome`.
@@ -204,6 +204,15 @@ A record MAY contain exactly four things, and nothing else.
 | events | `run_id` (plus the `EventType` dimension) |
 | web / webhook | `request_id` |
 | db pool | the ambient correlation key |
+| background jobs | `run_id` |
+
+The background-jobs shape is the card-refresh worker's (`libs/telegram/mitup_bot/card_refresh.py`).
+Its correlation key is the `run_id` of the reporting window, passed **per emit** because the client
+is process-lived, and written by the **reporter alone**: a property is last-writer-wins across the
+flush window, so an id stamped by one job would be reported as describing every other job in the
+window. The jobs bind that same id on their log lines, which is what the pivot walks. For the same
+reason `origin_update_id` — the update whose commit queued a job — stays on the log plane; it may
+ride a record only where a flush window covers exactly one job.
 
 Properties use the **same lowercase snake_case vocabulary as structlog fields**, so one Insights
 query reads both record shapes. Dimensions keep CloudWatch-facing CamelCase — a different namespace
@@ -217,13 +226,14 @@ emission in the window. See the `monitoring` skill for the mechanism and
 `broadcast/recording.py::emit_delivery_outcomes` for the reference implementation.
 </critical_rules>
 
-### Fault is emitted exactly once per invocation
+### Fault is emitted exactly once per unit of work
 
 <critical_rules>
-`MetricKey.FAULT` is written **exactly once per logger per flush window — not at most once** — by
-the framework only. In the bot the registry's `finally` in `callback_with_metrics` is the **sole
-writer**; in events it is `handle_maintainance`. No handler, no helper, no `error_handler.handler`,
-no post-commit drain may emit it.
+`MetricKey.FAULT` is written **exactly once per unit of work — not at most once** — by the framework
+only. The unit is the invocation in the bot (the registry's `finally` in `callback_with_metrics`),
+the run in events (`handle_maintainance`), and one job in the card-refresh worker
+(`RefreshQueue.run_next`). No handler, no helper, no `error_handler.handler`, no post-commit drain
+may emit it.
 </critical_rules>
 
 *Exactly* once, because `MitupCriticalFaultRate` uses `Fault`'s **SampleCount as its request
@@ -232,6 +242,14 @@ emitting does not report "no fault" — it removes the invocation from the denom
 the rate, and the benign classifications (a suppressed Telegram error, a lost conversation context)
 arrive in a burst during exactly the rolling deploy that is reading the alarm. So the error handler
 **returns** a `FaultOutcome` classification and the registry emits the one sample.
+
+The refresh worker is the one writer whose flush window holds more than one unit: a reporting window
+covers every job it ran, so `Fault` serializes there as one sample per job. That is deliberate — it
+puts background jobs in the same population the fault-rate alarm reads, so a queue timing out every
+job forever pages like anything else that fails, and the 0s keep its denominator honest. The array
+is also why the worker's triage is the `Background job failed` line and not a `filter Fault = 1`:
+Logs Insights flattens repeated values to `Fault.0`/`Fault.1`. Nothing else may take this shape —
+one unit per window everywhere else.
 
 A fact that is not the invocation outcome gets its own metric name — `PostCommitApiFault` is the one
 for a queued delivery that failed after commit.

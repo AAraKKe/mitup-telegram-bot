@@ -28,13 +28,15 @@ LEAKY_LITERAL = re.compile(r"https?://|\d{5,}:[A-Za-z0-9_-]{20,}")
 # instrumentation leaked the token exactly this way — `RemoteOperation` was built from `request.url`.
 LEAKY_EXPRESSION = re.compile(r"(?i)\b\w*(url|uri|token|secret|password|header|credential|api_key)\w*\b")
 
-# `Fault` is the invocation outcome and its SampleCount is the fault-rate alarm's request
-# denominator, so it has exactly one writer per runtime. `with_prefix` derivatives
-# (`TelegramApiFault`) are separate series and are not covered by this rule.
+# `Fault` is the outcome of one unit of work and its SampleCount is the fault-rate alarm's request
+# denominator, so it has exactly one writer per runtime: the framework wrapper that owns the unit —
+# an invocation, an events run, one background job. `with_prefix` derivatives (`TelegramApiFault`)
+# are separate series and are not covered by this rule.
 FAULT_WRITERS = frozenset(
     {
         "apps/bot/mitup_bot/handlers/registry.py",
         "apps/events/mitup_bot/events/service.py",
+        "libs/telegram/mitup_bot/card_refresh.py",
     }
 )
 
