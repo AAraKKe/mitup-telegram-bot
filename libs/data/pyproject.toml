@@ -5,7 +5,7 @@ description = "Persistence layer for mitup-telegram-bot: SQLModel tables, the as
 requires-python = ">=3.14"
 dependencies = [
     "sqlmodel==0.0.39",
-    "sqlalchemy[asyncio]==2.0.51",
+    "sqlalchemy[asyncio]==2.0.52",
     "psycopg[binary]==3.3.4",
     "alembic==1.19.1",
     "pydantic==2.13.4",
