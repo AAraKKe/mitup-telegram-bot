@@ -39,7 +39,7 @@ Code that **mutates state and then fans out over Telegram** (edit meeting messag
 
 1. The api is switched into capture mode: every `api.*` call enqueues a plain-data snapshot instead of executing (see the `api-wrapper` skill).
 2. The body runs and the transaction **commits**, releasing the pooled connection and any per-meeting row lock.
-3. The queued Telegram calls execute in order, and their DB fix-ups (dead message rows, unreachable users) are applied in one short reconcile transaction.
+3. The queued Telegram calls execute in order, and their DB fix-ups (dead message rows, unreachable users, the render digests of the cards Telegram confirmed) are applied in one short reconcile transaction.
 
 Handlers use it through `@with_session(write=True)`, a thin wrapper that captures on `context.api`; non-handler code (CLI batch jobs) has no `MitupContext` and drives the context manager directly, one `async with db.begin_write(api)` block per critical section — per meeting or per joined link, whichever row carries the job's flag (see the recurrent-event jobs in `apps/events/mitup_bot/events/`, e.g. `inactive_meetings.py`). Bodies keep their linear style — only the execution time of the api calls moves. Rules of thumb:
 

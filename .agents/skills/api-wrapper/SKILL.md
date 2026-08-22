@@ -46,6 +46,7 @@ Under the write lifecycle — `db.begin_write(api)` directly, or `@with_session(
 Capture rules baked into `TelegramApi`:
 
 - Queue entries carry **plain data snapshotted at enqueue time** (chat ids, message ids, rendered view content). `update_meeting_messages` renders each stored message into a `MeetingMessageEdit` payload at enqueue; the button persistence (`message.buttons.keyboard = ...`) happens then too, inside the transaction. Nothing reads ORM objects or the session during the drain.
+- A rendered card whose digest matches the one stored on its `Message` row is **not queued at all** — see [The render digest](#the-render-digest).
 - Argument validation (missing chat/query, view resolution) also happens at enqueue, inside the transaction, so programming errors fail early and abort.
 - `send_messages_to_users` rejects its result callbacks under capture (they would mutate ORM objects after commit and be lost) — callers needing them must use `immediate`.
 - `context.api.immediate.X(...)` executes right away, inside the open transaction; its failure aborts the transaction. Keep it rare and greppable.
@@ -76,7 +77,15 @@ New api methods that enqueue must pass `idempotent=True` only when repeating the
 
 ### The reconcile transaction
 
-Fan-out execution can discover DB fix-ups: messages deleted by users (`dead_message_ids`) and unreachable users (`inactive_tg_user_ids`). The write lifecycle applies both in one short follow-up transaction after the drain — never interleave ad-hoc API-then-DB writes in a caller; record onto the outbox instead. The reconcile owns the dead-message cleanup for every caller: `update_single_meeting_message`/`update_meeting_messages` take no session, and in immediate mode a dead message only emits its metric (the stale row is picked up by the next write-mode fan-out).
+Fan-out execution can discover DB fix-ups: messages deleted by users (`dead_message_ids`), unreachable users (`inactive_tg_user_ids`) and the cards Telegram confirmed (`confirmed_render_digests`, see [The render digest](#the-render-digest)). The write lifecycle applies them in one short follow-up transaction after the drain — never interleave ad-hoc API-then-DB writes in a caller; record onto the outbox instead. The reconcile owns the dead-message cleanup for every caller: `update_single_meeting_message`/`update_meeting_messages` take no session, and in immediate mode a dead message only emits its metric (the stale row is picked up by the next write-mode fan-out).
+
+### The render digest
+
+Each `Message` row carries the digest of the payload Telegram last confirmed for that card (`MeetingMessageEdit.digest`: the post-cap text, entities and reply markup). Under capture, `update_single_meeting_message` renders the card, compares, and **queues nothing when the digest matches** — the edit would only earn a "message is not modified" answer, and that round trip counts against the bot-wide flood limit like any other.
+
+The invariant that makes the skip safe is that the digest advances **only on a confirmed delivery**: the drain records it for a success and for the suppressed "not modified" 400 (the content is on Telegram either way), and records nothing for a failure, a timeout or a dead message. A card whose edit failed therefore keeps the digest of what is actually on Telegram, so the next render mismatches and repairs it. A `NULL` digest — every row before its first confirmed delivery — never matches, so the card is always edited.
+
+The digest describes what was rendered, not what Telegram displays: `retry_without_custom_emoji` can strip entities on the way out. That is benign; the next differing render converges. Immediate mode has no drain to confirm a delivery and edits unconditionally.
 
 ## Usage outside handlers (lambdas, CLI)
 

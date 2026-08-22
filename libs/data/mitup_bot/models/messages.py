@@ -35,13 +35,19 @@ class Message(BaseModel, SQLModel, table=True):
         default=MessageButtons(keyboard=[]),
         sa_column=Column(type_=MessageButtons.as_mutable(JSON(none_as_null=True)), nullable=True),
     )
+    # Fingerprint of the payload Telegram last confirmed for this card, written by the write
+    # lifecycle's reconcile once an edit is delivered. NULL means nothing has been confirmed yet,
+    # so the next render always edits.
+    render_digest: str | None = None
 
     # lazy="selectin": the inline search handler reads `message.meetup` in plain Python, and
     # implicit lazy loads raise MissingGreenlet under the async engine.
     meetup: Meetup = Relationship(back_populates="messages", sa_relationship_kwargs={"lazy": "selectin"})
 
     def __hash__(self) -> int:
-        return hash(self.model_dump_json(exclude={"id"}))
+        # `render_digest` is delivery bookkeeping rather than part of what identifies a card: two
+        # rows describing the same card differ by it as soon as one of them has been delivered.
+        return hash(self.model_dump_json(exclude={"id", "render_digest"}))
 
     def __eq__(self, other: object) -> bool:
         return hash(self) == hash(other) if isinstance(other, Message) else NotImplemented

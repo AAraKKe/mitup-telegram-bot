@@ -79,6 +79,7 @@ class OutboxProtocol(Protocol):
 
     dead_message_ids: list[int]
     inactive_tg_user_ids: list[int]
+    confirmed_render_digests: dict[int, str]
 
 
 class WriteApi[OutboxT: OutboxProtocol](Protocol):
@@ -386,7 +387,7 @@ def capture_api(args: Sequence[object], kwargs: Mapping[str, object]) -> WriteAp
 async def apply_reconcile(api: WriteApi[Any], outbox: OutboxProtocol):
     """Run the registered reconciler over the DB fix-ups discovered while draining the
     outbox, in one short transaction; a drain that recorded nothing skips the transaction."""
-    if not outbox.dead_message_ids and not outbox.inactive_tg_user_ids:
+    if not (outbox.dead_message_ids or outbox.inactive_tg_user_ids or outbox.confirmed_render_digests):
         return
     assert __outbox_reconciler is not None, "begin_write refuses to start without a registered reconciler"
     async with begin() as session:

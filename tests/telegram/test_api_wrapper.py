@@ -1,13 +1,22 @@
 """Tests for the real TelegramApi class with a mocked bot."""
 
 import logging
+import re
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
 from structlog.testing import capture_logs
-from telegram import ChatMember, ChatMemberRestricted, Message, MessageEntity, Update
+from telegram import (
+    ChatMember,
+    ChatMemberRestricted,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    MessageEntity,
+    Update,
+)
 from telegram.constants import ChatMemberStatus
 from telegram.error import BadRequest, Forbidden, NetworkError, TimedOut
 from telegram.ext import ExtBot
@@ -17,6 +26,7 @@ from mitup_bot.api_wrapper import (
     QUEUED_CALL_ATTEMPTS,
     ApiOutbox,
     BotAdapter,
+    MeetingMessageEdit,
     QueuedApiCall,
     TelegramApi,
     build_api,
@@ -1509,6 +1519,211 @@ async def test_execute_queued_message_without_db_id_gets_no_reconcile_entry(tele
     await telegram_api.execute_queued(outbox)
 
     assert outbox.dead_message_ids == []
+
+
+# ---------------------------------------------------------------------------
+# Render digests: skipping the card edits that would change nothing
+# ---------------------------------------------------------------------------
+
+
+def make_edit(
+    text: str = "Card body",
+    entities: list[MessageEntity] | None = None,
+    reply_markup: InlineKeyboardMarkup | None = None,
+) -> MeetingMessageEdit:
+    return MeetingMessageEdit(
+        message_db_id=1,
+        chat_id=100,
+        message_id=555,
+        inline_message_id=None,
+        text=text,
+        entities=entities,
+        reply_markup=reply_markup,
+    )
+
+
+def apply_confirmed_digests(outbox: ApiOutbox, *messages: MessageModel):
+    """Stand in for the write lifecycle's reconcile transaction, which is what actually writes
+    the digests a drain confirmed back onto the rows."""
+    for message in messages:
+        if message.id in outbox.confirmed_render_digests:
+            message.render_digest = outbox.confirmed_render_digests[message.id]
+
+
+def test_digest_is_stable_across_equal_payloads():
+    markup = InlineKeyboardMarkup([[InlineKeyboardButton("Join", callback_data="join")]])
+    entities = [MessageEntity(type=MessageEntity.BOLD, offset=0, length=4)]
+
+    assert (
+        make_edit(entities=entities, reply_markup=markup).digest
+        == make_edit(
+            entities=list(entities),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Join", callback_data="join")]]),
+        ).digest
+    )
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        make_edit(text="Different body"),
+        make_edit(entities=[MessageEntity(type=MessageEntity.BOLD, offset=0, length=4)]),
+        make_edit(reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Leave", callback_data="leave")]])),
+    ],
+    ids=["text", "entities", "reply_markup"],
+)
+def test_digest_changes_with_every_part_of_the_payload(changed: MeetingMessageEdit):
+    assert changed.digest != make_edit().digest
+
+
+async def test_execute_queued_records_the_confirmed_digest_for_reconcile(telegram_api: TelegramApi, bot: AsyncMock):
+    meeting, msg = make_bot_chat_meeting()
+
+    outbox = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(outbox)
+
+    # Keyed by msg.id, for the reconcile transaction to stamp onto the row.
+    assert list(outbox.confirmed_render_digests) == [1]
+    assert re.fullmatch(r"[0-9a-f]{64}", outbox.confirmed_render_digests[1])
+
+
+async def test_execute_queued_records_the_digest_when_telegram_answers_not_modified(
+    telegram_api: TelegramApi, bot: AsyncMock
+):
+    meeting, msg = make_bot_chat_meeting()
+    bot.edit_message_text.side_effect = BadRequest("Message is not modified: nothing changed")
+
+    outbox = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(outbox)
+
+    # The content is on Telegram either way, so the swallowed 400 confirms the render.
+    assert list(outbox.confirmed_render_digests) == [1]
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [BadRequest("Bad Request: something else"), NetworkError("connection reset")],
+    ids=["bad_request", "network_error"],
+)
+async def test_execute_queued_records_no_digest_when_the_edit_fails(
+    telegram_api: TelegramApi, bot: AsyncMock, no_retry_backoff: AsyncMock, failure: Exception
+):
+    meeting, msg = make_bot_chat_meeting()
+    bot.edit_message_text.side_effect = failure
+
+    outbox = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(outbox)
+
+    assert outbox.confirmed_render_digests == {}
+
+
+async def test_execute_queued_records_no_digest_for_a_dead_message(telegram_api: TelegramApi, bot: AsyncMock):
+    meeting, msg = make_bot_chat_meeting()
+    bot.edit_message_text.side_effect = BadRequest("Message to edit not found")
+
+    outbox = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(outbox)
+
+    # The row is on its way out; there is nothing left to stamp a digest onto.
+    assert outbox.dead_message_ids == [1]
+    assert outbox.confirmed_render_digests == {}
+
+
+async def test_capture_queues_the_edit_while_no_digest_has_been_confirmed(telegram_api: TelegramApi, bot: AsyncMock):
+    meeting, msg = make_bot_chat_meeting()
+    assert msg.render_digest is None
+
+    outbox = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+
+    assert len(outbox.calls) == 1
+
+
+async def test_capture_skips_the_card_whose_confirmed_digest_still_matches(telegram_api: TelegramApi, bot: AsyncMock):
+    meeting, msg = make_bot_chat_meeting()
+
+    first = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(first)
+    apply_confirmed_digests(first, msg)
+    bot.edit_message_text.reset_mock()
+
+    second = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(second)
+
+    # Nothing about the card changed, so the refresh costs no Telegram round trip at all.
+    assert second.calls == []
+    bot.edit_message_text.assert_not_called()
+
+
+async def test_capture_queues_the_edit_again_once_the_card_changes(telegram_api: TelegramApi, bot: AsyncMock):
+    meeting, msg = make_bot_chat_meeting()
+
+    first = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(first)
+    apply_confirmed_digests(first, msg)
+
+    meeting.title = "Renamed meeting"
+    second = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+
+    assert len(second.calls) == 1
+
+
+async def test_failed_edit_leaves_the_card_to_be_repaired_by_the_next_refresh(
+    telegram_api: TelegramApi, bot: AsyncMock, no_retry_backoff: AsyncMock
+):
+    meeting, msg = make_bot_chat_meeting()
+    bot.edit_message_text.side_effect = BadRequest("Bad Request: something else")
+
+    failing = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(failing)
+    apply_confirmed_digests(failing, msg)
+
+    # The stored digest still describes what is on Telegram, so the unchanged card is edited
+    # again rather than left stale until something else happens to it.
+    assert msg.render_digest is None
+    bot.edit_message_text.side_effect = None
+    repair = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(repair)
+
+    bot.edit_message_text.assert_awaited()
+    assert list(repair.confirmed_render_digests) == [1]
+
+
+async def test_immediate_mode_edits_a_card_whose_digest_matches(telegram_api: TelegramApi, bot: AsyncMock):
+    meeting, msg = make_bot_chat_meeting()
+
+    outbox = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(outbox)
+    apply_confirmed_digests(outbox, msg)
+    bot.edit_message_text.reset_mock()
+
+    # Outside the outbox there is no drain to confirm a delivery, so no digest is consulted.
+    await telegram_api.update_single_meeting_message(msg, meeting)
+
+    bot.edit_message_text.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------

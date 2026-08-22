@@ -1,3 +1,4 @@
+import json
 import re
 from asyncio import gather, sleep
 from collections.abc import Callable, Coroutine, Sequence
@@ -5,6 +6,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import partial
+from hashlib import sha256
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import httpx
@@ -143,14 +145,19 @@ class QueuedApiCall:
 class ApiOutbox:
     """Queued Telegram calls plus the DB fix-ups their execution discovers.
 
-    The fix-up lists (`dead_message_ids`, `inactive_tg_user_ids`) are filled while the queue
-    drains — after the caller's transaction committed — and applied by the write lifecycle
-    in a short follow-up transaction (see ``db.begin_write``).
+    The fix-ups (`dead_message_ids`, `inactive_tg_user_ids`, `confirmed_render_digests`) are
+    filled while the queue drains — after the caller's transaction committed — and applied by
+    the write lifecycle in a short follow-up transaction (see ``db.begin_write``).
+
+    `confirmed_render_digests` maps a `Message` row id to the digest of the payload Telegram
+    accepted for it. Only a confirmed delivery lands here, which is what lets a card whose edit
+    failed keep the digest of what is actually on Telegram and be repaired by the next render.
     """
 
     calls: list[QueuedApiCall] = field(default_factory=list)
     dead_message_ids: list[int] = field(default_factory=list)
     inactive_tg_user_ids: list[int] = field(default_factory=list)
+    confirmed_render_digests: dict[int, str] = field(default_factory=dict)
 
 
 class DrainOutcome(Enum):
@@ -213,6 +220,30 @@ class MeetingMessageEdit:
     text: str
     entities: Sequence[MessageEntity] | None
     reply_markup: InlineKeyboardMarkup | None
+
+    @property
+    def digest(self) -> str:
+        """Fingerprint of everything this edit sends, compared against the digest stored on the
+        `Message` row so an edit that would change nothing is never sent.
+
+        It describes what was rendered rather than what Telegram ends up displaying:
+        `retry_without_custom_emoji` can drop entities on the way out, leaving the card showing
+        fallback glyphs under the digest of the version that still had them. That is benign — the
+        next differing render edits again and converges. `default=str` keeps an exotic nested value
+        in a Telegram object from raising here, where a wrong fingerprint costs one edit but a
+        raise would abort the caller's whole render.
+        """
+        payload = json.dumps(
+            [
+                self.text,
+                [entity.to_dict() for entity in self.entities or ()],
+                self.reply_markup.to_dict() if self.reply_markup is not None else None,
+            ],
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )
+        return sha256(payload.encode()).hexdigest()
 
 
 class BotAdapter:
@@ -1089,8 +1120,21 @@ class TelegramApi:
         return False
 
     async def _queued_meeting_message_edit(self, edit: MeetingMessageEdit, outbox: ApiOutbox):
-        if await self._edit_meeting_message_now(edit) and edit.message_db_id is not None:
+        """Run one queued card edit and record what the reconcile transaction should write: the
+        row to drop when Telegram reported the card gone, otherwise the digest it just confirmed.
+
+        A failure records neither, on purpose. The stored digest then still describes what is on
+        Telegram, so the next render of that card mismatches and repairs it.
+        """
+        unreachable = await self._edit_meeting_message_now(edit)
+        if edit.message_db_id is None:
+            return
+        if unreachable:
             outbox.dead_message_ids.append(edit.message_db_id)
+            return
+        # Both a plain success and the swallowed "message is not modified" land here: either way
+        # the content is on Telegram.
+        outbox.confirmed_render_digests[edit.message_db_id] = edit.digest
 
     async def update_single_meeting_message(
         self,
@@ -1106,16 +1150,21 @@ class TelegramApi:
         user-deleted message is recorded for the write lifecycle's reconcile transaction,
         which owns the dead-row cleanup for every caller. In immediate mode a dead message
         only emits its metric — the stale row is picked up by the next write-mode fan-out.
+
+        A capture-mode render whose digest matches the one Telegram last confirmed for the card
+        queues nothing: the edit would be answered "message is not modified" and that round trip
+        counts against the bot-wide flood limit. Immediate mode edits unconditionally.
         """
         edit = self._render_meeting_message_edit(message, meeting, was_deleted, has_finished)
         payload = meeting_edit_log_payload(edit) if self.log_card_text else meeting_edit_log_facts(edit)
         if self._outbox is not None:
-            self._enqueue(
-                "update_meeting_message",
-                partial(self._queued_meeting_message_edit, edit, self._outbox),
-                payload,
-                idempotent=True,
-            )
+            if edit.digest != message.render_digest:
+                self._enqueue(
+                    "update_meeting_message",
+                    partial(self._queued_meeting_message_edit, edit, self._outbox),
+                    payload,
+                    idempotent=True,
+                )
             return
         await self._invoke_logging_failure(
             "update_meeting_message",

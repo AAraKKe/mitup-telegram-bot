@@ -506,6 +506,26 @@ async def test_write_mode_reconcile_deletes_messages_reported_gone(
     assert "messages.id IN (7)" in delete_queries[0]
 
 
+async def test_write_mode_reconcile_advances_the_digest_of_a_delivered_card(
+    mock_session: MockDbSession, write_context: SimpleNamespace, fanout_bot: mock.AsyncMock
+):
+    meeting = create_meetup(id=10, title="Meeting", language="en")
+    create_user(id=1, tg_user_id=100, owned_meetings=[meeting])
+    msg = create_message(id=7, inline_message_id=None, chat_id=100, message_id=501, meetup_id=10)
+
+    @db.with_session(write=True)
+    async def handler(session: AsyncSession, context: SimpleNamespace):
+        await context.api.update_meeting_messages(meeting=meeting, current_message=msg)
+
+    await handler(write_context)
+
+    # The digest can only be written after the drain confirmed the edit, which is why it rides
+    # the reconcile transaction rather than the handler's own.
+    updates = [query for query in mock_session.queries_executed if query.startswith("UPDATE messages")]
+    assert len(updates) == 1
+    assert "messages.id IN (7)" in updates[0]
+
+
 async def test_write_mode_connectivity_failure_stays_inside_the_drain(
     mock_session: MockDbSession,
     write_context: SimpleNamespace,

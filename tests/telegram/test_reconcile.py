@@ -41,6 +41,25 @@ async def test_reconcile_outbox_deletes_dead_messages(mock_session: MockDbSessio
     assert "messages.id IN (7, 9)" in delete_queries[0]
 
 
+async def test_reconcile_outbox_advances_confirmed_render_digests(mock_session: MockDbSession, adapter: BotAdapter):
+    outbox = ApiOutbox(confirmed_render_digests={7: "digest-seven", 9: "digest-nine"})
+
+    await reconcile.reconcile_outbox(mock_session, adapter, outbox)
+
+    updates = [query for query in mock_session.queries_executed if query.startswith("UPDATE messages")]
+    assert len(updates) == 1
+    assert "CASE messages.id WHEN 7 THEN 'digest-seven' WHEN 9 THEN 'digest-nine' END" in updates[0]
+    assert "messages.id IN (7, 9)" in updates[0]
+
+
+async def test_reconcile_outbox_writes_no_digests_when_none_were_confirmed(
+    mock_session: MockDbSession, adapter: BotAdapter
+):
+    await reconcile.reconcile_outbox(mock_session, adapter, ApiOutbox(dead_message_ids=[7]))
+
+    assert not [query for query in mock_session.queries_executed if query.startswith("UPDATE messages")]
+
+
 async def test_reconcile_outbox_marks_unreachable_user(
     mock_session: MockDbSession, adapter: BotAdapter, reconcile_metrics_client: MetricsClient
 ):
