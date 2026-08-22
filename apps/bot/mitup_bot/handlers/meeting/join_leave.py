@@ -6,6 +6,7 @@ from telegram import Update
 
 from mitup_bot import guards
 from mitup_bot.acquisition import SHARED_CARD_SOURCE
+from mitup_bot.callback_data import CallbackData
 from mitup_bot.db import racy_flush, with_session
 from mitup_bot.exceptions import EffectiveUserNotSet, UserNotFound
 from mitup_bot.handlers.registry import HandlersRegistry
@@ -88,7 +89,9 @@ async def user_joins_meeting(
         resolved("joined", "ok")
         return MeetingJoinMessages.JOIN_SUCCESS
 
-    await handle_join_leave_operation(session, update, context, user, join_operation, with_notification)
+    await handle_join_leave_operation(
+        session, update, context, user, join_operation, cb.JOIN, MeetingHandlerId.JOIN, with_notification
+    )
 
 
 async def register_default_user(session: AsyncSession, update: Update) -> User:
@@ -185,7 +188,9 @@ async def user_leaves_meeting(
         )
         return MeetingJoinMessages.LEAVE_NOT_JOINED
 
-    await handle_join_leave_operation(session, update, context, user, leave_operation, with_notification)
+    await handle_join_leave_operation(
+        session, update, context, user, leave_operation, cb.LEAVE, MeetingHandlerId.LEAVE, with_notification
+    )
 
 
 async def handle_non_existing_user_leave(session: AsyncSession, update: Update, context: TMitupContext):
@@ -208,10 +213,16 @@ async def handle_join_leave_operation(
     context: TMitupContext,
     user: User,
     operation: Callable[[Meetup, User], Awaitable[MeetingJoinMessages]],
+    callback_data: CallbackData,
+    handler: MeetingHandlerId,
     with_notification: bool = True,
 ):
-    """Handle common infrastructure for meeting operations (join/leave)."""
-    data = guards.valid_callback_data(cb.JOIN.parse(context.match), MeetingHandlerId.JOIN)
+    """Handle common infrastructure for meeting operations (join/leave).
+
+    `callback_data` must be the constant the running handler is registered under: parsing a wire
+    form through another constant reads as an alias hit to the wire-form drain telemetry.
+    """
+    data = guards.valid_callback_data(callback_data.parse(context.match), handler)
     # lock: both operations read capacity/waiting-list state and mutate participants, so the meetup
     # row must be locked before the first read to serialize cross-user races.
     meeting = await guards.shared_meeting(session, user, data.id, "join or leave a meeting", update, lock=True)

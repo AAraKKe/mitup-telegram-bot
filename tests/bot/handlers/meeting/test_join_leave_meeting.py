@@ -1,4 +1,5 @@
 import pytest
+from structlog.testing import capture_logs
 from telegram import Update
 
 import mitup_bot.utils.callbacks as cb
@@ -388,10 +389,16 @@ async def test_user_leaves_meeting(
     meeting = user_with_settings.meetups[0]
     JoinedUsers(meetup=meeting, user=user_with_settings, meetup_id=meeting.id, user_id=user_with_settings.id)
 
-    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
+    with capture_logs() as logs:
+        context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 
     # The user is no longer in the meeting
     assert not meeting.has_participant(user_with_settings.db_id)
+
+    # The leave wire form parses through its own callback constant: it must resolve the leave
+    # without registering as an alias hit, or the wire-form drain gauge counts every leave tap.
+    assert any(entry["event"] == "Meeting leave resolved" for entry in logs)
+    assert not [entry for entry in logs if entry["event"] == "Aliased callback wire form used"]
 
     # We have emited a feature metric for user left
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.LEAVE_MEETING)})
