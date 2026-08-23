@@ -611,6 +611,9 @@ msgstr "Algo ha salido mal por nuestra parte. Por favor, inténtalo de nuevo. Si
 msgid "CommonMessages.ACCOUNT_NOT_FOUND"
 msgstr "No tienes una cuenta de Mitup en este momento. Envía /start y me pondré a ello."
 
+msgid "CommonMessages.BOT_BLOCKED_ALERT"
+msgstr "Me has bloqueado, así que no puedo enviarte mensajes. Para usar Mitup de nuevo, desbloquéame y envía /start."
+
 msgid "InlineQueryMessages.CREATE_MEETING_BUTTON"
 msgstr "➕ Crear una nueva quedada"
 

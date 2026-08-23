@@ -488,6 +488,9 @@ msgstr "Qualcosa è andato storto da parte nostra. Per favore, riprova e scrivi 
 msgid "CommonMessages.ACCOUNT_NOT_FOUND"
 msgstr "Non hai un account Mitup al momento. Invia /start e ti preparo tutto."
 
+msgid "CommonMessages.BOT_BLOCKED_ALERT"
+msgstr "Mi hai bloccato, quindi non posso inviarti messaggi. Per usare di nuovo Mitup, sbloccami e invia /start."
+
 msgid "MeetingEditDateTimeMessages.DESCRIPTION"
 msgstr "Scegli cosa vuoi impostare per il tuo incontro.\n\n<i>Suggerimento: puoi anche inviare un messaggio utilizzando ${datetime_link} per impostare la data e l'ora contemporaneamente.</i>"
 

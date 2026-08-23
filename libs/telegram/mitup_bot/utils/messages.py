@@ -230,6 +230,11 @@ class CommonMessages(MessageBase):
     # tapped screen, or arrives as a reply to a message. /start is written out so Telegram makes it
     # tappable, since no button the caller can press would work.
     ACCOUNT_NOT_FOUND = "You don't have a Mitup account right now. Send /start and I'll set you up."
+    # Answers a tap from a caller who blocked the bot, as a plain callback-query alert
+    # (max 200 characters), so it must stay entity-free.
+    BOT_BLOCKED_ALERT = (
+        "You have blocked me, so I can't send you messages. To use Mitup again, unblock me and send /start."
+    )
     # Shown when in-memory conversation state was lost (e.g. after a rolling deploy mid-flow)
     CONTEXT_LOST = (
         "<b>Sorry, we lost our place!</b>\n\nThe bot had a quick internal update and forgot where you "

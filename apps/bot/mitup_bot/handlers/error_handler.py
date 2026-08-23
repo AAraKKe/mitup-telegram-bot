@@ -7,7 +7,7 @@ from rich.console import Console
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Chat, Update
-from telegram.error import BadRequest
+from telegram.error import BadRequest, Forbidden
 
 from mitup_bot import db, guards
 from mitup_bot.config import Env
@@ -222,6 +222,35 @@ async def handle_user_not_found(context: TMitupContext, update: Update):
             "Failed to deliver the missing-account notice to the user",
             exc_info=True,
             reason="account_notice_undeliverable",
+        )
+
+
+async def handle_blocked_user(context: TMitupContext, update: Update):
+    """Answer a caller whose block on the bot refused the send, and record them unreachable.
+
+    A block only closes the bot's direction: taps keep arriving while every send is refused, so
+    the answer rides the callback-query alert, the only reply Telegram still delivers. Delivery is
+    best-effort like every other render in this module.
+    """
+    log.warning("Rejected interaction from a user who blocked the bot", reason="bot_blocked_by_user")
+
+    if (tg_user := update.effective_user) is not None:
+        await handle_inactive_user(tg_user.id)
+
+    if update.callback_query is None:
+        return
+
+    try:
+        await context.api.answer_callback_query(
+            update=update,
+            text=CommonMessages.BOT_BLOCKED_ALERT.get_text(lang=await resolve_lang(update)),
+            show_alert=True,
+        )
+    except Exception:
+        log.warning(
+            "Failed to deliver the blocked-bot alert to the user",
+            exc_info=True,
+            reason="blocked_alert_undeliverable",
         )
 
 
@@ -487,6 +516,13 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
     update = context.telegram_update
     if isinstance(error, UserNotFound) and update is not None and in_bot_chat(update):
         await handle_user_not_found(context, update)
+        return HANDLED_OUTCOME
+
+    # A Forbidden from the caller's own chat means they blocked the bot: the same expected state a
+    # refused proactive DM reports as InactiveUserInteraction, except here there is a live
+    # interaction to answer. From any other chat it stays a fault.
+    if isinstance(error, Forbidden) and update is not None and in_bot_chat(update):
+        await handle_blocked_user(context, update)
         return HANDLED_OUTCOME
 
     # The meeting guard's rejections carry their own screen, so they are answered here and stop

@@ -767,6 +767,9 @@ msgstr "Algo saíu mal pola nosa parte. Por favor, inténtao de novo, e escribe 
 msgid "CommonMessages.ACCOUNT_NOT_FOUND"
 msgstr "Non tes conta de Mitup neste momento. Envía /start e prepároche todo."
 
+msgid "CommonMessages.BOT_BLOCKED_ALERT"
+msgstr "Bloqueáchesme, así que non podo enviarche mensaxes. Para usar Mitup de novo, desbloquéame e envía /start."
+
 msgid "NotificationMessages.STARTED"
 msgstr "A quedada <b>${meeting_title}</b> comezou!"
 

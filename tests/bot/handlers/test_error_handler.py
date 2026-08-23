@@ -3,7 +3,7 @@ from collections.abc import Callable
 import pytest
 from structlog.testing import capture_logs
 from telegram import Chat, Update
-from telegram.error import TelegramError
+from telegram.error import Forbidden, TelegramError
 
 from mitup_bot import db
 from mitup_bot.config import Env
@@ -324,6 +324,101 @@ async def test_user_not_found_suppresses_delivery_failures(
     assert swallowed["reason"] == "account_notice_undeliverable"
     assert outcome == FaultOutcome(0)
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+
+
+# --- Blocked-user handling in the bot's own chat ---
+
+
+async def test_blocked_user_tap_is_answered_with_the_alert_and_no_fault(
+    app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    """The alert is the only reply a block still delivers, rendered in the caller's stored language."""
+    user = create_user(id=1, tg_user_id=DEFAULT_USER_ID, settings=create_settings(language="es"))
+    mock_session.add_user(user)
+    context = build_callback_context(app, metrics_client)
+
+    outcome = await error_handler.handler(context, Forbidden("bot was blocked by the user"), Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_answer_callback_query_called(
+        context.telegram_update, text=CommonMessages.BOT_BLOCKED_ALERT.get_text(lang="es"), show_alert=True
+    )
+    context.api.assert_send_message_not_called()
+    assert outcome == FaultOutcome(0)
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+
+
+async def test_blocked_user_is_marked_left(
+    app: StubMitupApp, user: User, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """A blocked caller proved unreachable like a refused proactive DM: the same MEMBER to LEFT
+    transition runs."""
+    assert user.status is UserStatus.MEMBER
+    mock_session.add_object(user, query_field="tg_user_id")
+    context = build_callback_context(app)
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, Forbidden("bot was blocked by the user"), Env.PROD)
+    await context.metrics.flush()
+
+    assert user.status is UserStatus.LEFT
+    changed = next(entry for entry in logs if entry["event"] == "User status changed")
+    assert changed["reason"] == "interaction_unreachable"
+    metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
+
+
+async def test_blocked_user_is_recorded_as_a_handled_rejection(app: StubMitupApp, mock_session: MockDbSession):
+    """One warning names the decision; no error line reads as a bot defect."""
+    context = build_callback_context(app)
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, Forbidden("bot was blocked by the user"), Env.PROD)
+
+    rejections = [entry for entry in logs if entry["event"] == "Rejected interaction from a user who blocked the bot"]
+    assert len(rejections) == 1, f"captured {[entry['event'] for entry in logs]}"
+    assert rejections[0]["log_level"] == "warning"
+    assert rejections[0]["reason"] == "bot_blocked_by_user"
+    assert not [entry for entry in logs if entry["log_level"] in {"error", "critical"}]
+
+
+async def test_blocked_user_message_update_is_not_answered(app: StubMitupApp, mock_session: MockDbSession):
+    """With no callback query there is nothing to deliver, and the interaction still closes handled."""
+    context = build_message_context(app)
+
+    outcome = await error_handler.handler(context, Forbidden("bot was blocked by the user"), Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    context.api.assert_send_message_not_called()
+    assert outcome == FaultOutcome(0)
+
+
+async def test_blocked_user_suppresses_delivery_failures(app: StubMitupApp, mock_session: MockDbSession):
+    """Delivery is best-effort: a failing alert must not escape as a second fault."""
+    context = build_callback_context(app)
+    context.api.mock_method("answer_callback_query").side_effect = TelegramError("answer failed")
+
+    with capture_logs() as logs:
+        # Must not raise a second exception.
+        outcome = await error_handler.handler(context, Forbidden("bot was blocked by the user"), Env.PROD)
+
+    swallowed = next(entry for entry in logs if entry["event"] == "Failed to deliver the blocked-bot alert to the user")
+    assert swallowed["log_level"] == "warning"
+    assert swallowed["reason"] == "blocked_alert_undeliverable"
+    assert outcome == FaultOutcome(0)
+
+
+async def test_forbidden_outside_the_bot_chat_stays_a_fault(
+    app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions
+):
+    """A Forbidden from a group means a handler wrote into a chat the bot no longer belongs to."""
+    context = build_card_context(app, Chat.GROUP, metrics_client)
+
+    outcome = await error_handler.handler(context, Forbidden("bot was kicked from the group chat"), Env.PROD)
+    await context.metrics.flush()
+
+    assert outcome == FaultOutcome(1, {"error_type": "telegram.error.Forbidden"})
+    metrics.assert_not_emitted(name=MetricKey.FAULT)
 
 
 # --- Missing account handling on an unguarded surface ---

@@ -410,6 +410,9 @@ msgstr "Bei uns ist etwas schiefgelaufen. Versuche es erneut, und schreibe an su
 msgid "CommonMessages.ACCOUNT_NOT_FOUND"
 msgstr "Du hast momentan kein Mitup-Konto. Sende /start und ich richte dich neu ein."
 
+msgid "CommonMessages.BOT_BLOCKED_ALERT"
+msgstr "Du hast mich blockiert, deshalb kann ich dir keine Nachrichten senden. Um Mitup wieder zu nutzen, hebe die Blockierung auf und sende /start."
+
 msgid "MeetingEditDateTimeMessages.DESCRIPTION"
 msgstr "Wähle aus, was du für dein Treffen einstellen möchtest.\n\n<i>Tipp: Du kannst auch eine Nachricht mit ${datetime_link} senden, um Datum und Uhrzeit auf einmal einzustellen.</i>"
 
