@@ -29,6 +29,7 @@ from mitup_bot.config import (
 from mitup_bot.hosts_group import HostsGroupState
 from mitup_bot.logging_config import Component
 from mitup_bot.monitoring import MetricsClient
+from mitup_bot.rate_limiter import MitupRateLimiter
 from mitup_bot.update_processor import PerUserUpdateProcessor
 from tests.helpers import create_patreon_config
 from tests.helpers.logs import log_record
@@ -327,6 +328,10 @@ def test_builder_sets_rate_limiter(patch_runtime_deps: RuntimeDeps):
     MitupRuntime(Env.DEV)
 
     patch_runtime_deps.builder_instance.rate_limiter.assert_called_once()
+    # The bot app runs on the limiter that shapes inline-addressed requests and attributes its
+    # retry-after pauses, not on PTB's reference implementation.
+    (limiter,) = patch_runtime_deps.builder_instance.rate_limiter.call_args.args
+    assert isinstance(limiter, MitupRateLimiter)
 
 
 def test_builder_sets_per_user_update_processor(patch_runtime_deps: RuntimeDeps):

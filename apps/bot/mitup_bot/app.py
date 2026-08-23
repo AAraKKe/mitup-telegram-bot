@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, assert_never
 
 import structlog
 import uvicorn
-from telegram.ext import AIORateLimiter, Application, ContextTypes
+from telegram.ext import Application, ContextTypes
 
 from mitup_bot import api_guards, db, docs_links, hosts_group, patreon, reconcile, supporter, timezone_api
 from mitup_bot.bootstrap import load_config
@@ -15,6 +15,7 @@ from mitup_bot.models import configure_token_encryption
 from mitup_bot.monitoring.backend import EmfBackend, configure_emf_backend
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.patreon import webhooks as patreon_webhooks
+from mitup_bot.rate_limiter import MitupRateLimiter
 from mitup_bot.request import build_telegram_request
 from mitup_bot.update_processor import PerUserUpdateProcessor
 from mitup_bot.web import create_app
@@ -140,7 +141,7 @@ class MitupRuntime:
         builder.context_types(ContextTypes(context=MitupContext, user_data=MitupUserData))
 
         # Set rate limiter
-        builder.rate_limiter(AIORateLimiter(max_retries=self.config.bot.retries_on_throttle))
+        builder.rate_limiter(MitupRateLimiter(max_retries=self.config.bot.retries_on_throttle))
 
         # Short-timeout client for outbound calls; the long-polling request object is left alone.
         builder.request(build_telegram_request(self.config.bot))

@@ -196,6 +196,15 @@ class MetricKey(CamelCaseStrEnum):
     above the per-job timeout: a slow or failing job self-clears when that timeout cancels it, so
     the series crosses the threshold only when a job outlived its own cancellation."""
 
+    TELEGRAM_THROTTLED = auto()
+    """Whether one Telegram request was held up before it executed. 1 when client-side shaping made
+    it wait for bucket capacity or for a held retry-after pause, or when Telegram answered 429; 0
+    when it flowed straight through. One sample per request, so the average reads as the share of
+    traffic being throttled. The 429 subset is the drastic case and is the only one that also logs
+    a line (`Telegram rate limit hit`), which carries the scope this record deliberately omits: the
+    chats and inline messages behind it are unbounded. Diagnostic-only for now, with no widget or
+    alarm reading it yet."""
+
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"
 

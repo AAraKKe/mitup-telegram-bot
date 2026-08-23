@@ -96,7 +96,7 @@ def test_build_bot(mock_ext_bot: MagicMock):
     assert call_kwargs["request"]._client.timeout.read == 1.5
 
 
-@patch("mitup_bot.events.service.AIORateLimiter")
+@patch("mitup_bot.events.service.MitupRateLimiter")
 @patch("mitup_bot.events.service.ExtBot")
 def test_build_broadcast_bot_applies_configured_rate(mock_ext_bot: MagicMock, mock_rate_limiter: MagicMock):
     bot_config = BotConfig(

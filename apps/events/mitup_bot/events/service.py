@@ -9,7 +9,7 @@ from typing import assert_never
 from uuid import uuid4
 
 import structlog
-from telegram.ext import AIORateLimiter, ExtBot
+from telegram.ext import ExtBot
 
 from mitup_bot import api_guards, db, hosts_group, patreon, reconcile
 from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
@@ -35,6 +35,7 @@ from mitup_bot.monitoring import (
     bound_metrics_client,
     configure_emf_backend,
 )
+from mitup_bot.rate_limiter import MitupRateLimiter
 from mitup_bot.request import build_telegram_request
 
 from .lifecycle_queries import loggable_windows
@@ -120,7 +121,7 @@ def configure_patreon(config: Config):
 def build_bot(config: BotConfig) -> ExtBot:
     return ExtBot(
         token=config.token.get_secret_value(),
-        rate_limiter=AIORateLimiter(max_retries=config.retries_on_throttle),
+        rate_limiter=MitupRateLimiter(max_retries=config.retries_on_throttle),
         request=build_telegram_request(config),
     )
 
@@ -130,12 +131,12 @@ def build_broadcast_bot(config: BotConfig) -> ExtBot:
 
     Broadcasts are the highest-rate, least time-sensitive traffic; giving them their own limiter
     keeps their volume from competing with time-sensitive events (meeting reminders) for the shared
-    bot's rate budget. `AIORateLimiter` needs no lifecycle setup — its limiters are built in
+    bot's rate budget. `MitupRateLimiter` needs no lifecycle setup: its limiters are built in
     `__init__` and its `initialize`/`shutdown` are no-ops.
     """
     return ExtBot(
         token=config.token.get_secret_value(),
-        rate_limiter=AIORateLimiter(
+        rate_limiter=MitupRateLimiter(
             overall_max_rate=config.broadcast_max_rate,
             overall_time_period=1,
             max_retries=config.retries_on_throttle,
