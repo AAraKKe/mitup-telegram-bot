@@ -14,14 +14,21 @@ import subprocess
 import httpx
 
 from . import ci_env, console, gitlab_client, runner
-from .ci_env import TOKEN_ENV_VAR
+from .ci_env import PUSH_TOKEN_ENV_VAR
 
 MR_BRANCH = "crowdin-translations"
 HOLD_LABEL = "crowdin::hold"
 MR_TITLE = "🗣️ Update approved translations from Crowdin"
 LOCALES_PATHSPEC = "libs/core/mitup_bot/locales/*.po"
 
-CI_ENV_VARS = ("CI_API_V4_URL", "CI_PROJECT_ID", "CI_SERVER_HOST", "CI_PROJECT_PATH", "CI_DEFAULT_BRANCH")
+CI_ENV_VARS = (
+    PUSH_TOKEN_ENV_VAR,
+    "CI_API_V4_URL",
+    "CI_PROJECT_ID",
+    "CI_SERVER_HOST",
+    "CI_PROJECT_PATH",
+    "CI_DEFAULT_BRANCH",
+)
 
 
 def ci_environment() -> dict[str, str] | None:
@@ -38,7 +45,8 @@ def token_identity(environment: dict[str, str]) -> tuple[str, str]:
 
     The project enforces the committer-email push rule: a push is rejected unless the
     commit's committer email belongs to the pushing user, so the commit must be authored
-    as whoever owns the token.
+    as whoever owns the push token. The API and push tokens belong to the same service
+    account, so the identity resolved through the API token is the push identity too.
     """
     user = ci_env.api_from(environment).current_user()
     return user["name"], user.get("commit_email") or user["email"]
@@ -78,7 +86,7 @@ def push_translations_branch(environment: dict[str, str]):
     git("add", "--", LOCALES_PATHSPEC)
     git("commit", "-m", MR_TITLE)
     remote = (
-        f"https://oauth2:{environment[TOKEN_ENV_VAR]}@{environment['CI_SERVER_HOST']}"
+        f"https://oauth2:{environment[PUSH_TOKEN_ENV_VAR]}@{environment['CI_SERVER_HOST']}"
         f"/{environment['CI_PROJECT_PATH']}.git"
     )
     git(

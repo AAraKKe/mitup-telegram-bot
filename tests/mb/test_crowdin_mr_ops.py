@@ -11,10 +11,11 @@ PROJECT_ID = "724481"
 SERVER_HOST = "gitlab.example"
 PROJECT_PATH = "meetupbot/mitup-telegram-bot"
 DEFAULT_BRANCH = "main"
-TOKEN = "glpat-SECRETVALUE"
+API_TOKEN = "glpat-APISECRETVALUE"
+PUSH_TOKEN = "glpat-PUSHSECRETVALUE"
 
 # The oauth2:<token>@ remote the push targets; the token must never reach console output.
-REMOTE_URL = f"https://oauth2:{TOKEN}@{SERVER_HOST}/{PROJECT_PATH}.git"
+REMOTE_URL = f"https://oauth2:{PUSH_TOKEN}@{SERVER_HOST}/{PROJECT_PATH}.git"
 
 # The token owner's /user payload; commits must carry this identity to pass the
 # committer-email push rule.
@@ -25,7 +26,8 @@ TOKEN_USER = {
 }
 
 FULL_ENV = {
-    "MITUP_GITLAB_TOKEN": TOKEN,
+    "MITUP_GITLAB_API_TOKEN": API_TOKEN,
+    "MITUP_GITLAB_PUSH_TOKEN": PUSH_TOKEN,
     "CI_API_V4_URL": API_V4_URL,
     "CI_PROJECT_ID": PROJECT_ID,
     "CI_SERVER_HOST": SERVER_HOST,
@@ -136,7 +138,15 @@ def test_ci_environment_returns_all_values(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.mark.parametrize(
     "missing",
-    ["MITUP_GITLAB_TOKEN", "CI_API_V4_URL", "CI_PROJECT_ID", "CI_SERVER_HOST", "CI_PROJECT_PATH", "CI_DEFAULT_BRANCH"],
+    [
+        "MITUP_GITLAB_API_TOKEN",
+        "MITUP_GITLAB_PUSH_TOKEN",
+        "CI_API_V4_URL",
+        "CI_PROJECT_ID",
+        "CI_SERVER_HOST",
+        "CI_PROJECT_PATH",
+        "CI_DEFAULT_BRANCH",
+    ],
 )
 def test_ci_environment_reports_missing_variable(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], missing: str
@@ -169,7 +179,7 @@ def test_hold_requested_true_when_label_present(monkeypatch: pytest.MonkeyPatch)
     assert crowdin_mr_ops.hold_requested(FULL_ENV) is True
     assert seen["url"] == f"{API_V4_URL}/projects/{PROJECT_ID}/merge_requests"
     assert seen["params"] == {"state": "opened", "source_branch": "crowdin-translations"}
-    assert seen["headers"] == {"PRIVATE-TOKEN": TOKEN}
+    assert seen["headers"] == {"PRIVATE-TOKEN": API_TOKEN}
 
 
 def test_hold_requested_false_when_label_absent(monkeypatch: pytest.MonkeyPatch):
@@ -200,7 +210,7 @@ def test_token_identity_prefers_commit_email(monkeypatch: pytest.MonkeyPatch):
 
     assert crowdin_mr_ops.token_identity(FULL_ENV) == ("Crowdin Sync", "12345-crowdin-sync@noreply.gitlab.example")
     assert seen["user_url"] == f"{API_V4_URL}/user"
-    assert seen["user_headers"] == {"PRIVATE-TOKEN": TOKEN}
+    assert seen["user_headers"] == {"PRIVATE-TOKEN": API_TOKEN}
 
 
 @pytest.mark.parametrize("commit_email", [None, ""], ids=["null", "empty"])
@@ -337,10 +347,10 @@ def test_create_translations_mr_happy_path_pushes(monkeypatch: pytest.MonkeyPatc
 def test_create_translations_mr_missing_env_exits_one(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
-    set_ci_env(monkeypatch, MITUP_GITLAB_TOKEN=None)
+    set_ci_env(monkeypatch, MITUP_GITLAB_API_TOKEN=None)
 
     assert crowdin_mr_ops.create_translations_mr() == 1
-    assert "MITUP_GITLAB_TOKEN" in combined(capsys)
+    assert "MITUP_GITLAB_API_TOKEN" in combined(capsys)
 
 
 def test_create_translations_mr_hold_leaves_branch_untouched(
@@ -403,4 +413,5 @@ def test_create_translations_mr_git_failure_hides_token(
     assert crowdin_mr_ops.create_translations_mr() == 1
     output = combined(capsys)
     assert "exit code 128" in output
-    assert TOKEN not in output  # the token rides in the push remote URL and must never leak
+    assert PUSH_TOKEN not in output  # the push token rides in the remote URL and must never leak
+    assert API_TOKEN not in output

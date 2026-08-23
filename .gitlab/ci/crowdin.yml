@@ -4,10 +4,12 @@
 # Required CI/CD variables (Settings > CI/CD > Variables, masked):
 #   CROWDIN_API_KEY   - Crowdin personal access token (projects read, source files,
 #                       translations, storages).
-#   MITUP_GITLAB_TOKEN - PAT of the Mitup GitLab Bot service account (api + write_repository;
-#                        the account needs Developer on the project). crowdin-pull pushes
-#                        the MR branch with it and commits as the token's owner — the
-#                        committer-email push rule rejects any other identity.
+#   MITUP_GITLAB_API_TOKEN  - api-scope PAT of the Mitup GitLab Bot service account (the
+#                             account needs Developer on the project). crowdin-pull lists
+#                             the open MRs and resolves the account identity with it.
+#   MITUP_GITLAB_PUSH_TOKEN - write_repository-scope PAT of the same account. crowdin-pull
+#                             pushes the MR branch with it and commits as the account — the
+#                             committer-email push rule rejects any other identity.
 #
 # crowdin-pull runs from an hourly pipeline schedule targeting the default branch. The
 # schedule must define SCHEDULE_REASON="crowdin-sync" (each schedule names its purpose so

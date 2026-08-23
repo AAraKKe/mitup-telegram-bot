@@ -13,7 +13,7 @@ BASE_SHA = "abc123def456"
 TOKEN = "glpat-SECRETVALUE"
 
 FULL_ENV = {
-    "MITUP_GITLAB_TOKEN": TOKEN,
+    "MITUP_GITLAB_API_TOKEN": TOKEN,
     "CI_API_V4_URL": API_V4_URL,
     "CI_PROJECT_ID": PROJECT_ID,
     "CI_MERGE_REQUEST_IID": MR_IID,
@@ -261,10 +261,10 @@ def test_comment_lock_diff_treats_missing_base_lock_as_all_added(monkeypatch: py
 def test_comment_lock_diff_requires_the_ci_environment(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
-    set_ci_env(monkeypatch, MITUP_GITLAB_TOKEN=None)
+    set_ci_env(monkeypatch, MITUP_GITLAB_API_TOKEN=None)
 
     assert lock_diff.comment_lock_diff() == 1
-    assert "MITUP_GITLAB_TOKEN" in combined(capsys)
+    assert "MITUP_GITLAB_API_TOKEN" in combined(capsys)
 
 
 def test_comment_lock_diff_reports_git_failure(

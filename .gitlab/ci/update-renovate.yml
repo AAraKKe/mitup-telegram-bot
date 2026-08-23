@@ -1,3 +1,11 @@
+# Required CI/CD variables (Settings > CI/CD > Variables, masked):
+#   MITUP_GITLAB_API_TOKEN  - api-scope PAT of the Mitup GitLab Bot service account;
+#                             resolves the account's name and commit email for the fix
+#                             commit.
+#   MITUP_GITLAB_PUSH_TOKEN - write_repository-scope PAT of the same account; pushes the
+#                             fix back to the MR source branch. The committer-email push
+#                             rule only accepts the pushing token owner's identity, which
+#                             is why the fix commit cannot carry Renovate's.
 auto-format:
   stage: pre-flight
   rules:
@@ -26,28 +34,29 @@ auto-format:
 
       # Only proceed if there are changes to commit
       if ! git diff --quiet; then
-        echo "Formatting changes detected. Committing with Renovate's identity."
+        echo "Formatting changes detected. Committing as the push token's owner."
 
         # Install and configure pre-commit to ensure commit-msg hooks run
         pip install pre-commit
         pre-commit install
         pre-commit install --hook-type commit-msg
 
-        # Dynamically get the author details from the last commit (made by Renovate)
-        COMMIT_AUTHOR_NAME=$(git log -1 --pretty=format:'%an')
-        COMMIT_AUTHOR_EMAIL=$(git log -1 --pretty=format:'%ae')
+        # The committer-email push rule only accepts the pushing token owner's
+        # identity, so resolve the service account's name and commit email.
+        IDENTITY=$(curl --silent --fail --header "PRIVATE-TOKEN: ${MITUP_GITLAB_API_TOKEN}" "${CI_API_V4_URL}/user")
+        COMMIT_USER_NAME=$(echo "${IDENTITY}" | python3 -c "import json, sys; print(json.load(sys.stdin)['name'])")
+        COMMIT_USER_EMAIL=$(echo "${IDENTITY}" | python3 -c "import json, sys; u = json.load(sys.stdin); print(u.get('commit_email') or u['email'])")
 
-        echo "Setting git user to '${COMMIT_AUTHOR_NAME} <${COMMIT_AUTHOR_EMAIL}>'"
+        echo "Setting git user to '${COMMIT_USER_NAME} <${COMMIT_USER_EMAIL}>'"
 
-        # Use these dynamic details for the new commit
-        git config user.name "${COMMIT_AUTHOR_NAME}"
-        git config user.email "${COMMIT_AUTHOR_EMAIL}"
+        git config user.name "${COMMIT_USER_NAME}"
+        git config user.email "${COMMIT_USER_EMAIL}"
 
         git add -A
         git commit -m "refactor: fix formatting after renovate update"
 
-        # Push the changes back to the source branch using the token
-        git push https://oauth2:${RENOVATE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git HEAD:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
+        # Push the changes back to the source branch using the push token
+        git push https://oauth2:${MITUP_GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git HEAD:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
 
         # If this has run, there is no point in running the rest of the pipeline
         echo "Successfully pushed formatting changes. Failing job to stop pipeline."
