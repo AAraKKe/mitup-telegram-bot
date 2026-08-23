@@ -202,8 +202,9 @@ class MetricKey(CamelCaseStrEnum):
     when it flowed straight through. One sample per request, so the average reads as the share of
     traffic being throttled. The 429 subset is the drastic case and is the only one that also logs
     a line (`Telegram rate limit hit`), which carries the scope this record deliberately omits: the
-    chats and inline messages behind it are unbounded. Diagnostic-only for now, with no widget or
-    alarm reading it yet."""
+    chats and inline messages behind it are unbounded. Read by the Request volume widget on the
+    mitup-infra dashboard; the "Mitup/Bot/Telegram throttling & 429s" saved query names the 429
+    subset's requests."""
 
     def with_prefix(self, prefix: str, separator: str = "/") -> str:
         return f"{prefix}{separator}{self.value}"
