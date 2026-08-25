@@ -990,7 +990,7 @@ msgid "CommonMessages.CONTEXT_LOST"
 msgstr "<b>Desculpe, perdemos o fio da meada!</b>\n\nO bot passou por uma rápida atualização interna e esqueceu onde você estava no processo. Tudo o que você salvou está seguro. Por favor, comece de novo o que você estava fazendo a partir do menu abaixo."
 
 msgid "CommonMessages.RICH_MESSAGE_NOT_SUPPORTED"
-msgstr "<b>Essa é uma mensagem rica!</b>\n\nVejo que você enviou uma, mas ainda não posso trabalhar com mensagens ricas. O suporte chegará com a atualização v2.0, e vou anunciar aqui quando chegar, então fique de olho. Por enquanto, envie seu texto como uma mensagem comum e continuaremos."
+msgstr "<b>Essa é uma mensagem rica!</b>\n\nDá para ver que você enviou uma, mas não consigo trabalhar com mensagens ricas, porque as páginas dos eventos têm formatação própria. Envie seu texto como uma mensagem comum e continuamos. Qualquer <b>negrito</b> ou <i>itálico</i> que você digitar chega certinho."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Você atingiu seu limite de ${cap} eventos ativos. Encerre ou exclua um para criar outro, ou torne-se Host do Mitup no Patreon para desbloquear mais. Você encontra todos os detalhes no Colabore, logo abaixo."

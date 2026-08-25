@@ -945,7 +945,7 @@ msgid "CommonMessages.CONTEXT_LOST"
 msgstr "<b>¡Vaya, hemos perdido el hilo!</b>\n\nEl bot ha tenido una actualización interna y ha olvidado en qué paso estabas. Todo lo que guardaste está a salvo. Por favor, vuelve a empezar lo que estabas haciendo desde el menú de abajo."
 
 msgid "CommonMessages.RICH_MESSAGE_NOT_SUPPORTED"
-msgstr "<b>¡Ese es un mensaje enriquecido!</b>\n\nMe doy cuenta de que enviaste uno, pero no puedo trabajar con mensajes enriquecidos aún. El soporte llegará con la actualización v2.0, y te lo anunciaré aquí cuando llegue, así que mantente al tanto. Por ahora, envía tu texto como un mensaje normal y seguiremos adelante."
+msgstr "<b>¡Eso es un mensaje enriquecido!</b>\n\nVeo que has enviado uno, pero no puedo trabajar con mensajes enriquecidos, porque las páginas de las quedadas tienen su propio formato. Envíame tu texto como un mensaje normal y seguimos adelante. Cualquier <b>negrita</b> o <i>cursiva</i> que escribas sí me llega bien."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Has alcanzado tu límite de ${cap} quedadas activas. Cierra o elimina una para crear otra, o hazte Host de Mitup en Patreon para desbloquear más. Tienes todos los detalles en Colabora, justo debajo."

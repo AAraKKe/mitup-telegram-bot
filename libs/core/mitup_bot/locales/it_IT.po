@@ -972,7 +972,7 @@ msgid "CommonMessages.CONTEXT_LOST"
 msgstr "<b>Oops, abbiamo perso il filo!</b>\n\nIl bot ha ricevuto un rapido aggiornamento interno e ha dimenticato a che punto eri. Tutto quello che avevi salvato è al sicuro. Ricomincia quello che stavi facendo dal menu qui sotto."
 
 msgid "CommonMessages.RICH_MESSAGE_NOT_SUPPORTED"
-msgstr "<b>Questo è un messaggio avanzato!</b>\n\nSo che ne hai inviato uno, ma per ora non posso lavorare con i messaggi avanzati. Il supporto arriverà con l'aggiornamento v2.0, e te lo annuncerò qui quando arriverà, quindi rimani in ascolto. Per ora invia il tuo testo come messaggio semplice e continueremo."
+msgstr "<b>Questo è un messaggio avanzato!</b>\n\nVedo che ne hai inviato uno, ma non posso lavorare con i messaggi avanzati, perché le pagine degli incontri hanno una formattazione tutta loro. Inviami il tuo testo come messaggio semplice e andiamo avanti. Il <b>grassetto</b> e il <i>corsivo</i> che scrivi arrivano senza problemi."
 
 msgid "SupporterMessages.ACTIVE_MEETINGS_CAP"
 msgstr "Hai raggiunto il tuo limite di ${cap} incontri attivi. Chiudine o eliminane uno per crearne un altro, oppure diventa Host di Mitup su Patreon per sbloccarne altri. Trovi tutti i dettagli in Collabora, qui sotto."

@@ -249,12 +249,13 @@ class CommonMessages(MessageBase):
         "This message is from an older version of Mitup, so its buttons no longer work. "
         "Your account and meetings are safe. Open the main menu to keep going."
     )
-    # Shown when a user sends a Telegram rich message where plain text input is expected
-    # (title/description prompts). The bot cannot use rich content yet.
+    # Shown when a user sends a Telegram rich message where plain text is expected (title,
+    # description, location name, timezone) or with no flow open. Rich messages are never
+    # accepted as input.
     RICH_MESSAGE_NOT_SUPPORTED = (
-        "<b>That's a rich message!</b>\n\nI can tell you sent one, but I can't work with rich messages "
-        "just yet. Support is coming with the v2.0 update, and I'll announce it here when it arrives, so "
-        "keep an eye out. For now, send your text as a plain message and we'll keep going."
+        "<b>That's a rich message!</b>\n\nI can tell you sent one, but I can't work with rich messages, "
+        "since meeting pages keep their own formatting. Send your text as a plain message and we'll keep "
+        "going. Any <b>bold</b> or <i>italic</i> you type comes through fine."
     )
 
 
