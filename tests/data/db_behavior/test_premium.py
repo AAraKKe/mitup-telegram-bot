@@ -88,15 +88,20 @@ async def test_supporter_level_defaults_to_none(db_session: AsyncSession):
     assert user.supporter_level is SupporterLevel.NONE
 
 
-async def test_supporter_level_rejects_unknown_value(db_session: AsyncSession):
-    """The CHECK constraint the migration installs guards the column against tiers outside the enum."""
+async def test_supporter_level_rejects_unknown_value(db_session: AsyncSession, seed_user: User):
+    """The CHECK constraint the migration installs guards the column against tiers outside the enum.
+
+    ``seed_user`` is requested rather than assumed: the row it creates is the one this UPDATE aims
+    at, and an UPDATE matching nothing violates no constraint, so without the fixture the test would
+    pass or fail on whether some other test on the same xdist worker had already pulled the seed in.
+    """
     savepoint = await db_session.begin_nested()
     try:
         with pytest.raises(IntegrityError):
             await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
                 text("UPDATE users SET supporter_level = 'gold' WHERE tg_user_id = :t").bindparams(
-                    t=999_001
-                )  # seed_user
+                    t=seed_user.tg_user_id
+                )
             )
             await db_session.flush()
     finally:

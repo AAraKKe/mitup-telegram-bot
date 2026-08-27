@@ -17,7 +17,7 @@ from typing import cast
 
 import pytest
 from cryptography.fernet import Fernet
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram.ext import ApplicationHandlerStop, ExtBot
@@ -39,6 +39,13 @@ pytestmark = pytest.mark.db_test
 
 PATRON_USER_ID = "patreon-6001"
 NON_PATRON_USER_ID = "patreon-6002"
+
+# How far either side of the deadline a staged row sits. `live_row_predicate` weighs `expiration`
+# against PostgreSQL's clock, so a deadline measured from the host's would put two independent
+# clocks on either side of the comparison. These windows are wide enough that neither an offset
+# between the two nor the time a loaded run spends between staging and asserting can decide a case.
+LAPSED_WINDOW = dt.timedelta(minutes=-5)
+LIVE_WINDOW = dt.timedelta(seconds=pairing.PAIRING_CODE_TTL_SECONDS)
 
 
 @pytest.fixture(autouse=True)
@@ -91,14 +98,32 @@ async def committed_user(tg_user_id: int) -> AsyncIterator[int]:
             )
 
 
+async def database_deadline(session: AsyncSession, offset: dt.timedelta) -> dt.datetime:
+    """A deadline ``offset`` away from PostgreSQL's own clock.
+
+    That clock is the only one the expiry predicate consults, so it is the only one a fixture may
+    measure a deadline against. Reading it costs a round trip, which buys the property that matters:
+    both sides of ``expiration > now()`` then come from the same clock, and no offset between the
+    host and the database can move a row across the boundary the test placed it on.
+
+    ``now()`` is the transaction's start time, so a row staged here is fixed relative to every later
+    transaction rather than to the moment its statement happens to execute.
+    """
+    return (await session.exec(select(func.now()))).one() + offset
+
+
 @contextlib.asynccontextmanager
 async def committed_pending_link(
     patreon_user_id: str,
     level: SupporterLevel = SupporterLevel.HOST_2,
     *,
-    expires_in: dt.timedelta = dt.timedelta(minutes=15),
+    expires_in: dt.timedelta = LIVE_WINDOW,
 ) -> AsyncIterator[str]:
-    """Stage a pending link exactly as the OAuth callback would, and yield its pairing code."""
+    """Stage a pending link as the OAuth callback does, and yield its pairing code.
+
+    The one departure from ``stage_pending_link`` is deliberate: the deadline is measured from the
+    database clock rather than the host's, so ``expires_in`` means what it says here.
+    """
     code = pairing.generate_pairing_code()
     code_hash = pairing.hash_pairing_code(code)
     async with db.begin() as session:
@@ -108,7 +133,7 @@ async def committed_pending_link(
                 patreon_user_id=patreon_user_id,
                 patreon_full_name="Ada Lovelace",
                 supporter_level=level,
-                expiration=dt.datetime.now(dt.UTC) + expires_in,
+                expiration=await database_deadline(session, expires_in),
             )
         )
     try:
@@ -143,6 +168,23 @@ async def read_user_and_subscription(user_id: int) -> tuple[User, SupporterSubsc
             await session.exec(select(SupporterSubscription).where(SupporterSubscription.user_id == user_id))
         ).first()
         return user, subscription
+
+
+async def lapse_pending_link(code: str):
+    """Push a staged row's deadline into the past, standing in for the window elapsing.
+
+    A test cannot wind PostgreSQL's clock forward, so the deadline moves back instead. The predicate
+    only ever asks whether ``expiration`` is still ahead of ``now()`` and cannot tell which of the
+    two moved, which makes this the same question a real sleep would ask -- decided outright rather
+    than raced against however long the run takes.
+    """
+    async with db.begin() as session:
+        row = (
+            await session.exec(
+                select(PatreonPendingLink).where(PatreonPendingLink.code_hash == pairing.hash_pairing_code(code))
+            )
+        ).one()
+        row.expiration = await database_deadline(session, LAPSED_WINDOW)
 
 
 async def read_pending_link(code: str) -> PatreonPendingLink | None:
@@ -235,7 +277,7 @@ async def test_two_simultaneous_confirmations_yield_exactly_one_winner():
 
 
 async def test_an_expired_code_cannot_be_claimed():
-    async with committed_pending_link("patreon-6108", expires_in=dt.timedelta(seconds=-1)) as code:
+    async with committed_pending_link("patreon-6108", expires_in=LAPSED_WINDOW) as code:
         assert await claim_in_own_transaction(code) is None
         # The row is left untouched rather than silently claimed.
         unclaimed = await read_pending_link(code)
@@ -245,10 +287,11 @@ async def test_an_expired_code_cannot_be_claimed():
 
 async def test_expiry_is_re_checked_at_confirm_time():
     # A prompt opened just before the deadline must not still be confirmable after it. Expiry lives
-    # in the consume predicate for exactly this reason, not only in the claim.
-    async with committed_pending_link("patreon-6109", expires_in=dt.timedelta(seconds=2)) as code:
+    # in the consume predicate for exactly this reason, not only in the claim -- so the claim here
+    # has to happen while the row is live, and only then does the window close.
+    async with committed_pending_link("patreon-6109") as code:
         assert await claim_in_own_transaction(code, 555_109) is not None
-        await asyncio.sleep(2.1)
+        await lapse_pending_link(code)
 
         assert await consume_in_own_transaction(code, 555_109) is None
         unspent = await read_pending_link(code)
@@ -273,14 +316,14 @@ async def test_claim_and_consume_handle_a_real_sized_telegram_id():
 
 
 async def test_classification_tells_a_forged_confirm_from_an_expired_code():
-    # The two shapes behind the same failed consume, split by PostgreSQL's clock — the clock the
+    # The two shapes behind the same failed consume, split by PostgreSQL's clock, the clock the
     # transitions themselves filter on. A live row nobody claimed means the confirm was forged
     # around the claim step (near-zero baseline, alarmable); an expired row is the honest rate.
     async with committed_pending_link("patreon-6114") as code:
         assert await consume_in_own_transaction(code, 555_114) is None
         assert await classify_in_own_transaction(code, 555_114) is pending_links.ClaimFailure.UNCLAIMED
 
-    async with committed_pending_link("patreon-6115", expires_in=dt.timedelta(seconds=-1)) as code:
+    async with committed_pending_link("patreon-6115", expires_in=LAPSED_WINDOW) as code:
         assert await consume_in_own_transaction(code, 555_115) is None
         assert await classify_in_own_transaction(code, 555_115) is pending_links.ClaimFailure.EXPIRED
 
@@ -360,7 +403,7 @@ async def test_the_claim_survives_the_stop_that_ends_the_handler():
 async def test_the_sweep_erases_spent_and_expired_rows_but_not_live_ones():
     async with (
         committed_pending_link("patreon-6140") as spent,
-        committed_pending_link("patreon-6141", expires_in=dt.timedelta(seconds=-1)) as expired,
+        committed_pending_link("patreon-6141", expires_in=LAPSED_WINDOW) as expired,
         committed_pending_link("patreon-6142") as live,
     ):
         await claim_in_own_transaction(spent, 555_140)
