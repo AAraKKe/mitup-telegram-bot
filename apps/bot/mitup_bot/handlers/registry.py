@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
@@ -44,6 +45,7 @@ from mitup_bot.update_trace import current_update_trace, record_handler_invocati
 from .error_handler import FaultOutcome, fault_error_type
 from .error_handler import handler as error_handler
 from .legacy_callbacks import answer_legacy_callback, is_legacy_callback_data
+from .stale_conversation import answer_stale_conversation_button
 
 # Remove the warning that is sent when using the per_message option in the registry.
 # We have a case in which the user can interact with a simialr message in different palces
@@ -295,19 +297,28 @@ class UnhandledHandlerId(HandlerId):
 async def callback_query_fallback(update: Update, context: TMitupContext):
     """Answer a callback query no registered handler matched, or fail the invocation.
 
-    Two different things arrive here and the wire format tells them apart. A button rendered by the
-    bot Mitup replaced carries a payload `is_legacy_callback_data` recognises; its owner is holding a
-    message older than this bot and cannot tell, so the tap is answered with the notice saying so and
-    the invocation closes as a success.
+    Three different things arrive here and the wire format tells them apart. A button rendered by
+    the bot Mitup replaced carries a payload `is_legacy_callback_data` recognises; its owner is
+    holding a message older than this bot and cannot tell, so the tap is answered with the notice
+    saying so and the invocation closes as a success.
 
-    Every button this bot renders is bound to a handler, so anything else reaching here means a
-    button shipped without one or a client forged the data — either way the interaction failed.
-    Raising hands it to the wrapper's fault path, which writes the correlated error line, redirects
-    the user to the main menu with the unexpected-error notice, and closes the invocation on Fault=1.
+    A wire form belonging to a conversation-scoped callback (registered `bindable=False`) is a
+    real button of ours whose conversation has ended: only a live conversation state can claim it,
+    and its prompt outlives the conversation in the caller's chat. The tap is answered by swapping
+    the prompt for the main menu, and the invocation closes as a success.
+
+    Anything else means a button shipped without a handler or a client forged the data; either way
+    the interaction failed. Raising hands it to the wrapper's fault path, which writes the
+    correlated error line, redirects the user to the main menu with the unexpected-error notice,
+    and closes the invocation on Fault=1.
     """
     callback_query = guards.callback_query(update)
     if is_legacy_callback_data(callback_query.data):
         await answer_legacy_callback(context, update)
+        return
+
+    if callback_query.data is not None and HandlersRegistry.matches_conversation_scoped_callback(callback_query.data):
+        await answer_stale_conversation_button(context, update)
         return
 
     raise UnboundCallbackError(callback_query.data)
@@ -325,6 +336,24 @@ class HandlersRegistry:
 
     env: Env = Env.DEV
     handlers: dict[HandlerId, HandlerWrapper] = {}
+
+    @classmethod
+    def matches_conversation_scoped_callback(cls, data: str) -> bool:
+        """Whether `data` is the wire form of a callback only a conversation state can claim.
+
+        A `bindable=False` callback handler is reachable solely through a conversation's state
+        map, so its buttons outlive their conversation in the caller's chat and a re-tap arrives
+        with no handler matching it. Deriving the set from the registrations keeps it in step
+        with every conversation that adds one.
+        """
+        return any(
+            pattern.match(data) is not None
+            for wrapper in cls.handlers.values()
+            if not wrapper.bindable
+            and isinstance(wrapper.handler, CallbackQueryHandler)
+            # PTB also accepts callable and type patterns; only regex ones name a wire form.
+            and isinstance(pattern := wrapper.handler.pattern, re.Pattern)
+        )
 
     @classmethod
     def register_command(

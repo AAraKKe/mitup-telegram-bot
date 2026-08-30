@@ -44,9 +44,25 @@ it. The invocation closes as a completed one on `FAULT=0` and records one info l
 legacy bot callback`, with no `callback_data` of its own: the wrapper's exit line already carries it.
 Delivery is best-effort like every render in `error_handler`.
 
-Anything else raises `UnboundCallbackError`. Every button this bot renders is bound to a handler, so
-data that matched nothing is a button shipped without one or a forged payload — a genuine fault,
-answered by the generic redirect and counted `FAULT=1`.
+A wire form belonging to a **conversation-scoped callback** is also answered, not failed. A callback
+handler registered `bindable=False` is reachable only through a conversation's state map, so its
+buttons outlive their conversation in the caller's chat: a re-tap after the conversation ended (or
+after a deploy wiped conversation state) arrives with no handler matching it.
+`HandlersRegistry.matches_conversation_scoped_callback` recognises these by testing the data against
+the patterns of the unbound registrations — the set derives from the registrations themselves, so a
+new conversation button is covered without touching the fallback. The tap is answered by
+`stale_conversation.answer_stale_conversation_button`: the prompt is replaced by the main menu with
+`CommonMessages.STALE_BUTTONS_NOTICE` as its context line (which is what takes the unusable buttons
+off the screen), the query is answered empty to clear the spinner, and the invocation closes on
+`FAULT=0` with one info line, `Answered a stale conversation button` — the line the
+"Mitup/Bot/Stale conversation buttons" saved query counts. Conversation prompts only exist in the
+bot's own chat, so there is no group branch; language resolution and best-effort delivery follow the
+legacy path above.
+
+Anything else raises `UnboundCallbackError`. Every *globally bound* wire form this bot renders is
+covered by a handler and the conversation-scoped ones by the branch above, so data that matched
+nothing is a button shipped without a handler or a forged payload — a genuine fault, answered by the
+generic redirect and counted `FAULT=1`.
 
 ## Exception categories
 

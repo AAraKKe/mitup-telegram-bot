@@ -1079,6 +1079,9 @@ msgstr "<b>Desvincular a túa conta de Patreon?</b>\n\nHoxe es ${current_tier}. 
 msgid "CommonMessages.OLD_VERSION_MESSAGE"
 msgstr "Esta mensaxe é dunha versión antiga de Mitup, así que os seus botóns xa non funcionan. A túa conta e as túas quedadas están seguras. Abre o menú principal para continuar."
 
+msgid "CommonMessages.STALE_BUTTONS_NOTICE"
+msgstr "Estes botóns son dunha mensaxe antiga e xa non lembro que estabamos a facer aí. Convertín esta mensaxe no menú principal, así podes continuar desde aquí."
+
 msgid "AdminMessages.BUTTON_SUPPORTER_GRANTS"
 msgstr "🎁 Vantaxes de Host"
 

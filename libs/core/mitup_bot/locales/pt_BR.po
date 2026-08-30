@@ -1091,6 +1091,9 @@ msgstr "<b>Desconectar sua conta do Patreon?</b>\n\nVocê é um ${current_tier} 
 msgid "CommonMessages.OLD_VERSION_MESSAGE"
 msgstr "Esta mensagem é de uma versão antiga do Mitup, então seus botões não funcionam mais. Sua conta e seus eventos estão seguros. Abra o menu principal para continuar."
 
+msgid "CommonMessages.STALE_BUTTONS_NOTICE"
+msgstr "Estes botões são de uma mensagem antiga e não lembro mais o que estávamos fazendo ali. Transformei esta mensagem no menu principal, então você pode continuar a partir daqui."
+
 msgid "AdminMessages.BUTTON_SUPPORTER_GRANTS"
 msgstr "🎁 Concessões de Host"
 

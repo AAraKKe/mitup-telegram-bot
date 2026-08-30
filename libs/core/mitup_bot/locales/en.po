@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-08-25 08:07\n"
+"PO-Revision-Date: 2026-08-30 13:28\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -313,6 +313,9 @@ msgstr "<b>Sorry, we lost our place!</b>\n\nThe bot had a quick internal update 
 
 msgid "CommonMessages.OLD_VERSION_MESSAGE"
 msgstr "This message is from an older version of Mitup, so its buttons no longer work. Your account and meetings are safe. Open the main menu to keep going."
+
+msgid "CommonMessages.STALE_BUTTONS_NOTICE"
+msgstr "These buttons are from an old message and I no longer remember what we were doing there. I've turned this message into the main menu, so you can keep going from here."
 
 msgid "CommonMessages.RICH_MESSAGE_NOT_SUPPORTED"
 msgstr "<b>That's a rich message!</b>\n\nI can tell you sent one, but I can't work with rich messages, since meeting pages keep their own formatting. Send your text as a plain message and we'll keep going. Any <b>bold</b> or <i>italic</i> you type comes through fine."

@@ -1079,6 +1079,9 @@ msgstr "Limits und Host-Vorteile"
 msgid "CommonMessages.OLD_VERSION_MESSAGE"
 msgstr "Diese Nachricht stammt aus einer älteren Version von Mitup, deshalb funktionieren ihre Buttons nicht mehr. Dein Konto und deine Treffen sind sicher. Öffne das Hauptmenü, um weiterzumachen."
 
+msgid "CommonMessages.STALE_BUTTONS_NOTICE"
+msgstr "Diese Buttons gehören zu einer alten Nachricht und ich weiß nicht mehr, was wir dort gemacht haben. Diese Nachricht ist jetzt das Hauptmenü, von hier aus kannst du weitermachen."
+
 msgid "AdminMessages.BUTTON_SUPPORTER_GRANTS"
 msgstr "🎁 Host-Zuweisungen"
 

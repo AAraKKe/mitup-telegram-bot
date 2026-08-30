@@ -249,6 +249,12 @@ class CommonMessages(MessageBase):
         "This message is from an older version of Mitup, so its buttons no longer work. "
         "Your account and meetings are safe. Open the main menu to keep going."
     )
+    # Takes over a conversation prompt whose flow already ended when one of its buttons is tapped:
+    # rendered as the context line above the main menu that replaces the prompt.
+    STALE_BUTTONS_NOTICE = (
+        "These buttons are from an old message and I no longer remember what we were doing there. "
+        "I've turned this message into the main menu, so you can keep going from here."
+    )
     # Shown when a user sends a Telegram rich message where plain text is expected (title,
     # description, location name, timezone) or with no flow open. Rich messages are never
     # accepted as input.

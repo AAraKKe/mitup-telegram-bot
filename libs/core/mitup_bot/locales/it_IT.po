@@ -1079,6 +1079,9 @@ msgstr "<b>Scollegare il tuo account Patreon?</b>\n\nOggi sei un ${current_tier}
 msgid "CommonMessages.OLD_VERSION_MESSAGE"
 msgstr "Questo messaggio proviene da una vecchia versione di Mitup e i suoi pulsanti non funzionano più. Il tuo account e i tuoi incontri sono al sicuro. Apri il menu principale per continuare."
 
+msgid "CommonMessages.STALE_BUTTONS_NOTICE"
+msgstr "Questi pulsanti sono di un vecchio messaggio e non ricordo più cosa stavamo facendo lì. Ho trasformato questo messaggio nel menu principale, così puoi continuare da qui."
+
 msgid "AdminMessages.BUTTON_SUPPORTER_GRANTS"
 msgstr "🎁 Concessioni Host"
 

@@ -1079,6 +1079,9 @@ msgstr "¡Vaya! Ese no parece un tiempo de prórroga válido. Envíame un númer
 msgid "CommonMessages.OLD_VERSION_MESSAGE"
 msgstr "Este mensaje es de una versión antigua de Mitup, así que sus botones ya no funcionan. Tu cuenta y tus quedadas están a salvo. Abre el menú principal para continuar."
 
+msgid "CommonMessages.STALE_BUTTONS_NOTICE"
+msgstr "Estos botones son de un mensaje antiguo y ya no recuerdo qué estábamos haciendo ahí. He convertido este mensaje en el menú principal, así puedes continuar desde aquí."
+
 msgid "AdminMessages.BUTTON_SUPPORTER_GRANTS"
 msgstr "🎁 Ventajas de Host"
 

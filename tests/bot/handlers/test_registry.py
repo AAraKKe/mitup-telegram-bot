@@ -324,7 +324,7 @@ NON_LEGACY_PAYLOADS = [
     pytest.param(str(UNBOUND_CALLBACK.with_id(3)), id="current_format_bound_to_no_handler"),
 ]
 
-LEGACY_FALLBACK = callback_with_metrics(
+WRAPPED_FALLBACK = callback_with_metrics(
     UnhandledHandlerId.CALLBACK_QUERY_FALLBACK, "Callback", callback_query_fallback, Env.PROD
 )
 
@@ -376,7 +376,7 @@ async def test_a_legacy_button_in_the_bot_chat_is_replaced_by_the_old_version_no
     update = legacy_callback_update(data)
     context = build_context(update, app, metrics=metrics_client)
 
-    await LEGACY_FALLBACK(update, context)
+    await WRAPPED_FALLBACK(update, context)
     await context.flush_metrics()
 
     context.api.assert_edit_message_called(update, old_version_notice(TranslationEngine.FALLBACK_LANG))
@@ -398,7 +398,7 @@ async def test_a_legacy_button_tapped_outside_the_bot_chat_is_answered_with_an_a
     update = legacy_callback_update(LEGACY_MENU_BUTTON, chat_type=Chat.GROUP)
     context = build_context(update, app, metrics=metrics_client)
 
-    await LEGACY_FALLBACK(update, context)
+    await WRAPPED_FALLBACK(update, context)
     await context.flush_metrics()
 
     context.api.assert_answer_callback_query_called(
@@ -419,7 +419,7 @@ async def test_the_answered_legacy_tap_is_recorded_once_without_repeating_the_pa
     context = build_context(update, app, metrics=metrics_client)
 
     with capture_logs(processors=[merge_contextvars]) as logs:
-        await LEGACY_FALLBACK(update, context)
+        await WRAPPED_FALLBACK(update, context)
 
     answered = [entry for entry in logs if entry["event"] == "Answered a legacy bot callback"]
     assert len(answered) == 1
@@ -457,7 +457,7 @@ async def test_a_notice_that_cannot_be_delivered_never_becomes_a_fault(
     context.api.mock_method("edit_message").side_effect = BadRequest("Message can't be edited")
 
     with capture_logs(processors=[merge_contextvars]) as logs:
-        await LEGACY_FALLBACK(update, context)
+        await WRAPPED_FALLBACK(update, context)
     await context.flush_metrics()
 
     failures = [entry for entry in logs if entry["event"] == "Failed to deliver the old-version notice to the user"]
@@ -477,7 +477,7 @@ async def test_the_notice_follows_the_language_stored_on_the_caller_account(
     update = legacy_callback_update(LEGACY_MENU_BUTTON, language_code="de")
     context = build_context(update, app, metrics=metrics_client)
 
-    await LEGACY_FALLBACK(update, context)
+    await WRAPPED_FALLBACK(update, context)
 
     assert old_version_notice("es_ES") != old_version_notice("de_DE"), (
         "the assertion below only means anything while the two languages render differently"
@@ -493,9 +493,117 @@ async def test_the_notice_falls_back_to_the_client_language_without_an_account(
     update = legacy_callback_update(LEGACY_MENU_BUTTON, language_code="es-MX")
     context = build_context(update, app, metrics=metrics_client)
 
-    await LEGACY_FALLBACK(update, context)
+    await WRAPPED_FALLBACK(update, context)
 
     context.api.assert_edit_message_called(update, old_version_notice("es_ES"))
+
+
+# ---------------------------------------------------------------------------
+# Buttons whose conversation has ended
+# ---------------------------------------------------------------------------
+
+# The wire form of a real conversation-scoped registration: the no-limit button of the
+# max-participants prompt, reachable only through the edit-meeting conversation.
+STALE_CONVERSATION_BUTTON = str(cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(3))
+
+
+def stale_buttons_screen(lang: str) -> MitupView:
+    """The screen a stale conversation tap is expected to leave behind: the main menu, with the
+    notice saying why the prompt was taken over."""
+    return factory.main_menu_view(RenderContext(lang=lang), message=CommonMessages.STALE_BUTTONS_NOTICE.get(lang=lang))
+
+
+def test_conversation_scoped_wire_forms_are_recognised():
+    """The set derives from the registrations, so it must accept a bindable=False wire form and
+    reject both an unregistered one and one a global handler owns."""
+    assert HandlersRegistry.matches_conversation_scoped_callback(STALE_CONVERSATION_BUTTON)
+    assert not HandlersRegistry.matches_conversation_scoped_callback(str(UNBOUND_CALLBACK.with_id(3)))
+    assert not HandlersRegistry.matches_conversation_scoped_callback("show;main_menu:")
+
+
+async def test_a_stale_conversation_button_is_replaced_by_the_main_menu(
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+):
+    """The prompt the button sits on can no longer be acted through, so it becomes the main menu
+    with the notice saying why, and the invocation closes as a completed one.
+
+    `mock_session` backs the language lookup made while building that screen.
+    """
+    update = legacy_callback_update(STALE_CONVERSATION_BUTTON)
+    context = build_context(update, app, metrics=metrics_client)
+
+    await WRAPPED_FALLBACK(update, context)
+    await context.flush_metrics()
+
+    context.api.assert_edit_message_called(update, stale_buttons_screen(TranslationEngine.FALLBACK_LANG))
+    # Answered with no text: the swapped screen carries the whole message, and the empty answer is
+    # only what clears the pressed button's spinner.
+    context.api.assert_answer_callback_query_called(update, text="", show_alert=False)
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+
+
+async def test_the_answered_stale_tap_is_recorded_once_without_repeating_the_payload(
+    app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient
+):
+    """One constant-event line is what the stale-buttons saved query counts. The payload rides the
+    exit line the wrapper writes for every invocation, so carrying it here too would report it
+    twice."""
+    update = legacy_callback_update(STALE_CONVERSATION_BUTTON)
+    context = build_context(update, app, metrics=metrics_client)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await WRAPPED_FALLBACK(update, context)
+
+    answered = [entry for entry in logs if entry["event"] == "Answered a stale conversation button"]
+    assert len(answered) == 1
+    assert answered[0]["log_level"] == "info"
+    assert answered[0]["update_id"] == update.update_id
+    assert "callback_data" not in answered[0]
+    assert [entry for entry in logs if entry["event"] == "An error occurred while handling the update"] == []
+
+
+async def test_a_stale_notice_that_cannot_be_delivered_never_becomes_a_fault(
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+):
+    """The tapped prompt may be gone or no longer editable, and a delivery that fails must not put
+    the interaction back on the fault path this branch exists to keep it off."""
+    update = legacy_callback_update(STALE_CONVERSATION_BUTTON)
+    context = build_context(update, app, metrics=metrics_client)
+    context.api.mock_method("edit_message").side_effect = BadRequest("Message can't be edited")
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await WRAPPED_FALLBACK(update, context)
+    await context.flush_metrics()
+
+    failures = [entry for entry in logs if entry["event"] == "Failed to deliver the stale-buttons notice to the user"]
+    assert len(failures) == 1
+    assert failures[0]["log_level"] == "warning"
+    assert failures[0]["reason"] == "stale_buttons_notice_undeliverable"
+    assert [entry for entry in logs if entry["event"] == "Answered a stale conversation button"] == []
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+
+
+async def test_the_stale_notice_follows_the_language_stored_on_the_caller_account(
+    app: StubMitupApp, mock_session: MockDbSession, metrics_client: MetricsClient
+):
+    """A conversation only ever ran with a registered caller, so the row's language is the one the
+    prompt was speaking and the takeover keeps speaking it."""
+    mock_session.add_object(create_member(id=1, tg_user_id=DEFAULT_USER_ID, language="es_ES"), query_field="tg_user_id")
+    update = legacy_callback_update(STALE_CONVERSATION_BUTTON, language_code="de")
+    context = build_context(update, app, metrics=metrics_client)
+
+    await WRAPPED_FALLBACK(update, context)
+
+    assert stale_buttons_screen("es_ES") != stale_buttons_screen("de_DE"), (
+        "the assertion below only means anything while the two languages render differently"
+    )
+    context.api.assert_edit_message_called(update, stale_buttons_screen("es_ES"))
 
 
 def test_cannot_register_same_inline_handler_twice():
