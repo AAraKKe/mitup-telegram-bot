@@ -225,14 +225,37 @@ async def handle_user_not_found(context: TMitupContext, update: Update):
         )
 
 
-async def handle_blocked_user(context: TMitupContext, update: Update):
-    """Answer a caller whose block on the bot refused the send, and record them unreachable.
+class UnreachableCallerReason(StrEnum):
+    """Why a send into the caller's own chat was refused, split by the evidence the error carries."""
+
+    BOT_BLOCKED_BY_USER = auto()
+    CALLER_CHAT_GONE = auto()
+
+
+def unreachable_caller_reason(error: Exception) -> UnreachableCallerReason | None:
+    """Classify `error` as a refused send into the caller's own chat, or None when it is not one.
+
+    The split mirrors the one `_send_user_message_now` makes for proactive DMs: a block answers
+    Forbidden, an account that no longer exists answers BadRequest naming a chat that does not
+    resolve. The BadRequest match stays on the exact chat wording, since other "not found"
+    variants (a message to edit or delete) are not about the caller and must keep faulting.
+    """
+    if isinstance(error, Forbidden):
+        return UnreachableCallerReason.BOT_BLOCKED_BY_USER
+    if isinstance(error, BadRequest) and "chat not found" in error.message.lower():
+        return UnreachableCallerReason.CALLER_CHAT_GONE
+    return None
+
+
+async def handle_unreachable_user(context: TMitupContext, update: Update, reason: UnreachableCallerReason):
+    """Answer a caller the bot cannot send to, and record them unreachable.
 
     A block only closes the bot's direction: taps keep arriving while every send is refused, so
-    the answer rides the callback-query alert, the only reply Telegram still delivers. Delivery is
-    best-effort like every other render in this module.
+    the answer rides the callback-query alert, the only reply Telegram still delivers. A caller
+    whose chat is gone can receive nothing at all; the render is best-effort either way, like
+    every other render in this module.
     """
-    log.warning("Rejected interaction from a user who blocked the bot", reason="bot_blocked_by_user")
+    log.warning("Rejected interaction from an unreachable user", reason=reason.value)
 
     if (tg_user := update.effective_user) is not None:
         await handle_inactive_user(tg_user.id)
@@ -518,11 +541,16 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
         await handle_user_not_found(context, update)
         return HANDLED_OUTCOME
 
-    # A Forbidden from the caller's own chat means they blocked the bot: the same expected state a
-    # refused proactive DM reports as InactiveUserInteraction, except here there is a live
-    # interaction to answer. From any other chat it stays a fault.
-    if isinstance(error, Forbidden) and update is not None and in_bot_chat(update):
-        await handle_blocked_user(context, update)
+    # A refused send into the caller's own chat (a blocked bot, or an account that no longer
+    # exists) is the same expected state a refused proactive DM reports as
+    # InactiveUserInteraction, except here there is a live interaction to answer. The same
+    # errors from any other chat stay faults.
+    if (
+        (unreachable_reason := unreachable_caller_reason(error)) is not None
+        and update is not None
+        and in_bot_chat(update)
+    ):
+        await handle_unreachable_user(context, update, unreachable_reason)
         return HANDLED_OUTCOME
 
     # The meeting guard's rejections carry their own screen, so they are answered here and stop

@@ -141,6 +141,21 @@ Never add try/except blocks in handlers for either case.
 
 The `private` flag distinguishes private chat errors (where we should mark inactive) from group chat errors (where we should not). The `TelegramApi` methods in `api_wrapper.py` raise `InactiveUserInteraction` with the appropriate `private` value.
 
+### Unreachable caller handling
+
+The same two Telegram answers can also reach the error handler **raw**, from a send an update-driven
+handler made into the caller's own chat (the wrapper conversion above covers only the proactive-DM
+methods). `unreachable_caller_reason()` classifies them — `Forbidden` → `bot_blocked_by_user`,
+`BadRequest` whose message names "chat not found" → `caller_chat_gone` (an account deleted or banned
+mid-interaction; the match is on the exact chat wording so a "message to … not found" BadRequest
+keeps faulting) — and `handle_unreachable_user()` answers, gated on `in_bot_chat()`: one warning
+under the constant event `Rejected interaction from an unreachable user` with that `reason`, the
+same MEMBER→LEFT transition through `handle_inactive_user()`, and — only when the update carries a
+callback query — a best-effort `CommonMessages.BOT_BLOCKED_ALERT` alert (only a blocked caller can
+ever receive it; a gone chat refuses it, which the best-effort swallow absorbs). The invocation
+closes as `FAULT=0`. Either error arriving from any other chat falls through to the fault
+classification: there it means a handler wrote into a chat the bot no longer belongs to.
+
 ### Missing account handling
 
 `UserNotFound` splits on **where the caller is standing**, because the friendly answer only works on one surface. `in_bot_chat()` is the private-chat predicate that split reads, shared with `shared_banner_keyboard()`; an update carrying no chat at all (an inline query, or a callback on an inline message, which sends only its `inline_message_id`) counts as "not the bot's chat", and so does an invocation with no update.
