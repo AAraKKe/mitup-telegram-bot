@@ -10,7 +10,7 @@ dependencies = [
     "alembic==1.19.1",
     "pydantic==2.13.4",
     "structlog==26.1.0",
-    "cryptography==50.0.0",
+    "cryptography==50.0.1",
     "mitup-core",
     "mitup-monitoring",
 ]

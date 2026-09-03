@@ -4,7 +4,7 @@ version = "0.0.1"
 description = "The mitup recurrent-events worker: the periodic scheduler and the maintenance/notification/broadcast jobs"
 requires-python = ">=3.14"
 dependencies = [
-    "click==8.4.2",
+    "click==8.5.0",
     "mitup-core",
     "mitup-data",
     "mitup-monitoring",

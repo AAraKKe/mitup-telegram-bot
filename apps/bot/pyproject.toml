@@ -5,7 +5,7 @@ description = "The mitup Telegram bot application: the PTB runtime, the FastAPI 
 requires-python = ">=3.14"
 dependencies = [
     "python-telegram-bot[ext]==22.8",
-    "click==8.4.2",
+    "click==8.5.0",
     "fastapi==0.141.1",
     "uvicorn[standard]==0.52.4",
     "googlemaps==4.10.0",
