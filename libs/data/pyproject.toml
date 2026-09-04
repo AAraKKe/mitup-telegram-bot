@@ -8,7 +8,7 @@ dependencies = [
     "sqlalchemy[asyncio]==2.0.52",
     "psycopg[binary]==3.3.4",
     "alembic==1.19.1",
-    "pydantic==2.13.4",
+    "pydantic==2.13.5",
     "structlog==26.1.0",
     "cryptography==50.0.1",
     "mitup-core",
