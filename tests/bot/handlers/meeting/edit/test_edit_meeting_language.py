@@ -1,3 +1,5 @@
+import datetime as dt
+
 import pytest
 from telegram import Update
 
@@ -5,9 +7,8 @@ from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.models import Message, User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.translations import SUPPORTED_LANGUAGES
+from mitup_bot.utils import CommonMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import MeetingEditLanguageMessages
-from mitup_bot.views import RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 from tests.helpers import HandlerContext, UpdateRequest, call_handler, create_meetup
 from tests.helpers.monitoring import MetricAssertions
@@ -26,7 +27,8 @@ async def test_callback_edit_meeting_language(
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    """Test that the edit meeting language callback displays the language selection view."""
+    """The language button only survives on old messages, so tapping it lands on the settings card,
+    where the language chips live, behind the banner that explains the move."""
     meeting = create_meetup(id=10, title="TestMeeting", description="Description", language="en")
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
@@ -36,7 +38,9 @@ async def test_callback_edit_meeting_language(
 
     context.api.assert_edit_message_called(
         update,
-        factory.meeting_set_language_view(RenderContext(lang=user_with_settings.lang), meeting=meeting),
+        meeting_views.settings_view(meeting).with_context(
+            CommonMessages.EDITING_REVAMP_BANNER.rich(lang=user_with_settings.lang)
+        ),
     )
 
 
@@ -80,16 +84,15 @@ async def test_callback_set_meeting_language(
     for message in meeting.messages:
         assert message.buttons.keyboard == meeting_views.build_inline_keyboard(meeting)
 
-    # Verify the success message was shown
-    context.api.assert_edit_message_called(
-        update,
-        factory.meeting_set_language_view(RenderContext(lang=user_with_settings.lang), meeting=meeting).with_context(
-            MeetingEditLanguageMessages.SUCCESS.get(lang=meeting.user_language)
-        ),
-    )
+    # The redrawn settings card is the feedback: its language chips highlight the new value.
+    context.api.assert_edit_message_called(update, meeting_views.settings_view(meeting))
 
     # Verify meeting messages were updated
-    context.api.assert_update_meeting_messages_called(meeting)
+    context.api.assert_update_meeting_messages_called(
+        meeting=meeting,
+        current_message=meeting.message_from_update(update),
+        skip_current=True,
+    )
 
     # The language set is log-only; it emits no feature metric.
     metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.EDIT_MEETING)})
@@ -134,4 +137,40 @@ async def test_callback_set_meeting_language_changes_all_message_keyboards(
         assert new_keyboard == meeting_views.build_inline_keyboard(meeting)
 
     # Verify meeting messages were updated via API
-    context.api.assert_update_meeting_messages_called(meeting)
+    context.api.assert_update_meeting_messages_called(
+        meeting=meeting,
+        current_message=meeting.message_from_update(update),
+        skip_current=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.SET_MEETING_LANGUAGE.with_ids(10, 1))],
+    indirect=["update"],
+    ids=["change_language_while_locked_and_running"],
+)
+async def test_set_language_on_a_locked_running_meeting_stores_no_attendance_row(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """The rebuilt stored keyboards must match what the card renders while attendance is frozen."""
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", language="en")
+    now = dt.datetime.now(dt.UTC)
+    meeting.datetime = now - dt.timedelta(minutes=5)
+    meeting.end_datetime = now + dt.timedelta(minutes=55)
+    meeting.lock_on_start = True
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    message = Message(message_id=111, chat_id=111, meetup=meeting)
+    meeting.messages.append(message)
+
+    await call_handler(EditMeetingHandlerId.SET_LANGUAGE_CALLBACK, handler_context=handler_context)
+
+    assert message.buttons.keyboard == meeting_views.build_inline_keyboard(meeting, is_locked_and_in_progress=True)
+    stored_callbacks = [str(button.callback_data) for row in message.buttons.keyboard for button in row]
+    assert str(cb.JOIN.with_id(meeting.db_id)) not in stored_callbacks

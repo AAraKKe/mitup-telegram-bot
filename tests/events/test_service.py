@@ -943,6 +943,7 @@ def test_cli_narrates_every_subsystem_it_wired():
         "Configured the metrics backend",
         "Configured the Patreon integration",
         "Configured the hosts-only group",
+        "Configured the bot links",
         "Built the events bots",
     ]
 

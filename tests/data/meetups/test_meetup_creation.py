@@ -1,14 +1,16 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 import pytest
-from telegram import Chat, MessageEntity, Update
+from telegram import Chat, Update
 from telegram import Message as TgMessage
 
 from mitup_bot import supporter
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import LimitsConfig
+from mitup_bot.datetimes import TimeFormat
 from mitup_bot.emojis import Emojis
 from mitup_bot.exceptions import MeetupNotFound, NoMessageAvailable
 from mitup_bot.keyboards import ButtonConfig, Keyboard
@@ -16,29 +18,23 @@ from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Message, Messa
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils import render
-from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import (
     ButtonMessages,
     MeetingAttachMessages,
     MeetingDisplayMessages,
     MeetingEditParticipantsMessages,
     MeetingEditSettingsMessages,
+    SettingsMessages,
 )
-from mitup_bot.views import MitupInlineView, MitupView
+from mitup_bot.utils.rich_message import button_markup, horizontal_rule_content
+from mitup_bot.views import MitupInlineView
 from mitup_bot.views import meeting as meeting_views
-from mitup_bot.views.factory import options_button
-from mitup_bot.views.meeting_text import (
-    inline_message,
-    inline_query_message,
-    location_description,
-    maps_url,
-    meeting_message,
-    participants_badge,
-    participants_text,
-    participants_text_with_list,
-)
-from tests.helpers import UpdateRequest, create_meetup, create_user
+from mitup_bot.views.datetime_format import localized_datetime
+from mitup_bot.views.factory import toggle_chip
+from mitup_bot.views.meeting import shared_card
+from mitup_bot.views.meeting.sections import participants_count_line
+from mitup_bot.views.meeting_text import inline_query_message, participants_badge
+from tests.helpers import UpdateRequest, create_joined_link, create_meetup, create_user
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
 EXAMPLE_MEETING = Meetup(
@@ -57,123 +53,25 @@ COORDINATES = (123.1, -321.1)
 # a free owner's "no explicit limit" resolves to it (instead of rendering as unlimited) and the
 # expectations stay deterministic regardless of any config another test might leave behind.
 FREE_CAP = 20
+# The start every card in this module is dated with, and the timezone the `settings` fixture gives
+# the owner. A card writes the moment out in the owner's timezone, so the expectations need both.
+MEETING_START = datetime(1987, 7, 16, 23, 59, tzinfo=UTC)
+OWNER_TIMEZONE = ZoneInfo("Europe/Madrid")
+
+
+def expected_datetime_text(value: datetime, lang: str, time_format: TimeFormat) -> str:
+    """How a card writes *value* out: the owner's local wall clock, in the meeting's language.
+
+    The meetings in this module are built without a creation timestamp, so a card never spells the
+    year out for them.
+    """
+    return localized_datetime(value, lang=lang, tz=OWNER_TIMEZONE, created=None, time_format=time_format)
 
 
 @pytest.fixture(autouse=True)
 def pin_free_participant_cap(monkeypatch: pytest.MonkeyPatch) -> int:
     monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=FREE_CAP))
     return FREE_CAP
-
-
-def expected_location_name(lang: str, expected_name: str | None, expected_coordinates: str | None) -> FormattedText:
-    if expected_name is None and expected_coordinates is None:
-        return MeetingDisplayMessages.LOCATION_NOT_SET.get(lang=lang)
-    return FormattedText(f"{expected_name or ''} {expected_coordinates or ''}".strip())
-
-
-def expected_participants_message(max_participants: bool, lang: str, n_participants: int) -> str:
-    participant_label = (
-        MeetingDisplayMessages.PARTICIPANT_LABEL.get(lang=lang).text
-        if n_participants == 1
-        else MeetingDisplayMessages.PARTICIPANTS_LABEL.get(lang=lang).text
-    )
-    # The meeting owner here is free, so "no explicit limit" resolves to the free cap rather than
-    # rendering as unlimited.
-    max_text = MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(
-        lang=lang, max_participants=5 if max_participants else FREE_CAP
-    ).text
-    return f"{n_participants} {participant_label} {max_text}"
-
-
-def expected_message(
-    lang: str,
-    description: bool,
-    datetime: bool,
-    username: bool,
-    location_name: bool,
-    coordinates: bool,
-    max_participants: bool,
-    incognito: bool,
-    invited_user: bool = False,
-) -> str:
-    str_description = "Test Description" if description else MeetingDisplayMessages.DESCRIPTION_NOT_SET.get(lang=lang)
-    # When datetime is set, _datetime_section returns EntityDateTime("Meeting time", ...) — text is "Meeting time"
-    str_date = "Meeting time" if datetime else MeetingDisplayMessages.DATE_NOT_SET.get(lang=lang)
-    owner_inline = "john_doe" if username else "John"
-    location = expected_location_name(
-        lang=lang,
-        expected_name="Test Location" if location_name else None,
-        expected_coordinates=f"[{Emojis.PIN}]" if coordinates else None,
-    )
-    str_participants = expected_participants_message(
-        max_participants, lang=lang, n_participants=2 if invited_user else 1
-    )
-    incognito_prefix = f"{Emojis.GLASSES} " if incognito else ""
-    str_participants = f"{incognito_prefix}{str_participants}\n  {owner_inline}"
-    if invited_user:
-        invited_by_text = MeetingDisplayMessages.INVITED_BY.get(lang=lang, user=owner_inline).text
-        str_participants += f"\n  invited_user ({invited_by_text})"
-
-    return render(
-        t"Test Meeting ({MeetingDisplayMessages.CREATED_BY.get(lang=lang, owner=owner_inline)})\n\n"
-        t"--- {Emojis.DESCRIPTION} {str_description}\n"
-        t"--- {Emojis.CLOCK} {str_date}\n"
-        t"--- {Emojis.MAP} {location}\n"
-        t"--- {Emojis.JOINED} {str_participants}"
-    ).text
-
-
-def expected_inline_message(
-    lang: str,
-    description: bool,
-    datetime: bool,
-    username: bool,
-    location_name: bool,
-    coordinates: bool,
-    max_participants: bool,
-    incognito: bool,
-    invited_user: bool = False,
-) -> str:
-    owner_inline = "john_doe" if username else "John"
-    created_by = MeetingDisplayMessages.CREATED_BY.get(lang=lang, owner=owner_inline).text
-
-    str_participants = expected_participants_message(
-        max_participants, lang=lang, n_participants=2 if invited_user else 1
-    )
-    incognito_prefix = f"{Emojis.GLASSES} " if incognito else ""
-    participants_list = "" if incognito else f"\n  {owner_inline}"
-    if invited_user and not incognito:
-        invited_by_text = MeetingDisplayMessages.INVITED_BY.get(lang=lang, user=owner_inline).text
-        participants_list += f"\n  invited_user ({invited_by_text})"
-    str_participants = f"{incognito_prefix}{str_participants}{participants_list}"
-
-    has_location = location_name or coordinates
-    lines = [f"Test Meeting ({created_by})"]
-    if description:
-        lines.append(f"--- {Emojis.DESCRIPTION} Test Description")
-    if datetime:
-        # _datetime_section ends with "\n". In the datetime branch of inline_message:
-        #   t"\n{datetime_section}" produces "\n--- CLOCK time\n"
-        # If location is present, location_section starts with "\n", producing a blank
-        # line between the clock line and the location line.
-        # If location is absent, location_section is "" and participants follow directly
-        # with no blank line (since participants row has no leading "\n" in this branch).
-        lines.append(f"--- {Emojis.CLOCK} Meeting time")
-        if has_location:
-            lines.append("")  # blank line: location_section begins with "\n"
-    if has_location:
-        location_text = expected_location_name(
-            lang=lang,
-            expected_name="Test Location" if location_name else None,
-            expected_coordinates=f"[{Emojis.PIN}]" if coordinates else None,
-        ).text
-        lines.append(f"--- {Emojis.MAP} {location_text}")
-        if not datetime:
-            # In the no-datetime branch, location_section ends with "\n" and the
-            # participants row starts with "\n", producing a blank line between them.
-            lines.append("")
-    lines.append(f"--- {Emojis.JOINED} {str_participants}")
-    return "\n".join(lines)
 
 
 @pytest.mark.parametrize("mock_meeting", [EXAMPLE_MEETING, None], ids=["meeting_exist", "meeting_does_not_exist"])
@@ -193,173 +91,35 @@ async def test_meeting_does_not_exist_fail_when_must_exist(mock_session: MockDbS
         await Meetup.by_id(mock_session, 1, must_exist=True)
 
 
-@pytest.mark.parametrize(
-    "name, expected_name",
-    [
-        (None, None),
-        ("Central Park", "Central Park"),
-        ("", None),
-        (" ", None),
-    ],
-    ids=["name_not_set", "name_set", "name_empty", "name_space"],
-)
-@pytest.mark.parametrize(
-    "coordinates, expected_coordinates",
-    [
-        (None, None),
-        (COORDINATES, f"[{Emojis.PIN}]"),
-    ],
-    ids=["coordinates_not_set", "coordinates_set"],
-)
-def test_meetup_location_string_conversion(
-    name: str | None,
-    coordinates: tuple[float, float] | None,
-    expected_name: str | None,
-    expected_coordinates: str | None,
-    lang: str,
-):
-    location = MeetupLocation(name=name, coordinates=coordinates)
-
-    expected = expected_location_name(lang, expected_name, expected_coordinates)
-
-    assert expected == location_description(location, lang=lang)
-
-
-@pytest.mark.parametrize(
-    "description, meetup_datetime, username, location_name, location_coordinates, max_participants",
-    [
-        (False, True, True, True, True, True),
-        (True, False, True, True, True, True),
-        (True, True, False, True, True, True),
-        (True, True, True, False, False, True),
-        (True, True, True, True, True, False),
-        (True, True, True, False, True, True),
-        (True, True, True, True, False, True),
-        (True, True, True, True, True, True),
-    ],
-    ids=[
-        "no_description",
-        "no_date",
-        "no_username",
-        "no_location",
-        "no_max_members",
-        "with_location_coordinates",
-        "with_location_name",
-        "all_fields",
-    ],
-)
-@pytest.mark.parametrize(
-    "is_inline,expected_method",
-    [[True, expected_inline_message], [False, expected_message]],
-    ids=["inline_message", "normal_message"],
-)
-@pytest.mark.parametrize("incognito", [True, False], ids=["incognito", "no_incognito"])
-@pytest.mark.parametrize("invited_user", [True, False], ids=["with_invited_user", "without_invited_user"])
-def test_meetup_message(
-    settings: Settings,
-    description: bool,
-    meetup_datetime: bool,
-    username: bool,
-    location_name: bool,
-    location_coordinates: bool,
-    max_participants: bool,
-    is_inline: bool,
-    expected_method: Callable[[str, bool, bool, bool, bool, bool, bool, bool, bool], str],
-    lang: str,
-    incognito: bool,
-    invited_user: bool,
-):
-    location = MeetupLocation(
-        name="Test Location" if location_name else None,
-        coordinates=COORDINATES if location_coordinates else None,
-    )
-    owner = User(first_name="John", username="john_doe" if username else None, tg_user_id=1, settings=settings)
-    meeting = Meetup(
-        title="Test Meeting",
-        description="Test Description" if description else None,
-        datetime=datetime(1987, 7, 16, 23, 59, tzinfo=UTC) if meetup_datetime else None,
-        location=location,
-        max_members=5 if max_participants else None,
-        owner=owner,
-        language=lang,
-        waiting_list=False,
-        public=False,
-        allow_invitation=False,
-        incognito=incognito,
-    )
-    # Have at least one user joined to evaluate the list of user joined
-    JoinedUsers(user=owner, meetup=meeting)
-
-    if invited_user:
-        invited = create_user(
-            id=2,
-            tg_user_id=2,
-            first_name="invited_user",
-            username="invited_user",
-            settings=settings,
-        )
-        JoinedUsers(user=invited, meetup=meeting, invited_by=owner)
-
-    expected_text = expected_method(
-        lang,
-        description,
-        meetup_datetime,
-        username,
-        location_name,
-        location_coordinates,
-        max_participants,
-        incognito,
-        invited_user,
-    )
-
-    result: FormattedText = inline_message(meeting) if is_inline else meeting_message(meeting)
-    assert result.text == expected_text
-
-    # Entity structure: "Test Meeting" is always bold at offset=0, length=12.
-    bold_entities = [e for e in result.entities if e.type == MessageEntity.BOLD]
-    assert len(bold_entities) == 1
-    assert bold_entities[0].offset == 0
-    assert bold_entities[0].length == 12  # "Test Meeting"
-
-    # A date_time entity is present if and only if a datetime was set.
-    dt_entities = [e for e in result.entities if e.type == MessageEntity.DATE_TIME]
-    if meetup_datetime:
-        assert len(dt_entities) == 1
-        # PTB stores unix_time as datetime on the entity; compare against the expected datetime directly.
-        assert dt_entities[0].unix_time == datetime(1987, 7, 16, 23, 59, tzinfo=UTC)
-    else:
-        assert not dt_entities
-
-
-def test_meeting_message_badges_patron_owner():
+def test_the_card_badges_a_patron_owner():
     owner = create_user(id=1, username="alice", tg_user_id=997_720, supporter_level=SupporterLevel.HOST_2)
     meeting = create_meetup(id=1, owner=owner, language="en")
-    JoinedUsers(user=owner, meetup=meeting)
+    create_joined_link(owner, meeting, id=0)
 
     badged_owner = f"{Emojis.HOST_2} alice"
-    assert badged_owner in meeting_message(meeting).text
-    assert badged_owner in inline_message(meeting).text
+    text = meeting_views.shared_body(meeting).text
+
+    assert text.count(badged_owner) == 2, "expected the badge in the byline and again in the attendee list"
 
 
-def test_meeting_message_has_no_badge_for_free_owner():
+def test_the_card_carries_no_badge_for_a_free_owner():
     owner = create_user(id=1, username="alice", tg_user_id=997_721)
     meeting = create_meetup(id=1, owner=owner, language="en")
-    JoinedUsers(user=owner, meetup=meeting)
+    create_joined_link(owner, meeting, id=0)
 
-    assert str(Emojis.HOST_2) not in meeting_message(meeting).text
-    assert str(Emojis.HOST_2) not in inline_message(meeting).text
+    assert str(Emojis.HOST_2) not in meeting_views.shared_body(meeting).text
 
 
 def test_incognito_meeting_omits_supporter_participant_badge():
-    """Incognito hides the participant list, so a supporter's name — and its badge — never render."""
+    """Incognito hides the participant list, so a supporter's name, and its badge, never render."""
     owner = create_user(id=1, first_name="Owner", tg_user_id=997_722)
     meeting = create_meetup(id=1, owner=owner, incognito=True, language="en")
     patron_member = create_user(id=2, username="alice", tg_user_id=997_723, supporter_level=SupporterLevel.HOST_2)
-    meeting.create_joined_link(patron_member, is_waiting_list=False)
+    create_joined_link(patron_member, meeting, id=0)
 
-    inline_text = inline_message(meeting).text
-    assert "alice" not in inline_text
-    assert str(Emojis.HOST_2) not in inline_text
+    text = meeting_views.shared_body(meeting).text
+    assert "alice" not in text
+    assert str(Emojis.HOST_2) not in text
 
 
 @pytest.mark.parametrize(
@@ -371,16 +131,16 @@ def test_incognito_meeting_omits_supporter_participant_badge():
             0,
             None,
             lambda lang: (
-                f"{MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text} "
-                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=FREE_CAP).text}"
+                f"{MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.text(lang=lang)} "
+                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.text(lang=lang, max_participants=FREE_CAP)}"
             ),
         ),
         (
             0,
             2,
             lambda lang: (
-                f"{MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text} "
-                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=2).text}"
+                f"{MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.text(lang=lang)} "
+                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.text(lang=lang, max_participants=2)}"
             ),
         ),
         (1, 2, lambda lang: "(1/2)"),
@@ -413,7 +173,7 @@ def test_participants_badge(
         user = User(first_name=f"Joined_{idx}", tg_user_id=idx, settings=user_with_settings.settings)
         JoinedUsers(user=user, meetup=meeting)
 
-    assert f"{expected_incognito}{expected(user_with_settings.lang)}" == render(participants_badge(meeting)).text
+    assert f"{expected_incognito}{expected(user_with_settings.lang)}" == participants_badge(meeting)
 
 
 @pytest.mark.parametrize(
@@ -443,14 +203,13 @@ def test_short_description(description: str | None, expected_description: str | 
     assert expected_description == meeting.short_description
 
 
-def build_inline_message(lang: str, meeting_datetime: datetime | None) -> str:
+def build_inline_message(lang: str, meeting_datetime: datetime | None, time_format: TimeFormat) -> str:
     # Free owner + no explicit limit: the empty badge carries the effective cap label.
-    empty = MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text
-    max_label = MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=FREE_CAP).text
+    empty = MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.text(lang=lang)
+    max_label = MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.text(lang=lang, max_participants=FREE_CAP)
     result = [f"{Emojis.JOINED} {empty} {max_label}"]
     if meeting_datetime:
-        # inline_query_message uses _plain_datetime: plain UTC string with no timezone suffix
-        result.append(f"{Emojis.CLOCK} 2024-01-12 12:30")
+        result.append(f"{Emojis.CLOCK} {expected_datetime_text(meeting_datetime, lang, time_format)}")
     return "\n".join(result)
 
 
@@ -472,8 +231,8 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
         incognito=False,
     )
 
-    expected = build_inline_message(user_with_settings.lang, meeting_datetime)
-    inline_query_text = inline_query_message(meeting).text
+    expected = build_inline_message(user_with_settings.lang, meeting_datetime, meeting.time_format)
+    inline_query_text = inline_query_message(meeting)
 
     assert expected == inline_query_text
     assert "A description that should not appear in the inline preview" not in inline_query_text
@@ -481,95 +240,11 @@ def test_inline_query_message(user_with_settings: User, meeting_datetime: dateti
 
 
 @pytest.mark.parametrize(
-    "joined_count,max_participants,expected",
-    [
-        # A free owner's "no explicit limit" resolves to the cap, so both None cases read against it.
-        (
-            0,
-            None,
-            lambda lang: (
-                f"{MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text} "
-                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=FREE_CAP).text}"
-            ),
-        ),
-        (
-            1,
-            None,
-            lambda lang: (
-                f"1 {MeetingDisplayMessages.PARTICIPANT_LABEL.get(lang=lang).text} "
-                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=FREE_CAP).text}"
-                f"|\n  Joined_0"
-            ),
-        ),
-        (
-            2,
-            2,
-            lambda lang: (
-                f"2 {MeetingDisplayMessages.PARTICIPANTS_LABEL.get(lang=lang).text} "
-                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=2).text}"
-                f"|\n  Joined_0\n  Joined_1"
-            ),
-        ),
-        (
-            1,
-            2,
-            lambda lang: (
-                f"1 {MeetingDisplayMessages.PARTICIPANT_LABEL.get(lang=lang).text} "
-                f"{MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL.get(lang=lang, max_participants=2).text}|\n  Joined_0"
-            ),
-        ),
-    ],
-    ids=["empty_free_cap", "free_cap", "limit_reached", "limit_not_reached"],
-)
-@pytest.mark.parametrize(
-    "incognito, expected_incognito", [(True, f"{Emojis.GLASSES} "), (False, "")], ids=["incognito", "no_incognito"]
-)
-@pytest.mark.parametrize("with_list", [True, False], ids=["with_list", "without_list"])
-def test_participants_text(
-    user_with_settings: User,
-    joined_count: int,
-    max_participants: int,
-    expected: Callable[[str], str],
-    incognito: bool,
-    expected_incognito: str,
-    with_list: bool,
-):
-    meeting = create_meetup(
-        id=1,
-        owner=user_with_settings,
-        title="Test Meeting",
-        description="Test Description",
-        language=user_with_settings.lang,
-        incognito=incognito,
-        max_members=max_participants,
-    )
-
-    # Add as many joined user as necessary
-    # sourcery skip: no-loop-in-tests
-    for idx in range(joined_count):
-        user = User(first_name=f"Joined_{idx}", tg_user_id=idx, settings=user_with_settings.settings)
-        JoinedUsers(user=user, meetup=meeting)
-
-    # We expect the text to cinlude the list or not depending on:
-    # - with_list: Always include the list
-    # - incognito: Not include it only if we are not requesting to show the list
-    expected_text = (
-        expected(user_with_settings.lang).replace("|", "")
-        if with_list
-        else expected(user_with_settings.lang).split("|")[0]
-        if incognito
-        else expected(user_with_settings.lang).replace("|", "")
-    )
-    rendered_participants = participants_text_with_list(meeting) if with_list else participants_text(meeting)
-    assert f"{expected_incognito}{expected_text}" == render(rendered_participants).text
-
-
-@pytest.mark.parametrize(
     "joined_count,expected",
     [
         # Uncapped owner keeps "no explicit limit" as unlimited, so the badge never shows the cap.
-        (0, lambda lang: MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.get(lang=lang).text),
-        (1, lambda lang: f"1 ({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=lang).text})"),
+        (0, lambda lang: MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY.text(lang=lang)),
+        (1, lambda lang: f"1 ({MeetingEditParticipantsMessages.NO_LIMIT_LABEL.text(lang=lang)})"),
     ],
     ids=["empty", "one_participant"],
 )
@@ -584,20 +259,18 @@ def test_participants_badge_patron_owner_stays_no_limit(
         joined = User(first_name=f"Joined_{idx}", tg_user_id=idx, settings=user_with_settings.settings)
         JoinedUsers(user=joined, meetup=meeting)
 
-    assert render(participants_badge(meeting)).text == expected(user_with_settings.lang)
+    assert participants_badge(meeting) == expected(user_with_settings.lang)
 
 
-def test_participants_text_patron_owner_stays_no_limit(user_with_settings: User):
-    """A Patron owner's meeting with no explicit limit renders 'No limit', never the free cap."""
+def test_the_count_line_of_a_patron_owner_stays_no_limit(user_with_settings: User):
+    """A Patron owner's meeting with no explicit limit reads as unlimited, never as the free cap."""
     user_with_settings.supporter_level = SupporterLevel.HOST_2
     meeting = create_meetup(id=1, owner=user_with_settings, max_members=None, language=user_with_settings.lang)
-    joined = User(first_name="Joined_0", tg_user_id=0, settings=user_with_settings.settings)
-    JoinedUsers(user=joined, meetup=meeting)
+    joined = create_user(id=2, first_name="Joined_0", tg_user_id=0, settings=user_with_settings.settings)
+    create_joined_link(joined, meeting, id=0)
 
-    label = MeetingDisplayMessages.PARTICIPANT_LABEL.get(lang=user_with_settings.lang).text
-    no_limit = MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=user_with_settings.lang).text
-    expected_text = f"1 {label} ({no_limit})\n  Joined_0"
-    assert render(participants_text_with_list(meeting)).text == expected_text
+    no_limit = MeetingEditParticipantsMessages.NO_LIMIT_LABEL.text(lang=user_with_settings.lang)
+    assert participants_count_line(meeting).text == f"1 ({no_limit})"
 
 
 @pytest.mark.parametrize(
@@ -687,7 +360,7 @@ def test_add_message_does_nothing_if_message_exists():
         id=123,
         message_id=123,
         chat_id=123,
-        buttons=MessageButtons(keyboard=meeting_views.main_view(meeting).keyboard),
+        buttons=MessageButtons(keyboard=meeting_views.owner_view(meeting).menu),
         meetup=meeting,
     )
 
@@ -701,90 +374,83 @@ def test_add_message_fails_if_no_message_in_update(meeting: Meetup):
         meeting.add_message(Update(123), meeting_views.keyboard_for_update(Update(123), meeting, meeting.owner))
 
 
-def expected_meeting_settings_view(
-    meeting: Meetup,
-) -> MitupView:
-    lang = meeting.owner.lang
-    waiting_list = meeting.waiting_list
-    public = meeting.public
-    invitation = meeting.allow_invitation
-    incognito = meeting.incognito
-
-    message = MeetingEditSettingsMessages.DESCRIPTION.get(lang=lang)
-    waiting_list_button = options_button(
-        cb.SET_MEETING_WAITING_LIST.with_id(meeting.db_id),
-        ButtonMessages.WAITING_LIST.get(lang=lang),
-        waiting_list,
-    )
-    public_button = options_button(
-        cb.SET_MEETING_PUBLIC.with_id(meeting.db_id), ButtonMessages.PUBLIC.get(lang=lang), public
-    )
-    invitation_button = options_button(
-        cb.SET_MEETING_ALLOW_INVITATIONS.with_id(meeting.db_id),
-        ButtonMessages.OPEN_INVITATION.get(lang=lang),
-        invitation,
-    )
-    incognito_button = options_button(
-        cb.SET_MEETING_INCOGNITO.with_id(meeting.db_id), ButtonMessages.INCOGNITO.get(lang=lang), incognito
-    )
-
-    return MitupView(
-        message,
-        keyboard=[
-            [waiting_list_button, public_button],
-            [invitation_button, incognito_button],
-        ],
-    ).with_back_button(text=ButtonMessages.EDIT, callback_data=cb.EDIT_MEETING.with_id(meeting.db_id), lang=lang)
-
-
-@pytest.mark.parametrize("waiting_list", [True, False], ids=["waiting_list_true", "waiting_list_false"])
-@pytest.mark.parametrize("public", [True, False], ids=["public_true", "public_false"])
-@pytest.mark.parametrize("invitation", [True, False], ids=["invitation_true", "invitation_false"])
-@pytest.mark.parametrize("incognito", [True, False], ids=["incognito_true", "incognito_false"])
-def test_default_meeting_options_view(
-    waiting_list: bool,
-    public: bool,
-    invitation: bool,
-    incognito: bool,
-    user_with_settings: User,
-):
+def test_meeting_behavior_view_sections(user_with_settings: User):
+    """Every setting is its own section: bold name, the state chip that flips it, and the
+    explanation below. Mixed values prove each chip reads its own setting."""
     meeting = user_with_settings.meetups[0]
-    meeting.allow_invitation = invitation
-    meeting.incognito = incognito
-    meeting.public = public
-    meeting.waiting_list = waiting_list
+    meeting.waiting_list = True
+    meeting.public = False
+    meeting.allow_invitation = True
+    meeting.incognito = False
+    meeting.lock_on_start = True
 
-    view = meeting_views.settings_view(meeting)
+    view = meeting_views.behavior_view(meeting)
+    html = view.message.html
+    lang = meeting.owner.lang
 
-    expected_view = expected_meeting_settings_view(meeting)
+    # The tap-to-toggle hint sits under the heading: the state chips read as pills to anyone
+    # new to inline buttons, so the screen says they are tappable.
+    assert SettingsMessages.TOGGLE_HINT.text(lang=lang) in html
 
-    assert expected_view == view
+    sections = [
+        (
+            ButtonMessages.WAITING_LIST,
+            MeetingEditSettingsMessages.WAITING_LIST_EXPLANATION,
+            cb.SET_MEETING_WAITING_LIST,
+            True,
+        ),
+        (ButtonMessages.PUBLIC, MeetingEditSettingsMessages.PUBLIC_EXPLANATION, cb.SET_MEETING_PUBLIC, False),
+        (
+            ButtonMessages.OPEN_INVITATION,
+            MeetingEditSettingsMessages.OPEN_INVITATIONS_EXPLANATION,
+            cb.SET_MEETING_ALLOW_INVITATIONS,
+            True,
+        ),
+        (ButtonMessages.INCOGNITO, MeetingEditSettingsMessages.INCOGNITO_EXPLANATION, cb.SET_MEETING_INCOGNITO, False),
+        (
+            ButtonMessages.LOCK_ON_START,
+            MeetingEditSettingsMessages.LOCK_ON_START_EXPLANATION,
+            cb.SET_MEETING_LOCK_ON_START,
+            True,
+        ),
+    ]
+    for name, explanation, callback, value in sections:
+        assert f"<b>{name.text(lang=lang)}</b>" in html
+        assert explanation.text(lang=lang) in html
+        assert button_markup(toggle_chip(callback.with_id(meeting.db_id), value, lang)) in html
 
-
-def expected_inline_keyboard(language: str, location: MeetupLocation, *, chat_instance: str | None = None) -> Keyboard:
-    expected_keyboard = [
+    # The menu carries only the back row: the toggles live in the body.
+    assert view.menu == [
         [
             ButtonConfig(
-                text=ButtonMessages.JOIN.get_text(lang=language),
-                callback_data=cb.JOIN.with_id(123),
-            ),
-            ButtonConfig(
-                text=ButtonMessages.LEAVE.get_text(lang=language),
-                callback_data=cb.LEAVE.with_id(123),
-            ),
+                text=ButtonMessages.SETTINGS.back(lang=lang),
+                callback_data=cb.EDIT_MEETING_SETTINGS.with_id(meeting.db_id),
+            )
         ]
     ]
 
-    if (url := maps_url(location)) is not None:
-        expected_keyboard.append(
-            [ButtonConfig(text=ButtonMessages.OPEN_IN_MAPS.get_text(lang=language), url=url)],
-        )
+
+def expected_inline_keyboard(language: str, *, chat_instance: str | None = None) -> Keyboard:
+    expected_keyboard = [
+        [
+            ButtonConfig(
+                text=ButtonMessages.JOIN.text(lang=language),
+                callback_data=cb.JOIN.with_id(123),
+                style="success",
+            ),
+            ButtonConfig(
+                text=ButtonMessages.LEAVE.text(lang=language),
+                callback_data=cb.LEAVE.with_id(123),
+                style="danger",
+            ),
+        ]
+    ]
 
     if not chat_instance:
         expected_keyboard.append(
             [
                 ButtonConfig(
-                    text=ButtonMessages.MAKE_SEARCHABLE.get_text(lang=language),
+                    text=ButtonMessages.MAKE_SEARCHABLE.text(lang=language),
                     callback_data=cb.ATTACH_TO_CHAT.with_id(123),
                 ),
             ],
@@ -805,13 +471,18 @@ def test_inline_view(meeting: Meetup, meeting_language: str | None):
     used_language = meeting_language or meeting.owner.lang
     view = meeting_views.inline_view(meeting)
 
+    closing = shared_card.closing_footer(
+        used_language,
+        shared_card.SHARED_CHAT_SOURCE,
+        MeetingAttachMessages.STATE_NOT_SEARCHABLE.rich(lang=used_language),
+    )
     expected_view = MitupInlineView(
-        description=inline_message(meeting),
-        keyboard=expected_inline_keyboard(language=used_language, location=meeting.location),
+        message=meeting_views.shared_body(meeting).append(horizontal_rule_content()).append(closing),
+        menu=expected_inline_keyboard(language=used_language),
         id="123",
         title=meeting.title,
         inline_description=inline_query_message(meeting),
-    ).with_footnote(MeetingAttachMessages.FOOTNOTE_INACTIVE.get(lang=used_language))
+    )
 
     assert expected_view == view
 
@@ -827,14 +498,15 @@ def test_inline_view_searchable(meeting: Meetup, meeting_language: str | None):
 
     view = meeting_views.inline_view(meeting, chat_instance="some_chat_instance")
 
+    closing = shared_card.closing_footer(
+        used_language, shared_card.SHARED_CHAT_SOURCE, MeetingAttachMessages.STATE_SEARCHABLE.rich(lang=used_language)
+    )
     expected_view = MitupInlineView(
-        description=inline_message(meeting),
-        keyboard=expected_inline_keyboard(
-            language=used_language, location=meeting.location, chat_instance="some_chat_instance"
-        ),
+        message=meeting_views.shared_body(meeting).append(horizontal_rule_content()).append(closing),
+        menu=expected_inline_keyboard(language=used_language, chat_instance="some_chat_instance"),
         id="123",
         title=meeting.title,
         inline_description=inline_query_message(meeting),
-    ).with_footnote(MeetingAttachMessages.FOOTNOTE_ACTIVE.get(lang=used_language))
+    )
 
     assert expected_view == view

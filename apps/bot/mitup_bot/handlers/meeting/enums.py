@@ -26,6 +26,9 @@ class MeetingHandlerId(HandlerId):
     JOIN = auto()
     LEAVE = auto()
 
+    # Redraw the card in place
+    REFRESH = auto()
+
     # Attach to chat
     ATTACH_TO_CHAT = auto()
 

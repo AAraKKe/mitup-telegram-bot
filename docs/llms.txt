@@ -10,8 +10,8 @@
 - [User guide](https://mitup.social/user-guide/): Index of every screen the bot shows you, page by page.
 - [Getting started](https://mitup.social/user-guide/getting_started/): Open the bot, set your timezone, reach the main menu.
 - [The main menu](https://mitup.social/user-guide/main_menu/): What each button in the hub does.
-- [Create a meeting](https://mitup.social/user-guide/create_a_meeting/): Title, date and time, location, participant limit, meeting language.
-- [Meeting settings](https://mitup.social/user-guide/meeting_settings/): Waiting list, public, open invitations, incognito, lock on start.
+- [Create a meeting](https://mitup.social/user-guide/create_a_meeting/): Send a title, then fill in the card: photos, date and time, place, guest limit.
+- [Meeting settings](https://mitup.social/user-guide/meeting_settings/): Meeting language, waiting list, public, open invitations, incognito, lock on start, date and time format.
 - [Sharing and joining](https://mitup.social/user-guide/sharing_and_joining/): Post the card into a chat, RSVPs, the queue, inviting a guest by name.
 - [Using Mitup from any chat](https://mitup.social/user-guide/inline_mode/): Type @mitupbot inline to post or find a meeting without adding the bot.
 - [Meeting lifecycle](https://mitup.social/user-guide/meeting_lifecycle/): When a meeting turns inactive, how to reactivate it, when it is deleted.

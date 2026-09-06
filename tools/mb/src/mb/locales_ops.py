@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from rich.text import Text
 
 from mitup_bot.__about__ import __version__ as version
+from mitup_bot.format_tags import FORMAT_TAG_NAMES, TOKEN_RE, placeholder_names
 from mitup_bot.translations import SUPPORTED_LANGUAGES, TranslationEngine
 
 from . import console, runner
@@ -145,6 +146,95 @@ def msgid_from_block(block: list[str]) -> str | None:
     return None
 
 
+def unquote_po_line(line: str) -> str:
+    stripped = line.strip()
+    if stripped.startswith('"') and stripped.endswith('"') and len(stripped) >= 2:
+        return stripped[1:-1]
+    return stripped
+
+
+def msgstr_from_block(block: list[str]) -> str | None:
+    """Return the translated text of *block*, gluing on any continuation lines that follow it.
+
+    PO concatenates adjacent quoted lines with no separator, so a msgstr split across lines is one
+    string and has to be read as one before its placeholders can be counted.
+    """
+    for index, line in enumerate(block):
+        if not line.startswith("msgstr "):
+            continue
+        parts = [unquote_po_line(line.split(None, 1)[1])]
+        parts.extend(unquote_po_line(rest) for rest in block[index + 1 :] if rest.strip().startswith('"'))
+        return "".join(parts)
+    return None
+
+
+def entries_for_language(lang: str) -> dict[str, str]:
+    """Return the msgid → msgstr mapping of a catalog, without its metadata header."""
+    blocks = parse_po_blocks(po_file_for_language(lang).read_text(encoding="utf-8"))
+    entries: dict[str, str] = {}
+    for block in blocks:
+        msgid = msgid_from_block(block)
+        msgstr = msgstr_from_block(block)
+        if msgid is None or msgid == '""' or msgstr is None:
+            continue
+        entries[msgid] = msgstr
+    return entries
+
+
+# One diverging entry: its msgid, the placeholders only English has, and the ones only it has.
+PlaceholderMismatch = tuple[str, set[str], set[str]]
+
+
+def placeholder_mismatches(english: dict[str, str], translated: dict[str, str]) -> list[PlaceholderMismatch]:
+    """Every entry whose translation does not carry exactly the `${...}` placeholders English does.
+
+    A placeholder is a contract between the catalog and the code that fills it: one dropped in
+    translation leaves a gap where a name or a number should be, and one invented in translation
+    ships to the reader as the literal `${...}` because nothing supplies it.
+
+    An empty msgstr is not a translation at all. `msgfmt` leaves it out of the compiled catalog and
+    the reader is served the English entry, so it carries English's placeholders by definition.
+    """
+    mismatches: list[PlaceholderMismatch] = []
+    for msgid, source in english.items():
+        if not (translation := translated.get(msgid, "")):
+            continue
+        expected = placeholder_names(source)
+        found = placeholder_names(translation)
+        if expected != found:
+            mismatches.append((msgid, expected - found, found - expected))
+    return sorted(mismatches, key=lambda mismatch: mismatch[0])
+
+
+def tag_fault(text: str) -> str | None:
+    """Describe the first formatting tag in *text* the renderer could not carry.
+
+    Two ways a tag fails. A name outside the dialect has no markup to become, and a rich message
+    carries its formatting as nested HTML, where a close only ever pairs with the tag opened most
+    recently, so an unclosed or crossing tag has no rendering either. Once one tag is out of place
+    the rest of the string cannot be read reliably, which is why only the first is described rather
+    than every tag the mistake knocks out of step.
+    """
+    open_tags: list[str] = []
+    for token in TOKEN_RE.finditer(text):
+        if token.group("var") is not None:
+            continue
+        tag = token.group("tag")
+        if tag not in FORMAT_TAG_NAMES:
+            return f"<{tag}> is not a tag the dialect knows"
+        if not token.group("close"):
+            open_tags.append(tag)
+            continue
+        if not open_tags:
+            return f"</{tag}> closes a tag that was never opened"
+        if open_tags[-1] != tag:
+            return f"</{tag}> crosses <{open_tags[-1]}>, which is still open"
+        open_tags.pop()
+    if open_tags:
+        return f"<{open_tags[-1]}> is never closed"
+    return None
+
+
 def filter_blocks(blocks: list[list[str]], english_msgids: set[str]) -> tuple[list[list[str]], list[str]]:
     kept: list[list[str]] = []
     removed_msgids: list[str] = []
@@ -193,32 +283,67 @@ def clean_all_locales() -> int:
     return 1 if had_error else 0
 
 
+def report_msgid_divergence(lang: str, english_msgids: set[str]) -> bool:
+    lang_msgids = msgids_for_language(lang)
+    missing = sorted(english_msgids - lang_msgids)
+    extra = sorted(lang_msgids - english_msgids)
+
+    if missing:
+        console.error(f"{lang} is missing {len(missing)} msgid(s):")
+        for msgid in missing:
+            console.info(f"  [red]- {msgid.strip(chr(34))}[/]")
+    if extra:
+        console.error(f"{lang} has {len(extra)} stale msgid(s) (removed/renamed in English):")
+        for msgid in extra:
+            console.info(f"  [yellow]- {msgid.strip(chr(34))}[/]")
+    return bool(missing or extra)
+
+
+def report_tag_faults(lang: str, entries: dict[str, str]) -> bool:
+    faults = sorted((msgid, problem) for msgid, text in entries.items() if (problem := tag_fault(text)) is not None)
+    if not faults:
+        return False
+
+    console.error(f"{lang} has {len(faults)} entry(s) with unusable formatting tags:")
+    for msgid, problem in faults:
+        console.info(f"  [red]- {msgid.strip(chr(34))}[/]: {problem}")
+    return True
+
+
+def report_placeholder_divergence(lang: str, english_entries: dict[str, str], lang_entries: dict[str, str]) -> bool:
+    mismatches = placeholder_mismatches(english_entries, lang_entries)
+    if not mismatches:
+        return False
+
+    console.error(f"{lang} has {len(mismatches)} entry(s) with mismatched placeholders:")
+    for msgid, missing, extra in mismatches:
+        console.info(f"  [red]- {msgid.strip(chr(34))}[/]")
+        if missing:
+            console.info(f"      missing: {', '.join(sorted(missing))}")
+        if extra:
+            console.info(f"      unexpected: {', '.join(sorted(extra))}")
+    return True
+
+
 def ensure_all_translations() -> int:
     console.info(f"\nValidating all PO files for languages {SUPPORTED_LANGUAGES}")
 
     english_msgids = msgids_for_language("en")
+    english_entries = entries_for_language("en")
     non_english_languages = [lang for lang in SUPPORTED_LANGUAGES if lang != "en"]
 
-    diverged = False
+    # English is checked for tag balance too: it is a catalog like any other, and an unclosed tag
+    # authored in `messages.py` reaches the most readers of all.
+    diverged = report_tag_faults("en", english_entries)
 
     for lang in non_english_languages:
-        lang_msgids = msgids_for_language(lang)
-        missing = sorted(english_msgids - lang_msgids)
-        extra = sorted(lang_msgids - english_msgids)
-
-        if not missing and not extra:
+        lang_entries = entries_for_language(lang)
+        lang_diverged = report_msgid_divergence(lang, english_msgids)
+        lang_diverged |= report_placeholder_divergence(lang, english_entries, lang_entries)
+        lang_diverged |= report_tag_faults(lang, lang_entries)
+        if not lang_diverged:
             console.success(f"{lang} is in sync with en")
-            continue
-
-        diverged = True
-        if missing:
-            console.error(f"{lang} is missing {len(missing)} msgid(s):")
-            for msgid in missing:
-                console.info(f"  [red]- {msgid.strip(chr(34))}[/]")
-        if extra:
-            console.error(f"{lang} has {len(extra)} stale msgid(s) (removed/renamed in English):")
-            for msgid in extra:
-                console.info(f"  [yellow]- {msgid.strip(chr(34))}[/]")
+        diverged |= lang_diverged
 
     if not diverged:
         console.success("All languages are in sync with English.")

@@ -22,11 +22,11 @@ def meeting_unavailable_view(lang: str) -> MitupInlineView:
     production ``meeting_unavailable_view`` cannot make this assertion tautological.
     """
     return MitupInlineView(
-        description=InlineQueryMessages.MEETING_UNAVAILABLE_MESSAGE.get(lang=lang),
-        keyboard=[],
+        message=InlineQueryMessages.MEETING_UNAVAILABLE_MESSAGE.rich(lang=lang),
+        menu=[],
         id="meeting_unavailable",
-        title=InlineQueryMessages.MEETING_UNAVAILABLE_TITLE.get(lang=lang),
-        inline_description=InlineQueryMessages.MEETING_UNAVAILABLE_DESCRIPTION.get(lang=lang),
+        title=InlineQueryMessages.MEETING_UNAVAILABLE_TITLE.text(lang=lang),
+        inline_description=InlineQueryMessages.MEETING_UNAVAILABLE_DESCRIPTION.text(lang=lang),
     )
 
 

@@ -8,8 +8,8 @@ from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import User
 from mitup_bot.models.broadcasts import BroadcastStatus
-from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import BroadcastOperatorMessages
+from mitup_bot.utils.rich_message import RichContent
 from mitup_bot.views import MitupView
 
 from .types import BroadcastSummary, LanguageBreakdown
@@ -120,7 +120,7 @@ async def load_operators(session: AsyncSession, admin_tg_ids: list[int]) -> dict
 
 def build_summary_view(summary: BroadcastSummary, lang: str) -> MitupView:
     if summary.status is BroadcastStatus.FAILED:
-        text = BroadcastOperatorMessages.SENDER_FAILED.get(
+        text = BroadcastOperatorMessages.SENDER_FAILED.rich(
             lang=lang,
             broadcast_id=summary.broadcast_id,
             name=summary.name,
@@ -130,17 +130,17 @@ def build_summary_view(summary: BroadcastSummary, lang: str) -> MitupView:
             skipped=summary.skipped,
         )
         if summary.orphaned:
-            text = FormattedText.join(
+            text = RichContent.join(
                 "\n\n",
-                [text, BroadcastOperatorMessages.SENDER_ORPHANED_WARNING.get(lang=lang, orphaned=summary.orphaned)],
+                [text, BroadcastOperatorMessages.SENDER_ORPHANED_WARNING.rich(lang=lang, orphaned=summary.orphaned)],
             )
-        return MitupView(text, keyboard=[])
+        return MitupView(text, menu=[])
 
-    breakdown = FormattedText.join(
+    breakdown = RichContent.join(
         "\n",
         [build_breakdown_line(line, lang) for line in summary.breakdown],
     )
-    text = BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY.get(
+    text = BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY.rich(
         lang=lang,
         broadcast_id=summary.broadcast_id,
         name=summary.name,
@@ -151,16 +151,16 @@ def build_summary_view(summary: BroadcastSummary, lang: str) -> MitupView:
         breakdown=breakdown,
     )
     if summary.orphaned:
-        text = FormattedText.join(
+        text = RichContent.join(
             "\n\n",
-            [text, BroadcastOperatorMessages.SENDER_ORPHANED_WARNING.get(lang=lang, orphaned=summary.orphaned)],
+            [text, BroadcastOperatorMessages.SENDER_ORPHANED_WARNING.rich(lang=lang, orphaned=summary.orphaned)],
         )
-    return MitupView(text, keyboard=[])
+    return MitupView(text, menu=[])
 
 
-def build_breakdown_line(line: LanguageBreakdown, lang: str) -> FormattedText:
+def build_breakdown_line(line: LanguageBreakdown, lang: str) -> RichContent:
     if line.orphaned:
-        return BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE_WITH_ORPHANED.get(
+        return BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE_WITH_ORPHANED.rich(
             lang=lang,
             language=line.language,
             sent=line.sent,
@@ -168,6 +168,6 @@ def build_breakdown_line(line: LanguageBreakdown, lang: str) -> FormattedText:
             skipped=line.skipped,
             orphaned=line.orphaned,
         )
-    return BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.get(
+    return BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.rich(
         lang=lang, language=line.language, sent=line.sent, failed=line.failed, skipped=line.skipped
     )

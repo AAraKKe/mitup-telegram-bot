@@ -21,31 +21,31 @@ from tests.helpers.stub_db import MockDbSession
 
 def chat_card(lang: str) -> MitupInlineView:
     return MitupInlineView(
-        description=InlineQueryMessages.CHAT_MEETINGS_MESSAGE.get(lang=lang),
-        keyboard=[
+        message=InlineQueryMessages.CHAT_MEETINGS_MESSAGE.rich(lang=lang),
+        menu=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.LOAD_CHAT_MEETINGS.get_text(lang=lang),
+                    text=ButtonMessages.LOAD_CHAT_MEETINGS.text(lang=lang),
                     callback_data=cb.LOAD_CHAT_MEETINGS,
                 )
             ],
         ],
         id="meetings_in_this_chat",
-        title=InlineQueryMessages.CHAT_MEETINGS_TITLE.get(lang=lang),
-        inline_description=InlineQueryMessages.CHAT_MEETINGS_DESCRIPTION.get(lang=lang),
+        title=InlineQueryMessages.CHAT_MEETINGS_TITLE.text(lang=lang),
+        inline_description=InlineQueryMessages.CHAT_MEETINGS_DESCRIPTION.text(lang=lang),
     )
 
 
 def inline_button(lang: str) -> InlineResultsButton:
     return InlineResultsButton(
-        text=InlineQueryMessages.CREATE_MEETING_BUTTON.get_text(lang=lang),
+        text=InlineQueryMessages.CREATE_MEETING_BUTTON.text(lang=lang),
         start_parameter="inline",
     )
 
 
 def explore_button(lang: str) -> InlineResultsButton:
     return InlineResultsButton(
-        text=InlineQueryMessages.EXPLORE_BUTTON.get_text(lang=lang),
+        text=InlineQueryMessages.EXPLORE_BUTTON.text(lang=lang),
         start_parameter="inline",
     )
 
@@ -75,11 +75,11 @@ async def test_inline_view_returns_results_and_button(
     assert results[0].id == "meetings_in_this_chat"
 
     # The inline result should have a keyboard with the "Load meetings" button
-    keyboard = results[0].keyboard
+    keyboard = results[0].menu
     assert len(keyboard) == 1
     load_button = keyboard[0][0]
     assert load_button.callback_data == cb.LOAD_CHAT_MEETINGS
-    assert load_button.text == ButtonMessages.LOAD_CHAT_MEETINGS.get_text(lang=user_with_settings.lang)
+    assert load_button.text == ButtonMessages.LOAD_CHAT_MEETINGS.text(lang=user_with_settings.lang)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(inline_query=" ")], indirect=True)
@@ -97,10 +97,10 @@ async def test_inline_view_uses_user_language(
 
     _, kwargs = context.api.call_args("answer_inline_query")
     button = kwargs["button"]
-    assert button.text == InlineQueryMessages.CREATE_MEETING_BUTTON.get_text(lang=lang)
+    assert button.text == InlineQueryMessages.CREATE_MEETING_BUTTON.text(lang=lang)
 
     results = kwargs["results"]
-    assert results[0].title == InlineQueryMessages.CHAT_MEETINGS_TITLE.get_text(lang=lang)
+    assert results[0].title == InlineQueryMessages.CHAT_MEETINGS_TITLE.text(lang=lang)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(inline_query=" ")], indirect=True)

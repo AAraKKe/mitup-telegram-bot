@@ -1,166 +1,96 @@
 import calendar
 import datetime as dt
 from dataclasses import dataclass
-from typing import Literal, assert_never
 
-from mitup_bot.callback_data import CallbackData, DateCallbackData
-from mitup_bot.keyboards import ButtonConfig, ButtonRow, Keyboard
-from mitup_bot.utils import ButtonMessages, Emojis, MonthList, Weekday
-from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import FormattedText
+from mitup_bot.callback_data import DateCallbackData
+from mitup_bot.keyboards import ButtonConfig
+from mitup_bot.utils import ButtonMessages
+from mitup_bot.utils.rich_message import RichContent, button_markup, disabled_button_markup, escape_text
+from mitup_bot.views.datetime_format import month_name, weekday_names
+
+
+def standalone(name: str) -> str:
+    """A day or month name shown as the only word in its cell starts with a capital, whatever the
+    locale does inside a sentence."""
+    return name[:1].upper() + name[1:]
 
 
 @dataclass
-class CalendarKeyboard:
-    """
-    A Telegram inline keyboard that represents a calendar with navigation buttons.
+class Calendar:
+    """The date picker, rendered as a rich table whose day cells are inline buttons.
 
-    Two dates are provided to the calendar:
-    - The anchor_date is the date we are defining as a the current real time date. This is used to be marked
-    in the calendar with a green check emoji.
-    - the current_date is the date the calendar is going to be shown for. This allows to navigate on the calendar
-    to different months and years while making sure the calendar is still anchored in the anchor_date.
+    The green day is the selected one, or today until a selection exists, so the calendar always
+    anchors the reader somewhere. Below the table, one arrow row moves by month and one by year;
+    the back arrows never navigate before today's month or year, since earlier months hold no
+    schedulable day, so an arrow disappears instead of leading somewhere useless.
 
-    Providing these two dates makes the calendar timezone agnostic and does not need to deal with whenter it is
-    after midnight or not. It is up to whoever creates the calendar to make sure timezone is considered when providing
-    the dates.
-
-    The callback_data (of type DateCallbackData) is used to create the callback_data of each day button in the calendar.
-
-    The navigation_callback_data (of type DateCallbackData) is used to create the callback_data of the navigation
-    buttons (i.e. moving to the next/previous month or year).
+    Two dates parameterize the rendering: `month` names the rendered month (any day within it),
+    and `today` is today in the acting user's timezone, which bounds the back arrows. Keeping the
+    timezone out of this class is what lets the caller decide whose "today" applies. Both
+    callbacks already carry the meeting id; the day and arrow buttons only add their date.
     """
 
-    anchor_date: dt.date
-    current_date: dt.date
-    callback_data: DateCallbackData
-    navigation_callback_data: DateCallbackData
+    month: dt.date
+    selected: dt.date | None
+    today: dt.date
+    pick_callback: DateCallbackData
+    nav_callback: DateCallbackData
     lang: str = "en"
 
     @property
-    def keyboard(self) -> Keyboard:
-        """Generates the keyboard with the calendar and navigation buttons."""
+    def content(self) -> RichContent:
+        return RichContent.from_markup(self.table_markup() + self.month_nav_markup() + self.year_nav_markup())
 
-        keyboard = [self.__weekdays_row()]
-        keyboard += self.__month_rows()
-        keyboard.append(self.__navigation_buttons(by="month"))
-        keyboard.append(self.__navigation_buttons(by="year"))
-        return keyboard
+    def table_markup(self) -> str:
+        headers = "".join(f"<th>{escape_text(standalone(name))}</th>" for name in weekday_names(self.lang))
+        marked = self.selected or self.today
 
-    def __navigation_day(self, year: int, month: int) -> int:
-        """Returns the day to be use in navigation buttons taking care the date exist"""
-        try:
-            dt.date(year, month, self.anchor_date.day)
-            return self.anchor_date.day
-        except ValueError:
-            # If the day does not exist in the month, we use the last day of the month
-            return calendar.monthrange(year, month)[1]
+        rows = []
+        for week in calendar.Calendar().monthdatescalendar(self.month.year, self.month.month):
+            cells = []
+            for day in week:
+                if day.month != self.month.month:
+                    cells.append("<td></td>")
+                    continue
+                button = ButtonConfig(
+                    text=str(day.day),
+                    callback_data=self.pick_callback.with_date(day),
+                    style="success" if day == marked else None,
+                )
+                cells.append(f'<td align="center">{button_markup(button)}</td>')
+            rows.append(f"<tr>{''.join(cells)}</tr>")
 
-    def __weekdays_row(self) -> ButtonRow:
-        """Generates the row with the weekdays in the calendar."""
-        return [
-            ButtonConfig(text=Weekday.MONDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.TUESDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.WEDNESDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.THURSDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.FRIDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.SATURDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
-            ButtonConfig(text=Weekday.SUNDAY.get_text(lang=self.lang), callback_data=cb.EMPTY),
-        ]
+        return f"<table compact><tr>{headers}</tr>{''.join(rows)}</table>"
 
-    def __month_rows(self) -> Keyboard:
-        """Generates the rows of the calendar with the days of the month."""
-        month_calendar = calendar.Calendar()
+    def month_nav_markup(self) -> str:
+        previous = None
+        if (self.month.year, self.month.month) > (self.today.year, self.today.month):
+            previous = (dt.date(self.month.year, self.month.month, 1) - dt.timedelta(days=1)).replace(day=1)
+        following = (dt.date(self.month.year, self.month.month, 28) + dt.timedelta(days=7)).replace(day=1)
+        return self.nav_row_markup(standalone(month_name(self.month.month, self.lang)), previous, following)
 
-        def generate_text(day: dt.date) -> str:
-            if day == self.anchor_date:
-                return Emojis.CHECK.value
-            return " " if day.month != self.current_date.month else str(day.day)
+    def year_nav_markup(self) -> str:
+        previous = dt.date(self.month.year - 1, self.month.month, 1) if self.month.year > self.today.year else None
+        return self.nav_row_markup(str(self.month.year), previous, dt.date(self.month.year + 1, self.month.month, 1))
 
-        def generate_cb(day: dt.date) -> CallbackData:
-            return cb.EMPTY if day.month != self.current_date.month else self.callback_data.with_date(day)
-
-        return [
-            [ButtonConfig(text=generate_text(day), callback_data=generate_cb(day)) for day in week]
-            for week in month_calendar.monthdatescalendar(self.current_date.year, self.current_date.month)
-        ]
-
-    def __navigation_back_buttons(self, by: Literal["month", "year"]) -> ButtonConfig:
-        month = self.current_date.month
-        year = self.current_date.year
-
-        if by == "month":
-            if month == 1:
-                # If we are in January, we go back to December of the previous year
-                month = 12
-                year -= 1
-            else:
-                month -= 1
-        elif by == "year":
-            year -= 1
-        else:
-            assert_never(by)
-
-        date_back = dt.date(year, month, self.__navigation_day(year, month))
-        return ButtonConfig(
-            text=ButtonMessages.GO_BACK.get_text(),
-            callback_data=self.navigation_callback_data.with_date(date_back),
-        )
-
-    def __navigation_forward_buttons(self, by: Literal["month", "year"]) -> ButtonConfig:
-        month = self.current_date.month
-        year = self.current_date.year
-
-        if by == "month":
-            if month == 12:
-                # If we are in December, we go forward to January of the next year
-                month = 1
-                year += 1
-            else:
-                month += 1
-        elif by == "year":
-            year += 1
-        else:
-            assert_never(by)
-
-        date_forward = dt.date(year, month, self.__navigation_day(year, month))
-        return ButtonConfig(
-            text=ButtonMessages.GO_FORWARD.get_text(),
-            callback_data=self.navigation_callback_data.with_date(date_forward),
-        )
-
-    def __navigation_buttons(self, by: Literal["month", "year"]) -> ButtonRow:
-        """Generates the row with the navigation buttons to move delta days."""
-        row = []
-
-        # For the back button, the rule is:
-        # - Add month back button if the current month/year are greater than the real, today month/year
-        # - Only add year back button if the current year is greater than the real, today year
-        add_back_button = self.current_date.year > dt.date.today().year or (
-            self.current_date.month > dt.date.today().month and by == "month"
-        )
-
-        if add_back_button:
-            row.append(self.__navigation_back_buttons(by))
-
-        # We can always go forward. We add the current label and the navigation forward buttons.
-        current_label = (
-            str(self.current_date.year)
-            if by == "year"
-            else MonthList[self.current_date.month - 1].get_text(lang=self.lang)
-        )
-        row.extend(
-            (
+    def nav_row_markup(self, label: str, back_date: dt.date | None, forward_date: dt.date) -> str:
+        buttons = []
+        if back_date is not None:
+            buttons.append(
+                button_markup(
+                    ButtonConfig(
+                        text=ButtonMessages.GO_BACK.text(lang=self.lang),
+                        callback_data=self.nav_callback.with_date(back_date),
+                    )
+                )
+            )
+        buttons.append(disabled_button_markup(label))
+        buttons.append(
+            button_markup(
                 ButtonConfig(
-                    text=current_label,
-                    callback_data=cb.EMPTY,
-                ),
-                self.__navigation_forward_buttons(by),
+                    text=ButtonMessages.GO_FORWARD.text(lang=self.lang),
+                    callback_data=self.nav_callback.with_date(forward_date),
+                )
             )
         )
-        return row
-
-    def __str__(self) -> str:
-        return FormattedText.join(
-            "\n", [FormattedText.join(" | ", [button.text for button in row]) for row in self.keyboard]
-        ).text
+        return f"<tg-button-row>{''.join(buttons)}</tg-button-row>"

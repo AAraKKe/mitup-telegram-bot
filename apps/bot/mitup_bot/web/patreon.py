@@ -586,16 +586,16 @@ async def notify_membership_change(api: TelegramApiWrapper, user: User, outcome:
     match outcome:
         case WebhookApplied.UPGRADED:
             message = SupporterNotificationMessages.unlocked_for(user.supporter_level)
-            await api.send_message_to_user(user, message.get(lang=user.lang))
+            await api.send_message_to_user(user, message.rich(lang=user.lang))
         case WebhookApplied.DOWNGRADED:
             message = SupporterNotificationMessages.downgraded_to(user.supporter_level)
-            await api.send_message_to_user(user, message.get(lang=user.lang))
+            await api.send_message_to_user(user, message.rich(lang=user.lang))
         case WebhookApplied.GRACE_STARTED:
             # The catalog copy phrases the window in days (``${days}``), fed from SUPPORT_GRACE_DAYS so
             # the number in the message can never drift from the expiry math above.
             await api.send_message_to_user(
                 user,
-                SupporterNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=SUPPORT_GRACE_DAYS),
+                SupporterNotificationMessages.SUPPORT_ENDED_GRACE.rich(lang=user.lang, days=SUPPORT_GRACE_DAYS),
             )
         case WebhookApplied.UNCHANGED:
             ...

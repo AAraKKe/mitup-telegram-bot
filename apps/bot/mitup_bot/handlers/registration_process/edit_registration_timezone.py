@@ -62,10 +62,10 @@ async def start_onboarding(
     user, is_new_user = await get_or_create_onboarding_user(session, update, start_acquisition_source(context.args))
     if user.status is UserStatus.DELETION_REQUESTED:
         log.info("Onboarding refused", user_id=user.db_id, status=user.status.value, reason="deletion_requested")
-        await context.api.send_message(update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.get(lang=user.lang))
+        await context.api.send_message(update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.rich(lang=user.lang))
         return ConversationHandler.END
 
-    message = RegistrationMessages.TIMEZONE_PROMPT.get(first_name=user.first_name, lang=user.lang)
+    message = RegistrationMessages.TIMEZONE_PROMPT.rich(first_name=user.first_name, lang=user.lang)
 
     # Logged before the send so a prompt that never reaches the user still counts as attempted.
     log.info(
@@ -151,7 +151,7 @@ async def registration_timezone_invalid_input_handler(
     )
     await context.api.send_message(
         update=update,
-        view=RegistrationMessages.TIMEZONE_INVALID_INPUT.get(lang=user.lang),
+        view=RegistrationMessages.TIMEZONE_INVALID_INPUT.rich(lang=user.lang),
     )
     return ConversationRegistrationProcessState.TIMEZONE
 

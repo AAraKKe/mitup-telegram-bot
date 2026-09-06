@@ -17,7 +17,7 @@ def request_page(context: StubMitupContext, page: int) -> None:
     context.matches = [match]
 
 
-async def test_active_list_records_its_counts_and_names_each_hidden_meeting(
+async def test_active_list_records_what_it_showed_and_what_it_left_out(
     mock_session: MockDbSession,
     context: StubMitupContext,
     update: Update,
@@ -38,15 +38,7 @@ async def test_active_list_records_its_counts_and_names_each_hidden_meeting(
     built = log_record(caplog, "Meeting list built")
     assert built.__dict__["list"] == "active"
     assert built.__dict__["total"] == 3
-    assert built.__dict__["active"] == 2
-    assert built.__dict__["listed"] == 1
-    assert built.__dict__["dropped_blank_title"] == 1
-
-    # The blank-title filter is the only code-level cause of "my meeting is not in my list", so the
-    # meeting that vanished is named, not merely counted.
-    hidden = log_record(caplog, "Meeting hidden from list")
-    assert hidden.__dict__["meeting_id"] == 11
-    assert hidden.__dict__["reason"] == "blank_title"
+    assert built.__dict__["listed"] == 2
 
 
 async def test_a_list_filtered_down_to_nothing_is_distinguishable_from_an_empty_one(

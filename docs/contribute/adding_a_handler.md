@@ -82,14 +82,12 @@ user = await guards.current_user(update, session)
 
 ## Build the view and the text
 
-The reply is a view, not a raw message. Check the factory catalogue in [`views/factory.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/telegram/mitup_bot/views/factory.py) before building one by hand; something like `confirmation_view` or `main_menu_view` often already fits. Every factory takes a `RenderContext` as its first argument; build it in the handler with `guards.render_context(user, update, context)`. Button labels and the description come from `MessageBase` subclasses in [`libs/telegram/mitup_bot/utils/messages.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/telegram/mitup_bot/utils/messages.py), rendered with `.get(lang=user.lang)`.
+The reply is a view, not a raw message. Check the factory catalogue in [`views/factory.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/telegram/mitup_bot/views/factory.py) before building one by hand; something like `confirmation_view` or `main_menu_view` often already fits. Every factory takes a `RenderContext` as its first argument; build it in the handler with `guards.render_context(user, update, context)`. Button labels and the description come from `MessageBase` subclasses in [`libs/telegram/mitup_bot/utils/messages.py`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/libs/telegram/mitup_bot/utils/messages.py), rendered with `.rich(lang=user.lang)` for the body and `.text(lang=user.lang)` for button labels.
 
 ```python
 view = MitupView(
-    description=ReminderMessages.LIST.get(lang=user.lang),
-    keyboard=[
-        [ButtonConfig(text=ButtonMessages.MAIN_MENU.get(lang=user.lang), callback_data=cb.MAIN_MENU)],
-    ],
+    ReminderMessages.LIST.rich(lang=user.lang),
+    [[ButtonConfig(text=ButtonMessages.MAIN_MENU.text(lang=user.lang), callback_data=cb.MAIN_MENU)]],
 )
 ```
 

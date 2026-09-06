@@ -363,7 +363,7 @@ async def test_apply_upgrade_grants_and_notifies(
     assert outcome is WebhookApplied.UPGRADED
     assert user.supporter_level is SupporterLevel.HOST_2
     # The 500-cent pledge lands on Patron, so the DM must be the Patron unlock message specifically.
-    api.assert_send_message_to_user_called(user, SupporterNotificationMessages.PATRON_UNLOCKED.get(lang=user.lang))
+    api.assert_send_message_to_user_called(user, SupporterNotificationMessages.PATRON_UNLOCKED.rich(lang=user.lang))
     # What the delivery changed rides the apply line: this is the branch where it changed something.
     applied = next(entry for entry in logs if entry["event"] == "Patreon webhook applied")
     assert applied["stage"] == "apply"
@@ -388,7 +388,7 @@ async def test_apply_downgrade_notifies(
 
     assert outcome is WebhookApplied.DOWNGRADED
     assert user.supporter_level is SupporterLevel.HOST_2
-    api.assert_send_message_to_user_called(user, SupporterNotificationMessages.PATRON_TIER_SET.get(lang=user.lang))
+    api.assert_send_message_to_user_called(user, SupporterNotificationMessages.PATRON_TIER_SET.rich(lang=user.lang))
 
 
 async def test_apply_delete_starts_grace_and_keeps_perks(
@@ -408,7 +408,7 @@ async def test_apply_delete_starts_grace_and_keeps_perks(
     assert user.supporter_level is SupporterLevel.HOST_2
     assert_grace_window(subscription)
     api.assert_send_message_to_user_called(
-        user, SupporterNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=SUPPORT_GRACE_DAYS)
+        user, SupporterNotificationMessages.SUPPORT_ENDED_GRACE.rich(lang=user.lang, days=SUPPORT_GRACE_DAYS)
     )
     # Non-tautological guard: the day count must actually interpolate into the rendered copy.
     sent = api.call_args("send_message_to_user").kwargs["view"]
@@ -431,7 +431,7 @@ async def test_apply_non_active_member_starts_grace(
     assert user.supporter_level is SupporterLevel.HOST_2
     assert_grace_window(subscription)
     api.assert_send_message_to_user_called(
-        user, SupporterNotificationMessages.SUPPORT_ENDED_GRACE.get(lang=user.lang, days=SUPPORT_GRACE_DAYS)
+        user, SupporterNotificationMessages.SUPPORT_ENDED_GRACE.rich(lang=user.lang, days=SUPPORT_GRACE_DAYS)
     )
 
 

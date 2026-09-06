@@ -7,8 +7,9 @@ from mitup_bot.events.broadcast import reporting
 from mitup_bot.events.broadcast.types import LanguageBreakdown
 from mitup_bot.exceptions import InactiveUserInteraction
 from mitup_bot.models.broadcasts import BroadcastStatus
-from mitup_bot.utils.entities import FormattedText, parse_format_tags
+from mitup_bot.utils.entities import parse_format_tags
 from mitup_bot.utils.messages import BroadcastOperatorMessages
+from mitup_bot.utils.rich_message import RichContent
 from tests.events.broadcast.helpers import make_summary, script_exec
 from tests.helpers import MockApi, MockDbSession, Result, create_member
 
@@ -18,11 +19,11 @@ def test_build_summary_view_failed_variant():
 
     view = reporting.build_summary_view(summary, "en")
 
-    expected = BroadcastOperatorMessages.SENDER_FAILED.get(
+    expected = BroadcastOperatorMessages.SENDER_FAILED.rich(
         lang="en", broadcast_id=5, name="Camp", attempts=6, sent=1, failed=2, skipped=3
     )
-    assert view.description == expected
-    assert view.keyboard == []
+    assert view.message == expected
+    assert view.menu == []
 
 
 def test_build_summary_view_complete_variant():
@@ -33,14 +34,14 @@ def test_build_summary_view_complete_variant():
 
     view = reporting.build_summary_view(summary, "en")
 
-    expected_breakdown = FormattedText.join(
+    expected_breakdown = RichContent.join(
         "\n",
-        [BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.get(lang="en", language="en", sent=3, failed=1, skipped=0)],
+        [BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.rich(lang="en", language="en", sent=3, failed=1, skipped=0)],
     )
-    expected = BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY.get(
+    expected = BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY.rich(
         lang="en", broadcast_id=5, name="Camp", total=4, sent=3, failed=1, skipped=0, breakdown=expected_breakdown
     )
-    assert view.description == expected
+    assert view.message == expected
 
 
 @pytest.mark.parametrize(
@@ -51,7 +52,7 @@ def test_build_summary_view_appends_orphan_warning_when_present(status: Broadcas
 
     view = reporting.build_summary_view(summary, "en")
 
-    assert BroadcastOperatorMessages.SENDER_ORPHANED_WARNING.get(lang="en", orphaned=5).text in view.description.text
+    assert BroadcastOperatorMessages.SENDER_ORPHANED_WARNING.rich(lang="en", orphaned=5).text in view.message.text
 
 
 def test_build_summary_view_failed_omits_orphan_warning_when_none():
@@ -59,10 +60,10 @@ def test_build_summary_view_failed_omits_orphan_warning_when_none():
 
     view = reporting.build_summary_view(summary, "en")
 
-    expected = BroadcastOperatorMessages.SENDER_FAILED.get(
+    expected = BroadcastOperatorMessages.SENDER_FAILED.rich(
         lang="en", broadcast_id=5, name="Camp", attempts=6, sent=1, failed=2, skipped=3
     )
-    assert view.description == expected
+    assert view.message == expected
 
 
 def test_build_summary_view_complete_omits_orphan_warning_when_none():
@@ -73,14 +74,14 @@ def test_build_summary_view_complete_omits_orphan_warning_when_none():
 
     view = reporting.build_summary_view(summary, "en")
 
-    expected_breakdown = FormattedText.join(
+    expected_breakdown = RichContent.join(
         "\n",
-        [BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.get(lang="en", language="en", sent=3, failed=1, skipped=0)],
+        [BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.rich(lang="en", language="en", sent=3, failed=1, skipped=0)],
     )
-    expected = BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY.get(
+    expected = BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY.rich(
         lang="en", broadcast_id=5, name="Camp", total=4, sent=3, failed=1, skipped=0, breakdown=expected_breakdown
     )
-    assert view.description == expected
+    assert view.message == expected
 
 
 def test_build_breakdown_line_uses_plain_variant_without_orphans():
@@ -88,7 +89,7 @@ def test_build_breakdown_line_uses_plain_variant_without_orphans():
 
     result = reporting.build_breakdown_line(line, "en")
 
-    expected = BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.get(
+    expected = BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.rich(
         lang="en", language="en", sent=3, failed=1, skipped=0
     )
     assert result == expected
@@ -99,7 +100,7 @@ def test_build_breakdown_line_uses_orphaned_variant_when_orphans_present():
 
     result = reporting.build_breakdown_line(line, "en")
 
-    expected = BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE_WITH_ORPHANED.get(
+    expected = BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE_WITH_ORPHANED.rich(
         lang="en", language="en", sent=3, failed=1, skipped=0, orphaned=2
     )
     assert result == expected

@@ -66,11 +66,11 @@ context.api.assert_edit_message_called(
     update,
     factory.confirmation_view(
         lang=user.lang,
-        message=MeetingMessages.DELETE_MEETING.get(lang=user.lang),
+        message=MeetingMessages.DELETE_MEETING.rich(lang=user.lang),
         confirm_callback_data=cb.CONFIRM_DELETE_MEETING.with_id(1),
         decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(1),
     ),
 )
 ```
 
-For model-owned views (like meeting detail), use `meeting_views.main_view(meeting)` from `mitup_bot.views.meeting`.
+For model-owned views (like the meeting card), use `meeting_views.owner_view(meeting)` from `mitup_bot.views.meeting`.

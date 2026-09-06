@@ -5,10 +5,9 @@ import pytest
 from mitup_bot.emojis import Emojis
 from mitup_bot.models import JoinedUsers
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils.messages import ButtonMessages
 from mitup_bot.views import meeting as meeting_views
-from mitup_bot.views.meeting_text import participants_list_text
-from tests.helpers import create_meetup, create_user
+from mitup_bot.views.meeting import shared_card
+from tests.helpers import create_joined_link, create_meetup, create_user
 
 
 @pytest.mark.parametrize(
@@ -386,60 +385,29 @@ def test_promote_from_waiting_list_respects_order():
     assert link3.is_waiting_list
 
 
-def test_participants_list_text_includes_waiting_list_section():
+def test_the_attendee_list_leaves_the_waiting_list_out():
+    """The waiting list is a counted line of its own on the card: nobody on it is attending, so it
+    never lands among the names."""
     owner = create_user(id=1, first_name="Owner")
     meeting = create_meetup(id=1, owner=owner, max_members=3)
-    user1 = create_user(id=2, first_name="Bob")
-    user2 = create_user(id=3, first_name="Alice")
-    user3 = create_user(id=4, first_name="Charlie")
-    user4 = create_user(id=5, first_name="Dave")
+    for index, name in enumerate(["Bob", "Alice", "Charlie", "Dave"]):
+        joining = create_user(id=index + 2, first_name=name)
+        create_joined_link(joining, meeting, id=index, is_waiting_list=name == "Dave")
 
-    # Add regular participants
-    meeting.create_joined_link(user1, is_waiting_list=False)
-    meeting.create_joined_link(user2, is_waiting_list=False)
-    meeting.create_joined_link(user3, is_waiting_list=False)
-
-    # Add waiting list participants
-    meeting.create_joined_link(user4, is_waiting_list=True)
-
-    expected = (
-        f"\n  Bob"
-        f"\n  Alice"
-        f"\n  Charlie"
-        f"\n--- {Emojis.WAITING} {ButtonMessages.WAITING_LIST.get(lang=meeting.lang).text} \n  "
-        f"Dave"
-    )
-
-    assert expected == participants_list_text(meeting).text
+    assert shared_card.attendee_names(meeting, None).text == "\nBob\nAlice\nCharlie\n"
 
 
-def test_participants_list_text_without_waiting_list():
-    owner = create_user(id=1, first_name="Owner")
-    meeting = create_meetup(id=1, owner=owner)
-    user1 = create_user(id=2, first_name="Bob")
-    user2 = create_user(id=3, first_name="Alice")
-
-    # Add only regular participants
-    meeting.create_joined_link(user1, is_waiting_list=False)
-    meeting.create_joined_link(user2, is_waiting_list=False)
-
-    expected = "\n  Bob\n  Alice"
-
-    assert expected == participants_list_text(meeting).text
-
-
-def test_participants_list_text_badges_supporter_participant():
+def test_the_attendee_list_badges_a_supporter():
     owner = create_user(id=1, first_name="Owner", tg_user_id=997_710)
     meeting = create_meetup(id=1, owner=owner)
     free = create_user(id=2, first_name="Bob", tg_user_id=997_711)
     supporter_member = create_user(id=3, username="alice", tg_user_id=997_712, supporter_level=SupporterLevel.HOST_1)
 
-    meeting.create_joined_link(free, is_waiting_list=False)
-    meeting.create_joined_link(supporter_member, is_waiting_list=False)
+    create_joined_link(free, meeting, id=0)
+    create_joined_link(supporter_member, meeting, id=1)
 
     # Only the supporter carries the badge (their tier's emoji); the free participant is untouched.
-    expected = f"\n  Bob\n  {Emojis.HOST_1} alice"
-    assert expected == participants_list_text(meeting).text
+    assert shared_card.attendee_names(meeting, None).text == f"\nBob\n{Emojis.HOST_1} alice\n"
 
 
 def test_waiting_links_orders_by_created_time_then_id():
@@ -462,3 +430,58 @@ def test_waiting_links_orders_by_created_time_then_id():
     # Pins #191's fairness contract: created_time first, then id — the tiebreaker that
     # keeps pre-fix rows (which share one process-start timestamp) in true join order.
     assert meeting.waiting_links() == [legacy_first, legacy_second, newest]
+
+
+def test_owner_attendance_is_none_when_owner_never_joined():
+    owner = create_user(id=1, first_name="Owner")
+    meeting = create_meetup(id=1, owner=owner)
+    create_joined_link(create_user(id=2, first_name="Bob"), meeting)
+
+    assert meeting.owner_attendance is None
+
+
+def test_owner_attendance_returns_the_owners_confirmed_link():
+    owner = create_user(id=1, first_name="Owner")
+    meeting = create_meetup(id=1, owner=owner)
+    create_joined_link(create_user(id=2, first_name="Bob"), meeting)
+    owner_link = create_joined_link(owner, meeting)
+
+    assert meeting.owner_attendance == owner_link
+
+
+def test_owner_attendance_returns_the_owners_waiting_link():
+    """An owner on the waiting list is still on the list: the property does not filter by status."""
+    owner = create_user(id=1, first_name="Owner")
+    meeting = create_meetup(id=1, owner=owner)
+    owner_link = create_joined_link(owner, meeting, is_waiting_list=True)
+
+    assert meeting.owner_attendance == owner_link
+
+
+def test_guest_links_excludes_the_owner_and_the_waiting_list():
+    owner = create_user(id=1, first_name="Owner")
+    meeting = create_meetup(id=1, owner=owner)
+    create_joined_link(owner, meeting, id=1)
+    first_guest = create_joined_link(create_user(id=2, first_name="Bob"), meeting, id=2)
+    create_joined_link(create_user(id=3, first_name="Alice"), meeting, id=3, is_waiting_list=True)
+    second_guest = create_joined_link(create_user(id=4, first_name="Charlie"), meeting, id=4)
+
+    # Order is the meeting's own: the property filters, it does not sort.
+    assert meeting.guest_links == [first_guest, second_guest]
+
+
+def test_guest_links_excludes_a_waiting_owner():
+    owner = create_user(id=1, first_name="Owner")
+    meeting = create_meetup(id=1, owner=owner)
+    create_joined_link(owner, meeting, id=1, is_waiting_list=True)
+    guest = create_joined_link(create_user(id=2, first_name="Bob"), meeting, id=2)
+
+    assert meeting.guest_links == [guest]
+
+
+def test_guest_links_is_empty_without_guests():
+    owner = create_user(id=1, first_name="Owner")
+    meeting = create_meetup(id=1, owner=owner)
+    create_joined_link(owner, meeting)
+
+    assert meeting.guest_links == []

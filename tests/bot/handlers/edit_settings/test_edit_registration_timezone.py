@@ -14,11 +14,11 @@ from mitup_bot.handlers.registration_process.enums import (
     ConversationRegistrationProcessState,
     RegistrationProcessHandlerId,
 )
-from mitup_bot.models import User
+from mitup_bot.models import MeetingCounts, User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.timezone_api import TimezoneLookupFailure
 from mitup_bot.utils import RegistrationMessages
-from mitup_bot.utils.entities import Link, render
+from mitup_bot.utils.rich_message import RichContent
 from mitup_bot.views import RenderContext, factory
 from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import StubMitupContext, UpdateRequest, call_handler, claimed_state, log_record
@@ -30,11 +30,11 @@ from tests.helpers.stub_db import MockDbSession
 def expected_registration_complete_view(timezone: str, lang: str) -> MitupView:
     """Expected completion view built independently of the handler helper: the welcome as the
     main-menu message with an inline user-guide link pointing at the production docs site."""
-    user_guide_link = render(
-        t"{Link(RegistrationMessages.USER_GUIDE_LABEL.get_text(lang=lang), 'https://mitup.social/user-guide/')}"
+    user_guide_link = RichContent.link(
+        RegistrationMessages.USER_GUIDE_LABEL.text(lang=lang), "https://mitup.social/user-guide/"
     )
-    message = RegistrationMessages.REGISTRATION_COMPLETE.get(timezone=timezone, user_guide=user_guide_link, lang=lang)
-    return factory.main_menu_view(RenderContext(lang=lang), message=message)
+    message = RegistrationMessages.REGISTRATION_COMPLETE.rich(timezone=timezone, user_guide=user_guide_link, lang=lang)
+    return factory.main_menu_view(RenderContext(lang=lang), message=message, counts=MeetingCounts(0, 0, 0))
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(message_text="Something")]), indirect=True)
@@ -126,7 +126,9 @@ async def test_registration_timezone_message_handler_log_with_incorrect_timezone
     assert log_record(caplog, "Onboarding step retried").__dict__["reason"] == "address_not_geocoded"
     assert caplog.records[0].__dict__["user_id"] == user_with_settings.db_id
 
-    context.api.assert_send_message_called(update, RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang))
+    context.api.assert_send_message_called(
+        update, RegistrationMessages.TIMEZONE_FAIL.rich(lang=user_with_settings.lang)
+    )
     assert result == ConversationRegistrationProcessState.TIMEZONE
     metrics.assert_emitted(
         name=MetricKey.COUNT,
@@ -192,5 +194,7 @@ async def test_registration_timezone_message_handler_log_excludes_coordinates(
     assert log_record(caplog, "Onboarding step retried").__dict__["reason"] == "coordinates_without_timezone"
     assert caplog.records[0].__dict__["user_id"] == user_with_settings.db_id
 
-    context.api.assert_send_message_called(update, RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang))
+    context.api.assert_send_message_called(
+        update, RegistrationMessages.TIMEZONE_FAIL.rich(lang=user_with_settings.lang)
+    )
     assert result == ConversationRegistrationProcessState.TIMEZONE

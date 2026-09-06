@@ -38,11 +38,11 @@ def make_message(*, id: int, meetup_id: int) -> Message:
 
 def no_meetings_found_view(lang: str) -> MitupInlineView:
     return MitupInlineView(
-        description=InlineQueryMessages.NO_RESULTS_MESSAGE.get(lang=lang),
-        keyboard=[[search_chat_meetings_button(lang=lang, chat_instance=CHAT_INSTANCE)]],
+        message=InlineQueryMessages.NO_RESULTS_MESSAGE.rich(lang=lang),
+        menu=[[search_chat_meetings_button(lang=lang, chat_instance=CHAT_INSTANCE)]],
         id="no_meetings_found",
-        title=InlineQueryMessages.NO_RESULTS_TITLE.get(lang=lang),
-        inline_description=InlineQueryMessages.NO_RESULTS_DESCRIPTION.get(lang=lang),
+        title=InlineQueryMessages.NO_RESULTS_TITLE.text(lang=lang),
+        inline_description=InlineQueryMessages.NO_RESULTS_DESCRIPTION.text(lang=lang),
     )
 
 
@@ -55,7 +55,7 @@ def test_search_chat_meetings_button_embeds_real_chat_instance():
     button = search_chat_meetings_button(lang=TranslationEngine.FALLBACK_LANG, chat_instance=CHAT_INSTANCE)
 
     assert button.switch_inline_query_current_chat == f"{SEARCH_QUERY_PREFIX}{CHAT_INSTANCE}"
-    assert "None" not in (button.switch_inline_query_current_chat or "")
+    assert "None" not in (button.switch_inline_query_current_chat)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(inline_query=f"{SEARCH_QUERY_PREFIX}{CHAT_INSTANCE}")], indirect=True)

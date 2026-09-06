@@ -38,8 +38,8 @@ def timeout_rejection_reason(text: str | None, max_timeout: int) -> str:
 async def callback_query_timeout(session: AsyncSession, update: Update, context: TMitupContext):
     # Settings-only: reads `user.lang`/`user.settings`, never the meetups/joined_links collections.
     user = await guards.current_user(update, session)
-    message = SettingsMessages.TIMEOUT_PROMPT.get(
-        lang=user.lang, timeout=user.settings.timeout, max_timeout=LifecyclePolicy.get().max_timeout_minutes
+    message = SettingsMessages.TIMEOUT_PROMPT.rich(
+        lang=user.lang, max_timeout=LifecyclePolicy.get().max_timeout_minutes
     )
 
     log.info(
@@ -81,8 +81,8 @@ async def settings_timeout_text_message_handler(session: AsyncSession, update: U
         source=SETTINGS_MENU_SOURCE,
     )
 
-    message = SettingsMessages.TIMEOUT_SUCCESS.get(lang=user.lang, timeout=user.settings.timeout)
-    view = views.factory.settings_view(guards.render_context(user, update, context), message=message)
+    message = SettingsMessages.TIMEOUT_SUCCESS.rich(lang=user.lang, timeout=user.settings.timeout)
+    view = views.factory.settings_view(guards.render_context(user, update, context), user).with_context(message)
 
     await context.api.send_message(update=update, view=view)
 
@@ -101,7 +101,7 @@ async def settings_timeout_invalid_input_handler(session: AsyncSession, update: 
         max_timeout=max_timeout,
         reason=timeout_rejection_reason(guards.message(update).text, max_timeout),
     )
-    message = SettingsMessages.TIMEOUT_INVALID.get(lang=user.lang, max_timeout=max_timeout)
+    message = SettingsMessages.TIMEOUT_INVALID.rich(lang=user.lang, max_timeout=max_timeout)
 
     view = views.factory.change_settings_element_view(guards.render_context(user, update, context), message=message)
 

@@ -49,7 +49,7 @@ When writing tests that assert on user-facing text (views, messages, button labe
 ```python
 # Good — works for any language
 expected_view = factory.main_menu_view(lang=user_with_settings.lang)
-message = MeetingMessages.DELETE_MEETING.get(lang=user_with_settings.lang)
+message = MeetingMessages.DELETE_MEETING.rich(lang=user_with_settings.lang)
 
 # Bad — breaks when --lang es
 expected_view = factory.main_menu_view(lang="en")

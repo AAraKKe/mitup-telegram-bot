@@ -50,7 +50,7 @@ async def callback_query_delete_meeting(session: AsyncSession, update: Update, c
         update=update,
         view=factory.confirmation_view(
             guards.render_context(user, update, context),
-            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user.lang),
+            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.rich(lang=user.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING.with_id(callback_data.id),
             decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(callback_data.id),
         ),
@@ -83,8 +83,14 @@ async def callback_query_confirm_delete_meeting(session: AsyncSession, update: U
     )
 
     # Rendered (and queued) before the rows are deleted below; the edits themselves run after
-    # the deletion commits.
-    await context.api.update_meeting_messages(meeting=meeting, was_deleted=True)
+    # the deletion commits. The tapped message is left out of the fan-out because this handler
+    # edits it itself, straight to the deleted screen, so the banner never flashes on it first.
+    await context.api.update_meeting_messages(
+        meeting=meeting,
+        current_message=meeting.message_from_update(update),
+        skip_current=True,
+        was_deleted=True,
+    )
 
     # Keep all invited users ides to also delete them
     invited_users_ids = [cast(int, link.user_id) for link in meeting.joined_links if link.user.tg_user_id == -1]
@@ -109,8 +115,8 @@ async def callback_query_confirm_delete_meeting(session: AsyncSession, update: U
     await session.delete(meeting)
 
     view = MitupView(
-        description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user.lang),
-        keyboard=[
+        message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user.lang),
+        menu=[
             [
                 ButtonConfig(
                     text=ButtonMessages.ACTIVE_MEETINGS.back(lang=user.lang),
@@ -139,7 +145,7 @@ async def callback_query_decline_delete_meeting(session: AsyncSession, update: U
 
     await context.api.edit_message(
         update=update,
-        view=meeting_views.main_view(meeting).with_context(
-            MeetingLifecycleMessages.DELETE_DECLINED.get(lang=user.lang)
+        view=meeting_views.owner_view(meeting).with_context(
+            MeetingLifecycleMessages.DELETE_DECLINED.rich(lang=user.lang)
         ),
     )

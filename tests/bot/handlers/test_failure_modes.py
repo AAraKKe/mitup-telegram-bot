@@ -13,7 +13,7 @@ from enum import Enum
 from typing import Final
 
 import pytest
-from telegram import Location, MessageEntity, Update
+from telegram import Document, Location, MessageEntity, PhotoSize, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.custom_context import BOT_CONFIG_KEY, ContextId
@@ -61,6 +61,11 @@ from tests.helpers.stub_db import MockDbSession
 MEETING_ID_NOT_OWNED = 99
 MEETING_ID_NOT_FOUND = 9999
 MEETING_ID_INACTIVE = 88
+
+# Placeholder photo and image file: these tests only need an update of the shape each handler is
+# registered for.
+FAILURE_MODE_PHOTO = (PhotoSize(file_id="photo", file_unique_id="photo_unique", width=800, height=600),)
+FAILURE_MODE_IMAGE_DOCUMENT = Document(file_id="doc", file_unique_id="doc_unique", mime_type="image/png")
 
 
 class _Unset:
@@ -189,19 +194,6 @@ CONTEXTS = [
         meeting_id={ContextId.EDIT_MEETING_START: 99},
     ),
     Context(
-        handler_id=EditMeetingHandlerId.REJECT_START_TIME,
-        update_request=UpdateRequest(message_text="12:00"),
-        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="reject_start_time_text",
-        meeting_id={ContextId.EDIT_MEETING_START: 99},
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.REJECT_START_TIME,
-        update_request=UpdateRequest(message_text="12:00"),
-        error_modes={ErrorMode.MISSING_USER_DATA},
-        id="reject_start_time_text",
-    ),
-    Context(
         handler_id=EditMeetingHandlerId.REJECT_START_DATETIME,
         update_request=UpdateRequest(message_text="some text"),
         error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
@@ -274,16 +266,34 @@ CONTEXTS = [
         id="create_meeting_invalid_title_message",
     ),
     Context(
-        handler_id=EditSettingsHandlerId.LANGUAGE_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_LANGUAGE),
-        error_modes={ErrorMode.USER_NOT_FOUND},
-        id="user_not_found_edit_language",
-    ),
-    Context(
         handler_id=EditSettingsHandlerId.SET_DEFAULT_LOCK_ON_START,
         update_request=UpdateRequest(callback_query=cb.SET_DEFAULT_LOCK_ON_START),
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="user_not_found_set_default_lock_on_start",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.SET_DEFAULT_SHOW_TIMEZONE,
+        update_request=UpdateRequest(callback_query=cb.SET_DEFAULT_SHOW_TIMEZONE),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="user_not_found_set_default_show_timezone",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.SET_DEFAULT_CLOCK_24H,
+        update_request=UpdateRequest(callback_query=cb.SET_DEFAULT_CLOCK_24H),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="user_not_found_set_default_clock_24h",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.SET_DEFAULT_DATE_FORMAT,
+        update_request=UpdateRequest(callback_query=cb.SET_DEFAULT_DATE_FORMAT.with_id(0)),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="user_not_found_set_default_date_format",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.SET_DEFAULT_DATE_FORMAT,
+        update_request=UpdateRequest(callback_query=cb.SET_DEFAULT_DATE_FORMAT),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="set_default_date_format_malformed",
     ),
     Context(
         handler_id=EditMeetingHandlerId.TYPE_START_TIME,
@@ -332,6 +342,30 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_SETTINGS.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_settings",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.OPEN_MEETING_BEHAVIOR,
+        update_request=UpdateRequest(callback_query=cb.OPEN_MEETING_BEHAVIOR.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="open_meeting_behavior",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.OPEN_MEETING_TIME_FORMAT,
+        update_request=UpdateRequest(callback_query=cb.OPEN_MEETING_TIME_FORMAT.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="open_meeting_time_format",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.OPEN_DEFAULT_BEHAVIOR,
+        update_request=UpdateRequest(callback_query=cb.OPEN_DEFAULT_BEHAVIOR),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="user_not_found_open_default_behavior",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.OPEN_DEFAULT_TIME_FORMAT,
+        update_request=UpdateRequest(callback_query=cb.OPEN_DEFAULT_TIME_FORMAT),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="user_not_found_open_default_time_format",
     ),
     Context(
         handler_id=EditMeetingHandlerId.SET_MEETING_WAITING_LIST_CALLBACK,
@@ -498,6 +532,24 @@ CONTEXTS = [
         error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
         id="decline_delete_past_meeting_malformed",
     ),
+    Context(
+        handler_id=MeetingHandlerId.REFRESH,
+        update_request=UpdateRequest(callback_query=cb.REFRESH_MEETING.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="refresh_meeting",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.REFRESH,
+        update_request=UpdateRequest(callback_query=cb.REFRESH_MEETING.with_id(MEETING_ID_NOT_FOUND)),
+        error_modes={ErrorMode.MEETING_NOT_FOUND},
+        id="refresh_meeting_not_found",
+    ),
+    Context(
+        handler_id=MeetingHandlerId.REFRESH,
+        update_request=UpdateRequest(callback_query=cb.REFRESH_MEETING),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="refresh_meeting_malformed",
+    ),
     # --- Inactive meeting accessed by owner (handlers guarded with the default access) ---
     Context(
         handler_id=MeetingHandlerId.SHOW_MEETING_CALLBACK,
@@ -507,11 +559,17 @@ CONTEXTS = [
         reactivation_back_keyboard_factory=lambda lang: [
             [
                 ButtonConfig(
-                    text=ButtonMessages.ACTIVE_MEETINGS.get_text(lang=lang),
+                    text=ButtonMessages.ACTIVE_MEETINGS.text(lang=lang),
                     callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
                 )
             ]
         ],
+    ),
+    Context(
+        handler_id=MeetingHandlerId.REFRESH,
+        update_request=UpdateRequest(callback_query=cb.REFRESH_MEETING.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="refresh_inactive_meeting",
     ),
     Context(
         handler_id=MeetingHandlerId.DECLINE_DELETE_MEETING_CALLBACK,
@@ -616,6 +674,30 @@ CONTEXTS = [
         id="set_meeting_lock_on_start",
     ),
     Context(
+        handler_id=EditMeetingHandlerId.SET_MEETING_SHOW_TIMEZONE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_SHOW_TIMEZONE.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="set_meeting_show_timezone",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.SET_MEETING_CLOCK_24H_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_CLOCK_24H.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="set_meeting_clock_24h",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.SET_MEETING_DATE_FORMAT_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_DATE_FORMAT.with_ids(MEETING_ID_NOT_OWNED, 0)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="set_meeting_date_format",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.SET_MEETING_DATE_FORMAT_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_DATE_FORMAT),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="set_meeting_date_format_malformed",
+    ),
+    Context(
         handler_id=EditMeetingHandlerId.CANCEL_END_EDIT,
         update_request=UpdateRequest(callback_query=cb.CANCEL_END_EDIT.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
@@ -707,19 +789,6 @@ CONTEXTS = [
         update_request=UpdateRequest(message_text="some text"),
         error_modes={ErrorMode.MISSING_USER_DATA},
         id="reject_end_datetime",
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.REJECT_END_TIME,
-        update_request=UpdateRequest(message_text="bad time"),
-        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="reject_end_time",
-        meeting_id={ContextId.EDIT_MEETING_END: 99},
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.REJECT_END_TIME,
-        update_request=UpdateRequest(message_text="bad time"),
-        error_modes={ErrorMode.MISSING_USER_DATA},
-        id="reject_end_time",
     ),
     # End-half entity message handlers — require a message with a date_time entity
     Context(
@@ -827,6 +896,292 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_TIMES.with_id(MEETING_ID_INACTIVE)),
         error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
         id="decline_clear_times_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_END_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_END_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="remove_end_time",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_END_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_END_TIME),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="remove_end_time_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_END_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_END_TIME.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="remove_end_time_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_END_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_END_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="confirm_remove_end_time",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_END_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_END_TIME),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="confirm_remove_end_time_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_END_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_END_TIME.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="confirm_remove_end_time_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_END_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_END_TIME.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="decline_remove_end_time",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_END_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_END_TIME),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="decline_remove_end_time_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_END_TIME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_END_TIME.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="decline_remove_end_time_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_DESCRIPTION_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_DESCRIPTION.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="remove_description",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_DESCRIPTION_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_DESCRIPTION),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="remove_description_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_DESCRIPTION_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_DESCRIPTION.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="remove_description_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_DESCRIPTION_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.CONFIRM_DELETE_MEETING_DESCRIPTION.with_id(MEETING_ID_NOT_OWNED)
+        ),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="confirm_remove_description",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_DESCRIPTION_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DESCRIPTION),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="confirm_remove_description_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_DESCRIPTION_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DESCRIPTION.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="confirm_remove_description_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_DESCRIPTION_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.DECLINE_DELETE_MEETING_DESCRIPTION.with_id(MEETING_ID_NOT_OWNED)
+        ),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="decline_remove_description",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_DESCRIPTION_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DESCRIPTION),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="decline_remove_description_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_DESCRIPTION_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DESCRIPTION.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="decline_remove_description_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_LOCATION_NAME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_LOCATION_NAME.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="remove_location_name",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_LOCATION_NAME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_LOCATION_NAME),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="remove_location_name_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_LOCATION_NAME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_LOCATION_NAME.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="remove_location_name_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_LOCATION_NAME_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.CONFIRM_DELETE_MEETING_LOCATION_NAME.with_id(MEETING_ID_NOT_OWNED)
+        ),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="confirm_remove_location_name",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_LOCATION_NAME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_LOCATION_NAME),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="confirm_remove_location_name_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_LOCATION_NAME_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.CONFIRM_DELETE_MEETING_LOCATION_NAME.with_id(MEETING_ID_INACTIVE)
+        ),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="confirm_remove_location_name_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_LOCATION_NAME_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.DECLINE_DELETE_MEETING_LOCATION_NAME.with_id(MEETING_ID_NOT_OWNED)
+        ),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="decline_remove_location_name",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_LOCATION_NAME_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_LOCATION_NAME),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="decline_remove_location_name_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_LOCATION_NAME_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.DECLINE_DELETE_MEETING_LOCATION_NAME.with_id(MEETING_ID_INACTIVE)
+        ),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="decline_remove_location_name_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_COORDINATES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_COORDINATES.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="remove_coordinates",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_COORDINATES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_COORDINATES),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="remove_coordinates_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_COORDINATES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_COORDINATES.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="remove_coordinates_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_COORDINATES_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.CONFIRM_DELETE_MEETING_COORDINATES.with_id(MEETING_ID_NOT_OWNED)
+        ),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="confirm_remove_coordinates",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_COORDINATES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_COORDINATES),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="confirm_remove_coordinates_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_COORDINATES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_COORDINATES.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="confirm_remove_coordinates_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_COORDINATES_CALLBACK,
+        update_request=UpdateRequest(
+            callback_query=cb.DECLINE_DELETE_MEETING_COORDINATES.with_id(MEETING_ID_NOT_OWNED)
+        ),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="decline_remove_coordinates",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_COORDINATES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_COORDINATES),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="decline_remove_coordinates_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_COORDINATES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_COORDINATES.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="decline_remove_coordinates_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_LIMIT.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="remove_limit",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_LIMIT),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="remove_limit_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_LIMIT.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="remove_limit_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_CONFIRM_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_LIMIT.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="confirm_remove_limit",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_CONFIRM_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_LIMIT),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="confirm_remove_limit_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_CONFIRM_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_LIMIT.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="confirm_remove_limit_inactive",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_DECLINE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_LIMIT.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},
+        id="decline_remove_limit",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_DECLINE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_LIMIT),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="decline_remove_limit_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_DECLINE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_LIMIT.with_id(MEETING_ID_INACTIVE)),
+        error_modes={ErrorMode.MEETING_INACTIVE_OWNER},
+        id="decline_remove_limit_inactive",
     ),
     Context(
         handler_id=StaleCancelHandlerId.STALE_CANCEL_CALLBACK,
@@ -1027,12 +1382,6 @@ CONTEXTS = [
         id="privacy_show",
     ),
     Context(
-        handler_id=PrivacyHandlerId.SEND_PRIVACY,
-        update_request=UpdateRequest(callback_query=cb.SEND_PRIVACY),
-        error_modes={ErrorMode.USER_NOT_FOUND},
-        id="privacy_send_privacy",
-    ),
-    Context(
         handler_id=PrivacyHandlerId.EXPORT_DATA,
         update_request=UpdateRequest(callback_query=cb.EXPORT_USER_DATA),
         error_modes={ErrorMode.USER_NOT_FOUND},
@@ -1088,12 +1437,6 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.CANCEL_SETTINGS),
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="settings_cancel",
-    ),
-    Context(
-        handler_id=EditSettingsHandlerId.NOTIFICATIONS_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.EDIT_NOTIFICATIONS),
-        error_modes={ErrorMode.USER_NOT_FOUND},
-        id="settings_notifications",
     ),
     Context(
         handler_id=EditSettingsHandlerId.TOGGLE_NOTIFICATIONS,
@@ -1224,19 +1567,6 @@ CONTEXTS = [
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_description",
     ),
-    Context(
-        handler_id=EditMeetingHandlerId.REJECT_START_TIME,
-        update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
-        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
-        id="reject_start_time_media",
-        meeting_id={ContextId.EDIT_MEETING_START: 99},
-    ),
-    Context(
-        handler_id=EditMeetingHandlerId.REJECT_START_TIME,
-        update_request=UpdateRequest(location=Location(latitude=0, longitude=0)),
-        error_modes={ErrorMode.MISSING_USER_DATA},
-        id="reject_start_time_media",
-    ),
     # --- Inline query ---
     # Registered-sharer coverage only: the unregistered sharer is a valid case here, not a fault
     # (see the documented exclusions above).
@@ -1260,6 +1590,154 @@ CONTEXTS = [
         error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
         id="edit_meeting_description_message",
         meeting_id={ContextId.EDIT_MEETING_DESCRIPTION: MEETING_ID_NOT_OWNED},
+    ),
+    # --- Edit meeting images ---
+    Context(
+        handler_id=EditMeetingHandlerId.IMAGES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_IMAGES.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="edit_meeting_images",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.IMAGES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_IMAGES),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="edit_meeting_images_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REPLACE_IMAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.REPLACE_MEETING_IMAGE.with_ids(MEETING_ID_NOT_OWNED, 0)),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="replace_meeting_image",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REPLACE_IMAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.REPLACE_MEETING_IMAGE),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="replace_meeting_image_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_IMAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_IMAGE.with_ids(MEETING_ID_NOT_OWNED, 0)),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="remove_meeting_image",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_IMAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_IMAGE),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="remove_meeting_image_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_IMAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_IMAGE.with_ids(MEETING_ID_NOT_OWNED, 0)),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="confirm_remove_meeting_image",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_IMAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_IMAGE),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="confirm_remove_meeting_image_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_IMAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_IMAGE.with_ids(MEETING_ID_NOT_OWNED, 0)),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="decline_remove_meeting_image",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_IMAGE_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_IMAGE),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="decline_remove_meeting_image_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_IMAGES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_IMAGES.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="remove_meeting_images",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.REMOVE_IMAGES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_MEETING_IMAGES),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="remove_meeting_images_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_IMAGES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_IMAGES.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="confirm_remove_meeting_images",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.CONFIRM_REMOVE_IMAGES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_IMAGES),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="confirm_remove_meeting_images_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_IMAGES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_IMAGES.with_id(MEETING_ID_NOT_OWNED)),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="decline_remove_meeting_images",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.DECLINE_REMOVE_IMAGES_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_IMAGES),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="decline_remove_meeting_images_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.SET_IMAGE_LAYOUT_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_IMAGE_LAYOUT.with_ids(MEETING_ID_NOT_OWNED, 0)),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="set_meeting_image_layout",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.SET_IMAGE_LAYOUT_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.SET_MEETING_IMAGE_LAYOUT),
+        error_modes={ErrorMode.MALFORMED_CALLBACK_DATA},
+        id="set_meeting_image_layout_malformed",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE,
+        update_request=UpdateRequest(photo=FAILURE_MODE_PHOTO),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="meeting_image_photo_message",
+        meeting_id={ContextId.EDIT_MEETING_IMAGES: MEETING_ID_NOT_OWNED},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE,
+        update_request=UpdateRequest(photo=FAILURE_MODE_PHOTO),
+        error_modes={ErrorMode.MISSING_USER_DATA},
+        id="meeting_image_photo_message",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.IMAGES_DOCUMENT_MESSAGE,
+        update_request=UpdateRequest(document=FAILURE_MODE_IMAGE_DOCUMENT),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="meeting_image_document_message",
+        meeting_id={ContextId.EDIT_MEETING_IMAGES: MEETING_ID_NOT_OWNED},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.IMAGES_DOCUMENT_MESSAGE,
+        update_request=UpdateRequest(document=FAILURE_MODE_IMAGE_DOCUMENT),
+        error_modes={ErrorMode.MISSING_USER_DATA},
+        id="meeting_image_document_message",
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.IMAGES_WRONG_MESSAGE,
+        update_request=UpdateRequest(message_text="not a photo"),
+        error_modes={ErrorMode.USER_NOT_FOUND, ErrorMode.MEETING_NOT_OWNED},
+        id="meeting_image_wrong_message",
+        meeting_id={ContextId.EDIT_MEETING_IMAGES: MEETING_ID_NOT_OWNED},
+    ),
+    Context(
+        handler_id=EditMeetingHandlerId.IMAGES_WRONG_MESSAGE,
+        update_request=UpdateRequest(message_text="not a photo"),
+        error_modes={ErrorMode.MISSING_USER_DATA},
+        id="meeting_image_wrong_message",
     ),
     # --- Edit meeting location flow ---
     Context(
@@ -1616,8 +2094,8 @@ async def test_handler_rejects_meeting_that_is_gone(
         context,
         update,
         MitupView(
-            description=CommonMessages.DELETED_MEETING_ALERT.get(lang=user_with_settings.lang),
-            keyboard=keyboard,
+            message=CommonMessages.DELETED_MEETING_ALERT.rich(lang=user_with_settings.lang),
+            menu=keyboard,
         ),
         lang=user_with_settings.lang,
     )
@@ -1684,7 +2162,7 @@ async def test_callback_answers_a_caller_with_no_account(
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
-    notice = CommonMessages.ACCOUNT_NOT_FOUND.get(lang=TranslationEngine.FALLBACK_LANG)
+    notice = CommonMessages.ACCOUNT_NOT_FOUND.rich(lang=TranslationEngine.FALLBACK_LANG)
     if update.callback_query is not None:
         # The tapped screen is replaced by the notice alone: every button on it resolves through the
         # missing row and would be answered with this same notice.
@@ -1757,12 +2235,12 @@ async def test_handler_rejects_user_pending_deletion(
         context.api.assert_send_message_not_called()
     elif update.callback_query is not None:
         context.api.assert_answer_callback_query_called(
-            update, text=PrivacyMessages.PENDING_DELETION_ALERT.get_text(lang=marked_user.lang), show_alert=True
+            update, text=PrivacyMessages.PENDING_DELETION_ALERT.text(lang=marked_user.lang), show_alert=True
         )
         context.api.assert_send_message_not_called()
     else:
         context.api.assert_send_message_called(
-            update, PrivacyMessages.PENDING_DELETION_ALERT.get(lang=marked_user.lang)
+            update, PrivacyMessages.PENDING_DELETION_ALERT.rich(lang=marked_user.lang)
         )
 
 

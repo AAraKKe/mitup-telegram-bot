@@ -3,7 +3,6 @@ from typing import cast
 
 import pytest
 from pydantic import ValidationError
-from telegram import MessageEntity
 
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.keyboards import ButtonConfig
@@ -41,20 +40,55 @@ def test_no_action_field_raises_validation_error():
         ButtonConfig(text="some text")
 
 
-def test_formatted_text_without_entities_is_flattened_to_str():
-    # cast: deliberately passing a non-str to exercise the duck-typed before-validator.
+def test_a_label_that_is_not_a_string_raises():
+    # cast: a label reaches a button as the plain string every producer renders it to, so anything
+    # else is a caller mistake rather than a shape to unwrap.
     text = cast("str", FormattedText("plain text"))
 
-    button = ButtonConfig(text=text, callback_data="show;meeting:1")
-
-    assert button.text == "plain text"
-
-
-def test_formatted_text_with_entities_raises():
-    text = cast("str", FormattedText("bold", [MessageEntity(type="bold", offset=0, length=4)]))
-
-    with pytest.raises(ValidationError, match="ButtonConfig text should not contain entities"):
+    with pytest.raises(ValidationError):
         ButtonConfig(text=text, callback_data="show;meeting:1")
+
+
+def test_a_disabled_button_needs_no_action():
+    button = ButtonConfig(text="2/5", disabled=True)
+
+    assert button.disabled
+    assert button.callback_data is None
+
+
+@pytest.mark.parametrize(
+    "callback_data, url, switch_inline_query, switch_inline_query_current_chat",
+    [
+        ("show;meeting:1", None, None, None),
+        (None, "https://mitup.social/", None, None),
+        (None, None, "meeting:1", None),
+        (None, None, None, "meeting:1"),
+    ],
+    ids=["callback_data", "url", "switch_inline_query", "switch_inline_query_current_chat"],
+)
+def test_a_disabled_button_carrying_an_action_is_rejected(
+    callback_data: str | None,
+    url: str | None,
+    switch_inline_query: str | None,
+    switch_inline_query_current_chat: str | None,
+):
+    with pytest.raises(ValidationError, match="A disabled button answers no tap"):
+        ButtonConfig(
+            text="2/5",
+            disabled=True,
+            callback_data=callback_data,
+            url=url,
+            switch_inline_query=switch_inline_query,
+            switch_inline_query_current_chat=switch_inline_query_current_chat,
+        )
+
+
+def test_a_button_is_tappable_unless_it_says_otherwise():
+    """`disabled` is additive on a persisted wire format: a stored row that names no such field
+    still deserializes to the tappable button it was written as."""
+    button = ButtonConfig.model_validate({"text": "Join", "callback_data": "join;meeting:1"})
+
+    assert button.disabled is False
 
 
 @pytest.mark.parametrize("use_callback_data", [True, False], ids=["with_callback_data", "without_callback_data"])

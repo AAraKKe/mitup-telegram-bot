@@ -30,8 +30,11 @@ async def callback_query_edit_meeting(session: AsyncSession, update: Update, con
 
     log.info("Meeting edit hub opened", user_id=user.db_id)
 
-    # Only allow editing the meeting if the meeting belongs to the user
-    await context.api.edit_message(update=update, view=meeting_views.edit_view(meeting))
+    # The owner card replaces whichever edit screen led here, so the owner's next message must not
+    # be read as that screen's answer.
+    cleanup_states(context)
+
+    await context.api.edit_message(update=update, view=meeting_views.owner_view(meeting))
 
 
 @HandlersRegistry.register_callback_query(
@@ -63,7 +66,10 @@ async def callback_query_cancel_edit_meeting(session: AsyncSession, update: Upda
             conversation_state_cleared=True,
         )
         await context.api.edit_message(
-            update=update, view=factory.main_menu_view(guards.render_context(user, update, context))
+            update=update,
+            view=factory.main_menu_view(
+                guards.render_context(user, update, context), counts=await user.meeting_counts(session)
+            ),
         )
         return ConversationHandler.END
 
@@ -78,7 +84,7 @@ async def callback_query_cancel_edit_meeting(session: AsyncSession, update: Upda
 
     log.info("Meeting edit cancelled", user_id=user.db_id, reason="user_cancelled", conversation_state_cleared=True)
 
-    await context.api.edit_message(update=update, view=meeting_views.edit_view(meetup))
+    await context.api.edit_message(update=update, view=meeting_views.owner_view(meetup))
 
     # Cleanup any possible state set by any handler related with editing the meeting
     cleanup_states(context)

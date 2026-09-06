@@ -75,3 +75,6 @@ report.json
 
 # Claude Code Stop-hook subagent counters (session runtime state)
 .claude/agents_running/
+
+# Screen dumps the docs mockups are generated from (tools/docs_mockups/refresh.py rebuilds them)
+tools/docs_mockups/screens/

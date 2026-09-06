@@ -99,5 +99,5 @@ async def test_broadcast_button_admin_without_member_row_ends_silently(
 def test_upload_prompt_view_has_cancel_button():
     view = upload_prompt_view("en")
 
-    buttons = [button for row in view.keyboard for button in row]
+    buttons = [button for row in view.menu for button in row]
     assert any(button.callback_data == cb.CANCEL_BROADCAST for button in buttons)

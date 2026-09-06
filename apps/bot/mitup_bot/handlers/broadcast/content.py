@@ -58,7 +58,7 @@ async def broadcast_content_message_handler(update: Update, context: TMitupConte
             reason=error.reason,
             **error.log_params,
         )
-        await context.api.send_message(update=update, view=error.message.get(lang=operator.lang, **error.params))
+        await context.api.send_message(update=update, view=error.message.rich(lang=operator.lang, **error.params))
         return ConversationBroadcastState.AWAITING_CONTENT
 
     return await present_preview(update, context, operator, validated)
@@ -74,7 +74,7 @@ async def broadcast_invalid_content_message_handler(
     if operator is None:
         log.warning(UPLOAD_IGNORED_EVENT, stage="load_operator", outcome="ignored", reason="operator_not_member_user")
         return ConversationBroadcastState.AWAITING_CONTENT
-    await context.api.send_message(update=update, view=BroadcastOperatorMessages.UPLOAD_PROMPT.get(lang=operator.lang))
+    await context.api.send_message(update=update, view=BroadcastOperatorMessages.UPLOAD_PROMPT.rich(lang=operator.lang))
     log.info(
         "Broadcast upload prompt re-sent",
         user_id=operator.db_id,
@@ -151,7 +151,7 @@ async def read_document(update: Update, context: TMitupContext, document: Docume
     except UnicodeDecodeError:
         log_document_rejected(document, operator, reason="not_utf8", size_bytes=len(content))
         await context.api.send_message(
-            update=update, view=BroadcastOperatorMessages.ERROR_DOCUMENT_DECODE.get(lang=operator.lang)
+            update=update, view=BroadcastOperatorMessages.ERROR_DOCUMENT_DECODE.rich(lang=operator.lang)
         )
         return None
 
@@ -171,7 +171,7 @@ async def reject_document(update: Update, context: TMitupContext, document: Docu
     log_document_rejected(document, operator, reason=reason, size_bytes=document.file_size)
     await context.api.send_message(
         update=update,
-        view=BroadcastOperatorMessages.ERROR_DOCUMENT_TOO_LARGE.get(
+        view=BroadcastOperatorMessages.ERROR_DOCUMENT_TOO_LARGE.rich(
             lang=operator.lang, limit_kb=MAX_DOCUMENT_BYTES // 1024
         ),
     )

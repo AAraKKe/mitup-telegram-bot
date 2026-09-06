@@ -86,11 +86,11 @@ async def search_chat_meetings(session: AsyncSession, update: Update, context: T
     else:
         results = [
             MitupInlineView(
-                description=InlineQueryMessages.NO_RESULTS_MESSAGE.get(lang=lang),
-                keyboard=[[search_chat_meetings_button(lang=lang, chat_instance=chat_instance)]],
+                message=InlineQueryMessages.NO_RESULTS_MESSAGE.rich(lang=lang),
+                menu=[[search_chat_meetings_button(lang=lang, chat_instance=chat_instance)]],
                 id="no_meetings_found",
-                title=InlineQueryMessages.NO_RESULTS_TITLE.get(lang=lang),
-                inline_description=InlineQueryMessages.NO_RESULTS_DESCRIPTION.get(lang=lang),
+                title=InlineQueryMessages.NO_RESULTS_TITLE.text(lang=lang),
+                inline_description=InlineQueryMessages.NO_RESULTS_DESCRIPTION.text(lang=lang),
             ),
         ]
 

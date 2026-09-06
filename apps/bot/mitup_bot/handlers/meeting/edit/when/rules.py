@@ -3,6 +3,7 @@ import datetime as dt
 import structlog
 
 from mitup_bot import limits
+from mitup_bot.datetimes import as_utc
 from mitup_bot.models import Meetup
 from mitup_bot.utils.messages import MeetingEditDateTimeMessages, MeetingEditDurationMessages
 
@@ -15,18 +16,9 @@ from ...utils import scheduling_horizon_rejection
 log = structlog.get_logger(__name__)
 
 
-def to_utc(value: dt.datetime) -> dt.datetime:
-    """Normalise a possibly-naive datetime to aware UTC.
-
-    Meeting datetimes are stored as UTC but may be persisted naive, so a naive value is
-    tagged as UTC rather than reinterpreted; mirrors ``Meetup.enforce_datetime_ordering``.
-    """
-    return value.replace(tzinfo=dt.UTC) if value.tzinfo is None else value
-
-
 def is_in_past(candidate: dt.datetime, meeting: Meetup) -> bool:
-    """True if candidate is at or before the meeting owner's current time (both compared in UTC)."""
-    return to_utc(candidate) <= meeting.owner.now_in_tz().astimezone(dt.UTC)
+    """True if candidate is at or before the meeting owner's current time."""
+    return as_utc(candidate) <= meeting.owner.now_in_tz()
 
 
 def safe_anchor_date(reference_datetime: dt.datetime | None, user_now: dt.datetime) -> dt.date:
@@ -61,7 +53,7 @@ def validate_start_datetime(start_dt: dt.datetime, meeting: Meetup, lang: str) -
             proposed_datetime=start_dt,
             owner_now=meeting.owner.now_in_tz(),
         )
-        return MeetingEditDateTimeMessages.START_IN_PAST.get_text(lang=lang)
+        return MeetingEditDateTimeMessages.START_IN_PAST.text(lang=lang)
     return None
 
 
@@ -92,13 +84,13 @@ def validate_end_datetime(end_dt: dt.datetime, meeting: Meetup, lang: str) -> st
 
     if is_in_past(end_dt, meeting):
         reject("end_in_past")
-        return MeetingEditDurationMessages.END_IN_PAST.get_text(lang=lang)
-    if to_utc(end_dt) <= to_utc(meeting.datetime):
+        return MeetingEditDurationMessages.END_IN_PAST.text(lang=lang)
+    if as_utc(end_dt) <= as_utc(meeting.datetime):
         reject("end_before_start")
-        return MeetingEditDurationMessages.END_BEFORE_START.get_text(lang=lang)
+        return MeetingEditDurationMessages.END_BEFORE_START.text(lang=lang)
     if not limits.within_max_duration(meeting.datetime, end_dt):
         reject("exceeds_max_duration")
-        return MeetingEditDurationMessages.END_MAX_DURATION.get_text(lang=lang)
+        return MeetingEditDurationMessages.END_MAX_DURATION.text(lang=lang)
     return None
 
 
@@ -157,6 +149,6 @@ def apply_end_datetime(meeting: Meetup, end_dt: dt.datetime, *, input_source: st
         user_id=meeting.owner.db_id,
         old_end_datetime=old_end_datetime,
         new_end_datetime=end_dt,
-        duration_minutes=int((to_utc(end_dt) - to_utc(meeting.datetime)).total_seconds() // 60),
+        duration_minutes=int((as_utc(end_dt) - as_utc(meeting.datetime)).total_seconds() // 60),
         input_source=input_source,
     )

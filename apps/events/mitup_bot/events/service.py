@@ -11,7 +11,7 @@ from uuid import uuid4
 import structlog
 from telegram.ext import ExtBot
 
-from mitup_bot import api_guards, db, hosts_group, patreon, reconcile
+from mitup_bot import api_guards, api_wrapper, bot_links, db, hosts_group, patreon, reconcile
 from mitup_bot.api_wrapper import BotAdapter, TelegramApiWrapper, build_api
 from mitup_bot.bootstrap import load_config
 from mitup_bot.config import BotConfig, Config, Env
@@ -449,6 +449,13 @@ def run_events(env: Env, intervals: IntervalsConfiguration, start_time: float):
         log.info("Configured the hosts-only group", enabled=True, chat_id=hosts_group.chat_id())
     else:
         log.info("Configured the hosts-only group", enabled=False, reason="no_chat_id_configured")
+
+    # Point the deep links a shared card closes on at this deployment's own bot: the events runner
+    # re-renders those cards on every started and finished meeting.
+    bot_links.configure(config.bot.username)
+    log.info("Configured the bot links", bot_username=bot_links.BotLinkState.username)
+
+    api_wrapper.silence_modelled_endpoint_advisory()
 
     bot = build_bot(config.bot)
     broadcast_bot = build_broadcast_bot(config.bot)

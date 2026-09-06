@@ -21,10 +21,11 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils import CommonMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import MAX_MESSAGE_UTF16_LENGTH, utf16_len
 from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages, MeetingEditContentMessages
+from mitup_bot.utils.rich_message import MAX_RICH_TEXT_LENGTH
+from mitup_bot.views import RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
-from mitup_bot.views.meeting_text import rich_description
+from mitup_bot.views.meeting_text import description_content
 from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import (
     HandlerContext,
@@ -47,7 +48,7 @@ from tests.helpers.stub_db import MockDbSession
         ),
         (
             UpdateRequest(callback_query=cb.EDIT_MEETING_DESCRIPTION.with_id(2)),
-            lambda lang: MeetingDisplayMessages.DESCRIPTION_EMPTY.get(lang=lang),
+            lambda lang: MeetingDisplayMessages.DESCRIPTION_EMPTY.rich(lang=lang),
         ),
     ],
     ids=["meeting_with_a_previous_description", "meeting_without_a_previous_description"],
@@ -63,7 +64,7 @@ async def test_callback_query_edit_meeting_description_works(
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     callback_query = cast(CallbackQuery, update.callback_query)
-    meeting_id = cast(str, callback_query.data).split(":")[1]
+    meeting_id = (callback_query.data or "").split(":")[1]
 
     mock_session.add_object(user_with_settings.meetups[int(meeting_id) - 1])
 
@@ -75,13 +76,13 @@ async def test_callback_query_edit_meeting_description_works(
     meeting_id = context.user_data.registry[ContextId.EDIT_MEETING_DESCRIPTION].meeting_id
 
     view = MitupView(
-        description=MeetingEditContentMessages.DESCRIPTION_PROMPT.get(
+        message=MeetingEditContentMessages.DESCRIPTION_PROMPT.rich(
             lang=user_with_settings.lang, description=expected_description(user_with_settings.lang)
         ),
-        keyboard=[
+        menu=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.text(lang=user_with_settings.lang),
                     callback_data=cb.EDIT_MEETING_CANCEL.with_id(cast(int, meeting_id)),
                 )
             ]
@@ -143,7 +144,7 @@ async def test_edit_description_rich_message_reprompts_and_keeps_state(
     state = await edit_description_rich_message_handler(update, context)
 
     expected = edit_description_prompt_view(meeting, user_with_settings.lang).with_context(
-        CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=user_with_settings.lang)
+        CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.rich(lang=user_with_settings.lang)
     )
     context.api.assert_send_message_called(update, expected)
     assert state == ConversationMeetingState.EDIT_DESCRIPTION
@@ -181,10 +182,7 @@ async def test_edit_description_message_stores_tagged_description_and_renders_ri
     assert meeting.description == "Bring <i>snacks</i> &amp; drinks"
     assert meeting.plain_description == "Bring snacks & drinks"
 
-    view = meeting_views.edit_view(meeting).with_context(
-        MeetingEditContentMessages.DESCRIPTION_SUCCESS.get(description=rich_description(meeting))
-    )
-    context.api.assert_send_message_called(update, view)
+    context.api.assert_send_message_called(update, meeting_views.owner_view(meeting))
     assert state == ConversationHandler.END
 
 
@@ -224,7 +222,7 @@ async def test_over_cap_description_leaves_the_meeting_untouched_and_reprompts(
     assert context.has_meeting_id(ContextId.EDIT_MEETING_DESCRIPTION)
     context.api.assert_method_just_called("update_meeting_messages", times=0)
 
-    error = MeetingEditContentMessages.DESCRIPTION_TOO_LONG.get(
+    error = MeetingEditContentMessages.DESCRIPTION_TOO_LONG.rich(
         lang=user_with_settings.lang, length=len(OVER_CAP_DESCRIPTION), limit=limits.DESCRIPTION_MAX_CHARS
     )
     assert str(len(OVER_CAP_DESCRIPTION)) in error.text
@@ -267,6 +265,102 @@ async def test_description_at_the_cap_is_stored(
     assert state == ConversationHandler.END
 
     confirmation = cast(MitupView, context.api.call_args("send_message").kwargs["view"])
-    assert utf16_len(confirmation.description.text) <= MAX_MESSAGE_UTF16_LENGTH
-    # The card is what the owner acts on, so the echo above it is the part that gave way.
-    assert confirmation.description.text.endswith(meeting_views.edit_view(meeting).description.text)
+    # Nothing gives way: the echo is carried whole and the card follows it, well inside the ceiling
+    # a client folds behind "Show more".
+    assert confirmation.message.text_length <= MAX_RICH_TEXT_LENGTH
+    assert confirmation.message.html.endswith(meeting_views.owner_view(meeting).message.html)
+
+
+# ---------------------------------------------------------------------------
+# Remove description: confirmation, confirm, decline
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.DELETE_MEETING_DESCRIPTION.with_id(1))],
+    indirect=True,
+)
+async def test_remove_description_shows_confirmation(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting = user_with_settings.meetups[0]
+    meeting.description = "An old description"
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(EditMeetingHandlerId.REMOVE_DESCRIPTION_CALLBACK, handler_context=handler_context)
+
+    current = description_content(meeting)
+    assert current is not None
+    context.api.assert_edit_message_called(
+        update,
+        factory.confirmation_view(
+            RenderContext(lang=user_with_settings.lang),
+            message=MeetingEditContentMessages.REMOVE_DESCRIPTION_CONFIRMATION.rich(
+                lang=user_with_settings.lang, description=current
+            ),
+            confirm_callback_data=cb.CONFIRM_DELETE_MEETING_DESCRIPTION.with_id(1),
+            decline_callback_data=cb.DECLINE_DELETE_MEETING_DESCRIPTION.with_id(1),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_DESCRIPTION.with_id(1))],
+    indirect=True,
+)
+async def test_confirm_remove_description_clears_it_and_returns_to_the_editor(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting = user_with_settings.meetups[0]
+    meeting.description = "An old description"
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.CONFIRM_REMOVE_DESCRIPTION_CALLBACK, handler_context=handler_context
+    )
+
+    assert meeting.description is None
+
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(meeting))
+    context.api.assert_update_meeting_messages_called(
+        meeting=meeting,
+        current_message=meeting.message_from_update(update),
+        skip_current=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_DESCRIPTION.with_id(1))],
+    indirect=True,
+)
+async def test_decline_remove_description_keeps_it(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting = user_with_settings.meetups[0]
+    meeting.description = "An old description"
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.DECLINE_REMOVE_DESCRIPTION_CALLBACK, handler_context=handler_context
+    )
+
+    assert meeting.description == "An old description"
+    mock_session.assert_not_added()
+    mock_session.assert_not_flushed()
+
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(meeting))

@@ -86,7 +86,7 @@ async def test_link_new_patron_grants_support():
     # redeemed tier is wired through unlocked_for. The DM carries a Main-menu button.
     api.assert_send_message_to_user_called(
         user=user,
-        view=link_confirmation_view(SupporterNotificationMessages.PATRON_UNLOCKED.get(lang=user.lang), user.lang),
+        view=link_confirmation_view(SupporterNotificationMessages.PATRON_UNLOCKED.rich(lang=user.lang), user.lang),
     )
 
     linked = one_log(logs, "Patreon account linked")
@@ -160,8 +160,8 @@ async def test_confirmation_dm_carries_main_menu_button():
     await link_patreon_account(session, api, user, patreon_user_id="p-655", granted_level=SupporterLevel.NONE)
 
     view = api.call_args("send_message_to_user").kwargs["view"]
-    assert view == link_confirmation_view(CollaborateMessages.LINK_CONFIRMED_NO_PATRON.get(lang=user.lang), user.lang)
-    main_menu_button = view.keyboard[-1][0]
+    assert view == link_confirmation_view(CollaborateMessages.LINK_CONFIRMED_NO_PATRON.rich(lang=user.lang), user.lang)
+    main_menu_button = view.menu[-1][0]
     assert main_menu_button.callback_data == cb.MAIN_MENU
 
 

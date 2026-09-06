@@ -3,13 +3,15 @@ from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
 from zoneinfo import ZoneInfo
 
 from pydantic.config import ConfigDict
-from sqlalchemy import JSON, BigInteger, Column, DateTime, FetchedValue
+from sqlalchemy import JSON, BigInteger, Column, DateTime, Enum, FetchedValue
 from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import limits
+from mitup_bot.datetimes import DateFormat, TimeFormat, as_utc
 from mitup_bot.exceptions import MeetupNotFound
 from mitup_bot.format_tags import strip_format_tags
+from mitup_bot.images import ImageLayout
 from mitup_bot.keyboards import Keyboard
 from mitup_bot.models import Message
 
@@ -20,6 +22,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from telegram import Update
 
     from .joined_users import JoinedUsers
+    from .meeting_images import MeetingImage
     from .users import User
 
 
@@ -59,6 +62,36 @@ class Meetup(BaseModel, SQLModel, table=True):
     end_datetime: dt.datetime | None = None
     started_notification_sent: bool = Field(nullable=False, default=False)
     lock_on_start: bool = Field(nullable=False, default=False)
+    show_timezone: bool = Field(nullable=False, default=False)
+    clock_24h: bool = Field(nullable=False, default=True)
+    # native_enum=False keeps the column a plain VARCHAR while coercing loaded rows back to
+    # DateFormat, the same storage `users.supporter_level` uses.
+    date_format: DateFormat = Field(
+        default=DateFormat.DEFAULT,
+        sa_column=Column(
+            Enum(
+                DateFormat,
+                native_enum=False,
+                length=16,
+                values_callable=lambda enum: [member.value for member in enum],
+            ),
+            nullable=False,
+            server_default=DateFormat.DEFAULT.value,
+        ),
+    )
+    image_layout: ImageLayout = Field(
+        default=ImageLayout.COLLAGE,
+        sa_column=Column(
+            Enum(
+                ImageLayout,
+                native_enum=False,
+                length=16,
+                values_callable=lambda enum: [member.value for member in enum],
+            ),
+            nullable=False,
+            server_default=ImageLayout.COLLAGE.value,
+        ),
+    )
     description: str | None = None
     created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
     updated_time: dt.datetime | None = Field(
@@ -80,16 +113,20 @@ class Meetup(BaseModel, SQLModel, table=True):
     )
     active: bool = True
 
-    # lazy="selectin" on all three: model properties traverse them in plain Python
-    # (`lang`/`timezone` via owner, `message_from_update` via messages, participant counts and
-    # lists via joined_links), and implicit lazy loads raise MissingGreenlet under the async
-    # engine.
+    # lazy="selectin" on all four: model properties and the card renderers traverse them in plain
+    # Python (`lang`/`timezone` via owner, `message_from_update` via messages, participant counts
+    # and lists via joined_links, the banner via images), and implicit lazy loads raise
+    # MissingGreenlet under the async engine.
     owner: User = Relationship(back_populates="meetups", sa_relationship_kwargs={"lazy": "selectin"})
     messages: list[Message] = Relationship(back_populates="meetup", sa_relationship_kwargs={"lazy": "selectin"})
     joined_links: list[JoinedUsers] = Relationship(
         back_populates="meetup",
         cascade_delete=True,
         sa_relationship_kwargs={"lazy": "selectin"},
+    )
+    images: list[MeetingImage] = Relationship(
+        cascade_delete=True,
+        sa_relationship_kwargs={"lazy": "selectin", "order_by": "MeetingImage.position"},
     )
 
     def __hash__(self) -> int:
@@ -191,18 +228,36 @@ class Meetup(BaseModel, SQLModel, table=True):
         if self.datetime is None:
             return False
         now = dt.datetime.now(dt.UTC)
-        start = self.datetime if self.datetime.tzinfo else self.datetime.replace(tzinfo=dt.UTC)
-        if now < start:
+        if now < as_utc(self.datetime):
             return False
         if self.end_datetime is None:
             return True
-        end = self.end_datetime if self.end_datetime.tzinfo else self.end_datetime.replace(tzinfo=dt.UTC)
-        return now < end
+        return now < as_utc(self.end_datetime)
+
+    @property
+    def attendance_is_open(self) -> bool:
+        """Whether joining, inviting and leaving are offered at all.
+
+        A locked meeting freezes its attendee list for as long as it runs, so while that window is
+        open none of the three is available to anyone, the owner included.
+        """
+        return not (self.lock_on_start and self.is_in_progress)
 
     @property
     def participants(self) -> list[JoinedUsers]:
         """Get the users that have joined the meeting (not including the waiting list)"""
         return [link for link in self.joined_links if not link.is_waiting_list]
+
+    @property
+    def owner_attendance(self) -> JoinedUsers | None:
+        """The owner's own link on their meeting, confirmed or waiting, or None when they are not on
+        the list. Hosting a meeting is not attending it: joining is a separate act."""
+        return next((link for link in self.joined_links if link.user_id == self.owner_id), None)
+
+    @property
+    def guest_links(self) -> list[JoinedUsers]:
+        """The confirmed attendees other than the owner, in the order the meeting holds them."""
+        return [link for link in self.participants if link.user_id != self.owner_id]
 
     def participant(self, user_id: int) -> JoinedUsers | None:
         return next((link for link in self.participants if link.user.db_id == user_id), None)
@@ -347,13 +402,15 @@ class Meetup(BaseModel, SQLModel, table=True):
     def timezone(self) -> ZoneInfo:
         return self.owner.settings.tz
 
+    @property
+    def time_format(self) -> TimeFormat:
+        return TimeFormat(show_timezone=self.show_timezone, clock_24h=self.clock_24h, date_format=self.date_format)
+
     def enforce_datetime_ordering(self) -> bool:
         """Clear end_datetime if it's no longer after datetime. Returns True if cleared."""
         if self.end_datetime is None or self.datetime is None:
             return False
-        start = self.datetime.replace(tzinfo=dt.UTC) if self.datetime.tzinfo is None else self.datetime
-        end = self.end_datetime.replace(tzinfo=dt.UTC) if self.end_datetime.tzinfo is None else self.end_datetime
-        if start >= end:
+        if as_utc(self.datetime) >= as_utc(self.end_datetime):
             self.end_datetime = None
             self.lock_on_start = False
             return True

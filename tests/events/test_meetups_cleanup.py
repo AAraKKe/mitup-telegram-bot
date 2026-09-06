@@ -103,17 +103,17 @@ async def test_notify_meeting_about_to_be_deleted(
     await metrics_client.flush()
 
     expected_view = MitupView(
-        description=NotificationMessages.DELETION_WARNING.get(
+        message=NotificationMessages.DELETION_WARNING.rich(
             lang=meeting.lang,
             meeting_title=meeting.title,
             days_until_deletion=7,
-            past_meetings_button=ButtonMessages.PAST_MEETINGS.get(lang=meeting.user_language),
-            reactivate_meeting_button=ButtonMessages.REACTIVATE_MEETING.get(lang=meeting.user_language),
+            past_meetings_button=ButtonMessages.PAST_MEETINGS.text(lang=meeting.user_language),
+            reactivate_meeting_button=ButtonMessages.REACTIVATE_MEETING.text(lang=meeting.user_language),
         ),
-        keyboard=[
+        menu=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.REACTIVATE_MEETING.get_text(lang=meeting.user_language),
+                    text=ButtonMessages.REACTIVATE_MEETING.text(lang=meeting.user_language),
                     callback_data=cb.REACTIVATE_MEETING.with_id(cast(int, meeting.id)),
                 ),
                 ButtonConfig(
@@ -266,8 +266,8 @@ async def test_delete_meeting_successfully(
     await metrics_client.flush()
 
     expected_view = MitupView(
-        description=NotificationMessages.DELETED.get(lang=meeting.lang, meeting_title=meeting.title),
-        keyboard=[],
+        message=NotificationMessages.DELETED.rich(lang=meeting.lang, meeting_title=meeting.title),
+        menu=[],
     )
 
     # MockApi does not override send_messages_to_users, so the real TelegramApi implementation
@@ -596,12 +596,12 @@ def test_warning_deadline_comes_from_the_owners_own_policy(monkeypatch: pytest.M
 
     view = meetups_cleanup.deletion_warning_view(meeting)
 
-    assert view.description == NotificationMessages.DELETION_WARNING.get(
+    assert view.message == NotificationMessages.DELETION_WARNING.rich(
         lang=meeting.lang,
         meeting_title=meeting.title,
         days_until_deletion=patron_lead.days,
-        past_meetings_button=ButtonMessages.PAST_MEETINGS.get(lang=meeting.user_language),
-        reactivate_meeting_button=ButtonMessages.REACTIVATE_MEETING.get(lang=meeting.user_language),
+        past_meetings_button=ButtonMessages.PAST_MEETINGS.text(lang=meeting.user_language),
+        reactivate_meeting_button=ButtonMessages.REACTIVATE_MEETING.text(lang=meeting.user_language),
     )
 
 

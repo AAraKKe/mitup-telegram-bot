@@ -21,7 +21,9 @@ from tests.helpers import (
     assert_meeting_rejection_logged,
     call_handler,
     create_meetup,
+    create_message,
 )
+from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID
 from tests.helpers.fixtures import create_joined_link, create_user
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
@@ -74,7 +76,7 @@ async def test_delete_meeting_works(
         update,
         factory.confirmation_view(
             RenderContext(lang=user_with_settings.lang),
-            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user_with_settings.lang),
+            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.rich(lang=user_with_settings.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING.with_id(1),
             decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(1),
         ),
@@ -185,8 +187,8 @@ async def test_confirm_delete_meeting_works(
     # Regression for issue #171: the success view must route back to the Active
     # meetings list the user came from, not the Main Menu.
     expected_view = MitupView(
-        description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user_with_settings.lang),
-        keyboard=[
+        message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user_with_settings.lang),
+        menu=[
             [
                 ButtonConfig(
                     text=ButtonMessages.ACTIVE_MEETINGS.back(lang=user_with_settings.lang),
@@ -198,6 +200,39 @@ async def test_confirm_delete_meeting_works(
 
     context.api.assert_edit_message_called(update, expected_view)
     context.api.assert_method_just_called("send_message", times=0)
+
+    # The handler already edited the tapped message, so the update of the stored meeting messages skips it
+    context.api.assert_update_meeting_messages_called(
+        meeting=meeting_deleted, current_message=None, skip_current=True, was_deleted=True
+    )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(1))], indirect=True)
+async def test_confirm_delete_redraws_an_already_stored_bot_chat_message_only_once(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """Without the skip, the stored message would first get the deleted-meeting banner and then the
+    handler's deleted screen."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(meeting)
+    linked_message = create_message(
+        meetup_id=meeting.db_id,
+        message_id=DEFAULT_MESSAGE_ID,
+        chat_id=DEFAULT_CHAT_ID,
+        inline_message_id=None,
+    )
+    meeting.messages.append(linked_message)
+
+    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, handler_context=handler_context)
+
+    context.api.assert_method_just_called("edit_message", times=1)
+    context.api.assert_update_meeting_messages_called(
+        meeting=meeting, current_message=linked_message, skip_current=True, was_deleted=True
+    )
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(1))], indirect=True)
@@ -233,8 +268,8 @@ async def test_decline_delete_meeting_works(
     mock_session.assert_not_deleted()
     context.api.assert_edit_message_called(
         update,
-        meeting_views.main_view(user_with_settings.meetups[0]).with_context(
-            MeetingLifecycleMessages.DELETE_DECLINED.get(lang=user_with_settings.lang)
+        meeting_views.owner_view(user_with_settings.meetups[0]).with_context(
+            MeetingLifecycleMessages.DELETE_DECLINED.rich(lang=user_with_settings.lang)
         ),
     )
 

@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-08-30 13:28\n"
+"PO-Revision-Date: 2026-09-06 17:43\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -47,6 +47,18 @@ msgstr "💾 Past meetings"
 msgid "ButtonMessages.JOINED_MEETINGS"
 msgstr "👥 Joined meetings"
 
+msgid "ButtonMessages.ACTIVE_MEETINGS_CHIP"
+msgstr "📂 Active"
+
+msgid "ButtonMessages.PAST_MEETINGS_CHIP"
+msgstr "💾 Past"
+
+msgid "ButtonMessages.JOINED_MEETINGS_CHIP"
+msgstr "👥 Joined"
+
+msgid "ButtonMessages.COUNTED_CHIP"
+msgstr "${label} · ${count}"
+
 msgid "ButtonMessages.SETTINGS"
 msgstr "⚙️ Settings"
 
@@ -74,20 +86,26 @@ msgstr "👥 Default Options"
 msgid "ButtonMessages.PRIVACY"
 msgstr "🛡️ Privacy"
 
-msgid "ButtonMessages.PRIVACY_POLICY"
-msgstr "🛡️ Privacy policy"
+msgid "ButtonMessages.USER_GUIDE"
+msgstr "📖 User guide"
 
-msgid "ButtonMessages.OPEN_USER_GUIDE"
-msgstr "📖 Open the user guide"
+msgid "ButtonMessages.COMMUNITY_GROUP"
+msgstr "👥 Community group"
 
-msgid "ButtonMessages.JOIN_COMMUNITY_GROUP"
-msgstr "👥 Join the community group"
+msgid "ButtonMessages.NEWS_CHANNEL"
+msgstr "📣 News channel"
 
-msgid "ButtonMessages.EXPORT_MY_DATA"
-msgstr "📦 Export my data"
+msgid "ButtonMessages.READ"
+msgstr "Read"
 
-msgid "ButtonMessages.DELETE_MY_DATA"
-msgstr "🗑️ Delete my data"
+msgid "ButtonMessages.EXPORT"
+msgstr "Export"
+
+msgid "ButtonMessages.OPEN"
+msgstr "Open"
+
+msgid "ButtonMessages.CHANGE"
+msgstr "✏️ Change"
 
 msgid "ButtonMessages.WAITING_LIST"
 msgstr "Waiting list"
@@ -101,23 +119,35 @@ msgstr "Open invitations"
 msgid "ButtonMessages.INCOGNITO"
 msgstr "Incognito"
 
-msgid "ButtonMessages.ENABLE"
-msgstr "Enable"
+msgid "ButtonMessages.SHOW_TIMEZONE"
+msgstr "Show timezone"
 
-msgid "ButtonMessages.DISABLE"
-msgstr "Disable"
+msgid "ButtonMessages.CLOCK_24H"
+msgstr "24-hour clock"
+
+msgid "ButtonMessages.DATE_FORMAT"
+msgstr "Date format"
+
+msgid "ButtonMessages.DATE_FORMAT_DEFAULT"
+msgstr "Default"
+
+msgid "ButtonMessages.DATE_FORMAT_LONG"
+msgstr "Long"
+
+msgid "ButtonMessages.DATE_FORMAT_FULL"
+msgstr "Full"
+
+msgid "ButtonMessages.ENABLED"
+msgstr "Enabled"
+
+msgid "ButtonMessages.DISABLED"
+msgstr "Disabled"
+
+msgid "ButtonMessages.MEETING"
+msgstr "Meeting"
 
 msgid "ButtonMessages.CANCEL"
 msgstr "❌ Cancel"
-
-msgid "ButtonMessages.TITLE"
-msgstr "🅰️ Title"
-
-msgid "ButtonMessages.DESCRIPTION"
-msgstr "📄 Description"
-
-msgid "ButtonMessages.DATE"
-msgstr "🗓️ Date"
 
 msgid "ButtonMessages.DATE_TIME"
 msgstr "🗓️ Date & Time"
@@ -125,35 +155,20 @@ msgstr "🗓️ Date & Time"
 msgid "ButtonMessages.END_DATE_TIME"
 msgstr "🗓️ End Date & Time"
 
-msgid "ButtonMessages.TIME"
-msgstr "🕒 Time"
-
-msgid "ButtonMessages.NOTIFICATIONS_TIME"
-msgstr "⏰ Time"
-
-msgid "ButtonMessages.SET_TIME"
-msgstr "🕒 Set time"
-
-msgid "ButtonMessages.PARTICIPANTS"
-msgstr "👥 Participants"
-
-msgid "ButtonMessages.LOCATION"
-msgstr "🗺️ Location"
-
-msgid "ButtonMessages.OPEN_IN_MAPS"
-msgstr "📍 Open in Maps"
-
-msgid "ButtonMessages.DONE"
-msgstr "✅ Done"
-
 msgid "ButtonMessages.JOIN"
 msgstr "✅ Join"
+
+msgid "ButtonMessages.FULL"
+msgstr "🚫 Full"
 
 msgid "ButtonMessages.INVITE"
 msgstr "😄 Invite"
 
 msgid "ButtonMessages.LEAVE"
 msgstr "❌ Leave"
+
+msgid "ButtonMessages.OPEN_MEETING"
+msgstr "📂 Open meeting"
 
 msgid "ButtonMessages.DELETE"
 msgstr "🗑️ Delete"
@@ -164,29 +179,62 @@ msgstr "✏️ Edit"
 msgid "ButtonMessages.SHARE"
 msgstr "📨 Share"
 
-msgid "ButtonMessages.MEETING_LOCATION_NAME"
-msgstr "🅰️ Name"
-
-msgid "ButtonMessages.MEETING_LOCATION_COORDINATES"
-msgstr "📍 Map pin"
-
-msgid "ButtonMessages.MEETING_MAX_PARTICIPANTS"
-msgstr "Max participants"
-
-msgid "ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS"
-msgstr "No limit"
-
-msgid "ButtonMessages.MEETING_MAX_CAP_PARTICIPANTS"
-msgstr "Max (${cap})"
+msgid "ButtonMessages.REFRESH"
+msgstr "🔄 Refresh"
 
 msgid "ButtonMessages.MEETING_KICK_OUT"
 msgstr "Kick out"
 
-msgid "ButtonMessages.DELETE_DATE"
-msgstr "🗑️ Delete date"
+msgid "ButtonMessages.ADD_DESCRIPTION"
+msgstr "+ Add description"
 
-msgid "ButtonMessages.DELETE_DURATION"
-msgstr "🗑️ Delete duration"
+msgid "ButtonMessages.SET_DATETIME"
+msgstr "+ Set date & time"
+
+msgid "ButtonMessages.SELECT_DATE_FIRST"
+msgstr "Select a date first"
+
+msgid "ButtonMessages.REMOVE_DATETIME"
+msgstr "Remove date & time"
+
+msgid "ButtonMessages.REMOVE_END_DATETIME"
+msgstr "Remove end time"
+
+msgid "ButtonMessages.SET_END_DATETIME"
+msgstr "+ Set end time"
+
+msgid "ButtonMessages.SET_LOCATION_NAME"
+msgstr "+ Set name"
+
+msgid "ButtonMessages.SET_COORDINATES"
+msgstr "+ Set map pin"
+
+msgid "ButtonMessages.SET_PARTICIPANT_LIMIT"
+msgstr "Set limit"
+
+msgid "ButtonMessages.CHANGE_PARTICIPANT_LIMIT"
+msgstr "Change limit"
+
+msgid "ButtonMessages.REMOVE"
+msgstr "Remove"
+
+msgid "ButtonMessages.ADD_IMAGES"
+msgstr "+ Add images"
+
+msgid "ButtonMessages.EDIT_IMAGES"
+msgstr "✏️ Edit images"
+
+msgid "ButtonMessages.REPLACE"
+msgstr "Replace"
+
+msgid "ButtonMessages.REMOVE_ALL"
+msgstr "Remove all"
+
+msgid "ButtonMessages.COLLAGE"
+msgstr "Collage"
+
+msgid "ButtonMessages.SLIDESHOW"
+msgstr "Slideshow"
 
 msgid "ButtonMessages.MAKE_SEARCHABLE"
 msgstr "Make it searchable"
@@ -196,24 +244,6 @@ msgstr "🔍 Load meetings"
 
 msgid "ButtonMessages.SEARCH_CHAT_MEETINGS"
 msgstr "🔍 Search meetings"
-
-msgid "ButtonMessages.WHEN"
-msgstr "🕒 When"
-
-msgid "ButtonMessages.SET_START_TIME"
-msgstr "▶️ Set start time"
-
-msgid "ButtonMessages.SET_END_TIME"
-msgstr "⏹️ Set end time"
-
-msgid "ButtonMessages.CLEAR_TIMES"
-msgstr "🗑️ Clear times"
-
-msgid "ButtonMessages.DURATION"
-msgstr "⌛ Duration"
-
-msgid "ButtonMessages.SET_DURATION"
-msgstr "⌛ Set duration"
 
 msgid "ButtonMessages.LOCK_ON_START"
 msgstr "Lock on start"
@@ -230,8 +260,14 @@ msgstr "♥ Link Patreon account"
 msgid "ButtonMessages.BECOME_PATRON"
 msgstr "💶 Become a Host"
 
-msgid "ButtonMessages.UNLINK_PATREON"
-msgstr "Unlink Patreon account"
+msgid "ButtonMessages.UNLINK"
+msgstr "Unlink"
+
+msgid "ButtonMessages.COLLABORATE_PAGE"
+msgstr "📖 Ways to support"
+
+msgid "ButtonMessages.LIMITS_PAGE"
+msgstr "📊 Limits and perks"
 
 msgid "ButtonMessages.CONFIRM_PATREON_LINK"
 msgstr "Connect this account"
@@ -248,35 +284,50 @@ msgstr "Keep it connected"
 msgid "ButtonMessages.HOSTS_GROUP_JOIN"
 msgstr "👥 Join the Hosts-Only Group"
 
-msgid "ButtonMessages.HOSTS_GROUP_OPEN"
-msgstr "👥 Open the Hosts-Only Group"
+msgid "ButtonMessages.JOIN_GROUP"
+msgstr "Join"
 
-msgid "MainMenuMessages.DESCRIPTION"
-msgstr "Welcome to Mitup Bot!"
+msgid "MainMenuMessages.WELCOME"
+msgstr "Welcome to Mitup!"
 
-msgid "HelpMessages.DESCRIPTION"
-msgstr "<b>Help</b>\n\nThree ways to get help with Mitup:\n\n📖 The user guide walks through every screen, page by page. The best place to start.\n\n👥 The community group is open to anyone who uses Mitup. Come in and ask anything.\n\n✉️ For anything private, write to support@mitup.social. A person reads it."
+msgid "MainMenuMessages.TAGLINE"
+msgstr "Create meetings and share them with your friends."
 
-msgid "MeetingListMessages.ACTIVE_DESCRIPTION"
-msgstr "These are all your active meetings."
+msgid "MainMenuMessages.MEETINGS_SECTION"
+msgstr "Meetings"
 
-msgid "MeetingListMessages.ACTIVE_EMPTY"
-msgstr "You don't have any meetings yet.\n\nClick on <b>${new_meeting_button}</b> in the main menu to create one."
+msgid "MainMenuMessages.ACCOUNT_SECTION"
+msgstr "Account"
 
-msgid "MeetingListMessages.JOINED_DESCRIPTION"
-msgstr "These are the meetings you have joined."
+msgid "HelpMessages.INTRO"
+msgstr "Where to get help with Mitup:"
 
-msgid "MeetingListMessages.JOINED_EMPTY"
-msgstr "<i>You have not joined any meeting yet.</i>"
+msgid "HelpMessages.USER_GUIDE"
+msgstr "The ${button_guide} walks through every screen, page by page. The best place to start."
 
-msgid "MeetingListMessages.PAST_DESCRIPTION"
-msgstr "These are all your past meetings."
+msgid "HelpMessages.COMMUNITY_GROUP"
+msgstr "The ${button_group} is open to anyone who uses Mitup. Come in and ask anything."
 
-msgid "MeetingListMessages.PAST_EMPTY"
-msgstr "<i>You have no past meetings yet.</i>"
+msgid "HelpMessages.NEWS_CHANNEL"
+msgstr "The ${button_channel} announces every release and what changed. Follow it to hear first."
+
+msgid "HelpMessages.EMAIL"
+msgstr "✉️ For anything private, write to support@mitup.social. A person reads it."
+
+msgid "MeetingListMessages.ACTIVE_EMPTY_ALERT"
+msgstr "You have no active meetings. Tap New meeting to create one."
+
+msgid "MeetingListMessages.JOINED_EMPTY_ALERT"
+msgstr "You have not joined any meeting yet."
+
+msgid "MeetingListMessages.PAST_EMPTY_ALERT"
+msgstr "You have no past meetings yet."
 
 msgid "CommonMessages.STALE_CANCEL_ALERT"
 msgstr "You've already answered this question"
+
+msgid "CommonMessages.EDITING_REVAMP_BANNER"
+msgstr "✨ Editing got a revamp! Everything now happens right on the meeting card."
 
 msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
@@ -287,11 +338,8 @@ msgstr "Send me the time of the meeting in the format <i>HH:MM</i>"
 msgid "CommonMessages.TIME_INVALID_VALUE"
 msgstr "My internal clock is old and cannot understand this science fiction time 🛸.\n\nTry again with a time that has valid hours (00-23) and minutes (00-59), I am sure I can work with that 🧠."
 
-msgid "CommonMessages.TIME_INVALID_FORMAT"
-msgstr "Not sure I understand that time 🤔...\n\nPlease, send the time in the format <i>HH:MM</i>, for example <i>15:30</i> or <i>09:15</i>"
-
-msgid "CommonMessages.DATETIME_INVALID"
-msgstr "Tap <b>Date</b> or <b>Time</b> to update them, or send a message with a ${datetime_link} to set both at once."
+msgid "CommonMessages.DATETIME_INPUT_INVALID"
+msgstr "I could not read a date or time in that message. Pick a day from the calendar, send the time in <i>HH:MM</i> format, or send a message using ${datetime_link} to set the date and time at once."
 
 msgid "CommonMessages.DELETED_MEETING_ALERT"
 msgstr "This meeting has been deleted"
@@ -338,8 +386,8 @@ msgstr "That date is more than ${days} days ahead, the furthest you can schedule
 msgid "SupporterMessages.SCHEDULING_HORIZON_TITLE_PATRON"
 msgstr "That date is more than ${days} days ahead, the furthest your Gamemaster plan schedules. Send your meeting title again with an earlier date, or go Commissioner on Patreon to schedule as far out as you like. Collaborate below has all the details."
 
-msgid "SupporterMessages.PARTICIPANT_CAPACITY"
-msgstr "Free meetings can host up to ${cap} participants. Send a lower number, or become a Mitup Host on Patreon to host bigger meetings. Collaborate below has all the details."
+msgid "SupporterMessages.PARTICIPANT_CAPACITY_EXCEEDED"
+msgstr "Free meetings can host up to ${cap} participants. Send a lower number, or become a Mitup Host on Patreon to host bigger meetings: ${button_collaborate}"
 
 msgid "RegistrationMessages.TIMEZONE_PROMPT"
 msgstr "Welcome to Mitup Bot ${first_name}!\n\nLet's start by setting your timezone. Send me the name of your city or, for a more accurate result, your location by pressing on 📎 and selecting Location.\n\n<b>Important</b>: we do not store your location and this information is only used to configure your timezone."
@@ -356,9 +404,6 @@ msgstr "I'm sorry, I couldn't set your timezone. Please, try again."
 msgid "RegistrationMessages.TIMEZONE_INVALID_INPUT"
 msgstr "Please send your city name as text or share your location."
 
-msgid "SettingsMessages.DESCRIPTION"
-msgstr "Configure Mitup."
-
 msgid "SettingsMessages.TIMEZONE_PROMPT"
 msgstr "Your timezone is set to <b>${timezone}</b>.\nSend me the name of your city or your location to set your timezone or tap <b>Cancel</b> to go back."
 
@@ -366,19 +411,22 @@ msgid "SettingsMessages.TIMEZONE_SUCCESS"
 msgstr "Your timezone has been set to: <b>${timezone}</b>"
 
 msgid "SettingsMessages.TIMEZONE_ON_EXIT"
-msgstr "You were in the middle of changing your timezone. Send me either the name of your city or your location to continue.  If you don't want to continue, tap Cancel to exit."
-
-msgid "SettingsMessages.LANGUAGE_PROMPT"
-msgstr "Current language: <b>${language}</b>.\n\nSelect a language."
+msgstr "<i>You were in the middle of changing your timezone.</i>\nSend the name of your city or your location to continue, or ${button_cancel} to exit."
 
 msgid "SettingsMessages.LANGUAGE_SUCCESS"
 msgstr "Language set."
 
-msgid "SettingsMessages.DEFAULT_OPTIONS_DESCRIPTION"
-msgstr "Here you can configure the default options used when creating a meeting. Do you usually create public meetings? Set it here. Are you always allowing people to invite other people or to share the meeting in other chats? Do it here. All your meetings will inherit this configuration.\n\nYou can configure different aspects of your meeting:\n\n<b>Waiting list</b>: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n<b>Public</b>: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n<b>Open invitations</b>: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants.\n\n<b>Lock on start</b>: when enabled and a meeting has a duration set, participants cannot join or leave once the meeting starts. When disabled, participants can still join or leave freely."
+msgid "SettingsMessages.DEFAULT_OPTIONS_LEAD"
+msgstr "Every meeting you create starts with these settings."
+
+msgid "SettingsMessages.TOGGLE_HINT"
+msgstr "Tap a setting's state to turn it on or off."
+
+msgid "SettingsMessages.TIMEOUT_VALUE"
+msgstr "A meeting without an end time stays active ${minutes} minutes after it starts."
 
 msgid "SettingsMessages.TIMEOUT_PROMPT"
-msgstr "Timeout defines how long after a meeting starts it is kept active. Meetings without a set duration are deactivated once this time has passed. After deactivation, you can reactivate a meeting from <b>Past meetings</b>.\n\nThe current timeout is <b>${timeout} minutes</b>\n\nSend the timeout (in minutes) you would like to use or touch Cancel to go back. The maximum is <b>${max_timeout} minutes</b>, which is one day."
+msgstr "Send the new timeout in minutes, up to <b>${max_timeout}</b> (one day), or tap Cancel to go back."
 
 msgid "SettingsMessages.TIMEOUT_INVALID"
 msgstr "That doesn't look like a valid timeout. Send a positive whole number of minutes, up to <b>${max_timeout}</b> (one day). No decimals allowed!"
@@ -386,8 +434,8 @@ msgstr "That doesn't look like a valid timeout. Send a positive whole number of 
 msgid "SettingsMessages.TIMEOUT_SUCCESS"
 msgstr "Timeout set to: <b>${timeout} minutes</b>"
 
-msgid "SettingsMessages.NOTIFICATIONS_DESCRIPTION"
-msgstr "Configure Mitup notifications.\n\nNotifications: ${notifications_status}\nWhen notifications are enabled, Mitup will notify you <b>${notifications_time} minutes</b> before a meeting starts."
+msgid "SettingsMessages.NOTIFICATION_LEAD"
+msgstr "${minutes} minutes before a meeting starts ${button_change}"
 
 msgid "SettingsMessages.NOTIFICATIONS_TIME_PROMPT"
 msgstr "Send how long before a meeting starts (in minutes) you would like to be notified or touch Cancel to go back."
@@ -395,17 +443,35 @@ msgstr "Send how long before a meeting starts (in minutes) you would like to be 
 msgid "SettingsMessages.NOTIFICATIONS_TIME_SUCCESS"
 msgstr "Notification time set to <b>${notifications_time} minutes</b>."
 
-msgid "SettingsMessages.ENABLED"
-msgstr "Enabled ✅"
+msgid "SettingsMessages.DEFAULT_OPTIONS_LINE"
+msgstr "What every meeting you create starts with."
 
-msgid "SettingsMessages.DISABLED"
-msgstr "Disabled ❌"
+msgid "SettingsMessages.PRIVACY_LINE"
+msgstr "Your data, the policy, export and deletion."
 
-msgid "PrivacyMessages.DESCRIPTION"
-msgstr "<b>Privacy</b>\n\nYour data belongs to you. Read the privacy policy to see what Mitup stores and why, download a copy of your data, or request the permanent deletion of everything Mitup knows about you."
+msgid "PrivacyMessages.INTRO"
+msgstr "Your data belongs to you."
 
-msgid "PrivacyMessages.EXPORT_CAPTION"
-msgstr "Here is a copy of everything Mitup stores about you. Other people in your meetings appear by display name only."
+msgid "PrivacyMessages.POLICY_TITLE"
+msgstr "Privacy policy"
+
+msgid "PrivacyMessages.POLICY"
+msgstr "What Mitup stores about you, why, and for how long."
+
+msgid "PrivacyMessages.EXPORT_TITLE"
+msgstr "Your data"
+
+msgid "PrivacyMessages.EXPORT"
+msgstr "Download a copy of everything Mitup stores about you, as a JSON file. Other people in your meetings appear by display name only."
+
+msgid "PrivacyMessages.EXPORT_ATTACHED"
+msgstr "Your copy is attached to this message."
+
+msgid "PrivacyMessages.DELETE_TITLE"
+msgstr "Deletion"
+
+msgid "PrivacyMessages.DELETE"
+msgstr "Permanently remove everything linked to your account. Meetings you created disappear for everyone who joined them."
 
 msgid "PrivacyMessages.DELETE_WARNING"
 msgstr "<b>Delete all your data?</b>\n\nThis will permanently remove everything linked to your account:\n\n- Meetings you created will disappear for everyone who joined them, not just for you.\n- You will be removed from every meeting you joined.\n- Your settings and your Patreon link will be erased.\n\n<b>There is no undo.</b> Deleted data cannot be recovered."
@@ -425,8 +491,8 @@ msgstr "<b>Your data is deleted</b>\n\nEverything linked to your account is perm
 msgid "MeetingCreationMessages.PROMPT"
 msgstr "Let's create a meeting. What is the title?\n\n<i>Tip: you can also use ${datetime_link} to include a date and time directly.</i>"
 
-msgid "MeetingCreationMessages.SUCCESS"
-msgstr "Meeting created: <b>${title}</b>\n\nYou can add more information to the meeting with the options below. The information which has not been added won't be shown when the meeting is shared.\n\nWhen finished click on ✅ Done"
+msgid "MeetingCreationMessages.CREATED"
+msgstr "Meeting created: <b>${title}</b>\n\nYou can complete the meeting with the options on its card below. The information which has not been added won't be shown when the meeting is shared."
 
 msgid "MeetingCreationMessages.INVALID_TITLE"
 msgstr "I did not recognize what you sent as a valid title 🤔.\n\nSend a message with the title of the meeting or click on <b>Cancel</b>."
@@ -435,37 +501,40 @@ msgid "MeetingCreationMessages.INVALID_TITLE_ENTITY"
 msgstr "I only understand a title or a title with a date 🤔.\n\nPlease send just the meeting title, or the title with a date formatted by Telegram. Click <b>Cancel</b> to exit."
 
 msgid "MeetingCreationMessages.ON_EXIT"
-msgstr "You were in the middle of creating a meeting. Send the title of the meeting to continue. If you would not like to continue, tap Cancel to exit."
+msgstr "<i>You were in the middle of creating a meeting.</i>\nSend the title of the meeting to continue, or ${button_cancel} to exit."
 
-msgid "MeetingDisplayMessages.DATETIME_ENTITY_LABEL"
-msgstr "Meeting time"
+msgid "MeetingCardSectionMessages.DESCRIPTION"
+msgstr "Description"
 
-msgid "MeetingDisplayMessages.START_LABEL"
-msgstr "Starts"
+msgid "MeetingCardSectionMessages.IMAGES"
+msgstr "Images"
 
-msgid "MeetingDisplayMessages.END_LABEL"
-msgstr "Ends"
+msgid "MeetingCardSectionMessages.WHEN"
+msgstr "When"
+
+msgid "MeetingCardSectionMessages.WHERE"
+msgstr "Where"
+
+msgid "MeetingCardSectionMessages.PARTICIPANTS"
+msgstr "Participants"
+
+msgid "MeetingCardSectionMessages.COUNT_OF_MAX"
+msgstr "${count} of ${max}"
+
+msgid "MeetingCardSectionMessages.START_TIME"
+msgstr "Start time: ${when}"
+
+msgid "MeetingCardSectionMessages.END_TIME"
+msgstr "End time: ${when}"
 
 msgid "MeetingDisplayMessages.CREATED_BY"
 msgstr "Created by: ${owner}"
 
-msgid "MeetingDisplayMessages.DESCRIPTION_NOT_SET"
-msgstr "🚫 No description defined 🚫"
-
 msgid "MeetingDisplayMessages.DATE_NOT_SET"
 msgstr "🚫 No time defined 🚫"
 
-msgid "MeetingDisplayMessages.LOCATION_NOT_SET"
-msgstr "🚫 No location defined 🚫"
-
 msgid "MeetingDisplayMessages.PARTICIPANT_COUNT_EMPTY"
 msgstr "Empty"
-
-msgid "MeetingDisplayMessages.PARTICIPANT_LABEL"
-msgstr "Participant"
-
-msgid "MeetingDisplayMessages.PARTICIPANTS_LABEL"
-msgstr "Participants"
 
 msgid "MeetingDisplayMessages.MAX_PARTICIPANTS_LABEL"
 msgstr "(Max: ${max_participants})"
@@ -476,20 +545,29 @@ msgstr "${count} names not shown"
 msgid "MeetingDisplayMessages.INVITED_BY"
 msgstr "<i>invited by ${user}</i>"
 
+msgid "MeetingDisplayMessages.NOT_PART_OF_MEETING"
+msgstr "<i>You are not part of this meeting.</i>"
+
 msgid "MeetingDisplayMessages.DESCRIPTION_EMPTY"
 msgstr "<i>This meeting has no description yet</i>"
 
-msgid "MeetingDisplayMessages.IN_PROGRESS_BANNER"
-msgstr "▶️ This meeting is in progress ▶️"
+msgid "MeetingDisplayMessages.UNTITLED"
+msgstr "<i>Untitled meeting</i>"
 
-msgid "MeetingDisplayMessages.FINISHED_SUMMARY_BANNER"
-msgstr "✅ This meeting has finished ✅\n\n<b>From:</b> ${start_datetime} · <b>To:</b> ${end_datetime} · <b>Attendees:</b> ${attendee_count}"
+msgid "MeetingDisplayMessages.IN_PROGRESS_STATUS"
+msgstr "<i>This meeting is in progress.</i>"
+
+msgid "MeetingDisplayMessages.FINISHED_STATUS"
+msgstr "<i>This meeting has finished.</i>"
 
 msgid "MeetingDisplayMessages.DELETED_BANNER"
 msgstr "🚫 This meeting has been deleted 🚫"
 
 msgid "MeetingDisplayMessages.FINISHED_BANNER"
 msgstr "✅ This meeting has finished ✅"
+
+msgid "MeetingDisplayMessages.BUILT_WITH"
+msgstr "Built with ${mitup}"
 
 msgid "MeetingJoinMessages.JOIN_SUCCESS"
 msgstr "You joined the meeting!"
@@ -509,6 +587,9 @@ msgstr "You have joined the meeting, ${user}! It seems you have never used Mitup
 msgid "MeetingJoinMessages.LEAVE_SUCCESS"
 msgstr "You have left the meeting"
 
+msgid "MeetingJoinMessages.LEFT_CONFIRMATION"
+msgstr "You're no longer in this meeting."
+
 msgid "MeetingJoinMessages.LEAVE_NOT_JOINED"
 msgstr "You cannot leave a meeting you have not joined"
 
@@ -522,7 +603,7 @@ msgid "MeetingJoinMessages.JOIN_LOCKED"
 msgstr "This meeting has already started and its attendees list is locked."
 
 msgid "MeetingInviteMessages.ON_EXIT"
-msgstr "Sorry, I was expecting the name of the person you want to invite. Would you like to send it? If not, tap Cancel to exit."
+msgstr "<i>You were in the middle of inviting someone.</i>\nSend the name of the person to continue, or ${button_cancel} to exit."
 
 msgid "MeetingInviteMessages.PROMPT"
 msgstr "<b>Add to Guest List</b>\n\nPlease reply with the name of the person you want to add."
@@ -572,11 +653,11 @@ msgstr "Meeting deleted."
 msgid "MeetingLifecycleMessages.DELETE_DECLINED"
 msgstr "The meeting won't be deleted"
 
-msgid "MeetingAttachMessages.FOOTNOTE_INACTIVE"
-msgstr "🔍 Make this meeting searchable in this chat."
+msgid "MeetingAttachMessages.STATE_NOT_SEARCHABLE"
+msgstr "🔍 Not searchable in this chat yet"
 
-msgid "MeetingAttachMessages.FOOTNOTE_ACTIVE"
-msgstr "✅ This meeting is now searchable in this chat."
+msgid "MeetingAttachMessages.STATE_SEARCHABLE"
+msgstr "🔍 Searchable in this chat"
 
 msgid "MeetingAttachMessages.ENABLED_ALERT"
 msgstr "✅ Now Searchable!\n\nThis meeting is now attached to this chat. It will be included in your search results when you look for meetings using the bot's inline mode."
@@ -587,11 +668,8 @@ msgstr "✅ Already Searchable!\n\nThis meeting was already attached to this cha
 msgid "MeetingEditContentMessages.TITLE_PROMPT"
 msgstr "This is the current title of your meeting:\n<b>${title}</b>\n\nSend me the new one"
 
-msgid "MeetingEditContentMessages.TITLE_SUCCESS"
-msgstr "Title updated to: <b>${title}</b>"
-
 msgid "MeetingEditContentMessages.TITLE_ON_EXIT"
-msgstr "Sorry, I was expecting the title of your meeting. Would you like to send it? If not, tap Cancel to exit."
+msgstr "<i>You were in the middle of renaming your meeting.</i>\nSend the new title to continue, or ${button_cancel} to exit."
 
 msgid "MeetingEditContentMessages.TITLE_TOO_LONG"
 msgstr "That title is ${length} characters, over the limit of ${limit}. Send me a shorter one."
@@ -599,17 +677,14 @@ msgstr "That title is ${length} characters, over the limit of ${limit}. Send me 
 msgid "MeetingEditContentMessages.DESCRIPTION_PROMPT"
 msgstr "This is the current description of your meeting:\n${description}\n\nSend me the new one"
 
-msgid "MeetingEditContentMessages.DESCRIPTION_SUCCESS"
-msgstr "Description updated to: <b>${description}</b>"
-
 msgid "MeetingEditContentMessages.DESCRIPTION_ON_EXIT"
-msgstr "Sorry, I was expecting the description of your meeting. Would you like to send it? If not, tap Cancel to exit."
+msgstr "<i>You were in the middle of changing the description.</i>\nSend the new description to continue, or ${button_cancel} to exit."
 
 msgid "MeetingEditContentMessages.DESCRIPTION_TOO_LONG"
 msgstr "That description is ${length} characters, over the limit of ${limit}. Send me a shorter one."
 
-msgid "MeetingEditLocationMessages.DESCRIPTION"
-msgstr "A meeting can have a location associated. You can just set the name of the place or you can also attach the location. Choose any of the two options."
+msgid "MeetingEditContentMessages.REMOVE_DESCRIPTION_CONFIRMATION"
+msgstr "Are you sure you want to remove the description of your meeting?\n\n${description}"
 
 msgid "MeetingEditLocationMessages.NAME_PROMPT"
 msgstr "Send me the name of the place."
@@ -617,35 +692,32 @@ msgstr "Send me the name of the place."
 msgid "MeetingEditLocationMessages.COORDINATES_PROMPT"
 msgstr "<i>Only from the phone 📱</i>\n\nSend the location of the meeting. Touch on the 📎 icon and then choose location. You can send whatever location you want, not just your current location."
 
-msgid "MeetingEditLocationMessages.NAME_SUCCESS"
-msgstr "Location name set to: <b>${name}</b>"
-
-msgid "MeetingEditLocationMessages.COORDINATES_SUCCESS"
-msgstr "Location saved."
-
 msgid "MeetingEditLocationMessages.COORDINATES_INVALID"
 msgstr "Send me the location again. Remember to touch on the clip icon and choose location."
 
 msgid "MeetingEditLocationMessages.NAME_ON_EXIT"
-msgstr "Sorry, I was expecting the name of the location. Would you like to send it? If not, tap Cancel to exit."
+msgstr "<i>You were in the middle of naming the location.</i>\nSend the name of the location to continue, or ${button_cancel} to exit."
 
 msgid "MeetingEditLocationMessages.LOCATION_NAME_TOO_LONG"
 msgstr "That place name is ${length} characters, over the limit of ${limit}. Send me a shorter one."
 
 msgid "MeetingEditLocationMessages.COORDINATES_ON_EXIT"
-msgstr "Sorry, I was expecting the location of your meeting. Would you like to send it? If not, tap Cancel to exit."
+msgstr "<i>You were in the middle of setting the map pin.</i>\nSend the location of your meeting to continue, or ${button_cancel} to exit."
 
-msgid "MeetingEditParticipantsMessages.DESCRIPTION"
-msgstr "Here you will be able to manage the participants of the meeting: you can set the maximum number of people that can attend the meeting as well as kick out any of the participants that joined the meeting."
+msgid "MeetingEditLocationMessages.REMOVE_NAME_CONFIRMATION"
+msgstr "This removes the meeting's place name. Are you sure?"
 
-msgid "MeetingEditParticipantsMessages.MAX_PROMPT"
-msgstr "Send me the maximum number of participants allowed in the meeting (must be a number greater than 0) or tap <i>No limit</i> to allow an unlimited number of participants."
+msgid "MeetingEditLocationMessages.REMOVE_COORDINATES_CONFIRMATION"
+msgstr "This removes the meeting's map pin. Are you sure?"
 
-msgid "MeetingEditParticipantsMessages.MAX_PROMPT_CAPPED"
-msgstr "Send me the maximum number of participants allowed in the meeting (must be a number greater than 0) or tap <i>Max (${cap})</i> to allow your plan's maximum of ${cap} participants."
+msgid "MeetingEditParticipantsMessages.LIMIT_PROMPT"
+msgstr "Send me the maximum number of participants allowed in the meeting (must be a number greater than 0)."
 
 msgid "MeetingEditParticipantsMessages.MAX_SUCCESS"
 msgstr "Max participants set to: <b>${max_participants}</b>"
+
+msgid "MeetingEditParticipantsMessages.REMOVE_LIMIT_CONFIRMATION"
+msgstr "Removing the limit sets it back to <b>${cap}</b>, the most participants your meetings can have. Do you want to continue?\n\nNeed bigger meetings? Become a Mitup Host on Patreon to raise the ceiling: ${button_collaborate}"
 
 msgid "MeetingEditParticipantsMessages.NO_LIMIT_LABEL"
 msgstr "No limit"
@@ -662,47 +734,95 @@ msgstr "Are you sure you want to kick out <b>${participant}</b> from the meeting
 msgid "MeetingEditParticipantsMessages.KICK_OUT_NOT_IN_MEETING"
 msgstr "The participant you tried to kick out is no longer in the meeting."
 
-msgid "MeetingEditParticipantsMessages.KICK_OUT_SUCCESS"
-msgstr "<b>${participant}</b> removed."
-
-msgid "MeetingEditParticipantsMessages.KICK_OUT_SUCCESS_NO_MORE"
-msgstr "<b>${participant}</b> removed. No more participants to manage."
-
 msgid "MeetingEditParticipantsMessages.MAX_ON_EXIT"
-msgstr "Sorry, I was expecting the maximum number of participants. Would you like to send it? If not, tap Cancel to exit."
+msgstr "<i>You were in the middle of setting the participant limit.</i>\nSend the maximum number of participants to continue, or ${button_cancel} to exit."
 
-msgid "MeetingEditLanguageMessages.DESCRIPTION"
-msgstr "Choose the language of your meeting. This will change the language used when sharing the meeting.\n\nCurrent language: <b>${language}</b>."
+msgid "MeetingEditSettingsMessages.WAITING_LIST_EXPLANATION"
+msgstr "When the meeting is full, new joiners land on a waiting list and move into the meeting automatically as spots free up, in the order they joined."
 
-msgid "MeetingEditLanguageMessages.SUCCESS"
-msgstr "Language set."
+msgid "MeetingEditSettingsMessages.PUBLIC_EXPLANATION"
+msgstr "Anyone who receives the meeting can share it again. Perfect to reach more people."
 
-msgid "MeetingEditSettingsMessages.DESCRIPTION"
-msgstr "You can configure different aspects of your meeting:\n\n<b>Waiting list</b>: allow users to join the meeting even when it is full. Users joining when it is full will be added to a waiting list and added to the participants list as soon as a spot is available in the order they joined.\n\n<b>Public</b>: activate this to allow everyone that receives the meeting to share it again. Perfect to reach more people.\n\n<b>Open invitations</b>: activate this option to allow users who have joined the meeting to add friends even if those friends are not in Telegram.\n\n<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. Only the number of participants will be shown. You will still be able to see the participants."
+msgid "MeetingEditSettingsMessages.OPEN_INVITATIONS_EXPLANATION"
+msgstr "Participants can bring friends along, even friends who are not on Telegram."
 
-msgid "MeetingEditDateTimeMessages.DESCRIPTION"
-msgstr "Choose what you want to set for your meeting.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+msgid "MeetingEditSettingsMessages.INCOGNITO_EXPLANATION"
+msgstr "The shared meeting shows only how many people joined, not who. As the host, you still see everyone."
 
-msgid "MeetingEditDateTimeMessages.DATE_EDIT_PROMPT"
-msgstr "Select the new date. Press <b>🗑️ Delete date</b> if you want to unset the date and time of the meeting."
+msgid "MeetingEditSettingsMessages.LOCK_ON_START_EXPLANATION"
+msgstr "The moment the meeting starts, the attendee list is locked: nobody can join or leave while it is in progress. Takes effect once the meeting has a start time."
 
-msgid "MeetingEditDateTimeMessages.DATE_ADD_PROMPT"
-msgstr "Select the date."
+msgid "MeetingEditSettingsMessages.BEHAVIOR_GROUP"
+msgstr "Behavior"
 
-msgid "MeetingEditDateTimeMessages.TIME_DATE_DEFAULT_NOTE"
-msgstr "The date defaults to today, but you can set a different one."
+msgid "MeetingEditSettingsMessages.BEHAVIOR_LINE"
+msgstr "How the meeting behaves: who can join and share it, invitations, privacy, and locking on start."
 
-msgid "MeetingEditDateTimeMessages.DATE_ADDED_TIME_PROMPT"
-msgstr "The date has been set to <b>${datetime}</b>. The time defaults to 23:59, just before midnight.\n\nSend a different time in <i>HH:MM</i> format, or tap Done to keep 23:59."
+msgid "MeetingEditSettingsMessages.TIME_FORMAT_GROUP"
+msgstr "Time format"
 
-msgid "MeetingEditDateTimeMessages.DATE_UPDATED"
-msgstr "Date set to: ${datetime}"
+msgid "MeetingEditSettingsMessages.TIME_FORMAT_LINE"
+msgstr "How the meeting's date and time are written for everyone who sees it."
 
-msgid "MeetingEditDateTimeMessages.TIME_SUCCESS"
-msgstr "Time set to ${datetime}"
+msgid "MeetingEditSettingsMessages.SHOW_TIMEZONE_EXPLANATION"
+msgstr "Writes the meeting's timezone next to its times, so people elsewhere know which clock they are reading."
+
+msgid "MeetingEditSettingsMessages.CLOCK_24H_EXPLANATION"
+msgstr "Shows the meeting's times as 22:45 instead of 10:45 PM."
+
+msgid "MeetingEditSettingsMessages.DATE_FORMAT_EXPLANATION"
+msgstr "How the meeting's dates are written, for everyone who sees them."
+
+msgid "MeetingImagesMessages.TITLE"
+msgstr "Images"
+
+msgid "MeetingImagesMessages.LEAD"
+msgstr "Send one or more photos to show them on the meeting card, in the order they should appear. A meeting holds up to ${limit} photos, and wide ones look best."
+
+msgid "MeetingImagesMessages.REPLACING"
+msgstr "Send the photo that replaces image ${number}."
+
+msgid "MeetingImagesMessages.IMAGE_LABEL"
+msgstr "Image ${number}"
+
+msgid "MeetingImagesMessages.LAYOUT"
+msgstr "Layout"
+
+msgid "MeetingImagesMessages.LAYOUT_EXPLANATION"
+msgstr "How several photos are drawn on the card: a collage shows them all at once, a slideshow shows one at a time."
+
+msgid "MeetingImagesMessages.LOCKED"
+msgstr "Photos on the meeting card are one of the extras Hosts get. Become a Mitup Host on Patreon to bring them to your meetings. Collaborate below has all the details."
+
+msgid "MeetingImagesMessages.LIMIT_REACHED"
+msgstr "This meeting already holds its ${limit} photos. Remove one to make room for another."
+
+msgid "MeetingImagesMessages.REMOVE_CONFIRMATION"
+msgstr "This removes image ${number} from the card. Are you sure?"
+
+msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
+msgstr "This removes every photo from the card. Are you sure?"
+
+msgid "MeetingImagesMessages.SEND_AS_PHOTO"
+msgstr "That arrived as a file. Send it as a photo to put it on the card."
+
+msgid "MeetingImagesMessages.ADDING_PHOTOS"
+msgstr "Adding your photos"
+
+msgid "MeetingImagesMessages.ON_EXIT"
+msgstr "<i>You were in the middle of changing your meeting's photos.</i>\nSend a photo to continue, or ${button_cancel} to exit."
+
+msgid "MeetingEditDateTimeMessages.EXPLANATION"
+msgstr "Select the date and time of your meeting from the calendar.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+
+msgid "MeetingEditDateTimeMessages.CURRENT_TIME"
+msgstr "🕒 Current time: <b>${time}</b> ${button_edit}"
+
+msgid "MeetingEditDateTimeMessages.TIME_NEEDS_DATE"
+msgstr "Select a date first, then set the time."
 
 msgid "MeetingEditDateTimeMessages.ON_EXIT"
-msgstr "Sorry, I was expecting the new time for your meeting. Would you like to send it? If not, tap Cancel to exit."
+msgstr "<i>You were in the middle of changing the start time.</i>\nSend the new time to continue, or ${button_cancel} to exit."
 
 msgid "MeetingEditDateTimeMessages.END_CLEARED_BY_START"
 msgstr "The new start time is after the end time, so the end time has been cleared."
@@ -710,29 +830,14 @@ msgstr "The new start time is after the end time, so the end time has been clear
 msgid "MeetingEditDateTimeMessages.START_IN_PAST"
 msgstr "The start time must be in the future."
 
-msgid "MeetingEditWhenMessages.DESCRIPTION_NO_TIMES"
-msgstr "Set when your meeting happens. You can set a start time, an end time, or both. You can also lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
+msgid "MeetingEditWhenMessages.REMOVE_TIMES_CONFIRMATION"
+msgstr "This removes the meeting's start time, and the end time along with it. Are you sure?"
 
-msgid "MeetingEditWhenMessages.DESCRIPTION_START_ONLY"
-msgstr "Meeting starts at: <b>${start_datetime}</b>\n\nYou can set an end time or lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
+msgid "MeetingEditWhenMessages.REMOVE_END_CONFIRMATION"
+msgstr "This removes the meeting's end time. Are you sure?"
 
-msgid "MeetingEditWhenMessages.DESCRIPTION_BOTH"
-msgstr "Meeting starts at: <b>${start_datetime}</b>\nMeeting ends at: <b>${end_datetime}</b>\n\nYou can change the times or lock the attendees list when the meeting starts, so no one can join or leave once it is underway."
-
-msgid "MeetingEditWhenMessages.CLEAR_CONFIRMATION"
-msgstr "Are you sure you want to clear the start and end times?"
-
-msgid "MeetingEditWhenMessages.CLEAR_DECLINED"
-msgstr "The times won't be cleared."
-
-msgid "MeetingEditWhenMessages.CLEAR_SUCCESS"
-msgstr "Times removed."
-
-msgid "MeetingEditDurationMessages.END_PROMPT"
-msgstr "Meeting starts at <b>${start_datetime}</b>. Set when it ends.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
-
-msgid "MeetingEditDurationMessages.END_EDIT_PROMPT"
-msgstr "Meeting starts at <b>${start_datetime}</b>. The meeting currently ends at <b>${end_datetime}</b>.\n\nSet the new end time.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
+msgid "MeetingEditDurationMessages.EXPLANATION"
+msgstr "The meeting starts at <b>${start_datetime}</b>. Select the date and time it ends from the calendar.\n\n<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
 
 msgid "MeetingEditDurationMessages.END_BEFORE_START"
 msgstr "The end time must be after the start time."
@@ -743,14 +848,11 @@ msgstr "The end time must be in the future."
 msgid "MeetingEditDurationMessages.END_MAX_DURATION"
 msgstr "A meeting can last a week at most. Set an end within a week of the start."
 
-msgid "MeetingEditDurationMessages.END_DATE_ADDED_TIME_PROMPT"
-msgstr "The end date has been set to <b>${datetime}</b>. The time defaults to 23:59.\n\nSend the time in <i>HH:MM</i> format to change it, or tap Done to keep 23:59."
-
 msgid "MeetingEditDurationMessages.END_STALE_ALERT"
 msgstr "The start time was cleared. Set it again before choosing an end time."
 
 msgid "MeetingEditDurationMessages.ON_EXIT"
-msgstr "Sorry, I was expecting the end time. Would you like to send it? If not, tap Cancel to exit."
+msgstr "<i>You were in the middle of setting the end time.</i>\nSend the end time to continue, or ${button_cancel} to exit."
 
 msgid "InlineQueryMessages.CREATE_MEETING_BUTTON"
 msgstr "➕ Create a new meeting"
@@ -794,32 +896,89 @@ msgstr "The meeting <b>${meeting_title}</b> will be permanently deleted in <b>${
 msgid "NotificationMessages.DELETED"
 msgstr "The meeting <b>${meeting_title}</b> has been permanently deleted."
 
-msgid "NotificationMessages.STARTING_SOON"
-msgstr "The meeting <b>${meeting_title}</b> is starting soon!"
+msgid "NotificationMessages.STARTING_SOON_HEADING"
+msgstr "⏰ Starting soon"
 
-msgid "NotificationMessages.STARTED"
-msgstr "The meeting <b>${meeting_title}</b> has started!"
+msgid "NotificationMessages.STARTED_HEADING"
+msgstr "🟢 Started"
 
-msgid "CollaborateMessages.NOT_LINKED"
-msgstr "<b>Help keep Mitup running</b>\n\nMitup is built by a pair of brothers, not a big company, and it is free for everyone. Your support is what pays for the servers, the database, and the late-night debugging. Any help counts: telling your friends, translating, reporting bugs, or backing the project. The ${collaborate_page} page on our website walks through every way to pitch in.\n\nThe most direct way to help is becoming a Mitup Host on Patreon. As a thank you, Hosts get a badge next to their name, a members-only group, and raised limits depending on the tier: Brewer, Gamemaster, or Commissioner. The ${limits_page} page shows what each tier unlocks.\n\nLink your Patreon account to get started, and thank you for being here."
+msgid "NotificationMessages.CANNOT_MAKE_IT"
+msgstr "Can't make it? ${button_leave}"
 
-msgid "CollaborateMessages.COLLABORATE_PAGE_LABEL"
-msgstr "ways to support"
+msgid "NotificationMessages.STARTS_IN"
+msgstr "Starts ${when}"
 
-msgid "CollaborateMessages.LIMITS_PAGE_LABEL"
-msgstr "limits and Host perks"
+msgid "NotificationMessages.STARTED_AGO"
+msgstr "Started ${when}"
 
-msgid "CollaborateMessages.LINKED_NOT_PATRON"
-msgstr "<b>Patreon account linked</b>\n\nYou're all set, thanks for taking the first step! You're not a Host yet, so your Host perks are still off.\n\nHosts get a badge next to their name, a members-only group, and raised limits depending on the tier: Brewer, Gamemaster, or Commissioner. The ${limits_page} page shows what each tier unlocks.\n\nBecome a Host and your perks turn on automatically, with no need to link again."
+msgid "NotificationMessages.STARTED_JUST_NOW"
+msgstr "Started just now"
 
-msgid "CollaborateMessages.LINKED_PATRON_SUPPORTER"
-msgstr "<b>☕️ You're a Brewer</b>\n\nThanks for backing Mitup. Your Brewer badge shows on your profile, and your support helps keep Mitup running for everyone. You can unlink your Patreon account whenever you want."
+msgid "CollaborateMessages.PITCH"
+msgstr "Mitup is built by a pair of brothers, not a big company, and it is free for everyone. Your support pays for the servers, the database and the late-night debugging."
 
-msgid "CollaborateMessages.LINKED_PATRON_PATRON"
-msgstr "<b>🎲 You're a Gamemaster</b>\n\nThanks for backing Mitup. Your Gamemaster badge is on, and you can run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting. You can unlink your Patreon account whenever you want."
+msgid "CollaborateMessages.WAYS_TO_HELP_TITLE"
+msgstr "Ways to help"
 
-msgid "CollaborateMessages.LINKED_PATRON_ORGANIZER"
-msgstr "<b>🏆 You're a Commissioner</b>\n\nThanks for backing Mitup. Your Commissioner badge is on, and every limit is off: run as many meetings as you want, schedule them as far ahead as you need, and invite as many people as you like to each one. You can unlink your Patreon account whenever you want."
+msgid "CollaborateMessages.WAYS_TO_HELP"
+msgstr "Tell your friends, translate, report bugs, or back the project. The ${button_collaborate_page} page walks through every one."
+
+msgid "CollaborateMessages.BECOME_HOST_TITLE"
+msgstr "Become a Host"
+
+msgid "CollaborateMessages.BECOME_HOST"
+msgstr "The most direct way to help. Hosts get a badge, a members-only group and raised limits depending on the tier."
+
+msgid "CollaborateMessages.LIMITS_PAGE_LINE"
+msgstr "The ${button_limits_page} page has the numbers."
+
+msgid "CollaborateMessages.TABLE_BADGE"
+msgstr "Badge"
+
+msgid "CollaborateMessages.TABLE_GROUP"
+msgstr "Group"
+
+msgid "CollaborateMessages.TABLE_LIMITS"
+msgstr "Limits"
+
+msgid "CollaborateMessages.TIER_LIMITS_FREE"
+msgstr "free"
+
+msgid "CollaborateMessages.TIER_LIMITS_RAISED"
+msgstr "raised"
+
+msgid "CollaborateMessages.TIER_LIMITS_NONE"
+msgstr "none"
+
+msgid "CollaborateMessages.LINKED_TITLE"
+msgstr "Patreon account linked"
+
+msgid "CollaborateMessages.LINKED_NOT_HOST"
+msgstr "You're all set, thanks for taking the first step! You're not a Host yet, so your Host perks are still off. Become a Host and they turn on automatically, with no need to link again."
+
+msgid "CollaborateMessages.STATUS_TITLE_HOST_1"
+msgstr "You're a Brewer"
+
+msgid "CollaborateMessages.STATUS_HOST_1"
+msgstr "Thanks for backing Mitup. Your Brewer badge shows next to your name, and your support helps keep Mitup running for everyone."
+
+msgid "CollaborateMessages.STATUS_TITLE_HOST_2"
+msgstr "You're a Gamemaster"
+
+msgid "CollaborateMessages.STATUS_HOST_2"
+msgstr "Thanks for backing Mitup. Your Gamemaster badge is on, and you can run up to ${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited participants per meeting."
+
+msgid "CollaborateMessages.STATUS_TITLE_HOST_3"
+msgstr "You're a Commissioner"
+
+msgid "CollaborateMessages.STATUS_HOST_3"
+msgstr "Thanks for backing Mitup. Your Commissioner badge is on, and every limit is off: run as many meetings as you want, schedule them as far ahead as you need, and invite as many people as you like to each one."
+
+msgid "CollaborateMessages.HOSTS_GROUP_TITLE"
+msgstr "Hosts-Only Group"
+
+msgid "CollaborateMessages.HOSTS_GROUP"
+msgstr "The members-only group where Hosts meet the people behind Mitup and each other."
 
 msgid "CollaborateMessages.UNLINKED"
 msgstr "Your Patreon account has been unlinked."
@@ -902,99 +1061,6 @@ msgstr "<b>Your Hosts-Only Group access has ended</b>\n\nYour Host support has c
 msgid "SupporterNotificationMessages.HOSTS_GROUP_READMITTED"
 msgstr "<b>Your Host access is back</b>\n\nWelcome back. Your Host perks are on again, and you're welcome in the Hosts-Only Group. Tap below to rejoin."
 
-msgid "Weekday.MONDAY"
-msgstr "Mon"
-
-msgid "Weekday.TUESDAY"
-msgstr "Tue"
-
-msgid "Weekday.WEDNESDAY"
-msgstr "Wed"
-
-msgid "Weekday.THURSDAY"
-msgstr "Thu"
-
-msgid "Weekday.FRIDAY"
-msgstr "Fri"
-
-msgid "Weekday.SATURDAY"
-msgstr "Sat"
-
-msgid "Weekday.SUNDAY"
-msgstr "Sun"
-
-msgid "Month.JANUARY"
-msgstr "January"
-
-msgid "Month.FEBRUARY"
-msgstr "February"
-
-msgid "Month.MARCH"
-msgstr "March"
-
-msgid "Month.APRIL"
-msgstr "April"
-
-msgid "Month.MAY"
-msgstr "May"
-
-msgid "Month.JUNE"
-msgstr "June"
-
-msgid "Month.JULY"
-msgstr "July"
-
-msgid "Month.AUGUST"
-msgstr "August"
-
-msgid "Month.SEPTEMBER"
-msgstr "September"
-
-msgid "Month.OCTOBER"
-msgstr "October"
-
-msgid "Month.NOVEMBER"
-msgstr "November"
-
-msgid "Month.DECEMBER"
-msgstr "December"
-
-msgid "MonthShort.JANUARY"
-msgstr "Jan"
-
-msgid "MonthShort.FEBRUARY"
-msgstr "Feb"
-
-msgid "MonthShort.MARCH"
-msgstr "Mar"
-
-msgid "MonthShort.APRIL"
-msgstr "Apr"
-
-msgid "MonthShort.MAY"
-msgstr "May"
-
-msgid "MonthShort.JUNE"
-msgstr "Jun"
-
-msgid "MonthShort.JULY"
-msgstr "Jul"
-
-msgid "MonthShort.AUGUST"
-msgstr "Aug"
-
-msgid "MonthShort.SEPTEMBER"
-msgstr "Sep"
-
-msgid "MonthShort.OCTOBER"
-msgstr "Oct"
-
-msgid "MonthShort.NOVEMBER"
-msgstr "Nov"
-
-msgid "MonthShort.DECEMBER"
-msgstr "Dec"
-
 msgid "Languages.SPANISH"
 msgstr "🇪🇸 Spanish"
 
@@ -1039,6 +1105,9 @@ msgstr "🚫 The message for <b>${language}</b> is empty."
 
 msgid "BroadcastOperatorMessages.ERROR_MESSAGE_TOO_LONG"
 msgstr "🚫 The message for <b>${language}</b> is ${length} characters, over the limit of ${limit}. Shorten it and resend."
+
+msgid "BroadcastOperatorMessages.ERROR_PREVIEW_REJECTED"
+msgstr "🚫 The <b>${language}</b> message could not be sent, so nothing was queued.\n\n<code>${reason}</code>\n\nFix it and send it again."
 
 msgid "BroadcastOperatorMessages.ERROR_DOCUMENT_TOO_LARGE"
 msgstr "🚫 That file is too large. The limit is ${limit_kb} KB."

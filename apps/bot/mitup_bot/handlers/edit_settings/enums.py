@@ -21,16 +21,20 @@ class EditSettingsHandlerId(HandlerId):
     CANCEL = auto()
 
     # Edit language
-    LANGUAGE_CALLBACK = auto()
     SET_LANGUAGE_CALLBACK = auto()
 
     # Edit default options
     DEFAULT_OPTIONS_CALLBACK = auto()
+    OPEN_DEFAULT_BEHAVIOR = auto()
+    OPEN_DEFAULT_TIME_FORMAT = auto()
     SET_DEFAULT_WAITING_LIST = auto()
     SET_DEFAULT_PUBLIC = auto()
     SET_DEFAULT_INVITATIONS = auto()
     SET_DEFAULT_INCOGNITO = auto()
     SET_DEFAULT_LOCK_ON_START = auto()
+    SET_DEFAULT_SHOW_TIMEZONE = auto()
+    SET_DEFAULT_CLOCK_24H = auto()
+    SET_DEFAULT_DATE_FORMAT = auto()
 
     # Edit timeout
     TIMEOUT_CALLBACK = auto()
@@ -39,7 +43,6 @@ class EditSettingsHandlerId(HandlerId):
     TIMEOUT_CONVERSATION = auto()
 
     # Edit notifications
-    NOTIFICATIONS_CALLBACK = auto()
     TOGGLE_NOTIFICATIONS = auto()
     SET_NOTIFICATION_TIME = auto()
     NOTIFICATION_TIME_MESSAGE_WITH_TEXT = auto()
@@ -56,8 +59,8 @@ class ConversationSettingsState(Enum):
 class SettingName(StrEnum):
     """The `setting` facet of the shared `User setting changed` event.
 
-    The five `DEFAULT_*` members double as the `Settings` attribute they flip, which is what lets
-    the default-meeting-option toggles share one call site.
+    Every `DEFAULT_*` member doubles as the `Settings` attribute it writes, which is what lets the
+    default-meeting-option toggles share one call site.
     """
 
     LANGUAGE = auto()
@@ -70,3 +73,6 @@ class SettingName(StrEnum):
     DEFAULT_ALLOW_INVITATION = auto()
     DEFAULT_INCOGNITO = auto()
     DEFAULT_LOCK_ON_START = auto()
+    DEFAULT_SHOW_TIMEZONE = auto()
+    DEFAULT_CLOCK_24H = auto()
+    DEFAULT_DATE_FORMAT = auto()

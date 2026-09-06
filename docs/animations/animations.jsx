@@ -333,7 +333,9 @@ function Stage({
 }) {
   const [time, setTime] = React.useState(() => {
     try {
-      const v = parseFloat(localStorage.getItem(persistKey + ':t') || '0');
+      // A `?t=<seconds>` query opens the stage at that moment, for previews and screenshots.
+      const seek = new URLSearchParams(window.location.search).get('t');
+      const v = parseFloat(seek ?? localStorage.getItem(persistKey + ':t') ?? '0');
       return isFinite(v) ? clamp(v, 0, duration) : 0;
     } catch { return 0; }
   });

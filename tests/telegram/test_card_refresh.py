@@ -11,14 +11,25 @@ from telegram.error import BadRequest
 from telegram.ext import ExtBot
 
 from mitup_bot import card_refresh, reconcile
-from mitup_bot.api_wrapper import BotAdapter, MeetingRefresh, TelegramApi
+from mitup_bot.api_wrapper import (
+    BackgroundJob,
+    BotAdapter,
+    JobKey,
+    JobKind,
+    KeyedSend,
+    MeetingRefresh,
+    TelegramApi,
+    meeting_job_key,
+)
 from mitup_bot.card_refresh import JobOutcome, RefreshQueue, RunningJob, WorkerLimits
 from mitup_bot.config import AppConfig, RunModes
 from mitup_bot.models import Meetup
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.protocols import ContextOrBotAdapter
+from mitup_bot.utils.rich_message import RichMessagePayload
 from tests.helpers.fixtures import create_meetup, create_message, create_user
 from tests.helpers.monitoring import MetricAssertions
+from tests.helpers.rich_transport import rich_call
 from tests.helpers.stub_db import MockDbSession
 
 WORKER_TIMEOUT = 5.0
@@ -61,7 +72,7 @@ def queue(refresh_api: TelegramApi, metrics_client: MetricsClient) -> RefreshQue
 
 def mark_in_flight(queue: RefreshQueue, meeting_id: int):
     """Hold a meeting in flight the way `take` does, for tests that never run the drain loop."""
-    queue.in_flight[meeting_id] = RunningJob(MeetingRefresh(meeting_id=meeting_id), perf_counter())
+    queue.in_flight[meeting_job_key(meeting_id)] = RunningJob(MeetingRefresh(meeting_id=meeting_id), perf_counter())
 
 
 def emitted_values(client: MetricsClient, name: MetricKey) -> list[float]:
@@ -102,7 +113,7 @@ def test_submit_keeps_one_job_per_meeting(queue: RefreshQueue):
     assert queue.submit(MeetingRefresh(meeting_id=7, skip_message_db_id=41))
     assert queue.submit(MeetingRefresh(meeting_id=8))
 
-    assert list(queue.pending) == [7, 8]
+    assert list(queue.pending) == [meeting_job_key(7), meeting_job_key(8)]
 
 
 @pytest.mark.parametrize(
@@ -123,7 +134,9 @@ def test_conflicting_skips_coalesce_to_no_skip(
     queue.submit(MeetingRefresh(meeting_id=7, skip_message_db_id=waiting_skip))
     queue.submit(MeetingRefresh(meeting_id=7, skip_message_db_id=incoming_skip))
 
-    assert queue.pending[7] == MeetingRefresh(meeting_id=7, skip_message_db_id=merged_skip, coalesced=1)
+    assert queue.pending[meeting_job_key(7)] == MeetingRefresh(
+        meeting_id=7, skip_message_db_id=merged_skip, coalesced=1
+    )
 
 
 @pytest.mark.parametrize(
@@ -147,7 +160,9 @@ def test_coalescing_scopes_cover_every_card_either_submit_asked_for(
     queue.submit(MeetingRefresh(meeting_id=7, message_db_ids=waiting_scope))
     queue.submit(MeetingRefresh(meeting_id=7, message_db_ids=incoming_scope))
 
-    assert queue.pending[7].message_db_ids == merged_scope
+    merged = queue.pending[meeting_job_key(7)]
+    assert isinstance(merged, MeetingRefresh)
+    assert merged.message_db_ids == merged_scope
 
 
 def test_a_merged_job_keeps_the_origin_and_the_wait_of_the_submit_it_merged_into(queue: RefreshQueue):
@@ -155,11 +170,11 @@ def test_a_merged_job_keeps_the_origin_and_the_wait_of_the_submit_it_merged_into
     submit's update and enqueue time: `queue_wait_ms` measures the oldest unrendered change, and
     the pivot leads to the update whose user has been looking at a stale card since."""
     queue.submit(MeetingRefresh(meeting_id=7, origin_update_id=4242))
-    first = queue.pending[7]
+    first = queue.pending[meeting_job_key(7)]
 
     queue.submit(MeetingRefresh(meeting_id=7, origin_update_id=9999))
 
-    merged = queue.pending[7]
+    merged = queue.pending[meeting_job_key(7)]
     assert merged.origin_update_id == 4242
     assert merged.enqueued_at == first.enqueued_at
     assert merged.coalesced == 1
@@ -172,7 +187,7 @@ def test_a_skip_is_not_honoured_while_the_meeting_is_in_flight(queue: RefreshQue
 
     assert queue.submit(MeetingRefresh(meeting_id=7, skip_message_db_id=41))
 
-    assert queue.pending[7] == MeetingRefresh(meeting_id=7, skip_message_db_id=None)
+    assert queue.pending[meeting_job_key(7)] == MeetingRefresh(meeting_id=7, skip_message_db_id=None)
 
 
 def test_an_in_flight_meeting_drops_the_skip_before_coalescing(queue: RefreshQueue):
@@ -183,7 +198,7 @@ def test_an_in_flight_meeting_drops_the_skip_before_coalescing(queue: RefreshQue
 
     queue.submit(MeetingRefresh(meeting_id=7, skip_message_db_id=41))
 
-    assert queue.pending[7] == MeetingRefresh(meeting_id=7, skip_message_db_id=None, coalesced=1)
+    assert queue.pending[meeting_job_key(7)] == MeetingRefresh(meeting_id=7, skip_message_db_id=None, coalesced=1)
 
 
 # --- The pending cap ---
@@ -200,8 +215,8 @@ def test_the_pending_cap_drops_a_new_meeting_and_reports_it(refresh_api: Telegra
         accepted = queue.submit(MeetingRefresh(meeting_id=3))
 
     assert accepted is False
-    assert list(queue.pending) == [1, 2]
-    dropped = [entry for entry in logs if entry["event"] == "Meeting card refresh dropped"]
+    assert list(queue.pending) == [meeting_job_key(1), meeting_job_key(2)]
+    dropped = [entry for entry in logs if entry["event"] == "Background job dropped"]
     assert len(dropped) == 1
     assert dropped[0]["log_level"] == "warning"
     assert dropped[0]["reason"] == "queue_full"
@@ -221,7 +236,7 @@ def test_the_pending_cap_still_coalesces_onto_a_waiting_meeting(
 
     assert queue.submit(MeetingRefresh(meeting_id=1, skip_message_db_id=42))
 
-    assert queue.pending[1] == MeetingRefresh(meeting_id=1, skip_message_db_id=None, coalesced=1)
+    assert queue.pending[meeting_job_key(1)] == MeetingRefresh(meeting_id=1, skip_message_db_id=None, coalesced=1)
 
 
 # --- Taking a job ---
@@ -237,9 +252,9 @@ def test_take_claims_jobs_oldest_first_and_marks_them_in_flight(queue: RefreshQu
 
     assert taken is not None
     assert taken.job == MeetingRefresh(meeting_id=7)
-    assert queue.in_flight == {7: taken}
+    assert queue.in_flight == {meeting_job_key(7): taken}
     assert taken.started >= taken.job.enqueued_at
-    assert list(queue.pending) == [8]
+    assert list(queue.pending) == [meeting_job_key(8)]
     next_taken = queue.take()
     assert next_taken is not None
     assert next_taken.job == MeetingRefresh(meeting_id=8)
@@ -256,7 +271,7 @@ async def test_the_key_leaves_pending_before_the_meeting_is_read(
     the meeting must be able to queue a job of its own. Were the key still in `pending` at read
     time the two would coalesce, and the queue would settle on the older job's view of the
     meeting with the newer change never rendered."""
-    observed_pending: list[dict[int, MeetingRefresh]] = []
+    observed_pending: list[dict[JobKey, BackgroundJob]] = []
 
     async def observe_then_load(session: object, meetup_id: int) -> Meetup:
         observed_pending.append(dict(queue.pending))
@@ -270,7 +285,7 @@ async def test_the_key_leaves_pending_before_the_meeting_is_read(
     assert observed_pending == [{}]
     # The concurrent submit survived as a job of its own, with its skip dropped because the
     # meeting was in flight when it arrived.
-    assert queue.pending[7] == MeetingRefresh(meeting_id=7, skip_message_db_id=None)
+    assert queue.pending[meeting_job_key(7)] == MeetingRefresh(meeting_id=7, skip_message_db_id=None)
     assert queue.in_flight == {}
 
 
@@ -289,15 +304,15 @@ async def test_execute_renders_every_card_and_reconciles_the_dead_one(
     by the write lifecycle's reconcile transaction."""
     mock_session.add_object(meeting_with_two_cards)
     owner_card, shared_card = meeting_with_two_cards.messages
-    bot.edit_message_text.side_effect = [BadRequest("Message to edit not found"), None]
+    bot.do_api_request.side_effect = [BadRequest("Message to edit not found"), None]
 
     await queue.execute(MeetingRefresh(meeting_id=7))
 
-    assert bot.edit_message_text.await_count == 2
+    assert bot.do_api_request.await_count == 2
     # The text came off the loaded meeting, so the render read the DB rather than anything the
     # job carried, and it reached both the owner's card and the shared one.
-    assert "Refresh me" in bot.edit_message_text.call_args_list[0].kwargs["text"]
-    assert bot.edit_message_text.call_args_list[1].kwargs["inline_message_id"] == shared_card.inline_message_id
+    assert "Refresh me" in rich_call(bot, 0).html
+    assert rich_call(bot, 1).inline_message_id == shared_card.inline_message_id
     delete_queries = [query for query in mock_session.queries_executed if query.startswith("DELETE FROM messages")]
     assert len(delete_queries) == 1
     assert f"messages.id IN ({owner_card.id})" in delete_queries[0]
@@ -318,8 +333,8 @@ async def test_execute_passes_over_the_card_the_submitter_already_rendered(
 
     await queue.execute(MeetingRefresh(meeting_id=7, skip_message_db_id=owner_card.id))
 
-    bot.edit_message_text.assert_awaited_once()
-    assert bot.edit_message_text.call_args.kwargs["inline_message_id"] == shared_card.inline_message_id
+    bot.do_api_request.assert_awaited_once()
+    assert rich_call(bot).inline_message_id == shared_card.inline_message_id
 
 
 async def test_execute_draws_only_the_cards_the_job_is_scoped_to(
@@ -336,8 +351,8 @@ async def test_execute_draws_only_the_cards_the_job_is_scoped_to(
 
     await queue.execute(MeetingRefresh(meeting_id=7, message_db_ids=frozenset({shared_card.id})))
 
-    bot.edit_message_text.assert_awaited_once()
-    assert bot.edit_message_text.call_args.kwargs["inline_message_id"] == shared_card.inline_message_id
+    bot.do_api_request.assert_awaited_once()
+    assert rich_call(bot).inline_message_id == shared_card.inline_message_id
 
 
 async def test_execute_refreshes_every_card_when_the_skipped_one_is_gone(
@@ -353,7 +368,7 @@ async def test_execute_refreshes_every_card_when_the_skipped_one_is_gone(
 
     await queue.execute(MeetingRefresh(meeting_id=7, skip_message_db_id=999))
 
-    assert bot.edit_message_text.await_count == 2
+    assert bot.do_api_request.await_count == 2
 
 
 async def test_execute_is_a_no_op_when_the_meeting_is_gone(
@@ -365,7 +380,7 @@ async def test_execute_is_a_no_op_when_the_meeting_is_gone(
     """A meeting deleted between submit and run has no cards left to draw and must not raise."""
     assert await queue.execute(MeetingRefresh(meeting_id=7)) is JobOutcome.SKIPPED
 
-    bot.edit_message_text.assert_not_awaited()
+    bot.do_api_request.assert_not_awaited()
 
 
 async def test_a_job_draws_its_own_cards_rather_than_queueing_the_meeting_again(
@@ -382,7 +397,7 @@ async def test_a_job_draws_its_own_cards_rather_than_queueing_the_meeting_again(
 
     await queue.execute(MeetingRefresh(meeting_id=7))
 
-    assert bot.edit_message_text.await_count == 2
+    assert bot.do_api_request.await_count == 2
     assert queue.pending == {}
 
 
@@ -397,7 +412,7 @@ async def test_a_failed_card_edit_reports_the_card_by_size(
     title, description and participants its users wrote: the queue's api reports how big the card
     was and never what it said."""
     mock_session.add_object(meeting_with_two_cards)
-    bot.edit_message_text.side_effect = BadRequest("Bad Request: message can't be edited")
+    bot.do_api_request.side_effect = BadRequest("Bad Request: message can't be edited")
 
     with capture_logs() as logs:
         await queue.execute(MeetingRefresh(meeting_id=7))
@@ -405,7 +420,7 @@ async def test_a_failed_card_edit_reports_the_card_by_size(
     failures = [entry for entry in logs if entry["event"] == "Queued Telegram call failed after commit"]
     assert len(failures) == 2
     payload = failures[0]["payload"]
-    assert set(payload) == {"chat_id", "message_id", "inline_message_id", "text_len", "entity_count"}
+    assert set(payload) == {"chat_id", "message_id", "inline_message_id", "text_len"}
     assert payload["text_len"] > 0
 
 
@@ -419,7 +434,7 @@ async def test_run_next_does_nothing_when_the_queue_is_empty(
     no-op rather than a job that is not there."""
     await queue.run_next()
 
-    bot.edit_message_text.assert_not_awaited()
+    bot.do_api_request.assert_not_awaited()
     assert queue.in_flight == {}
     # A take that found nothing timed nothing: the sample would be a zero the p90 has to carry.
     metrics.assert_not_emitted(name=MetricKey.JOB_PROCESSING_TIME)
@@ -786,7 +801,7 @@ async def test_a_stopping_queue_takes_no_more_work(queue: RefreshQueue):
 
     assert accepted is False
     assert queue.pending == {}
-    dropped = [entry for entry in logs if entry["event"] == "Meeting card refresh dropped"]
+    dropped = [entry for entry in logs if entry["event"] == "Background job dropped"]
     assert len(dropped) == 1
     assert dropped[0]["log_level"] == "warning"
     assert dropped[0]["reason"] == "shutting_down"
@@ -912,8 +927,8 @@ async def test_every_job_reports_one_fault_sample_whichever_way_it_ended(
 def test_a_wedged_worker_keeps_reporting_the_jobs_waiting_behind_it(queue: RefreshQueue, metrics: MetricAssertions):
     """Depth is reported from what is standing at publication time as well as from the submits,
     so a queue nobody adds to and nobody drains still reads as a backlog instead of a zero."""
-    queue.pending[7] = MeetingRefresh(meeting_id=7)
-    queue.pending[8] = MeetingRefresh(meeting_id=8)
+    queue.pending[meeting_job_key(7)] = MeetingRefresh(meeting_id=7)
+    queue.pending[meeting_job_key(8)] = MeetingRefresh(meeting_id=8)
 
     queue.report()
 
@@ -1021,3 +1036,133 @@ def test_current_queue_is_none_where_no_runtime_configured_one():
     """A CLI job and a test render their cards inline; a submit there has to be a no-op rather
     than a failure, which is what the None answer buys the enqueuing call sites."""
     assert card_refresh.current_queue() is None
+
+
+# --- Holding a job while the rest of its burst arrives ---
+
+HOLD_SECONDS = 0.05
+ALBUM_KEY: JobKey = ("album", "media-group-1")
+
+
+def keyed_send(html: str, hold_seconds: float = 0.0) -> KeyedSend:
+    return KeyedSend(key=ALBUM_KEY, chat_id=100, payload=RichMessagePayload(html=html), hold_seconds=hold_seconds)
+
+
+def test_a_job_with_no_hold_may_be_taken_at_once(queue: RefreshQueue):
+    queue.submit(MeetingRefresh(meeting_id=7))
+
+    assert queue.next_ready_in() == 0.0
+    assert queue.take() is not None
+
+
+def test_a_held_job_is_left_waiting_until_its_hold_runs_out(queue: RefreshQueue):
+    queue.submit(MeetingRefresh(meeting_id=7, hold_seconds=HOLD_SECONDS))
+
+    assert queue.take() is None
+    remaining = queue.next_ready_in()
+    assert remaining is not None
+    assert 0.0 < remaining <= HOLD_SECONDS
+
+
+def test_a_submit_onto_a_held_job_starts_its_hold_again(queue: RefreshQueue):
+    """Every submit restarts the hold, because the hold measures quiet time after the last submit.
+    The enqueue time stays the first submit's, so the reported wait covers the whole burst."""
+    queue.submit(MeetingRefresh(meeting_id=7, hold_seconds=HOLD_SECONDS))
+    waiting = queue.pending[meeting_job_key(7)]
+
+    queue.submit(MeetingRefresh(meeting_id=7, hold_seconds=HOLD_SECONDS))
+
+    merged = queue.pending[meeting_job_key(7)]
+    assert merged.hold_since > waiting.hold_since
+    assert merged.enqueued_at == waiting.enqueued_at
+    assert queue.take() is None
+
+
+def test_a_queue_out_of_service_holds_nothing(queue: RefreshQueue):
+    """A stopping queue accepts no submits, so a held job has nothing left to wait for."""
+    queue.submit(MeetingRefresh(meeting_id=7, hold_seconds=HOLD_SECONDS))
+    queue.accepting = False
+
+    assert queue.next_ready_in() == 0.0
+    assert queue.take() is not None
+
+
+async def test_the_worker_runs_a_held_meeting_refresh_once_its_burst_goes_quiet(queue: RefreshQueue):
+    executed: list[BackgroundJob] = []
+    ran = asyncio.Event()
+
+    async def execute(job: BackgroundJob) -> JobOutcome:
+        executed.append(job)
+        ran.set()
+        return JobOutcome.REFRESHED
+
+    with mock.patch.object(queue, "execute", side_effect=execute):
+        worker = asyncio.create_task(queue.run_worker())
+        submitted = perf_counter()
+        for _ in range(3):
+            queue.submit(MeetingRefresh(meeting_id=7, hold_seconds=HOLD_SECONDS))
+        async with asyncio.timeout(WORKER_TIMEOUT):
+            await ran.wait()
+        finished = perf_counter()
+        worker.cancel()
+        with suppress(asyncio.CancelledError):
+            await worker
+
+    assert len(executed) == 1
+    assert executed[0].coalesced == 2
+    assert finished - submitted >= HOLD_SECONDS
+
+
+# --- The keyed send ---
+
+
+def test_a_later_send_under_one_key_replaces_the_one_waiting(queue: RefreshQueue):
+    """The last rendered message already reflects every earlier change, so it is the one to post."""
+    queue.submit(keyed_send("first"))
+    queue.submit(keyed_send("second"))
+
+    waiting = queue.pending[ALBUM_KEY]
+    assert isinstance(waiting, KeyedSend)
+    assert waiting.payload.html == "second"
+    assert waiting.coalesced == 1
+    assert list(queue.pending) == [ALBUM_KEY]
+
+
+async def test_a_keyed_send_posts_the_payload_it_carries(queue: RefreshQueue, bot: mock.AsyncMock):
+    assert await queue.execute(keyed_send("only")) is JobOutcome.SENT
+
+    bot.do_api_request.assert_awaited_once()
+    assert rich_call(bot).chat_id == 100
+    assert rich_call(bot).html == "only"
+
+
+async def test_a_keyed_send_telegram_refuses_is_counted_and_never_raised(queue: RefreshQueue, bot: mock.AsyncMock):
+    """A refused send counts as a failed job and does not stop the drain loop."""
+    bot.do_api_request.side_effect = BadRequest("Chat not found")
+
+    with capture_logs() as logs:
+        outcome = await queue.run_job(RunningJob(keyed_send("gone"), perf_counter()))
+
+    assert outcome is JobOutcome.FAILED
+    assert queue.counters.failed == 1
+    failures = [entry for entry in logs if entry["event"] == "Background job failed"]
+    assert len(failures) == 1
+    assert failures[0]["job_kind"] == JobKind.KEYED_SEND
+    assert failures[0]["job_key"] == "album:media-group-1"
+
+
+async def test_the_worker_posts_a_held_send_once_its_burst_goes_quiet(queue: RefreshQueue, bot: mock.AsyncMock):
+    """Three photos of one album leave the chat with one screen, the last one rendered."""
+    worker = asyncio.create_task(queue.run_worker())
+    for index in range(3):
+        queue.submit(keyed_send(f"screen-{index}", hold_seconds=HOLD_SECONDS))
+
+    async with asyncio.timeout(WORKER_TIMEOUT):
+        while not bot.do_api_request.await_count:
+            await asyncio.sleep(HOLD_SECONDS / 4)
+    worker.cancel()
+    with suppress(asyncio.CancelledError):
+        await worker
+
+    bot.do_api_request.assert_awaited_once()
+    assert rich_call(bot).html == "screen-2"

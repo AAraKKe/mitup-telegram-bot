@@ -1,10 +1,17 @@
+from collections.abc import Callable
+
 import pytest
 from telegram import Update
 
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views.meeting_settings import default_meeting_settings_view
+from mitup_bot.views import MitupView
+from mitup_bot.views.meeting_settings import (
+    default_behavior_view,
+    default_meeting_settings_view,
+    default_time_format_view,
+)
 from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler
 
 
@@ -79,7 +86,40 @@ async def test_callbacks_to_set_default_option(
 
     context, _ = await call_handler(handler_id, handler_context=handler_context)
 
-    expected_view = default_meeting_settings_view(settings)
+    expected_view = default_behavior_view(settings)
 
     context.api.assert_edit_message_called(update, expected_view)
     assert_default_options_value(settings, handler_id, waiting_list, public, invitation, incognito)
+
+
+@pytest.mark.parametrize(
+    "update,handler_id,sub_card",
+    [
+        (
+            UpdateRequest(callback_query=cb.OPEN_DEFAULT_BEHAVIOR),
+            EditSettingsHandlerId.OPEN_DEFAULT_BEHAVIOR,
+            default_behavior_view,
+        ),
+        (
+            UpdateRequest(callback_query=cb.OPEN_DEFAULT_TIME_FORMAT),
+            EditSettingsHandlerId.OPEN_DEFAULT_TIME_FORMAT,
+            default_time_format_view,
+        ),
+    ],
+    ids=["behavior", "time_format"],
+    indirect=["update"],
+)
+async def test_opening_a_sub_card_draws_it_over_the_default_options_card(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    update: Update,
+    handler_id: EditSettingsHandlerId,
+    sub_card: Callable[[Settings], MitupView],
+    handler_context: HandlerContext,
+):
+    settings = user_with_settings.settings
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    context, _ = await call_handler(handler_id, handler_context=handler_context)
+
+    context.api.assert_edit_message_called(update, sub_card(settings))

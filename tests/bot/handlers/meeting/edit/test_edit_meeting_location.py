@@ -14,13 +14,13 @@ from mitup_bot.handlers.meeting.edit.edit_meeting_location import (
     edit_location_name_rich_message_handler,
 )
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
-from mitup_bot.handlers.meeting.edit.views import edit_location_view
 from mitup_bot.keyboards import ButtonConfig
-from mitup_bot.models import Meetup, MeetupLocation, User
+from mitup_bot.models import MeetingCounts, MeetupLocation, User
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, MeetingEditLocationMessages
 from mitup_bot.views import MitupView, RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -68,35 +68,6 @@ def assert_metrics_for_failure(error_type: type[Exception], metrics_client: Metr
     metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
 
 
-def test_edit_location_view(meeting: Meetup, lang: str):
-    meeting_id = meeting.db_id
-    meeting.language = lang
-
-    result = edit_location_view(meeting=meeting)
-    expected_view = MitupView(
-        description=MeetingEditLocationMessages.DESCRIPTION.get(lang=lang),
-        keyboard=[
-            [
-                ButtonConfig(
-                    text=ButtonMessages.MEETING_LOCATION_NAME.get_text(lang=lang),
-                    callback_data=cb.EDIT_MEETING_LOCATION_NAME.with_id(meeting_id),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.MEETING_LOCATION_COORDINATES.get_text(lang=lang),
-                    callback_data=cb.EDIT_MEETING_LOCATION_COORDINATES.with_id(meeting_id),
-                ),
-            ],
-            [
-                ButtonConfig(
-                    text=ButtonMessages.EDIT.back(lang=lang), callback_data=cb.EDIT_MEETING.with_id(meeting_id)
-                ),
-            ],
-        ],
-    )
-
-    assert expected_view == result
-
-
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION.with_id(1))], indirect=True)
 async def test_edit_location_works(
     mock_session: MockDbSession,
@@ -109,7 +80,12 @@ async def test_edit_location_works(
 
     context, _ = await call_handler(EditMeetingHandlerId.LOCATION_CALLBACK, handler_context=handler_context)
 
-    context.api.assert_edit_message_called(update, edit_location_view(user_with_settings.meetups[0]))
+    context.api.assert_edit_message_called(
+        update,
+        meeting_views.owner_view(user_with_settings.meetups[0]).with_context(
+            CommonMessages.EDITING_REVAMP_BANNER.rich(lang=user_with_settings.lang)
+        ),
+    )
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION.with_id(999))], indirect=True)
@@ -183,18 +159,18 @@ async def test_edit_location_name_works(
 
     context, result = await call_handler(EditMeetingHandlerId.LOCATION_NAME_CALLBACK, handler_context=handler_context)
     expected_view = MitupView(
-        description=MeetingEditLocationMessages.NAME_PROMPT.get(lang=user_with_settings.lang),
-        keyboard=[
+        message=MeetingEditLocationMessages.NAME_PROMPT.rich(lang=user_with_settings.lang),
+        menu=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.text(lang=user_with_settings.lang),
                     callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(1),
                 )
             ]
         ],
     )
 
-    context.api.assert_send_message_called(update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)
     assert result is ConversationMeetingState.EDIT_LOCATION_NAME
     with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME) as meeting_id:
         assert meeting_id == 1
@@ -280,18 +256,18 @@ async def test_edit_location_coordinates_works(
         EditMeetingHandlerId.LOCATION_COORDINATES_CALLBACK, handler_context=handler_context
     )
     expected_view = MitupView(
-        description=MeetingEditLocationMessages.COORDINATES_PROMPT.get(lang=user_with_settings.lang),
-        keyboard=[
+        message=MeetingEditLocationMessages.COORDINATES_PROMPT.rich(lang=user_with_settings.lang),
+        menu=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.text(lang=user_with_settings.lang),
                     callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(1),
                 )
             ]
         ],
     )
 
-    context.api.assert_send_message_called(update, expected_view)
+    context.api.assert_edit_message_called(update, expected_view)
     assert result is ConversationMeetingState.EDIT_LOCATION_COORDIANTES
     with context.meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES) as meeting_id:
         assert meeting_id == 1
@@ -380,12 +356,8 @@ async def test_edit_location_name_message_works(
         handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_LOCATION_NAME: 1},
     )
-    expected_view = edit_location_view(meeting).with_context(
-        MeetingEditLocationMessages.NAME_SUCCESS.get(name=meeting.location.name)
-    )
-
     assert meeting.location.name == "My Location"
-    context.api.assert_send_message_called(update, expected_view)
+    context.api.assert_send_message_called(update, meeting_views.owner_view(meeting))
     assert result is ConversationHandler.END
     # Meeting id has been cleaned from the context
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
@@ -415,7 +387,8 @@ async def test_edit_location_name_message_fails_if_context_not_saved(
         update,
         factory.main_menu_view(
             RenderContext(lang=user_with_settings.lang),
-            message=CommonMessages.CONTEXT_LOST.get(lang=user_with_settings.lang),
+            message=CommonMessages.CONTEXT_LOST.rich(lang=user_with_settings.lang),
+            counts=MeetingCounts(0, 0, 0),
         ),
     )
 
@@ -436,12 +409,8 @@ async def test_edit_location_coordinates_message_works(
         handler_context=handler_context,
         with_meeting_id={ContextId.EDIT_MEETING_LOCATION_COORDINATES: 1},
     )
-    expected_view = edit_location_view(meeting).with_context(
-        MeetingEditLocationMessages.COORDINATES_SUCCESS.get(lang=user_with_settings.lang)
-    )
-
     assert meeting.location.coordinates == (123.4, 567.8)
-    context.api.assert_send_message_called(update, expected_view)
+    context.api.assert_send_message_called(update, meeting_views.owner_view(meeting))
     assert result is ConversationHandler.END
     # Meeting id has been cleaned from the context
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_COORDINATES)
@@ -471,7 +440,8 @@ async def test_edit_location_coordinates_message_fails_if_context_not_saved(
         update,
         factory.main_menu_view(
             RenderContext(lang=user_with_settings.lang),
-            message=CommonMessages.CONTEXT_LOST.get(lang=user_with_settings.lang),
+            message=CommonMessages.CONTEXT_LOST.rich(lang=user_with_settings.lang),
+            counts=MeetingCounts(0, 0, 0),
         ),
     )
 
@@ -494,11 +464,11 @@ async def test_edit_location_coordinates_message_with_wrong_message(
     )
 
     expected_view = MitupView(
-        description=MeetingEditLocationMessages.COORDINATES_INVALID.get(lang=user_with_settings.lang),
-        keyboard=[
+        message=MeetingEditLocationMessages.COORDINATES_INVALID.rich(lang=user_with_settings.lang),
+        menu=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.text(lang=user_with_settings.lang),
                     callback_data=cb.CANCEL_EDIT_MEETING_LOCATION.with_id(1),
                 )
             ]
@@ -532,7 +502,8 @@ async def test_edit_location_coordinates_message_with_wrong_message_fails_withou
         update,
         factory.main_menu_view(
             RenderContext(lang=user_with_settings.lang),
-            message=CommonMessages.CONTEXT_LOST.get(lang=user_with_settings.lang),
+            message=CommonMessages.CONTEXT_LOST.rich(lang=user_with_settings.lang),
+            counts=MeetingCounts(0, 0, 0),
         ),
     )
 
@@ -551,7 +522,7 @@ async def test_cancel_edit_meeting_location_property_works(
 
     context, result = await call_handler(EditMeetingHandlerId.LOCATION_CANCEL_CALLBACK, handler_context=handler_context)
 
-    context.api.assert_edit_message_called(update, edit_location_view(user_with_settings.meetups[0]))
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(user_with_settings.meetups[0]))
     assert result is ConversationHandler.END
 
 
@@ -593,7 +564,11 @@ async def test_edit_location_name_message_sends_main_menu_when_context_missing(
     assert state == ConversationHandler.END
     context.api.assert_send_message_called(
         update,
-        factory.main_menu_view(RenderContext(lang=user.lang), message=CommonMessages.CONTEXT_LOST.get(lang=user.lang)),
+        factory.main_menu_view(
+            RenderContext(lang=user.lang),
+            message=CommonMessages.CONTEXT_LOST.rich(lang=user.lang),
+            counts=MeetingCounts(0, 0, 0),
+        ),
     )
 
 
@@ -632,7 +607,11 @@ async def test_edit_location_coordinates_wrong_message_sends_main_menu_when_cont
     assert state == ConversationHandler.END
     context.api.assert_send_message_called(
         update,
-        factory.main_menu_view(RenderContext(lang=user.lang), message=CommonMessages.CONTEXT_LOST.get(lang=user.lang)),
+        factory.main_menu_view(
+            RenderContext(lang=user.lang),
+            message=CommonMessages.CONTEXT_LOST.rich(lang=user.lang),
+            counts=MeetingCounts(0, 0, 0),
+        ),
     )
 
 
@@ -671,7 +650,11 @@ async def test_edit_location_coordinates_message_sends_main_menu_when_context_mi
     assert state == ConversationHandler.END
     context.api.assert_send_message_called(
         update,
-        factory.main_menu_view(RenderContext(lang=user.lang), message=CommonMessages.CONTEXT_LOST.get(lang=user.lang)),
+        factory.main_menu_view(
+            RenderContext(lang=user.lang),
+            message=CommonMessages.CONTEXT_LOST.rich(lang=user.lang),
+            counts=MeetingCounts(0, 0, 0),
+        ),
     )
 
 
@@ -731,10 +714,7 @@ async def test_edit_location_coordinates_message_mutates_session_meeting(
 
     assert session_meeting.location.coordinates == (123.4, 567.8)
     assert user_rooted_meeting.location.coordinates is None
-    expected_view = edit_location_view(session_meeting).with_context(
-        MeetingEditLocationMessages.COORDINATES_SUCCESS.get(lang=user.lang)
-    )
-    context.api.assert_send_message_called(update, expected_view)
+    context.api.assert_send_message_called(update, meeting_views.owner_view(session_meeting))
     assert result is ConversationHandler.END
 
 
@@ -752,7 +732,7 @@ async def test_edit_location_name_rich_message_reprompts_and_keeps_state(
     state = await edit_location_name_rich_message_handler(update, context)
 
     expected = edit_location_name_prompt_view(1, user_with_settings.lang).with_context(
-        CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=user_with_settings.lang)
+        CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.rich(lang=user_with_settings.lang)
     )
     context.api.assert_send_message_called(update, expected)
     assert state == ConversationMeetingState.EDIT_LOCATION_NAME
@@ -795,7 +775,7 @@ async def test_over_cap_location_name_leaves_the_venue_untouched_and_reprompts(
     assert context.has_meeting_id(ContextId.EDIT_MEETING_LOCATION_NAME)
     context.api.assert_method_just_called("update_meeting_messages", times=0)
 
-    error = MeetingEditLocationMessages.LOCATION_NAME_TOO_LONG.get(
+    error = MeetingEditLocationMessages.LOCATION_NAME_TOO_LONG.rich(
         lang=user_with_settings.lang, length=len(OVER_CAP_LOCATION_NAME), limit=limits.LOCATION_NAME_MAX_CHARS
     )
     assert str(len(OVER_CAP_LOCATION_NAME)) in error.text
@@ -831,3 +811,187 @@ async def test_location_name_at_the_cap_is_stored(
 
     assert meeting.location.name == "l" * limits.LOCATION_NAME_MAX_CHARS
     assert state == ConversationHandler.END
+
+
+# ---------------------------------------------------------------------------
+# Remove location name: confirmation, confirm, decline
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.DELETE_MEETING_LOCATION_NAME.with_id(1))],
+    indirect=True,
+)
+async def test_remove_location_name_shows_confirmation(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting = user_with_settings.meetups[0]
+    meeting.location = MeetupLocation(name="The Old Cafe")
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(EditMeetingHandlerId.REMOVE_LOCATION_NAME_CALLBACK, handler_context=handler_context)
+
+    context.api.assert_edit_message_called(
+        update,
+        factory.confirmation_view(
+            RenderContext(lang=user_with_settings.lang),
+            message=MeetingEditLocationMessages.REMOVE_NAME_CONFIRMATION.rich(lang=user_with_settings.lang),
+            confirm_callback_data=cb.CONFIRM_DELETE_MEETING_LOCATION_NAME.with_id(1),
+            decline_callback_data=cb.DECLINE_DELETE_MEETING_LOCATION_NAME.with_id(1),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_LOCATION_NAME.with_id(1))],
+    indirect=True,
+)
+async def test_confirm_remove_location_name_clears_it_and_keeps_the_pin(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting = user_with_settings.meetups[0]
+    meeting.location = MeetupLocation(name="The Old Cafe", coordinates=(123.4, 567.8))
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.CONFIRM_REMOVE_LOCATION_NAME_CALLBACK, handler_context=handler_context
+    )
+
+    assert meeting.location.name is None
+    assert meeting.location.coordinates == (123.4, 567.8)
+
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(meeting))
+    context.api.assert_update_meeting_messages_called(
+        meeting=meeting,
+        current_message=meeting.message_from_update(update),
+        skip_current=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_LOCATION_NAME.with_id(1))],
+    indirect=True,
+)
+async def test_decline_remove_location_name_keeps_it(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting = user_with_settings.meetups[0]
+    meeting.location = MeetupLocation(name="The Old Cafe")
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.DECLINE_REMOVE_LOCATION_NAME_CALLBACK, handler_context=handler_context
+    )
+
+    assert meeting.location.name == "The Old Cafe"
+    mock_session.assert_not_added()
+    mock_session.assert_not_flushed()
+
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(meeting))
+
+
+# ---------------------------------------------------------------------------
+# Remove coordinates: confirmation, confirm, decline
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.DELETE_MEETING_COORDINATES.with_id(1))],
+    indirect=True,
+)
+async def test_remove_coordinates_shows_confirmation(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting = user_with_settings.meetups[0]
+    meeting.location = MeetupLocation(coordinates=(123.4, 567.8))
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(EditMeetingHandlerId.REMOVE_COORDINATES_CALLBACK, handler_context=handler_context)
+
+    context.api.assert_edit_message_called(
+        update,
+        factory.confirmation_view(
+            RenderContext(lang=user_with_settings.lang),
+            message=MeetingEditLocationMessages.REMOVE_COORDINATES_CONFIRMATION.rich(lang=user_with_settings.lang),
+            confirm_callback_data=cb.CONFIRM_DELETE_MEETING_COORDINATES.with_id(1),
+            decline_callback_data=cb.DECLINE_DELETE_MEETING_COORDINATES.with_id(1),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_COORDINATES.with_id(1))],
+    indirect=True,
+)
+async def test_confirm_remove_coordinates_clears_them_and_keeps_the_name(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting = user_with_settings.meetups[0]
+    meeting.location = MeetupLocation(name="The Old Cafe", coordinates=(123.4, 567.8))
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.CONFIRM_REMOVE_COORDINATES_CALLBACK, handler_context=handler_context
+    )
+
+    assert meeting.location.coordinates is None
+    assert meeting.location.name == "The Old Cafe"
+
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(meeting))
+    context.api.assert_update_meeting_messages_called(
+        meeting=meeting,
+        current_message=meeting.message_from_update(update),
+        skip_current=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_COORDINATES.with_id(1))],
+    indirect=True,
+)
+async def test_decline_remove_coordinates_keeps_them(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting = user_with_settings.meetups[0]
+    meeting.location = MeetupLocation(coordinates=(123.4, 567.8))
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.DECLINE_REMOVE_COORDINATES_CALLBACK, handler_context=handler_context
+    )
+
+    assert meeting.location.coordinates == (123.4, 567.8)
+    mock_session.assert_not_added()
+    mock_session.assert_not_flushed()
+
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(meeting))

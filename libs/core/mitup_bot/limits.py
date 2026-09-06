@@ -16,6 +16,7 @@ import datetime as dt
 from typing import TYPE_CHECKING
 
 from mitup_bot import supporter
+from mitup_bot.datetimes import as_utc
 from mitup_bot.lifecycle import LifecyclePolicy
 
 if TYPE_CHECKING:
@@ -60,6 +61,13 @@ LOCATION_NAME_GUARANTEED_CHARS = 128
 A card that is still over budget with its description at the floor above ellipsizes the place name
 next, down to this: enough to leave the venue recognizable to someone who has to find it. Measured
 in UTF-16 code units, as the card measures everything.
+"""
+
+MEETING_IMAGES_MAX = 5
+"""Most photos a meeting can hold.
+
+The banner is drawn as one block, so this keeps it from filling the screen before the meeting's
+own fields.
 """
 
 
@@ -116,8 +124,7 @@ def within_scheduling_horizon(user: User, when: dt.datetime) -> bool:
     days = scheduling_horizon_days(user)
     if days is None:
         return True
-    aware = when if when.tzinfo else when.replace(tzinfo=dt.UTC)
-    picked_date = user.datetime_in_tz(aware).date()
+    picked_date = user.datetime_in_tz(when).date()
     latest = user.now_in_tz().date() + dt.timedelta(days=days)
     return picked_date <= latest
 
@@ -125,9 +132,6 @@ def within_scheduling_horizon(user: User, when: dt.datetime) -> bool:
 def within_max_duration(start: dt.datetime, end: dt.datetime) -> bool:
     """Whether the span from `start` to `end` is at most `LifecyclePolicy.get().max_duration`.
 
-    No tier lifts this cap, so it takes no `User`. Naive datetimes are read as UTC, matching how
-    meeting datetimes are persisted, so the delta is measured on comparable aware values.
+    No tier lifts this cap, so it takes no `User`.
     """
-    start_utc = start if start.tzinfo else start.replace(tzinfo=dt.UTC)
-    end_utc = end if end.tzinfo else end.replace(tzinfo=dt.UTC)
-    return end_utc - start_utc <= LifecyclePolicy.get().max_duration
+    return as_utc(end) - as_utc(start) <= LifecyclePolicy.get().max_duration

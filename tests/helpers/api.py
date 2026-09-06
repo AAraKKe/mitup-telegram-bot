@@ -5,9 +5,10 @@ from unittest import mock
 
 from telegram import Update
 
-from mitup_bot.api_wrapper import ApiOutbox, TelegramApi
+from mitup_bot.api_wrapper import ApiOutbox, OutboxStrategy, TelegramApi
 from mitup_bot.models import Meetup, Message, User
 from mitup_bot.utils.entities import FormattedText
+from mitup_bot.utils.rich_message import RichContent, RichMessagePayload
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from tests.assertions import assert_awaited_once_with_diff, assert_awaited_with_diff
 
@@ -52,19 +53,32 @@ class MockApi(TelegramApi):
         real enqueue/drain ordering should exercise a real TelegramApi instead."""
         return ApiOutbox()
 
-    def send_message_to_user(self, user: User, view: MitupView | FormattedText | str):
+    def send_message_to_user(self, user: User, view: MitupView | RichContent | str):
         return self.call_mock("send_message_to_user", user=user, view=view)
 
-    def send_message(self, update: Update, view: MitupView | FormattedText | str):
-        return self.call_mock("send_message", update=update, view=view)
+    def send_message(
+        self,
+        update: Update,
+        view: MitupView | RichContent | str,
+        *,
+        strategy: OutboxStrategy | None = None,
+    ):
+        # A missing strategy is recorded as an absent argument, so the assertions of the callers
+        # that never pass one keep naming the two arguments they care about.
+        return self.call_mock(
+            "send_message", update=update, view=view, strategy=DEFAULT_NONE if strategy is None else strategy
+        )
 
-    def send_document(self, update: Update, view: MitupView):
-        return self.call_mock("send_document", update=update, view=view)
+    def send_rich_payload(self, chat_id: int, message: RichMessagePayload):
+        return self.call_mock("send_rich_payload", chat_id=chat_id, message=message)
 
-    def edit_message(self, update: Update, view: MitupView | FormattedText | str):
+    def send_draft(self, update: Update, view: MitupView | RichContent | str, *, draft_id: int):
+        return self.call_mock("send_draft", update=update, view=view, draft_id=draft_id)
+
+    def edit_message(self, update: Update, view: MitupView | RichContent | str):
         return self.call_mock("edit_message", update=update, view=view)
 
-    def edit_message_for_user(self, user: User, message_id: int, view: MitupView | FormattedText | str):
+    def edit_message_for_user(self, user: User, message_id: int, view: MitupView | RichContent | str):
         return self.call_mock("edit_message_for_user", user=user, message_id=message_id, view=view)
 
     def update_single_meeting_message(
@@ -91,6 +105,7 @@ class MockApi(TelegramApi):
         was_deleted: bool = DEFAULT_FALSE,  # type: ignore
         has_finished: bool = DEFAULT_FALSE,  # type: ignore
         only_message_db_ids: Collection[int] | None = DEFAULT_NONE,  # type: ignore
+        strategy: OutboxStrategy | None = None,
     ):
         return self.call_mock(
             "update_meeting_messages",
@@ -100,6 +115,7 @@ class MockApi(TelegramApi):
             was_deleted=was_deleted,
             has_finished=has_finished,
             only_message_db_ids=only_message_db_ids,
+            strategy=DEFAULT_NONE if strategy is None else strategy,
         )
 
     def answer_callback_query(
@@ -120,9 +136,6 @@ class MockApi(TelegramApi):
         return self.call_mock(
             "answer_inline_query", update=update, results=results, button=button, cache_time=cache_time
         )
-
-    async def clear_reply_markup(self, update: Update):
-        return await self.call_mock("clear_reply_markup", update=update)
 
     async def approve_chat_join_request(self, chat_id: int, tg_user_id: int) -> bool:
         return applied(await self.call_mock("approve_chat_join_request", chat_id=chat_id, tg_user_id=tg_user_id))
@@ -182,20 +195,26 @@ class MockApi(TelegramApi):
             assert mocked_method is not None
             assert mocked_method.call_count == times
 
-    def assert_send_message_called(self, update: Update, view: MitupView | FormattedText | str, times: int = 1):
-        self.assert_method_called("send_message", update=update, view=view, times=times)
+    def assert_send_message_called(
+        self,
+        update: Update,
+        view: MitupView | RichContent | str,
+        times: int = 1,
+        strategy: OutboxStrategy | None = None,
+    ):
+        self.assert_method_called("send_message", update=update, view=view, times=times, strategy=strategy)
 
-    def assert_send_message_to_user_called(self, user: User, view: MitupView | FormattedText | str, times: int = 1):
+    def assert_send_message_to_user_called(self, user: User, view: MitupView | RichContent | str, times: int = 1):
         if times == 1:
             assert_awaited_once_with_diff(self.mock_method("send_message_to_user"), user=user, view=view)
         else:
             assert_awaited_with_diff(self.mock_method("send_message_to_user"), times, user=user, view=view)
 
-    def assert_edit_message_called(self, update: Update, view: MitupView | FormattedText | str, times: int = 1):
+    def assert_edit_message_called(self, update: Update, view: MitupView | RichContent | str, times: int = 1):
         self.assert_method_called("edit_message", update=update, view=view, times=times)
 
     def assert_edit_message_for_user_called(
-        self, user: User, message_id: int, view: MitupView | FormattedText | str, times: int = 1
+        self, user: User, message_id: int, view: MitupView | RichContent | str, times: int = 1
     ):
         if times == 1:
             assert_awaited_once_with_diff(
@@ -272,11 +291,14 @@ class MockApi(TelegramApi):
         skip_current: bool | None = None,
         was_deleted: bool | None = None,
         only_message_db_ids: Collection[int] | None = None,
+        strategy: OutboxStrategy | None = None,
         times: int = 1,
     ):
         arguments: dict[str, Any] = {
             "meeting": meeting,
         }
+        if strategy is not None:
+            arguments["strategy"] = strategy
         if current_message != DEFAULT_CURRENT_MESSAGE:
             arguments["current_message"] = current_message
         if skip_current is not None:
@@ -304,8 +326,9 @@ class MockApi(TelegramApi):
         self,
         method_name: str,
         update: Update,
-        view: MitupView | FormattedText | str,
+        view: MitupView | RichContent | str,
         times: int,
+        strategy: OutboxStrategy | None = None,
     ):
         # Validate that the update has been properly generated.
         # Bot-chat updates have effective_chat + effective_message.
@@ -317,7 +340,10 @@ class MockApi(TelegramApi):
             "(callback_query.inline_message_id) to call API methods"
         )
 
+        arguments: dict[str, Any] = {"update": update, "view": view}
+        if strategy is not None:
+            arguments["strategy"] = strategy
         if times == 1:
-            assert_awaited_once_with_diff(self.mock_method(method_name), update=update, view=view)
+            assert_awaited_once_with_diff(self.mock_method(method_name), **arguments)
         else:
-            assert_awaited_with_diff(self.mock_method(method_name), times, update=update, view=view)
+            assert_awaited_with_diff(self.mock_method(method_name), times, **arguments)

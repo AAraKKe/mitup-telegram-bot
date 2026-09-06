@@ -68,7 +68,7 @@ async def test_join_leave_blocked_when_lock_on_start_and_in_progress(
 
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.JOIN_LOCKED.get_text(lang=user.lang),
+        text=MeetingJoinMessages.JOIN_LOCKED.text(lang=user.lang),
         show_alert=True,
     )
 
@@ -188,7 +188,7 @@ async def test_join_leave_blocked_when_lock_on_and_open_ended_window(
 
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.JOIN_LOCKED.get_text(lang=user.lang),
+        text=MeetingJoinMessages.JOIN_LOCKED.text(lang=user.lang),
         show_alert=True,
     )
 

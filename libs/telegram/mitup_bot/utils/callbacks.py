@@ -44,6 +44,7 @@ SHOW_JOINED_MEETINGS_PAGE = CallbackData(action="show", entity="joined_meetings"
 SHOW_PAST_MEETING = PaginatedCallbackData(action="show", entity="past_meeting")
 SHOW_PAST_MEETING_PAGE = CallbackData(action="show", entity="past_meeting_page")
 EDIT_MEETING = CallbackData(action="edit", entity="meeting")
+REFRESH_MEETING = CallbackData(action="refresh", entity="meet")
 CREATE_MEETING = CallbackData(action="create", entity="meeting")
 CANCEL_CREATE_MEETING = CallbackData(action="cancel", entity="meeting")
 JOIN = CallbackData(action="join", entity="meeting")
@@ -70,11 +71,29 @@ CANCEL_INVITE_USER = CallbackData(action="cancel", entity="invite")
 # ----------------------------------------
 # ---- Title and description
 EDIT_MEETING_DESCRIPTION = CallbackData(action="edit", entity="meet_desc")
+DELETE_MEETING_DESCRIPTION = CallbackData(action="delete", entity="meet_desc")
+CONFIRM_DELETE_MEETING_DESCRIPTION = CallbackData(action="confirm_delete", entity="meet_desc")
+DECLINE_DELETE_MEETING_DESCRIPTION = CallbackData(action="decline_delete", entity="meet_desc")
 EDIT_MEETING_TITLE = CallbackData(action="edit", entity="meet_title")
+# ---- Images
+EDIT_MEETING_IMAGES = CallbackData(action="edit", entity="meet_imgs")
+# The id is the photo's position in the banner, counting from zero.
+DELETE_MEETING_IMAGE = MeetingCallbackData(action="delete", entity="meet_img")
+CONFIRM_DELETE_MEETING_IMAGE = MeetingCallbackData(action="confirm_delete", entity="meet_img")
+DECLINE_DELETE_MEETING_IMAGE = MeetingCallbackData(action="decline_delete", entity="meet_img")
+REPLACE_MEETING_IMAGE = MeetingCallbackData(action="replace", entity="meet_img")
+DELETE_MEETING_IMAGES = CallbackData(action="delete", entity="meet_imgs")
+CONFIRM_DELETE_MEETING_IMAGES = CallbackData(action="confirm_delete", entity="meet_imgs")
+DECLINE_DELETE_MEETING_IMAGES = CallbackData(action="decline_delete", entity="meet_imgs")
+# The id is the layout's index in `ImageLayout`, since a callback id holds only a number.
+SET_MEETING_IMAGE_LAYOUT = MeetingCallbackData(action="set", entity="meet_imglay")
 # ---- Participants
 EDIT_MEETING_PARTICIPANTS = CallbackData(action="edit", entity="meet_part")
 EDIT_MEETING_MAX_PARTICIPANTS = CallbackData(action="edit", entity="meet_max_part")
 EDIT_MEETING_NO_LIMIT_PARTICIPANTS = CallbackData(action="edit", entity="meet_nl_part")
+DELETE_MEETING_LIMIT = CallbackData(action="delete", entity="meet_limit")
+CONFIRM_DELETE_MEETING_LIMIT = CallbackData(action="confirm_delete", entity="meet_limit")
+DECLINE_DELETE_MEETING_LIMIT = CallbackData(action="decline_delete", entity="meet_limit")
 EDIT_MEETING_KICK_OUT_PARTICIPANTS = MeetingCallbackData(action="show", entity="kickout_page")
 EDIT_MEETING_KICK_OUT_ACTION = MeetingCallbackData(action="kickout", entity="user")
 CONFIRM_KICK_OUT = MeetingCallbackData(action="confirm", entity="kickout")
@@ -82,22 +101,38 @@ CANCEL_EDIT_MEETING_PARTICIPANS = CallbackData(action="cancel", entity="meet_par
 # ---- Location
 EDIT_MEETING_LOCATION = CallbackData(action="edit", entity="meet_loc")
 EDIT_MEETING_LOCATION_NAME = CallbackData(action="edit", entity="meet_loc_name")
+DELETE_MEETING_LOCATION_NAME = CallbackData(action="delete", entity="meet_loc_name")
+CONFIRM_DELETE_MEETING_LOCATION_NAME = CallbackData(action="confirm_delete", entity="meet_loc_name")
+DECLINE_DELETE_MEETING_LOCATION_NAME = CallbackData(action="decline_delete", entity="meet_loc_name")
 EDIT_MEETING_LOCATION_COORDINATES = CallbackData(action="edit", entity="meet_loc_coords")
+DELETE_MEETING_COORDINATES = CallbackData(action="delete", entity="meet_loc_coords")
+CONFIRM_DELETE_MEETING_COORDINATES = CallbackData(action="confirm_delete", entity="meet_loc_coords")
+DECLINE_DELETE_MEETING_COORDINATES = CallbackData(action="decline_delete", entity="meet_loc_coords")
 CANCEL_EDIT_MEETING_LOCATION = CallbackData(action="cancel", entity="meet_loc")
 # ---- Language
 EDIT_MEETING_LANGUAGE = CallbackData(action="edit", entity="meet_lang")
 SET_MEETING_LANGUAGE = MeetingCallbackData(action="set", entity="meet_lang")
 # ---- Settings
 EDIT_MEETING_SETTINGS = CallbackData(action="edit", entity="meet_settings")
+OPEN_MEETING_BEHAVIOR = CallbackData(action="open", entity="meet_behav")
+OPEN_MEETING_TIME_FORMAT = CallbackData(action="open", entity="meet_tfmt")
 SET_MEETING_WAITING_LIST = CallbackData(action="set", entity="meet_wait")
 SET_MEETING_PUBLIC = CallbackData(action="set", entity="meet_pub")
 SET_MEETING_ALLOW_INVITATIONS = CallbackData(action="set", entity="meet_inv")
 SET_MEETING_INCOGNITO = CallbackData(action="set", entity="meet_inc")
+SET_MEETING_SHOW_TIMEZONE = CallbackData(action="set", entity="meet_showtz")
+SET_MEETING_CLOCK_24H = CallbackData(action="set", entity="meet_clock")
+# The id is the date format's position in `DateFormat`, since the format name would not fit
+# the callback's numeric id.
+SET_MEETING_DATE_FORMAT = MeetingCallbackData(action="set", entity="meet_datefmt")
 # ---- When: the meeting's start and end, each with a date and a time
 # The two halves are wire-symmetric: one entity per half, and the same six gestures on each. The
 # `aliases` on a gesture are the retired forms it still answers — a keyboard already sitting in a
 # chat sends the string it was built with, and nothing on the tap says which form it is.
 EDIT_MEETING_WHEN = CallbackData(action="edit", entity="meet_when")
+DELETE_MEETING_END_TIME = CallbackData(action="delete", entity="meet_end")
+CONFIRM_DELETE_MEETING_END_TIME = CallbackData(action="confirm_delete", entity="meet_end")
+DECLINE_DELETE_MEETING_END_TIME = CallbackData(action="decline_delete", entity="meet_end")
 DELETE_MEETING_TIMES = CallbackData(action="delete", entity="meet_times")
 CONFIRM_DELETE_MEETING_TIMES = CallbackData(action="confirm_delete", entity="meet_times")
 DECLINE_DELETE_MEETING_TIMES = CallbackData(action="decline_delete", entity="meet_times")
@@ -155,11 +190,6 @@ DECLINE_PATREON_LINK = CodeCallbackData(action="decline", entity="pl")
 # ----------------------------------------
 CANCEL_SETTINGS = CallbackData(action="cancel", entity="settings")
 EDIT_PRIVACY = CallbackData(action="edit", entity="privacy")
-# SEND_PRIVACY sends the privacy screen as a NEW message instead of editing the tapped one, so a
-# standalone message (the data-export document) stays in the chat while the user still gets a way
-# back into the flow. Distinct action keeps its pattern from colliding with EDIT_PRIVACY, whose
-# handler edits.
-SEND_PRIVACY = CallbackData(action="send", entity="privacy")
 EXPORT_USER_DATA = CallbackData(action="export", entity="user_data")
 # Data-deletion flow: two confirmation steps, both declining back to the privacy screen through
 # the single DECLINE callback.
@@ -167,18 +197,21 @@ DELETE_USER_DATA = CallbackData(action="delete", entity="user_data")
 CONFIRM_DELETE_USER_DATA = CallbackData(action="confirm_delete", entity="user_data")
 CONFIRM_DELETE_USER_DATA_FINAL = CallbackData(action="confirm_delete", entity="user_data_final")
 DECLINE_DELETE_USER_DATA = CallbackData(action="decline_delete", entity="user_data")
-EDIT_LANGUAGE = CallbackData(action="edit", entity="lang")
 SET_LANGUAGE = CallbackData(action="set", entity="lang")
 EDIT_TIMEOUT = CallbackData(action="edit", entity="timeout")
-EDIT_NOTIFICATIONS = CallbackData(action="edit", entity="notif")
 EDIT_TIEMZONE = CallbackData(action="edit", entity="timezone")
 # Default meeting options
 EDIT_DEFAULT_OPTIONS = CallbackData(action="edit", entity="defaults")
+OPEN_DEFAULT_BEHAVIOR = CallbackData(action="open", entity="def_behav")
+OPEN_DEFAULT_TIME_FORMAT = CallbackData(action="open", entity="def_tfmt")
 SET_DEFAULT_WAITING_LIST = CallbackData(action="set", entity="def_wait")
 SET_DEFAULT_PUBLIC = CallbackData(action="set", entity="def_pub")
 SET_DEFAULT_INVITATIONS = CallbackData(action="set", entity="def_inv")
 SET_DEFAULT_INCOGNITO = CallbackData(action="set", entity="def_inc")
 SET_DEFAULT_LOCK_ON_START = CallbackData(action="set", entity="def_lock")
+SET_DEFAULT_SHOW_TIMEZONE = CallbackData(action="set", entity="def_showtz")
+SET_DEFAULT_CLOCK_24H = CallbackData(action="set", entity="def_clock")
+SET_DEFAULT_DATE_FORMAT = CallbackData(action="set", entity="def_datefmt")
 # Notifications
 TOGGLE_NOTIFICATIONS = CallbackData(action="toggle", entity="notif")
 SET_NOTIFICATION_TIME = CallbackData(action="set", entity="notif_time")

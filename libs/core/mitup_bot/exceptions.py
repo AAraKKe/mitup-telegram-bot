@@ -346,10 +346,6 @@ class NoMessageAvailable(ValueError):
     pass
 
 
-class NoDocumentAvailable(ValueError):
-    pass
-
-
 class InvalidLanguageError(ValueError):
     def __init__(self, idx: int):
         super().__init__(f"Language {idx} is not supported and was received as callabck id.")

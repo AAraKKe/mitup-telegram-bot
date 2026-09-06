@@ -17,11 +17,32 @@ class EditMeetingHandlerId(HandlerId):
     DESCRIPTION_MESSAGE = auto()
     DESCRIPTION_RICH_MESSAGE = auto()
     DESCRIPTION_CONVERSATION = auto()
+    REMOVE_DESCRIPTION_CALLBACK = auto()
+    CONFIRM_REMOVE_DESCRIPTION_CALLBACK = auto()
+    DECLINE_REMOVE_DESCRIPTION_CALLBACK = auto()
+
+    # Edit meeting images
+    IMAGES_CALLBACK = auto()
+    REMOVE_IMAGE_CALLBACK = auto()
+    CONFIRM_REMOVE_IMAGE_CALLBACK = auto()
+    DECLINE_REMOVE_IMAGE_CALLBACK = auto()
+    REPLACE_IMAGE_CALLBACK = auto()
+    REMOVE_IMAGES_CALLBACK = auto()
+    CONFIRM_REMOVE_IMAGES_CALLBACK = auto()
+    DECLINE_REMOVE_IMAGES_CALLBACK = auto()
+    SET_IMAGE_LAYOUT_CALLBACK = auto()
+    IMAGES_PHOTO_MESSAGE = auto()
+    IMAGES_DOCUMENT_MESSAGE = auto()
+    IMAGES_WRONG_MESSAGE = auto()
+    IMAGES_CONVERSATION = auto()
 
     # Edit meeting participants
     PARTICIPANTS_CALLBACK = auto()
     PARTICIPANTS_MAXIMUM_CALLBACK = auto()
     PARTICIPANTS_NO_LIMIT_CALLBACK = auto()
+    PARTICIPANTS_REMOVE_LIMIT_CALLBACK = auto()
+    PARTICIPANTS_REMOVE_LIMIT_CONFIRM_CALLBACK = auto()
+    PARTICIPANTS_REMOVE_LIMIT_DECLINE_CALLBACK = auto()
     PARTICIPANTS_CANCEL_CALLBACK = auto()
     PARTICIPANTS_MAXIMUM_MESSAGE = auto()
     PARTICIPANTS_MAXIMUM_CONVERSATION = auto()
@@ -41,12 +62,21 @@ class EditMeetingHandlerId(HandlerId):
     LOCATION_COORDINATES_CONVERSATION = auto()
     LOCATION_COORDINATES_MESSAGE = auto()
     LOCATION_COORDINATES_WRONG_MESSAGE = auto()
+    REMOVE_LOCATION_NAME_CALLBACK = auto()
+    CONFIRM_REMOVE_LOCATION_NAME_CALLBACK = auto()
+    DECLINE_REMOVE_LOCATION_NAME_CALLBACK = auto()
+    REMOVE_COORDINATES_CALLBACK = auto()
+    CONFIRM_REMOVE_COORDINATES_CALLBACK = auto()
+    DECLINE_REMOVE_COORDINATES_CALLBACK = auto()
 
     # When screen
     WHEN_ENTRY_CALLBACK = auto()
     CLEAR_TIMES_CALLBACK = auto()
     CONFIRM_CLEAR_TIMES_CALLBACK = auto()
     DECLINE_CLEAR_TIMES_CALLBACK = auto()
+    REMOVE_END_TIME_CALLBACK = auto()
+    CONFIRM_REMOVE_END_TIME_CALLBACK = auto()
+    DECLINE_REMOVE_END_TIME_CALLBACK = auto()
     LOCK_ON_START_CALLBACK = auto()
 
     # When — the meeting's start
@@ -58,7 +88,6 @@ class EditMeetingHandlerId(HandlerId):
     TYPE_START_DATETIME = auto()
     TYPE_START_TIME = auto()
     REJECT_START_DATETIME = auto()
-    REJECT_START_TIME = auto()
     CANCEL_START_EDIT = auto()
     START_EDITOR_CONVERSATION = auto()
 
@@ -71,7 +100,6 @@ class EditMeetingHandlerId(HandlerId):
     TYPE_END_DATETIME = auto()
     TYPE_END_TIME = auto()
     REJECT_END_DATETIME = auto()
-    REJECT_END_TIME = auto()
     CANCEL_END_EDIT = auto()
     END_EDITOR_CONVERSATION = auto()
 
@@ -81,10 +109,15 @@ class EditMeetingHandlerId(HandlerId):
 
     # Edit meeting settings
     MEETING_SETTINGS_CALLBACK = auto()
+    OPEN_MEETING_BEHAVIOR = auto()
+    OPEN_MEETING_TIME_FORMAT = auto()
     SET_MEETING_WAITING_LIST_CALLBACK = auto()
     SET_MEETING_PUBLIC_CALLBACK = auto()
     SET_MEETING_ALLOW_INVITATIONS_CALLBACK = auto()
     SET_MEETING_INCOGNITO_CALLBACK = auto()
+    SET_MEETING_SHOW_TIMEZONE_CALLBACK = auto()
+    SET_MEETING_CLOCK_24H_CALLBACK = auto()
+    SET_MEETING_DATE_FORMAT_CALLBACK = auto()
 
     # Cancel button during edit
     CANCEL = auto()
@@ -96,11 +129,8 @@ class ConversationMeetingState(Enum):
     EDIT_MAX_PARTICIPANTS = auto()
     EDIT_LOCATION_NAME = auto()
     EDIT_LOCATION_COORDIANTES = auto()
+    EDIT_IMAGES = auto()
 
     # When — each state is named after the screen the owner is looking at
-    START_EDITOR = auto()
-    START_CALENDAR = auto()
-    START_TIME_PROMPT = auto()
-    END_EDITOR = auto()
-    END_CALENDAR = auto()
-    END_TIME_PROMPT = auto()
+    START_DATETIME_CARD = auto()
+    END_DATETIME_CARD = auto()

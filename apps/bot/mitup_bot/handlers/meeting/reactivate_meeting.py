@@ -49,7 +49,7 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
     # tap must not wipe the date they set after the first one.
     if meeting.active:
         log.info("Skip meeting reactivation", user_id=user.db_id, reason="already_active")
-        await context.api.edit_message(update=update, view=meeting_views.edit_view(meeting))
+        await context.api.edit_message(update=update, view=meeting_views.owner_view(meeting))
         return
 
     # Reactivating turns an inactive meeting active again, so it counts against the cap. The meeting
@@ -90,10 +90,10 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
     meeting.expiration_time = None
     meeting.clear_deletion_warning()
 
-    success_message = MeetingLifecycleMessages.REACTIVATE_SUCCESS.get(lang=user.lang)
+    success_message = MeetingLifecycleMessages.REACTIVATE_SUCCESS.rich(lang=user.lang)
     await context.api.edit_message(
         update=update,
-        view=meeting_views.edit_view(meeting).with_context(success_message),
+        view=meeting_views.owner_view(meeting).with_context(success_message),
     )
 
     context.put_feature_metric(Feature.REACTIVATE_MEETING)

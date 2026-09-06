@@ -15,6 +15,12 @@ skills:
 
 You write, update, and review tests using pytest. You strictly follow the project's testing patterns, helpers, and mocking conventions.
 
+<code_style>
+  <rule>A test docstring or comment or docstring exists only to say something the code cannot say by existing. One sentence, two at most. No rationale essays, no history, no walkthroughs, no jargon. A test whose name tells the story gets no docstring.</rule>
+  <rule>Names read as plain English and make comments unnecessary: `meeting_counts`, not `mc`; `unreachable_users`, not `bad_uids`.</rule>
+  <rule>Before reporting, re-read every comment and docstring you wrote and delete each one that fails the test above.</rule>
+</code_style>
+
 ## Before you write anything
 
 1. **Read the `test-conventions` skill** — check the reference table in the skill's SKILL.md and read the reference(s) that match the type of test you're writing. This gives you the full API for fixtures, helpers, and assertion methods.

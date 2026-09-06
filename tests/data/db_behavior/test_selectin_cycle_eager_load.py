@@ -20,7 +20,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import db
-from mitup_bot.models import JoinedUsers, Meetup, Settings, User
+from mitup_bot.models import JoinedUsers, MeetingImage, Meetup, Settings, User
 
 pytestmark = pytest.mark.db_test
 
@@ -30,7 +30,8 @@ INVITER_TG_USER_ID = 997_203
 
 
 async def seed_meeting_with_invited_participant(db_session: AsyncSession) -> None:
-    """Owner owns a meeting; participant joined it, invited by a third user.
+    """Owner owns a meeting; participant joined it, invited by a third user. The meeting shows one
+    photo.
 
     The invitation is load-bearing: `participant_name` only traverses `invited_by` when it is set, so
     an invited participant is what exercises the `invited_by` leaf of the eager-load chains.
@@ -55,6 +56,7 @@ async def seed_meeting_with_invited_participant(db_session: AsyncSession) -> Non
         session.add_all([owner, participant, inviter, meeting])
         await session.flush()
         session.add(JoinedUsers(user=participant, meetup=meeting, invited_by=inviter))
+        session.add(MeetingImage(meetup_id=meeting.id, position=0, file_id="cycle_file", file_unique_id="AQADcycle"))
 
 
 async def test_owner_rooted_load_reaches_participant_leaves(db_session: AsyncSession):
@@ -91,17 +93,33 @@ async def test_participant_rooted_load_reaches_participant_leaves(db_session: As
         assert link.invited_by.inline_name == "Cycle Inviter"
 
 
+@pytest.mark.parametrize(
+    "tg_user_id", [OWNER_TG_USER_ID, PARTICIPANT_TG_USER_ID], ids=["owner_rooted", "participant_rooted"]
+)
+async def test_a_user_rooted_load_reaches_the_meeting_photos(db_session: AsyncSession, tg_user_id: int):
+    """The banner is part of every card the meeting renders, and `MeetingImage` repeats no mapper on
+    the load path, so the selectin cascade reaches it from either root with no chain spelled out."""
+    await seed_meeting_with_invited_participant(db_session)
+
+    async with db.begin() as fresh:
+        user = await User.by_tg_user_id(fresh, tg_user_id, must_exist=True, load_collections=True)
+        meeting = user.meetups[0] if user.meetups else user.joined_links[0].meetup
+
+        assert "images" in db.loaded_attributes(meeting)
+        assert [image.file_unique_id for image in meeting.images] == ["AQADcycle"]
+
+
 async def test_default_load_leaves_participant_leaves_unloaded(db_session: AsyncSession):
     """Contract: WITHOUT `load_participants` the deep leaves stay unloaded, so the default does not
-    silently pull the whole social graph. `joined_links -> meetup` is still named (the list screens
-    read `link.meetup.title`), but that meeting's own `owner` and `joined_links` remain unloaded."""
+    silently pull the whole social graph. `joined_links -> meetup` is still named (the guards read
+    the meeting itself), but that meeting's own `owner` and `joined_links` remain unloaded."""
     await seed_meeting_with_invited_participant(db_session)
 
     async with db.begin() as fresh:
         participant = await User.by_tg_user_id(fresh, PARTICIPANT_TG_USER_ID, must_exist=True)
         joined_meeting = participant.joined_links[0].meetup
 
-        # The default reaches the meeting itself (its scalar columns render the joined-meetings list)...
+        # The default reaches the meeting itself...
         assert joined_meeting.title == "Cycle Meeting"
         # ...but stops before the participant leaves the deep flag would add.
         loaded = db.loaded_attributes(joined_meeting)

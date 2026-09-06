@@ -130,7 +130,7 @@ async def handle_non_existing_user_join(session: AsyncSession, update: Update, c
     await user_joins_meeting(session, update, context, user, with_notification=False)
     await context.api.answer_callback_query(
         update=update,
-        text=MeetingJoinMessages.JOIN_UNREGISTERED.get_text(user=user.inline_name),
+        text=MeetingJoinMessages.JOIN_UNREGISTERED.text(user=user.inline_name),
         show_alert=True,
     )
 
@@ -202,7 +202,7 @@ async def handle_non_existing_user_leave(session: AsyncSession, update: Update, 
     await user_leaves_meeting(session, update, context, user, with_notification=False)
     await context.api.answer_callback_query(
         update=update,
-        text=MeetingJoinMessages.LEAVE_UNREGISTERED.get_text(user=user.inline_name),
+        text=MeetingJoinMessages.LEAVE_UNREGISTERED.text(user=user.inline_name),
         show_alert=True,
     )
 
@@ -233,7 +233,7 @@ async def handle_join_leave_operation(
     # operations) to unloaded. Re-load them; the row lock is already held, so the re-read is race-safe.
     await session.refresh(user, ["meetups", "joined_links"])
 
-    if meeting.lock_on_start and meeting.is_in_progress:
+    if not meeting.attendance_is_open:
         # "Why couldn't I join?" is the domain's most-asked support question, and the state that
         # produced the refusal has to be on the line: `is_in_progress` is a function of the clock,
         # so by the time anyone reads this it can no longer be re-derived.
@@ -247,13 +247,19 @@ async def handle_join_leave_operation(
         )
         await context.api.answer_callback_query(
             update=update,
-            text=MeetingJoinMessages.JOIN_LOCKED.get_text(lang=user.lang),
+            text=MeetingJoinMessages.JOIN_LOCKED.text(lang=user.lang),
             show_alert=True,
         )
         return
 
-    # Common message handling
-    if (current_message := meeting.message_from_update(update)) is None:
+    # In the private chat with the bot the tapped message is a navigation screen that will later
+    # show other things, so it is not stored as a meeting message. This handler redraws it once
+    # below, and the fan-out to the stored messages skips it.
+    bot_chat_card = guards.in_bot_chat(update)
+    current_message = meeting.message_from_update(update)
+    if current_message is not None:
+        current_message.capture_chat_instance(update)
+    elif not bot_chat_card:
         current_message = Message.from_update(update, meeting, meeting_views.keyboard_for_update(update, meeting, user))
         meeting.messages.append(current_message)
         # The stored row decides which surfaces the later fan-out reaches, so its creation is a
@@ -266,8 +272,6 @@ async def handle_join_leave_operation(
             chat_instance_set=current_message.chat_instance is not None,
             reason="first_interaction_from_this_message",
         )
-    else:
-        current_message.capture_chat_instance(update)
 
     # Execute core operation
     notification_key = await operation(meeting, user)
@@ -275,8 +279,18 @@ async def handle_join_leave_operation(
     if with_notification:
         await context.api.answer_callback_query(
             update=update,
-            text=notification_key.get_text(lang=user.lang),
+            text=notification_key.text(lang=user.lang),
             show_alert=False,
         )
 
-    await context.api.update_meeting_messages(meeting=meeting, current_message=current_message)
+    if bot_chat_card:
+        # After tapping Leave a participant gets a confirmation screen instead of the card. The card
+        # would show a Join button, and on a private meeting that button only works for current
+        # participants, which the user has just stopped being. The owner keeps their card.
+        left = handler is MeetingHandlerId.LEAVE and not user.own_meeting(meeting.db_id)
+        view = meeting_views.left_view(meeting, user.lang) if left else meeting_views.view_for(meeting, user)
+        await context.api.edit_message(update=update, view=view)
+
+    await context.api.update_meeting_messages(
+        meeting=meeting, current_message=current_message, skip_current=bot_chat_card
+    )

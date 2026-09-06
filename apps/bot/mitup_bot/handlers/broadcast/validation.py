@@ -4,14 +4,10 @@ import structlog
 import yaml
 
 from mitup_bot.translations import SUPPORTED_LANGUAGES, TranslationEngine
-from mitup_bot.utils.entities import parse_format_tags, utf16_len
 from mitup_bot.utils.messages import BroadcastOperatorMessages
+from mitup_bot.utils.rich_message import MAX_RICH_TEXT_LENGTH, rich_text_length
 
 log = structlog.get_logger(__name__)
-
-# Telegram's sendMessage caps a single message at 4096 UTF-16 code units, measured on the rendered
-# text (tags do not count toward the limit).
-MAX_MESSAGE_UTF16_LENGTH = 4096
 
 # Substitutions that quote the uploaded document back at the operator. They belong in the reply,
 # never on a log line: the parser detail embeds the offending fragment of the message body.
@@ -43,7 +39,7 @@ class BroadcastContentError(ValueError):
 @dataclass(frozen=True)
 class BroadcastLanguageContent:
     language: str
-    body_html: str
+    body: str
     char_count: int
 
 
@@ -54,21 +50,16 @@ class ValidatedBroadcast:
 
     @property
     def english_body(self) -> str:
-        return next(
-            content.body_html for content in self.messages if content.language == TranslationEngine.FALLBACK_LANG
-        )
-
-
-def strip_html(body: str) -> str:
-    """Return the visible text of *body*, dropping the supported Telegram HTML tags."""
-    return parse_format_tags(body, {}).text
+        return next(content.body for content in self.messages if content.language == TranslationEngine.FALLBACK_LANG)
 
 
 def parse_and_validate(raw: str) -> ValidatedBroadcast:
     """Parse the operator's YAML into a validated set of per-language messages.
 
     Unknown language codes are skipped as warnings; a missing English fallback, a duplicate
-    language, or a malformed message is fatal and raises `BroadcastContentError`.
+    language, or a message that is empty or over the rich-message limit is fatal and raises
+    `BroadcastContentError`. Whether Telegram can parse the body is answered by the preview step,
+    which is the only place that asks Telegram at all.
     """
     entries = load_entries(raw)
     contents: list[BroadcastLanguageContent] = []
@@ -133,20 +124,19 @@ def entry_fields(entry: object, index: int) -> tuple[str, str]:
 
 
 def validated_content(language: str, body: str) -> BroadcastLanguageContent:
-    # Validate against the rendered text: unsupported tags are dropped by parse_format_tags (the
-    # visual preview is the safety net), and Telegram's length limit is measured on visible text.
-    rendered = parse_format_tags(body, {})
-    if not rendered.text.strip():
+    # Telegram's limit counts the visible text, not the tags, so the tags are stripped before
+    # measuring.
+    if not body.strip():
         raise BroadcastContentError(BroadcastOperatorMessages.ERROR_EMPTY_MESSAGE, language=language)
-    length = utf16_len(rendered.text)
-    if length > MAX_MESSAGE_UTF16_LENGTH:
+    length = rich_text_length(body)
+    if length > MAX_RICH_TEXT_LENGTH:
         raise BroadcastContentError(
             BroadcastOperatorMessages.ERROR_MESSAGE_TOO_LONG,
             language=language,
             length=length,
-            limit=MAX_MESSAGE_UTF16_LENGTH,
+            limit=MAX_RICH_TEXT_LENGTH,
         )
-    return BroadcastLanguageContent(language=language, body_html=body, char_count=length)
+    return BroadcastLanguageContent(language=language, body=body, char_count=length)
 
 
 def yaml_detail(error: yaml.YAMLError) -> str:

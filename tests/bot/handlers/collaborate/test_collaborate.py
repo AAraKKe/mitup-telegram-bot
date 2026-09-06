@@ -13,12 +13,13 @@ from mitup_bot.custom_context import BOT_CONFIG_KEY
 from mitup_bot.handlers.collaborate.entry import UNLINK_EVENT
 from mitup_bot.handlers.collaborate.enums import CollaborateHandlerId
 from mitup_bot.hosts_group import HostsGroupState
+from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.patreon import PatreonRuntime, oauth
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import Link, render
 from mitup_bot.utils.messages import ButtonMessages, CollaborateMessages
+from mitup_bot.utils.rich_message import button_content
 from mitup_bot.views.collaborate import (
     collaborate_linked_not_patron_view,
     collaborate_linked_patron_view,
@@ -51,9 +52,10 @@ def stash_hosts_group_config(handler_context: HandlerContext):
     )
 
 
-def has_hosts_group_button(view: MitupView) -> bool:
-    """Whether the rendered Collaborate view exposes the Hosts-Only Group access button."""
-    return any(button.url == HOSTS_GROUP_INVITE_URL for row in view.keyboard for button in row)
+def has_hosts_group_chip(view: MitupView) -> bool:
+    """Whether the rendered Collaborate view carries the Hosts-Only Group chip, which rides the
+    title line of a section in the body rather than sitting in the menu."""
+    return HOSTS_GROUP_INVITE_URL in view.message.html
 
 
 @pytest.fixture
@@ -130,19 +132,9 @@ async def test_collaborate_not_linked_offers_oauth_link(
     context, _ = await call_handler(CollaborateHandlerId.SHOW, handler_context=handler_context)
 
     view = context.api.call_args("edit_message").kwargs["view"]
-    collaborate_page = render(
-        t"{Link(CollaborateMessages.COLLABORATE_PAGE_LABEL.get_text(lang=user_with_settings.lang), 'https://mitup.social/collaborate/donation/')}"
-    )
-    limits_page = render(
-        t"{Link(CollaborateMessages.LIMITS_PAGE_LABEL.get_text(lang=user_with_settings.lang), 'https://mitup.social/user-guide/limits/')}"
-    )
-    assert view.description == CollaborateMessages.NOT_LINKED.get(
-        lang=user_with_settings.lang,
-        collaborate_page=collaborate_page,
-        limits_page=limits_page,
-    )
-    assert "${" not in view.description.text
-    link_button = view.keyboard[0][0]
+    assert CollaborateMessages.PITCH.text(lang=user_with_settings.lang) in view.message.text
+    assert "${" not in view.message.text
+    link_button = view.menu[0][0]
     assert link_button.url.startswith("https://www.patreon.com/oauth2/authorize")
     # The button anyone can be handed carries a state that identifies nobody: it validates, and
     # that is all it does.
@@ -183,9 +175,9 @@ async def test_collaborate_linked_not_patron_view(
 @pytest.mark.parametrize(
     "level,expected_message",
     [
-        (SupporterLevel.HOST_1, CollaborateMessages.LINKED_PATRON_SUPPORTER),
-        (SupporterLevel.HOST_2, CollaborateMessages.LINKED_PATRON_PATRON),
-        (SupporterLevel.HOST_3, CollaborateMessages.LINKED_PATRON_ORGANIZER),
+        (SupporterLevel.HOST_1, CollaborateMessages.STATUS_HOST_1),
+        (SupporterLevel.HOST_2, CollaborateMessages.STATUS_HOST_2),
+        (SupporterLevel.HOST_3, CollaborateMessages.STATUS_HOST_3),
     ],
 )
 async def test_collaborate_linked_patron_view(
@@ -208,25 +200,26 @@ async def test_collaborate_linked_patron_view(
         update,
         collaborate_linked_patron_view(user_with_settings.lang, level, PATRON_ACTIVE_MEETINGS, PATRON_SCHEDULING_DAYS),
     )
-    # The rendered screen uses the message tied to the user's own tier, not a generic one.
+    # The rendered screen carries the status tied to the user's own tier, not a generic one.
     view = context.api.call_args("edit_message").kwargs["view"]
-    assert view.description == expected_message.get(
+    status = expected_message.rich(
         lang=user_with_settings.lang,
         active_meetings=PATRON_ACTIVE_MEETINGS,
         scheduling_days=PATRON_SCHEDULING_DAYS,
     )
-    assert "${" not in view.description.text
+    assert status.html in view.message.html
+    assert "${" not in view.message.text
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.COLLABORATE)], indirect=True)
 @pytest.mark.parametrize(
     "in_group,expected_label",
     [
-        (True, ButtonMessages.HOSTS_GROUP_OPEN),
-        (False, ButtonMessages.HOSTS_GROUP_JOIN),
+        (True, ButtonMessages.OPEN),
+        (False, ButtonMessages.JOIN_GROUP),
     ],
 )
-async def test_collaborate_patron_shows_hosts_group_button(
+async def test_collaborate_patron_shows_hosts_group_chip(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
@@ -247,13 +240,12 @@ async def test_collaborate_patron_shows_hosts_group_button(
 
     member_check.assert_awaited_once_with(chat_id=HOSTS_GROUP_CHAT_ID, tg_user_id=user_with_settings.tg_user_id)
     view = context.api.call_args("edit_message").kwargs["view"]
-    group_button = view.keyboard[0][0]
-    assert group_button.text == expected_label.get_text(lang=user_with_settings.lang)
-    assert group_button.url == HOSTS_GROUP_INVITE_URL
+    chip = ButtonConfig(text=expected_label.text(lang=user_with_settings.lang), url=HOSTS_GROUP_INVITE_URL)
+    assert button_content(chip).html in view.message.html
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.COLLABORATE)], indirect=True)
-async def test_collaborate_patron_omits_hosts_group_button_when_unconfigured(
+async def test_collaborate_patron_omits_hosts_group_chip_when_unconfigured(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
@@ -261,7 +253,7 @@ async def test_collaborate_patron_omits_hosts_group_button_when_unconfigured(
     patreon_config: PatreonConfig,
 ):
     # The default stashed BotConfig leaves both hosts-group values None, so the feature is disabled:
-    # the group membership lookup must be skipped and only the Unlink button rendered.
+    # the group membership lookup must be skipped and the group section left out.
     api = MockApi()
     member_check = api.register_on_method("is_chat_member", return_value=True)
     user_with_settings.supporter_level = SupporterLevel.HOST_2
@@ -282,7 +274,7 @@ async def test_collaborate_patron_omits_hosts_group_button_when_unconfigured(
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.COLLABORATE)], indirect=True)
 @pytest.mark.parametrize("level", [SupporterLevel.HOST_1, SupporterLevel.HOST_2, SupporterLevel.HOST_3])
-async def test_hosts_group_button_present_for_any_linked_host(
+async def test_hosts_group_chip_present_for_any_linked_host(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
@@ -290,7 +282,7 @@ async def test_hosts_group_button_present_for_any_linked_host(
     patreon_config: PatreonConfig,
     level: SupporterLevel,
 ):
-    """A linked, active host sees the group button regardless of which host tier they hold."""
+    """A linked, active host sees the group chip regardless of which host tier they hold."""
     stash_hosts_group_config(handler_context)
     api = MockApi()
     api.register_on_method("is_chat_member", return_value=False)
@@ -302,18 +294,18 @@ async def test_hosts_group_button_present_for_any_linked_host(
     context, _ = await call_handler(CollaborateHandlerId.SHOW, handler_context=handler_context, api=api)
 
     view = context.api.call_args("edit_message").kwargs["view"]
-    assert has_hosts_group_button(view)
+    assert has_hosts_group_chip(view)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.COLLABORATE)], indirect=True)
-async def test_hosts_group_button_absent_when_not_linked(
+async def test_hosts_group_chip_absent_when_not_linked(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
     user_with_settings: User,
     patreon_config: PatreonConfig,
 ):
-    """A user who never linked Patreon is in the not-linked state, so the group button is absent
+    """A user who never linked Patreon is in the not-linked state, so the group chip is absent
     and no membership lookup runs even with the feature configured."""
     stash_hosts_group_config(handler_context)
     api = MockApi()
@@ -325,11 +317,11 @@ async def test_hosts_group_button_absent_when_not_linked(
 
     member_check.assert_not_awaited()
     view = context.api.call_args("edit_message").kwargs["view"]
-    assert not has_hosts_group_button(view)
+    assert not has_hosts_group_chip(view)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.COLLABORATE)], indirect=True)
-async def test_hosts_group_button_absent_when_linked_not_patron(
+async def test_hosts_group_chip_absent_when_linked_not_patron(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
@@ -349,7 +341,7 @@ async def test_hosts_group_button_absent_when_linked_not_patron(
 
     member_check.assert_not_awaited()
     view = context.api.call_args("edit_message").kwargs["view"]
-    assert not has_hosts_group_button(view)
+    assert not has_hosts_group_chip(view)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_PATREON_UNLINK)], indirect=True)
@@ -371,7 +363,7 @@ async def test_confirming_unlink_deletes_subscription_and_revokes_premium(
     assert user_with_settings.supporter_level is SupporterLevel.NONE
     # The refreshed view confirms the unlink above the not-linked state.
     view = context.api.call_args("edit_message").kwargs["view"]
-    assert view.description.text.startswith(CollaborateMessages.UNLINKED.get(lang=user_with_settings.lang).text)
+    assert view.message.text.startswith(CollaborateMessages.UNLINKED.rich(lang=user_with_settings.lang).text)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_PATREON_UNLINK)], indirect=True)
@@ -519,17 +511,17 @@ async def test_unlink_button_opens_a_prompt_and_deletes_nothing(
     mock_session.assert_not_deleted()
     assert user_with_settings.supporter_level is SupporterLevel.HOST_2
     view = context.api.call_args("edit_message").kwargs["view"]
-    assert view.description == CollaborateMessages.UNLINK_CONFIRM_HOST.get(
+    assert view.message == CollaborateMessages.UNLINK_CONFIRM_HOST.rich(
         lang=user_with_settings.lang,
-        current_tier=CollaborateMessages.TIER_NAME_HOST_2.get_text(lang=user_with_settings.lang),
+        current_tier=CollaborateMessages.TIER_NAME_HOST_2.text(lang=user_with_settings.lang),
     )
-    assert "Gamemaster" in view.description.text
-    assert "${" not in view.description.text
-    confirm, decline = view.keyboard[0]
+    assert "Gamemaster" in view.message.text
+    assert "${" not in view.message.text
+    confirm, decline = view.menu[0]
     assert confirm.callback_data == cb.CONFIRM_PATREON_UNLINK
     assert decline.callback_data == cb.DECLINE_PATREON_UNLINK
-    assert confirm.text == ButtonMessages.CONFIRM_PATREON_UNLINK.get_text(lang=user_with_settings.lang)
-    assert decline.text == ButtonMessages.DECLINE_PATREON_UNLINK.get_text(lang=user_with_settings.lang)
+    assert confirm.text == ButtonMessages.CONFIRM_PATREON_UNLINK.text(lang=user_with_settings.lang)
+    assert decline.text == ButtonMessages.DECLINE_PATREON_UNLINK.text(lang=user_with_settings.lang)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.UNLINK_PATREON)], indirect=True)
@@ -550,7 +542,7 @@ async def test_unlink_prompt_reads_plain_for_a_non_supporter(
 
     mock_session.assert_not_deleted()
     view = context.api.call_args("edit_message").kwargs["view"]
-    assert view.description == CollaborateMessages.UNLINK_CONFIRM.get(lang=user_with_settings.lang)
+    assert view.message == CollaborateMessages.UNLINK_CONFIRM.rich(lang=user_with_settings.lang)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.UNLINK_PATREON)], indirect=True)
@@ -569,17 +561,7 @@ async def test_unlink_button_with_nothing_linked_skips_the_prompt(
 
     mock_session.assert_not_deleted()
     view = context.api.call_args("edit_message").kwargs["view"]
-    collaborate_page = render(
-        t"{Link(CollaborateMessages.COLLABORATE_PAGE_LABEL.get_text(lang=user_with_settings.lang), 'https://mitup.social/collaborate/donation/')}"
-    )
-    limits_page = render(
-        t"{Link(CollaborateMessages.LIMITS_PAGE_LABEL.get_text(lang=user_with_settings.lang), 'https://mitup.social/user-guide/limits/')}"
-    )
-    assert view.description == CollaborateMessages.NOT_LINKED.get(
-        lang=user_with_settings.lang,
-        collaborate_page=collaborate_page,
-        limits_page=limits_page,
-    )
+    assert CollaborateMessages.PITCH.text(lang=user_with_settings.lang) in view.message.text
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DECLINE_PATREON_UNLINK)], indirect=True)

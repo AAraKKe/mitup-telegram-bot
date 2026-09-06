@@ -1,17 +1,20 @@
 import datetime as dt
 from collections.abc import Sequence
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
 import structlog
-from sqlalchemy import BigInteger, Column, DateTime, Enum, FetchedValue, String
+from sqlalchemy import BigInteger, Column, DateTime, Enum, FetchedValue, String, func
 from sqlalchemy.orm import QueryableAttribute, selectinload
 from sqlalchemy.orm.interfaces import LoaderOption
-from sqlmodel import Field, Relationship, SQLModel, select
+from sqlmodel import Field, Relationship, SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import supporter
 from mitup_bot.acquisition import ACQUISITION_SOURCE_MAX_LENGTH
+from mitup_bot.datetimes import in_timezone
 from mitup_bot.exceptions import UserNotFound
 from mitup_bot.supporter import SupporterLevel
 
@@ -54,6 +57,15 @@ class InactiveReason(StrEnum):
     FANOUT_UNREACHABLE = "fanout_unreachable"
     POST_COMMIT_FANOUT_UNREACHABLE = "post_commit_fanout_unreachable"
     BROADCAST_UNREACHABLE = "broadcast_unreachable"
+
+
+@dataclass(frozen=True)
+class MeetingCounts:
+    """How many meetings each of the main menu's three lists would show."""
+
+    active: int
+    joined: int
+    past: int
 
 
 class User(BaseModel, SQLModel, table=True):
@@ -197,8 +209,8 @@ class User(BaseModel, SQLModel, table=True):
     ) -> Self | None:
         # The default loads the one-hop `meetups`/`joined_links` (plus `joined_links -> meetup`) that
         # handlers and list views traverse. `load_participants=True` additionally spells out each
-        # meeting's `owner` and participant leaves; pass it only from handlers that render a full
-        # meeting card straight off these collections (the inline query), since selectin does not
+        # meeting's `owner` and participant leaves; pass it only from handlers that render a meeting
+        # card straight off these collections (the inline query and the meeting lists), since selectin does not
         # cascade through the user-rooted load cycle — see `user_collection_loaders` and the database
         # skill. `load_collections=False` skips the collections entirely (they are `lazy="raise"`, so
         # such an instance must not touch either).
@@ -299,10 +311,17 @@ class User(BaseModel, SQLModel, table=True):
         return next((meetup for meetup in self.meetups if meetup.db_id == meeting_id), None)
 
     def datetime_in_tz(self, datetime: dt.datetime) -> dt.datetime:
-        return datetime.astimezone(self.settings.tz)
+        return in_timezone(datetime, self.settings.tz)
 
     def now_in_tz(self) -> dt.datetime:
         return self.datetime_in_tz(dt.datetime.now(dt.UTC))
+
+    async def meeting_counts(self, session: AsyncSession) -> MeetingCounts:
+        return MeetingCounts(
+            active=(await session.exec(active_meetings_count_statement(self))).first() or 0,
+            joined=(await session.exec(joined_meetings_count_statement(self))).first() or 0,
+            past=(await session.exec(past_meetings_count_statement(self))).first() or 0,
+        )
 
 
 def as_loadable(relationship: Any) -> QueryableAttribute[Any]:
@@ -319,9 +338,9 @@ def user_collection_loaders(*, participants: bool) -> Sequence[LoaderOption]:
 
     Selectin does not cascade through the User -> Meetup -> JoinedUsers -> User load-path cycle, so
     each hop the views read must be named (see the database skill). Without `participants` (the
-    default): the one-hop collections plus `joined_links -> meetup` (the list screens read
-    `link.meetup.title`/`active`). With `participants`: additionally each meeting's `owner` and its
-    participants' `user`/`invited_by`, for the full meeting-card renderers.
+    default): the one-hop collections plus `joined_links -> meetup` (the paths reading
+    `own_meeting`/`joined_meeting`). With `participants`: additionally each meeting's `owner` and its
+    participants' `user`/`invited_by`, for the meeting-card renderers.
 
     The two roots double as builders for the shared Meetup leaves; SQLAlchemy loader options are
     generative, so the branches off one root do not interfere — pinned by
@@ -339,3 +358,20 @@ def user_collection_loaders(*, participants: bool) -> Sequence[LoaderOption]:
                 joined_links_leaf.selectinload(as_loadable(JoinedUsers.invited_by)),
             ]
     return options
+
+
+def active_meetings_count_statement(user: User) -> SelectOfScalar[int]:
+    return select(func.count()).select_from(Meetup).where(Meetup.owner_id == user.db_id, col(Meetup.active).is_(True))
+
+
+def joined_meetings_count_statement(user: User) -> SelectOfScalar[int]:
+    return (
+        select(func.count())
+        .select_from(JoinedUsers)
+        .join(Meetup, col(JoinedUsers.meetup_id) == col(Meetup.id))
+        .where(JoinedUsers.user_id == user.db_id, col(Meetup.active).is_(True))
+    )
+
+
+def past_meetings_count_statement(user: User) -> SelectOfScalar[int]:
+    return select(func.count()).select_from(Meetup).where(Meetup.owner_id == user.db_id, col(Meetup.active).is_(False))

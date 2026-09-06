@@ -1,11 +1,11 @@
 ---
-description: "A page-by-page guide to every screen in the Mitup Telegram bot, from your first chat to sharing an event your friends can join."
+description: "A guide to every part of the Mitup Telegram bot, from your first chat to sharing an event your friends can join with a tap."
 icon: material/book-open-outline
 ---
 
 # User guide
 
-This guide walks through Mitup the way you actually meet it: from your first chat with the bot to sharing a meeting your friends can join with a tap. Every screen the bot shows you has a page here, so if a button leaves you wondering what it does, this is where to look.
+This guide walks through Mitup the way you meet it: from your first chat with the bot to sharing a meeting your friends can join with a tap. Every part of the bot has a page here, so if a button leaves you wondering what it does, this is where to look.
 
 You don't have to read it front to back. Start with [Getting started](getting_started.md) if you've never opened the bot, or jump straight to the page for whatever you're trying to do. The bot's *❓ Help*{.button-like} button lands you right here.
 
@@ -13,8 +13,8 @@ You don't have to read it front to back. Start with [Getting started](getting_st
 
 * [Getting started](getting_started.md): open the bot, set your timezone, and reach the main menu.
 * [The main menu](main_menu.md): the hub every action starts from.
-* [Create a meeting](create_a_meeting.md): a title, a date, a place, and who can join.
-* [Meeting settings](meeting_settings.md): the per-meeting toggles for waiting lists, sharing, invitations, and more.
+* [Create a meeting](create_a_meeting.md): a title, then the card where the photos, the date, the place and the guest limit are set.
+* [Meeting settings](meeting_settings.md): the meeting's language, the switches under Behavior, and how its dates are written.
 * [Sharing and joining](sharing_and_joining.md): post a meeting into a chat and follow it through RSVPs.
 * [Using Mitup from any chat](inline_mode.md): pull up your meetings inline, without adding the bot to the group.
 * [Meeting lifecycle](meeting_lifecycle.md): when a meeting turns inactive and when it's deleted.

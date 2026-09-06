@@ -45,6 +45,23 @@ if meeting is None:
 await context.api.edit_message(update=update, view=meeting.main_view)
 ```
 
+### Extraction must earn itself
+
+Extract a function when the extraction earns its indirection: it isolates logic that can be
+reasoned about or tested alone, it removes duplication (a second caller exists), it restores
+single responsibility to an oversized function, or it wraps a nameable unit whose body has room
+to grow. Never extract when the result is a one-expression function with a single caller and no
+logic of its own: the name adds a jump for the reader and nothing else.
+
+Two refinements:
+
+* A one-line function is fine when it is itself the shared entry point many callers use (a
+  public dispatch like `view_for` is one line by design).
+* When a second caller is anticipated but not yet real, leave the code inline and extract at
+  second use. The exception is a designed seam whose future caller will exercise it with its own
+  behavior, where inlining now would mean re-inlining that behavior's gate later (the owner
+  card's section builders exist so shared surfaces can render each section conditionally).
+
 ## Naming conventions
 
 | Symbol | Convention | Example |
@@ -87,8 +104,9 @@ Write a docstring only when the function name and signature do not convey the fu
 | Handler entry point | No — the decorator and name are sufficient |
 
 <critical_rules>
-  <rule>Docstrings must be short (1–3 sentences max). No `Args:` / `Returns:` sections unless a parameter has a non-obvious contract.</rule>
-  <rule>Explain *why* a non-obvious decision was made — never narrate *what* the code does.</rule>
+  <rule>A docstring is one sentence, two at most. No `Args:` / `Returns:` sections unless a parameter has a non-obvious contract.</rule>
+  <rule>A function whose name and signature already tell the story gets no docstring at all.</rule>
+  <rule>Explain a non-obvious constraint, never narrate what the code does or why it was chosen over alternatives.</rule>
 </critical_rules>
 
 **Good:**
@@ -174,11 +192,11 @@ raise UserNotFound(tg_id)
 **`match` statements** — for exhaustive case analysis. Always include an `assert_never` arm on unreachable branches:
 
 ```python
-match self.position:
-    case PaginatedViewPosition.FIRST:
-        return [go_forward]
-    case PaginatedViewPosition.LAST:
-        return [go_back]
+match level:
+    case None | SupporterLevel.NONE | SupporterLevel.HOST_1:
+        return FREE_POLICY
+    case SupporterLevel.HOST_2 | SupporterLevel.HOST_3:
+        return PATRON_POLICY
     case _ as unreachable:
         assert_never(unreachable)
 ```
@@ -234,7 +252,16 @@ from mitup_bot.utils import callbacks as cb
 
 ## Comments
 
-Use comments to explain *why*, not *what*. The code already shows what is happening.
+**The one test:** a comment or docstring exists only to say something the code cannot say by existing. If a reader with the code open learns nothing new from it, it does not get written. Everything below refines that test.
+
+<critical_rules>
+  <rule>A comment is one sentence, two at most. Never a paragraph, never a block that walks through the lines below it.</rule>
+  <rule>No design rationale, no history, no alternatives considered, no cross-references to other code paths. That prose belongs in the MR description.</rule>
+  <rule>Plain words, no jargon. A comment that needs its own glossary is rewritten or deleted.</rule>
+  <rule>A name beats a comment. If a comment is needed to explain what a function or variable is, rename it in plain English instead (`meeting_counts`, not `mc`; `unreachable_users`, not `bad_uids`).</rule>
+</critical_rules>
+
+What a comment may say: a Telegram or third-party API quirk, a wire-format or database invariant, a security reason, a deliberate deviation from the obvious approach.
 
 **Good:**
 

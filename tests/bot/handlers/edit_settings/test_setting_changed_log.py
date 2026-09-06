@@ -3,6 +3,7 @@ import logging
 import pytest
 from telegram import Update
 
+from mitup_bot.datetimes import DateFormat
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId, SettingName
 from mitup_bot.handlers.edit_settings.utils import (
     DEFAULT_OPTIONS_SOURCE,
@@ -60,3 +61,26 @@ async def test_default_option_toggle_shares_the_setting_changed_event(
     assert record.__dict__["new_value"] is True
     assert record.__dict__["source"] == DEFAULT_OPTIONS_SOURCE
     assert user_with_settings.settings.default_incognito is True
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.SET_DEFAULT_DATE_FORMAT.with_id(1))], indirect=True)
+async def test_the_default_date_format_writes_the_same_event_from_its_own_call_site(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    update: Update,
+    handler_context: HandlerContext,
+    caplog: pytest.LogCaptureFixture,
+):
+    """A pick rather than a flip, so it writes the shared event itself instead of going through the
+    toggle helper; the facets have to line up all the same."""
+    caplog.set_level(logging.INFO)
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    user_with_settings.settings.default_date_format = DateFormat.DEFAULT
+
+    await call_handler(EditSettingsHandlerId.SET_DEFAULT_DATE_FORMAT, handler_context=handler_context)
+
+    record = log_record(caplog, SETTING_CHANGED_EVENT)
+    assert record.__dict__["setting"] == SettingName.DEFAULT_DATE_FORMAT.value
+    assert record.__dict__["old_value"] == DateFormat.DEFAULT.value
+    assert record.__dict__["new_value"] == DateFormat.LONG.value
+    assert record.__dict__["source"] == DEFAULT_OPTIONS_SOURCE

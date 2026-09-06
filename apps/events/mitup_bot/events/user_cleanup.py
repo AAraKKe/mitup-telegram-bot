@@ -182,7 +182,7 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
             )
 
         for user in marked_users:
-            farewell = MitupView(description=PrivacyMessages.DELETION_COMPLETE.get(lang=user.lang), keyboard=[])
+            farewell = MitupView(message=PrivacyMessages.DELETION_COMPLETE.rich(lang=user.lang), menu=[])
             await api.send_message_to_user(user, farewell)
             log.info("Deletion farewell queued", user_id=user.db_id, tg_user_id=user.tg_user_id, lang=user.lang)
             log.info("User purged", user_id=user.db_id, tg_user_id=user.tg_user_id, reason="deletion_requested")

@@ -215,6 +215,9 @@ class AppConfig(BaseModel):
 
 class BotConfig(BaseModel):
     token: Annotated[SecretStr, Sample("123456:paste-your-botfather-token", comment="Get a bot token from @BotFather.")]
+    # The bot's own @username, which the `t.me` deep links on a shared card are built from. Unset
+    # keeps the production bot (see `bot_links.DEFAULT_USERNAME`).
+    username: str | None = None
     # These properties are needed when running with webhook
     domain: str | None = None
     # Port where Telegram should connect to. This is not the port in the host

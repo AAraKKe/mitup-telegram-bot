@@ -4,13 +4,9 @@ import pytest
 from pydantic import ValidationError
 from pytest import LogCaptureFixture
 
+from mitup_bot.datetimes import DateFormat, TimeFormat
 from mitup_bot.lifecycle import LifecyclePolicy
-from mitup_bot.models import Settings, User
-from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, SettingsMessages
-from mitup_bot.views import MitupView
-from mitup_bot.views.factory import options_button
-from mitup_bot.views.meeting_settings import default_meeting_settings_view
+from mitup_bot.models import Settings
 
 
 def test_valid_timezone(settings: Settings):
@@ -30,7 +26,7 @@ def test_invalid_timezone(settings: Settings, caplog: LogCaptureFixture):
     ids=["just_above_cap", "far_above_cap"],
 )
 def test_timeout_above_cap_is_rejected_on_assignment(settings: Settings, timeout: int):
-    """The cap belongs to the model, so it holds on any write path — an over-cap timeout keeps its
+    """The cap belongs to the model, so it holds on any write path: an over-cap timeout keeps its
     owner's dated meetings active forever."""
     with pytest.raises(ValidationError):
         settings.timeout = timeout
@@ -47,62 +43,15 @@ def test_timeout_at_cap_is_accepted(settings: Settings):
     assert settings.timeout == LifecyclePolicy.get().max_timeout_minutes
 
 
-def expected_default_meeting_options_view(settings: Settings) -> MitupView:
-    lang = settings.language
-    waiting_list = settings.default_waiting_list
-    public = settings.default_public
-    invitation = settings.default_allow_invitation
-    incognito = settings.default_incognito
-    lock_on_start = settings.default_lock_on_start
-
-    message = SettingsMessages.DEFAULT_OPTIONS_DESCRIPTION.get(lang=lang)
-    waiting_list_button = options_button(
-        cb.SET_DEFAULT_WAITING_LIST, ButtonMessages.WAITING_LIST.get(lang=lang), waiting_list
-    )
-    public_button = options_button(cb.SET_DEFAULT_PUBLIC, ButtonMessages.PUBLIC.get(lang=lang), public)
-    invitation_button = options_button(
-        cb.SET_DEFAULT_INVITATIONS, ButtonMessages.OPEN_INVITATION.get(lang=lang), invitation
-    )
-    incognito_button = options_button(cb.SET_DEFAULT_INCOGNITO, ButtonMessages.INCOGNITO.get(lang=lang), incognito)
-    # Row 3 is the lock toggle directly (no sub-screen navigation)
-    lock_button = options_button(
-        cb.SET_DEFAULT_LOCK_ON_START,
-        ButtonMessages.LOCK_ON_START.get(lang=lang),
-        lock_on_start,
+def test_a_new_settings_row_names_the_time_format_every_meeting_starts_with():
+    assert Settings().default_time_format == TimeFormat(
+        show_timezone=False, clock_24h=True, date_format=DateFormat.DEFAULT
     )
 
-    return MitupView(
-        message,
-        keyboard=[
-            [waiting_list_button, public_button],
-            [invitation_button, incognito_button],
-            [lock_button],
-        ],
-    ).with_back_button(text=ButtonMessages.SETTINGS, callback_data=cb.SETTINGS, lang=lang)
 
+def test_the_default_time_format_reads_the_three_stored_defaults(settings: Settings):
+    settings.default_show_timezone = False
+    settings.default_clock_24h = False
+    settings.default_date_format = DateFormat.FULL
 
-@pytest.mark.parametrize("waiting_list", [True, False], ids=["waiting_list_true", "waiting_list_false"])
-@pytest.mark.parametrize("public", [True, False], ids=["public_true", "public_false"])
-@pytest.mark.parametrize("invitation", [True, False], ids=["invitation_true", "invitation_false"])
-@pytest.mark.parametrize("incognito", [True, False], ids=["incognito_true", "incognito_false"])
-@pytest.mark.parametrize("lock_on_start", [True, False], ids=["lock_on_start_true", "lock_on_start_false"])
-def test_default_meeting_options_view(
-    waiting_list: bool,
-    public: bool,
-    invitation: bool,
-    incognito: bool,
-    lock_on_start: bool,
-    user_with_settings: User,
-):
-    settings = user_with_settings.settings
-    settings.default_allow_invitation = invitation
-    settings.default_incognito = incognito
-    settings.default_public = public
-    settings.default_waiting_list = waiting_list
-    settings.default_lock_on_start = lock_on_start
-
-    view = default_meeting_settings_view(settings)
-
-    expected_view = expected_default_meeting_options_view(settings)
-
-    assert expected_view == view
+    assert settings.default_time_format == TimeFormat(show_timezone=False, clock_24h=False, date_format=DateFormat.FULL)

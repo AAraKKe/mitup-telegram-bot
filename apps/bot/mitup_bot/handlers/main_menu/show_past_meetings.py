@@ -9,15 +9,16 @@ from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
 from mitup_bot.utils import ButtonMessages, MeetingListMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import PaginatedMitupView, factory
+from mitup_bot.views import PaginatedMitupView
+from mitup_bot.views import meeting as meeting_views
 
 from .enums import MainMenuHandlerId
-from .utils import MeetingList, log_meeting_list
+from .utils import MEETINGS_PER_PAGE, MeetingList, log_meeting_list
 
 
 async def show_past_meetings_page(user: User, requested_page: int, update: Update, context: TMitupContext):
     past_meetings = sorted([m for m in user.meetups if not m.active], key=lambda m: m.db_id)
-    page_number = PaginatedMitupView.clamp_page(requested_page, len(past_meetings))
+    page_number = PaginatedMitupView.clamp_page(requested_page, len(past_meetings), MEETINGS_PER_PAGE)
 
     log_meeting_list(
         user,
@@ -29,33 +30,29 @@ async def show_past_meetings_page(user: User, requested_page: int, update: Updat
         dropped_active=len(user.meetups) - len(past_meetings),
     )
 
-    if buttons := [
-        ButtonConfig(
-            text=meeting.plain_title,
-            callback_data=cb.SHOW_PAST_MEETING.with_page(meeting.db_id, page_number),
+    if not past_meetings:
+        await context.api.answer_callback_query(
+            update=update, text=MeetingListMessages.PAST_EMPTY_ALERT.text(lang=user.lang), show_alert=True
         )
-        for meeting in past_meetings
-    ]:
-        view = PaginatedMitupView(
-            description=MeetingListMessages.PAST_DESCRIPTION.get(lang=user.lang),
-            buttons=buttons,
-            page_number=page_number,
-            navigation_callback_data=cb.SHOW_PAST_MEETING_PAGE,
-        ).with_context_menu(
-            [
-                [
-                    ButtonConfig(
-                        text=ButtonMessages.MAIN_MENU.back(lang=user.lang),
-                        callback_data=cb.MAIN_MENU,
-                    )
-                ]
-            ]
-        )
-    else:
-        view = factory.main_menu_view(
-            guards.render_context(user, update, context),
-            message=MeetingListMessages.PAST_EMPTY.get(lang=user.lang),
-        )
+        return
+
+    view = PaginatedMitupView(
+        message=meeting_views.list_heading(ButtonMessages.PAST_MEETINGS, user.lang),
+        sections=[
+            meeting_views.meeting_list_section(
+                meeting,
+                cb.SHOW_PAST_MEETING.with_page(meeting.db_id, page_number),
+                user.lang,
+                delete_callback=cb.DELETE_PAST_MEETING.with_page(meeting.db_id, page_number),
+            )
+            for meeting in past_meetings
+        ],
+        page_size=MEETINGS_PER_PAGE,
+        page_number=page_number,
+        navigation_callback_data=cb.SHOW_PAST_MEETING_PAGE,
+    ).with_context_menu(
+        [[ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=user.lang), callback_data=cb.MAIN_MENU)]]
+    )
 
     await context.api.edit_message(update=update, view=view)
 
@@ -65,8 +62,8 @@ async def show_past_meetings_page(user: User, requested_page: int, update: Updat
 )
 @with_session
 async def callback_query_show_past_meetings(session: AsyncSession, update: Update, context: TMitupContext):
-    # load_collections: `show_past_meetings_page` filters `user.meetups`.
-    user = await guards.current_user(update, session, load_collections=True)
+    # Each meeting renders as a card section, which reads its owner and its joined links.
+    user = await guards.current_user(update, session, load_collections=True, load_participants=True)
     await show_past_meetings_page(user, 1, update, context)
 
 
@@ -78,6 +75,6 @@ async def callback_query_show_past_meeting_page(session: AsyncSession, update: U
     callback_data = guards.valid_callback_data(
         cb.SHOW_PAST_MEETING_PAGE.parse(context.match), MainMenuHandlerId.SHOW_PAST_MEETING_PAGE_CALLBACK
     )
-    # load_collections: `show_past_meetings_page` filters `user.meetups`.
-    user = await guards.current_user(update, session, load_collections=True)
+    # Each meeting renders as a card section, which reads its owner and its joined links.
+    user = await guards.current_user(update, session, load_collections=True, load_participants=True)
     await show_past_meetings_page(user, callback_data.id, update, context)

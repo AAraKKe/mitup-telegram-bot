@@ -90,7 +90,7 @@ async def test_grant_button_non_admin_is_dropped(
 def test_target_prompt_view_has_cancel_button():
     view = target_prompt_view("en")
 
-    buttons = [button for row in view.keyboard for button in row]
+    buttons = [button for row in view.menu for button in row]
     assert any(button.callback_data == cb.CANCEL_GRANT for button in buttons)
 
 
@@ -141,7 +141,7 @@ async def test_target_message_unknown_identifier_reprompts(
     step = result.last_context
     step.api.assert_send_message_called(
         step.get_update(),
-        GrantOperatorMessages.TARGET_NOT_FOUND.get(lang=user_with_settings.lang, identifier="@nobody"),
+        GrantOperatorMessages.TARGET_NOT_FOUND.rich(lang=user_with_settings.lang, identifier="@nobody"),
     )
 
 
@@ -180,10 +180,10 @@ async def test_level_pick_shows_confirmation(
         step.get_update(),
         factory.confirmation_view(
             RenderContext(lang=lang, is_admin=True),
-            message=GrantOperatorMessages.CONFIRM_PROMPT.get(
+            message=GrantOperatorMessages.CONFIRM_PROMPT.rich(
                 lang=lang,
                 name=target.display_name,
-                level=GrantOperatorMessages.level_label(SupporterLevel.HOST_2).get(lang=lang),
+                level=GrantOperatorMessages.level_label(SupporterLevel.HOST_2).text(lang=lang),
             ),
             confirm_callback_data=cb.CONFIRM_GRANT.with_level(target.db_id, rank),
             decline_callback_data=cb.CANCEL_GRANT,
@@ -223,7 +223,7 @@ async def test_confirm_grants_the_level_to_an_unlinked_target(
     step.api.assert_send_message_to_user_called(
         user=target,
         view=grant_notification_view(
-            SupporterNotificationMessages.granted_for(SupporterLevel.HOST_3).get(lang=target.lang), target.lang
+            SupporterNotificationMessages.granted_for(SupporterLevel.HOST_3).rich(lang=target.lang), target.lang
         ),
     )
 
@@ -259,7 +259,7 @@ async def test_confirm_removing_the_grant_revokes_and_notifies(
     step = result.last_context
     step.api.assert_send_message_to_user_called(
         user=target,
-        view=grant_notification_view(SupporterNotificationMessages.GRANT_REMOVED.get(lang=target.lang), target.lang),
+        view=grant_notification_view(SupporterNotificationMessages.GRANT_REMOVED.rich(lang=target.lang), target.lang),
     )
 
 
@@ -321,7 +321,7 @@ async def test_cancel_returns_to_the_admin_menu(
     step.api.assert_edit_message_called(
         step.get_update(),
         factory.admin_menu_view(RenderContext(lang=lang, is_admin=True)).with_context(
-            GrantOperatorMessages.CANCELLED_CONFIRMATION.get(lang=lang)
+            GrantOperatorMessages.CANCELLED_CONFIRMATION.rich(lang=lang)
         ),
     )
 
@@ -368,7 +368,7 @@ async def test_non_text_input_on_the_target_step_reprompts(
 
     assert state == ConversationGrantState.AWAITING_TARGET
     context.api.assert_send_message_called(
-        update, GrantOperatorMessages.TARGET_PROMPT.get(lang=user_with_settings.lang)
+        update, GrantOperatorMessages.TARGET_PROMPT.rich(lang=user_with_settings.lang)
     )
 
 
@@ -412,7 +412,7 @@ async def test_level_pick_for_a_vanished_target_aborts_to_the_admin_menu(
     context.api.assert_edit_message_called(
         update,
         factory.admin_menu_view(RenderContext(lang=lang, is_admin=True)).with_context(
-            GrantOperatorMessages.CANCELLED_CONFIRMATION.get(lang=lang)
+            GrantOperatorMessages.CANCELLED_CONFIRMATION.rich(lang=lang)
         ),
     )
 
@@ -435,7 +435,7 @@ async def test_confirm_for_a_vanished_target_grants_nothing(
     context.api.assert_edit_message_called(
         update,
         factory.admin_menu_view(RenderContext(lang=lang, is_admin=True)).with_context(
-            GrantOperatorMessages.CANCELLED_CONFIRMATION.get(lang=lang)
+            GrantOperatorMessages.CANCELLED_CONFIRMATION.rich(lang=lang)
         ),
     )
 
@@ -477,6 +477,6 @@ async def test_lowering_the_grant_notifies_the_new_tier(
     result.last_context.api.assert_send_message_to_user_called(
         user=target,
         view=grant_notification_view(
-            SupporterNotificationMessages.downgraded_to(SupporterLevel.HOST_1).get(lang=target.lang), target.lang
+            SupporterNotificationMessages.downgraded_to(SupporterLevel.HOST_1).rich(lang=target.lang), target.lang
         ),
     )

@@ -7,7 +7,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.views import MitupView, RenderContext, factory
-from mitup_bot.views.meeting_text import meeting_message
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -26,17 +26,17 @@ def inactive_meeting(user_with_settings: User):
 
 
 def expected_past_meeting_view(meeting: Meetup, user: User, page: int = 1) -> MitupView:
-    description = MeetingLifecycleMessages.PAST_DESCRIPTION.get(lang=user.lang)
+    description = MeetingLifecycleMessages.PAST_DESCRIPTION.rich(lang=user.lang)
     return MitupView(
-        meeting_message(meeting),
+        meeting_views.shared_body(meeting, finished=True),
         [
             [
                 ButtonConfig(
-                    text=ButtonMessages.REACTIVATE_MEETING.get_text(lang=user.lang),
+                    text=ButtonMessages.REACTIVATE_MEETING.text(lang=user.lang),
                     callback_data=cb.REACTIVATE_MEETING.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.DELETE.get_text(lang=user.lang),
+                    text=ButtonMessages.DELETE.text(lang=user.lang),
                     callback_data=cb.DELETE_PAST_MEETING.with_page(meeting.db_id, page),
                 ),
             ],
@@ -70,7 +70,7 @@ async def test_delete_past_meeting_shows_confirmation(
         update,
         factory.confirmation_view(
             RenderContext(lang=user_with_settings.lang),
-            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user_with_settings.lang),
+            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.rich(lang=user_with_settings.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_id(MEETING_ID),
             decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_id(MEETING_ID),
         ),
@@ -120,7 +120,7 @@ async def test_show_past_meeting_back_button_returns_to_originating_page(
     )
     # CallbackData.__eq__ ignores the page field, so assert it explicitly on the DELETE button.
     edited_view = context.api.call_args("edit_message").kwargs["view"]
-    delete_button = edited_view.keyboard[0][1]
+    delete_button = edited_view.menu[0][1]
     assert str(delete_button.callback_data).endswith(";page:3")
 
 
@@ -144,15 +144,15 @@ async def test_delete_past_meeting_threads_page_into_confirmation(
         update,
         factory.confirmation_view(
             RenderContext(lang=user_with_settings.lang),
-            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user_with_settings.lang),
+            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.rich(lang=user_with_settings.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_page(MEETING_ID, 3),
             decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_page(MEETING_ID, 3),
         ),
     )
     # CallbackData.__eq__ ignores the page field, so assert it explicitly on both buttons.
     edited_view = context.api.call_args("edit_message").kwargs["view"]
-    confirm_button = edited_view.keyboard[0][0]
-    decline_button = edited_view.keyboard[-1][-1]
+    confirm_button = edited_view.menu[0][0]
+    decline_button = edited_view.menu[-1][-1]
     assert str(confirm_button.callback_data).endswith(";page:3")
     assert str(decline_button.callback_data).endswith(";page:3")
 
@@ -178,8 +178,8 @@ async def test_confirm_delete_past_meeting_back_button_returns_to_originating_pa
     context.api.assert_edit_message_called(
         update,
         MitupView(
-            description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user_with_settings.lang),
-            keyboard=[
+            message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user_with_settings.lang),
+            menu=[
                 [
                     ButtonConfig(
                         text=ButtonMessages.PAST_MEETINGS.back(lang=user_with_settings.lang),
@@ -214,7 +214,7 @@ async def test_decline_delete_past_meeting_returns_to_originating_page(
     )
     # CallbackData.__eq__ ignores the page field, so assert it explicitly on the DELETE button.
     edited_view = context.api.call_args("edit_message").kwargs["view"]
-    delete_button = edited_view.keyboard[0][1]
+    delete_button = edited_view.menu[0][1]
     assert str(delete_button.callback_data).endswith(";page:3")
 
 
@@ -240,8 +240,8 @@ async def test_confirm_delete_past_meeting_deletes_and_redirects_to_past_meeting
     context.api.assert_edit_message_called(
         update,
         MitupView(
-            description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user_with_settings.lang),
-            keyboard=[
+            message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user_with_settings.lang),
+            menu=[
                 [
                     ButtonConfig(
                         text=ButtonMessages.PAST_MEETINGS.back(lang=user_with_settings.lang),

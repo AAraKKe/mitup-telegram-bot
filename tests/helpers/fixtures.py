@@ -9,10 +9,12 @@ from telegram import (
     Chat,
     ChatJoinRequest,
     ChosenInlineResult,
+    Document,
     InlineQuery,
     Location,
     Message,
     MessageEntity,
+    PhotoSize,
     Update,
 )
 from telegram import User as TgUser
@@ -65,6 +67,8 @@ class UpdateRequest:
             fixture's chat and user. Defaults to False.
         chosen_inline_result (str | None, optional): The id of the inline result the user picked. When set,
             the update carries a ChosenInlineResult for it, sent as ``inline_message_id``. Defaults to None.
+        media_group_id (str | None, optional): The album the message belongs to. Telegram sets it on every
+            message of a media group. Defaults to None.
         language_code (str | None, optional): When set, overrides the sender's Telegram ``language_code``
             (the IETF BCP-47 client-language tag). Defaults to None, leaving the fixture user's value.
     """
@@ -75,6 +79,9 @@ class UpdateRequest:
     message_text: str | None = None
     entities: list[MessageEntity] | None = None
     location: Location | None = None
+    photo: tuple[PhotoSize, ...] = ()
+    media_group_id: str | None = None
+    document: Document | None = None
     callback_query: CallbackData | bool = False
     command: str | bool = False
     command_args: str | None = None
@@ -484,5 +491,8 @@ def create_update(
             text=request.message_text,
             entities=request.entities,
             location=request.location,
+            photo=request.photo,
+            media_group_id=request.media_group_id,
+            document=request.document,
         ),
     )

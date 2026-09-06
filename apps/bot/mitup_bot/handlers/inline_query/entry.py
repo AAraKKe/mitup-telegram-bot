@@ -55,24 +55,24 @@ async def inline_view(session: AsyncSession, update: Update, context: TMitupCont
 
     button_text = InlineQueryMessages.CREATE_MEETING_BUTTON if user else InlineQueryMessages.EXPLORE_BUTTON
     button = InlineResultsButton(
-        text=button_text.get_text(lang=lang),
+        text=button_text.text(lang=lang),
         start_parameter="inline",
     )
 
     results: list[MitupInlineView] = [
         MitupInlineView(
-            description=InlineQueryMessages.CHAT_MEETINGS_MESSAGE.get(lang=lang),
-            keyboard=[
+            message=InlineQueryMessages.CHAT_MEETINGS_MESSAGE.rich(lang=lang),
+            menu=[
                 [
                     ButtonConfig(
-                        text=ButtonMessages.LOAD_CHAT_MEETINGS.get_text(lang=lang),
+                        text=ButtonMessages.LOAD_CHAT_MEETINGS.text(lang=lang),
                         callback_data=cb.LOAD_CHAT_MEETINGS,
                     )
                 ],
             ],
             id="meetings_in_this_chat",
-            title=InlineQueryMessages.CHAT_MEETINGS_TITLE.get(lang=lang),
-            inline_description=InlineQueryMessages.CHAT_MEETINGS_DESCRIPTION.get(lang=lang),
+            title=InlineQueryMessages.CHAT_MEETINGS_TITLE.text(lang=lang),
+            inline_description=InlineQueryMessages.CHAT_MEETINGS_DESCRIPTION.text(lang=lang),
         ),
     ]
 

@@ -29,9 +29,8 @@ async def test_callback_query_timeout(
 
     expected_view = factory.change_settings_element_view(
         RenderContext(lang=user_with_settings.lang),
-        message=SettingsMessages.TIMEOUT_PROMPT.get(
+        message=SettingsMessages.TIMEOUT_PROMPT.rich(
             lang=user_with_settings.lang,
-            timeout=user_with_settings.settings.timeout,
             max_timeout=LifecyclePolicy.get().max_timeout_minutes,
         ),
     )
@@ -40,7 +39,7 @@ async def test_callback_query_timeout(
     assert result == ConversationSettingsState.TIMEOUT
 
     # The prompt states the ceiling with a substituted number, not a leftover placeholder
-    rendered = context.api.call_args("edit_message").kwargs["view"].description.text
+    rendered = context.api.call_args("edit_message").kwargs["view"].message.text
     assert str(LifecyclePolicy.get().max_timeout_minutes) in rendered
     assert "${" not in rendered
 
@@ -70,13 +69,12 @@ async def test_settings_timeout_text_message_handler(
         EditSettingsHandlerId.TIMEOUT_MESSAGE_WITH_TEXT, handler_context=handler_context
     )
 
-    expected_view = factory.settings_view(
-        RenderContext(lang=user_with_settings.lang),
-        message=SettingsMessages.TIMEOUT_SUCCESS.get(lang=user_with_settings.lang, timeout=timeout),
-    )
-
     mock_session.assert_flushed()
     assert user_with_settings.settings.timeout == timeout
+
+    expected_view = factory.settings_view(RenderContext(lang=user_with_settings.lang), user_with_settings).with_context(
+        SettingsMessages.TIMEOUT_SUCCESS.rich(lang=user_with_settings.lang, timeout=timeout)
+    )
     context.api.assert_send_message_called(update, expected_view)
     assert result == ConversationHandler.END
 
@@ -129,7 +127,7 @@ async def test_settings_timeout_invalid_input_handler(
 
     expected_view = factory.change_settings_element_view(
         RenderContext(lang=user_with_settings.lang),
-        message=SettingsMessages.TIMEOUT_INVALID.get(
+        message=SettingsMessages.TIMEOUT_INVALID.rich(
             lang=user_with_settings.lang, max_timeout=LifecyclePolicy.get().max_timeout_minutes
         ),
     )
@@ -138,7 +136,7 @@ async def test_settings_timeout_invalid_input_handler(
     context.api.assert_send_message_called(update, expected_view)
 
     # The rejection states the ceiling with a substituted number, not a leftover placeholder
-    rendered = context.api.call_args("send_message").kwargs["view"].description.text
+    rendered = context.api.call_args("send_message").kwargs["view"].message.text
     assert str(LifecyclePolicy.get().max_timeout_minutes) in rendered
     assert "${" not in rendered
 

@@ -21,7 +21,6 @@ from mitup_bot.utils import CommonMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingEditContentMessages
 from mitup_bot.views import meeting as meeting_views
-from mitup_bot.views.meeting_text import rich_title
 from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import (
     HandlerContext,
@@ -55,13 +54,13 @@ async def test_callback_query_edit_meeting_title_calls_to_correct_view_and_store
     assert context.user_data.registry[ContextId.EDIT_MEETING_TITLE].meeting_id == 1
 
     view = MitupView(
-        description=MeetingEditContentMessages.TITLE_PROMPT.get(
+        message=MeetingEditContentMessages.TITLE_PROMPT.rich(
             lang=user_with_settings.lang, title=user_with_settings.meetups[0].title
         ),
-        keyboard=[
+        menu=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.text(lang=user_with_settings.lang),
                     callback_data=cb.EDIT_MEETING_CANCEL.with_id(1),
                 )
             ]
@@ -126,7 +125,7 @@ async def test_edit_title_rich_message_reprompts_and_keeps_state(
     state = await edit_title_rich_message_handler(update, context)
 
     expected = edit_title_prompt_view(meeting, user_with_settings.lang).with_context(
-        CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=user_with_settings.lang)
+        CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.rich(lang=user_with_settings.lang)
     )
     context.api.assert_send_message_called(update, expected)
     assert state == ConversationMeetingState.EDIT_TITLE
@@ -168,10 +167,7 @@ async def test_edit_title_message_stores_tagged_title_and_renders_rich_success(
     assert meeting.title == f'<b>Raid</b> night <tg-emoji emoji-id="{CUSTOM_EMOJI_ID}">😀</tg-emoji>'
     assert meeting.plain_title == "Raid night 😀"
 
-    view = meeting_views.edit_view(meeting).with_context(
-        MeetingEditContentMessages.TITLE_SUCCESS.get(title=rich_title(meeting))
-    )
-    context.api.assert_send_message_called(update, view)
+    context.api.assert_send_message_called(update, meeting_views.owner_view(meeting))
     assert state == ConversationHandler.END
 
 
@@ -217,7 +213,7 @@ async def test_over_cap_title_leaves_the_meeting_untouched_and_reprompts(
     # Nothing was published: the cards in other chats still show the stored title.
     context.api.assert_method_just_called("update_meeting_messages", times=0)
 
-    error = MeetingEditContentMessages.TITLE_TOO_LONG.get(
+    error = MeetingEditContentMessages.TITLE_TOO_LONG.rich(
         lang=user_with_settings.lang, length=len(OVER_CAP_TITLE), limit=limits.TITLE_MAX_CHARS
     )
     # Both numbers reach the reader: a message still carrying `${length}` would leave them guessing.

@@ -25,10 +25,10 @@ from mitup_bot.handlers.registration_process.enums import (
     ConversationRegistrationProcessState,
     RegistrationProcessHandlerId,
 )
-from mitup_bot.models import User
+from mitup_bot.models import MeetingCounts, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.utils import PrivacyMessages, RegistrationMessages
-from mitup_bot.utils.entities import build_datetime_link
+from mitup_bot.utils.rich_message import datetime_link_content
 from mitup_bot.views import RenderContext
 from mitup_bot.views.factory import create_meeting_view, main_menu_view
 from tests.helpers import MockApi, UpdateRequest, create_bot_config, create_user, make_test_metrics_client
@@ -125,7 +125,9 @@ async def test_member_start_falls_through_to_main_menu(
     api = await process_update(routing_app, update)
 
     # times=1 asserts the main menu was the ONLY message: the re-onboarding prompt never fired.
-    api.assert_send_message_called(update, main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    api.assert_send_message_called(
+        update, main_menu_view(RenderContext(lang=user_with_settings.lang), counts=MeetingCounts(0, 0, 0))
+    )
     registration = conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
     assert registration._conversations.get(CONVERSATION_KEY) is None
 
@@ -152,7 +154,7 @@ async def test_non_member_start_is_claimed_by_reonboarding(
     # times=1: the prompt was the only message — no main menu means group 0 was stopped.
     api.assert_send_message_called(
         update,
-        RegistrationMessages.TIMEZONE_PROMPT.get(first_name=existing_user.first_name),
+        RegistrationMessages.TIMEZONE_PROMPT.rich(first_name=existing_user.first_name),
     )
     registration = conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
     assert registration._conversations.get(CONVERSATION_KEY) == ConversationRegistrationProcessState.TIMEZONE
@@ -174,7 +176,7 @@ async def test_pending_deletion_start_is_rejected_without_reonboarding(
     api = await process_update(routing_app, update)
 
     # times=1: the notice was the only message — no timezone prompt and no main menu.
-    api.assert_send_message_called(update, PrivacyMessages.PENDING_DELETION_ALERT.get(lang=marked_user.lang))
+    api.assert_send_message_called(update, PrivacyMessages.PENDING_DELETION_ALERT.rich(lang=marked_user.lang))
     registration = conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
     assert registration._conversations.get(CONVERSATION_KEY) is None
     assert marked_user.status is UserStatus.DELETION_REQUESTED
@@ -192,7 +194,7 @@ async def test_brand_new_user_start_is_claimed_by_reonboarding(
 
     api.assert_send_message_called(
         update,
-        RegistrationMessages.TIMEZONE_PROMPT.get(first_name=DEFAULT_TG_USER_PARAMS["first_name"]),
+        RegistrationMessages.TIMEZONE_PROMPT.rich(first_name=DEFAULT_TG_USER_PARAMS["first_name"]),
     )
     registration = conversation_for(RegistrationProcessHandlerId.TIMEZONE_CONVERSATION)
     assert registration._conversations.get(CONVERSATION_KEY) == ConversationRegistrationProcessState.TIMEZONE
@@ -217,7 +219,7 @@ async def test_member_start_inline_deep_link_enters_create_meeting(
     api = await process_update(routing_app, update)
 
     api.assert_send_message_called(
-        update, create_meeting_view(RenderContext(lang=user_with_settings.lang), datetime_link=build_datetime_link())
+        update, create_meeting_view(RenderContext(lang=user_with_settings.lang), datetime_link=datetime_link_content())
     )
     create_meeting = conversation_for(MeetingHandlerId.CREATE_MEETING_CONVERSATION)
     assert create_meeting._conversations.get(CONVERSATION_KEY) == ConversationMeetingState.TITLE

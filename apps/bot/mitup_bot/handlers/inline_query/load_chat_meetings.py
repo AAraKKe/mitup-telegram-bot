@@ -35,8 +35,8 @@ async def load_chat_meetings(session: AsyncSession, update: Update, context: TMi
     log.info("Chat meeting search armed", chat_instance=chat_instance, lang=lang)
 
     view = MitupView(
-        description=InlineQueryMessages.READY_TO_SEARCH_MESSAGE.get(lang=lang),
-        keyboard=[[search_chat_meetings_button(lang=lang, chat_instance=chat_instance)]],
+        message=InlineQueryMessages.READY_TO_SEARCH_MESSAGE.rich(lang=lang),
+        menu=[[search_chat_meetings_button(lang=lang, chat_instance=chat_instance)]],
     )
 
     await context.api.edit_message(update=update, view=view)

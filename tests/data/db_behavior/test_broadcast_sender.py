@@ -13,13 +13,12 @@ import contextlib
 import datetime as dt
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from sqlalchemy import text
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from telegram import MessageEntity
 from telegram.error import BadRequest, Forbidden, NetworkError, RetryAfter
 from telegram.ext import ExtBot
 
@@ -32,19 +31,18 @@ from mitup_bot.models.broadcasts import BroadcastDeliveryStatus, BroadcastStatus
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.monitoring.backend import NullBackend
-from mitup_bot.utils.entities import parse_format_tags
 from mitup_bot.utils.messages import BroadcastOperatorMessages
-from tests.helpers import make_test_metrics_client
+from mitup_bot.utils.rich_message import RichContent, RichMessagePayload
+from tests.helpers import RichCall, make_test_metrics_client
 from tests.helpers.monitoring import MetricAssertions
 
 pytestmark = pytest.mark.db_test
 
 
-@dataclass
-class SentMessage:
-    chat_id: int
-    text: str
-    entities: tuple[MessageEntity, ...]
+def expected_html(message: RichContent) -> str:
+    """The html a rendered message goes out as, for comparing a delivery against what the same
+    view would have shown."""
+    return RichMessagePayload.from_content(message).html
 
 
 # --- Fake bot recording every outbound send; can fail specific chat ids ---
@@ -57,38 +55,38 @@ class RecordingBot:
         network_error: set[int] | None = None,
         flood: set[int] | None = None,
     ):
-        self.sent: list[SentMessage] = []
+        self.sent: list[RichCall] = []
         self.forbidden = forbidden or set()
         self.not_found = not_found or set()
         self.generic_error = generic_error or set()
         self.network_error = network_error or set()
         self.flood = flood or set()
 
-    async def send_message(
-        self, *, chat_id: int, text: str, entities: list[MessageEntity] | None = None, **kwargs: object
-    ) -> object:
-        if chat_id in self.forbidden:
+    async def do_api_request(self, endpoint: str, api_kwargs: dict[str, Any] | None = None, **kwargs: object) -> object:
+        call = RichCall(endpoint, api_kwargs or {})
+        if call.chat_id in self.forbidden:
             raise Forbidden("Forbidden: bot was blocked by the user")
-        if chat_id in self.not_found:
+        if call.chat_id in self.not_found:
             raise BadRequest("Chat not found")
-        if chat_id in self.network_error:
+        if call.chat_id in self.network_error:
             raise NetworkError("Bad Gateway")
-        if chat_id in self.flood:
+        if call.chat_id in self.flood:
             raise RetryAfter(20)
-        if chat_id in self.generic_error:
+        if call.chat_id in self.generic_error:
             raise RuntimeError("unexpected serialization failure")
-        self.sent.append(SentMessage(chat_id=chat_id, text=text, entities=tuple(entities or ())))
+        self.sent.append(call)
         return object()
 
     @property
     def sent_chat_ids(self) -> set[int]:
-        return {message.chat_id for message in self.sent}
+        return {call.chat_id for call in self.sent}
 
-    def texts_to(self, chat_id: int) -> list[str]:
-        return [message.text for message in self.sent if message.chat_id == chat_id]
+    def body_html_to(self, chat_id: int) -> list[str]:
+        """The rendered bodies delivered to *chat_id*, without the button rows closing them."""
+        return [call.body_html for call in self.sent if call.chat_id == chat_id]
 
-    def messages_to(self, chat_id: int) -> list[SentMessage]:
-        return [message for message in self.sent if message.chat_id == chat_id]
+    def messages_to(self, chat_id: int) -> list[RichCall]:
+        return [call for call in self.sent if call.chat_id == chat_id]
 
 
 def make_api(bot: RecordingBot) -> TelegramApi:
@@ -301,7 +299,9 @@ async def test_language_without_message_falls_back_to_english(db_session: AsyncS
         await send_broadcasts.send_all_pending(
             make_api(bot), make_test_metrics_client(), data.broadcast_id, total, {"en": "English body"}
         )
-        assert bot.texts_to(recipient) == ["English body"]
+        assert bot.body_html_to(recipient) == ["English body"]
+        # A broadcast DM arrives with no surrounding UI, so it carries its navigation buttons.
+        assert bot.messages_to(recipient)[0].button_rows
 
 
 async def test_anonymous_invitee_never_receives_a_delivery(db_session: AsyncSession):
@@ -390,7 +390,7 @@ async def test_broadcast_beyond_attempt_threshold_is_failed(db_session: AsyncSes
         assert broadcast.status is BroadcastStatus.FAILED
         # The failure summary goes to the author (author-first); no recipient was contacted, and the
         # admin fallback is never reached because the author was.
-        expected = BroadcastOperatorMessages.SENDER_FAILED.get(
+        expected = BroadcastOperatorMessages.SENDER_FAILED.rich(
             lang="en",
             broadcast_id=data.broadcast_id,
             name=broadcast.name,
@@ -399,7 +399,7 @@ async def test_broadcast_beyond_attempt_threshold_is_failed(db_session: AsyncSes
             failed=0,
             skipped=0,
         )
-        assert bot.texts_to(tg_base) == [expected.text]
+        assert bot.body_html_to(tg_base) == [expected_html(expected)]
         assert admin not in bot.sent_chat_ids
 
 
@@ -422,7 +422,7 @@ async def test_summary_dm_reaches_the_author(db_session: AsyncSession):
         await send_broadcasts.run(make_api(bot), metrics, [admin])
 
         broadcast, _ = await fetch_broadcast(data.broadcast_id)
-        summary = BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY.get(
+        summary = BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY.rich(
             lang="en",
             broadcast_id=data.broadcast_id,
             name=broadcast.name,
@@ -430,13 +430,13 @@ async def test_summary_dm_reaches_the_author(db_session: AsyncSession):
             sent=1,
             failed=0,
             skipped=0,
-            breakdown=BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.get(
+            breakdown=BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.rich(
                 lang="en", language="en", sent=1, failed=0, skipped=0
             ),
         )
         # The author gets the summary; the recipient gets only the body; the admin gets nothing.
-        assert bot.texts_to(author) == [summary.text]
-        assert bot.texts_to(recipient) == ["hi"]
+        assert bot.body_html_to(author) == [expected_html(summary)]
+        assert bot.body_html_to(recipient) == ["hi"]
         assert admin not in bot.sent_chat_ids
 
 
@@ -456,7 +456,7 @@ async def test_summary_dm_falls_back_to_admins_when_the_author_has_no_user_row(d
         await send_broadcasts.run(make_api(bot), metrics, [admin])
 
         broadcast, _ = await fetch_broadcast(data.broadcast_id)
-        summary = BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY.get(
+        summary = BroadcastOperatorMessages.SENDER_COMPLETE_SUMMARY.rich(
             lang="en",
             broadcast_id=data.broadcast_id,
             name=broadcast.name,
@@ -464,12 +464,12 @@ async def test_summary_dm_falls_back_to_admins_when_the_author_has_no_user_row(d
             sent=1,
             failed=0,
             skipped=0,
-            breakdown=BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.get(
+            breakdown=BroadcastOperatorMessages.SENDER_BREAKDOWN_LINE.rich(
                 lang="en", language="en", sent=1, failed=0, skipped=0
             ),
         )
         # The author has no user row, so the summary falls back to the admin list.
-        assert bot.texts_to(admin) == [summary.text]
+        assert bot.body_html_to(admin) == [expected_html(summary)]
         assert tg_base not in bot.sent_chat_ids
 
 
@@ -591,8 +591,8 @@ async def test_recipient_receives_their_own_language_body(db_session: AsyncSessi
         await send_broadcasts.run(make_api(bot), make_test_metrics_client(), [])
 
         # Each recipient gets the body for their own language, not the English fallback.
-        assert bot.texts_to(spanish) == ["ES body"]
-        assert bot.texts_to(english) == ["EN body"]
+        assert bot.body_html_to(spanish) == ["ES body"]
+        assert bot.body_html_to(english) == ["EN body"]
         assert tg_base not in bot.sent_chat_ids
         broadcast, broadcast_messages = await fetch_broadcast(data.broadcast_id)
         assert broadcast.status is BroadcastStatus.DONE
@@ -656,33 +656,27 @@ async def test_terminal_failure_marks_never_attempted_pending_deliveries_as_fail
         assert [d.status for d in deliveries] == [BroadcastDeliveryStatus.FAILED]
 
 
-async def test_delivery_renders_body_as_the_same_formatted_text_the_preview_uses(db_session: AsyncSession):
-    """Preview/delivery parity: the sender delivers `parse_format_tags(body_html, {})` — the exact
-    FormattedText the preview builds — so an operator `<a href>` link arrives as a text_link entity."""
+async def test_delivery_sends_the_stored_body_exactly_as_the_operator_wrote_it(db_session: AsyncSession):
+    """Preview/delivery parity: the sender puts the stored body on the wire byte for byte, which is
+    the one view the operator previewed."""
     tg_base = 997_720
-    # tg_base is the (unseeded) author, so no summary DM lands in the recipient's capture. RecordingBot
-    # records only text + entities (not the reply markup), so the Main Menu button does not affect
-    # the preview-parity comparison below.
+    # tg_base is the (unseeded) author, so no summary DM lands in the recipient's capture.
     recipient = tg_base + 1
-    link_body = '<a href="https://mitup.social">join us</a>'
+    body = '<h2>Release 2.0</h2><ul><li><a href="https://mitup.social">join us</a></li></ul>'
     async with provisioned_broadcast(
         tg_base,
-        messages={"en": link_body},
+        messages={"en": body},
         seed_users=[SeedUser(recipient, "en")],
     ) as data:
         bot = RecordingBot()
 
         await send_broadcasts.run(make_api(bot), make_test_metrics_client(), [])
 
-        expected = parse_format_tags(link_body, {})
         delivered = bot.messages_to(recipient)
         assert len(delivered) == 1
-        # Same visible text and same entities the preview would have shown — tags stripped, link kept.
-        assert delivered[0].text == expected.text == "join us"
-        assert list(delivered[0].entities) == expected.entities
-        assert [(entity.type, entity.url) for entity in delivered[0].entities] == [
-            ("text_link", "https://mitup.social")
-        ]
+        assert delivered[0].body_html == body
+        # A broadcast DM arrives with no surrounding UI, so it still closes on its navigation row.
+        assert delivered[0].button_rows
         broadcast, _ = await fetch_broadcast(data.broadcast_id)
         assert broadcast.status is BroadcastStatus.DONE
 

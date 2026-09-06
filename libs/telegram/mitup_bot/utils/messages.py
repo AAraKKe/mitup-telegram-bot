@@ -6,9 +6,16 @@ from typing import Protocol, assert_never
 from mitup_bot.emojis import Emojis
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils.entities import FormattedText, parse_format_tags
+from mitup_bot.utils.rich_message import RichContent
+from mitup_bot.utils.rich_template import RichParams, render_rich_template
 
-MessageParams = str | int | float | FormattedText | None
+
+class FormattedMessageAsText(ValueError):
+    def __init__(self, message_id: str):
+        super().__init__(
+            f"Message {message_id} renders with formatting, which plain text cannot carry. "
+            "A caller that wants its words gives up the formatting at the call site, with `rich(...).text`."
+        )
 
 
 class TranslationEngineProtocol(Protocol):
@@ -17,28 +24,29 @@ class TranslationEngineProtocol(Protocol):
 
 
 class MessageBase(StrEnum):
-    def get(
-        self,
-        *,
-        lang: str = TranslationEngine.FALLBACK_LANG,
-        **kwargs: MessageParams,
-    ) -> FormattedText:
-        """Return the translated, tag-parsed message as a `FormattedText`.
+    def rich(self, *, lang: str = TranslationEngine.FALLBACK_LANG, **kwargs: RichParams) -> RichContent:
+        """Return the translated message as rich-HTML content, with every `${var}` substituted.
 
-        Keyword arguments are substituted into `${varname}` placeholders.
-        Values may be plain scalars *or* a `FormattedText` from another
-        `get()` call — in which case its entities are preserved and their
-        offsets are adjusted to their final position in the outer string.
+        Strict about both defects a catalog string can carry: a placeholder given no value raises
+        instead of reaching the reader as a literal `${var}`, and a formatting tag with no rich
+        equivalent raises instead of being dropped along with the emphasis it carried.
         """
-        translated = self.to_lang(lang)
-        substitutions = {k: v if isinstance(v, FormattedText) else str(v) for k, v in kwargs.items()}
-        return parse_format_tags(translated, substitutions)
+        return render_rich_template(self.to_lang(lang), kwargs)
 
-    def get_text(self, *, lang: str = TranslationEngine.FALLBACK_LANG, **kwargs: MessageParams) -> str:
-        formatted_text = self.get(lang=lang, **kwargs)
-        if formatted_text.entities:
-            raise ValueError("Requested `get_text` from a message that contains entities")
-        return formatted_text.text
+    def text(self, *, lang: str = TranslationEngine.FALLBACK_LANG, **kwargs: RichParams) -> str:
+        """Return the translated message as plain text, with every `${var}` substituted.
+
+        For the surfaces Telegram gives no formatting at all: button labels, callback-query
+        alerts, inline-picker titles. Substitution runs through `rich`, so a placeholder given no
+        value raises here too rather than shipping the literal `${var}`. Content that renders with
+        any formatting raises as well, since a plain string keeps none of it: a caller who wants
+        the words of a formatted message gives up the formatting at the call site by asking for
+        `rich(...).text`.
+        """
+        content = self.rich(lang=lang, **kwargs)
+        if not content.is_plain:
+            raise FormattedMessageAsText(self.id())
+        return content.text
 
     def to_lang(self, lang: str) -> str:
         """Given a message, return the translation in the given language."""
@@ -66,6 +74,12 @@ class ButtonMessages(MessageBase):
     ACTIVE_MEETINGS = f"{Emojis.LIST} Active meetings"
     PAST_MEETINGS = f"{Emojis.PAST} Past meetings"
     JOINED_MEETINGS = f"{Emojis.JOINED} Joined meetings"
+    # Short forms for the main menu's three-chip row; the full labels serve every other screen.
+    ACTIVE_MEETINGS_CHIP = f"{Emojis.LIST} Active"
+    PAST_MEETINGS_CHIP = f"{Emojis.PAST} Past"
+    JOINED_MEETINGS_CHIP = f"{Emojis.JOINED} Joined"
+    # A template so a language can put the count before the label.
+    COUNTED_CHIP = "${label} · ${count}"
     SETTINGS = f"{Emojis.SETTINGS} Settings"
     HELP = f"{Emojis.HELP} Help"
     COLLABORATE = f"{Emojis.HEART} Collaborate"
@@ -77,60 +91,76 @@ class ButtonMessages(MessageBase):
     TIMEZONE = f"{Emojis.TIME} Timezone"
     DEFAULT_OPTIONS = f"{Emojis.PEOPLE} Default Options"
     PRIVACY = f"{Emojis.SHIELD} Privacy"
-    PRIVACY_POLICY = f"{Emojis.SHIELD} Privacy policy"
-    OPEN_USER_GUIDE = f"{Emojis.BOOK} Open the user guide"
-    JOIN_COMMUNITY_GROUP = f"{Emojis.PEOPLE} Join the community group"
-    EXPORT_MY_DATA = f"{Emojis.PACKAGE} Export my data"
-    DELETE_MY_DATA = f"{Emojis.DELETE} Delete my data"
+    USER_GUIDE = f"{Emojis.BOOK} User guide"
+    COMMUNITY_GROUP = f"{Emojis.PEOPLE} Community group"
+    NEWS_CHANNEL = f"{Emojis.NEWS} News channel"
+    # Bare verbs: each rides a section title that already names what it acts on.
+    READ = "Read"
+    EXPORT = "Export"
+    OPEN = "Open"
+    CHANGE = f"{Emojis.EDIT} Change"
     WAITING_LIST = "Waiting list"
     PUBLIC = "Public"
     OPEN_INVITATION = "Open invitations"
     INCOGNITO = "Incognito"
-    ENABLE = "Enable"
-    DISABLE = "Disable"
+    SHOW_TIMEZONE = "Show timezone"
+    CLOCK_24H = "24-hour clock"
+    DATE_FORMAT = "Date format"
+    # The date formats as chips on the Date format line, the one in force accented.
+    DATE_FORMAT_DEFAULT = "Default"
+    DATE_FORMAT_LONG = "Long"
+    DATE_FORMAT_FULL = "Full"
+    # Toggle-chip states: the label names the CURRENT state, tapping flips it
+    ENABLED = "Enabled"
+    DISABLED = "Disabled"
 
     # Meeting buttons
+    # The back-button label every meeting sub-screen carries: it names the card the tap returns to.
+    MEETING = "Meeting"
     CANCEL = f"{Emojis.CANCEL} Cancel"
-    TITLE = f"{Emojis.TITLE} Title"
-    DESCRIPTION = f"{Emojis.DESCRIPTION} Description"
-    DATE = f"{Emojis.CALENDAR} Date"
     DATE_TIME = f"{Emojis.CALENDAR} Date & Time"
     END_DATE_TIME = f"{Emojis.CALENDAR} End Date & Time"
-    TIME = f"{Emojis.CLOCK} Time"
-    NOTIFICATIONS_TIME = f"{Emojis.NOTIF} Time"
-    SET_TIME = f"{Emojis.CLOCK} Set time"
-    PARTICIPANTS = f"{Emojis.JOINED} Participants"
-    LOCATION = f"{Emojis.MAP} Location"
-    OPEN_IN_MAPS = f"{Emojis.PIN} Open in Maps"
-    DONE = f"{Emojis.CHECK} Done"
     JOIN = f"{Emojis.CHECK} Join"
+    # Stands where Join would, on a meeting nobody can join. It reports the meeting's state rather
+    # than naming an action, which is what the inert chip carrying it is for.
+    FULL = f"{Emojis.PROHIB} Full"
     INVITE = f"{Emojis.FRIEND} Invite"
     LEAVE = f"{Emojis.CANCEL} Leave"
+    OPEN_MEETING = f"{Emojis.LIST} Open meeting"
+    # Rides the title line of a meeting in a list, where the title already names what opens.
     DELETE = f"{Emojis.DELETE} Delete"
     EDIT = f"{Emojis.EDIT} Edit"
     SHARE = f"{Emojis.SHARE} Share"
-    MEETING_LOCATION_NAME = f"{Emojis.TITLE} Name"
-    MEETING_LOCATION_COORDINATES = f"{Emojis.PIN} Map pin"
-    MEETING_MAX_PARTICIPANTS = "Max participants"
-    MEETING_NO_LIMIT_PARTICIPANTS = "No limit"
-    # Replaces MEETING_NO_LIMIT_PARTICIPANTS for owners whose plan caps participant capacity.
-    MEETING_MAX_CAP_PARTICIPANTS = "Max (${cap})"
+    # Redraws the card in place with the meeting's current state.
+    REFRESH = f"{Emojis.ACTIVATE} Refresh"
     MEETING_KICK_OUT = "Kick out"
-    DELETE_DATE = f"{Emojis.DELETE} Delete date"
-    DELETE_DURATION = f"{Emojis.DELETE} Delete duration"
+
+    # Meeting editor inline chips. A "+" marks a field still unset; the pencil marks one already
+    # filled, whose chip re-opens the same editor.
+    ADD_DESCRIPTION = "+ Add description"
+    SET_DATETIME = "+ Set date & time"
+    SELECT_DATE_FIRST = "Select a date first"
+    REMOVE_DATETIME = "Remove date & time"
+    REMOVE_END_DATETIME = "Remove end time"
+    SET_END_DATETIME = "+ Set end time"
+    SET_LOCATION_NAME = "+ Set name"
+    SET_COORDINATES = "+ Set map pin"
+    SET_PARTICIPANT_LIMIT = "Set limit"
+    CHANGE_PARTICIPANT_LIMIT = "Change limit"
+    REMOVE = "Remove"
+    ADD_IMAGES = "+ Add images"
+    EDIT_IMAGES = f"{Emojis.EDIT} Edit images"
+    # Images screen chips: Replace acts on one photo, Remove all on every photo.
+    REPLACE = "Replace"
+    REMOVE_ALL = "Remove all"
+    # The layout buttons on the Images screen; the current layout is highlighted.
+    COLLAGE = "Collage"
+    SLIDESHOW = "Slideshow"
+
     MAKE_SEARCHABLE = "Make it searchable"
     LOAD_CHAT_MEETINGS = f"{Emojis.SEARCH} Load meetings"
     SEARCH_CHAT_MEETINGS = f"{Emojis.SEARCH} Search meetings"
 
-    # When screen buttons
-    WHEN = f"{Emojis.CLOCK} When"
-    SET_START_TIME = f"{Emojis.START} Set start time"
-    SET_END_TIME = f"{Emojis.STOP} Set end time"
-    CLEAR_TIMES = f"{Emojis.DELETE} Clear times"
-
-    # Duration buttons
-    DURATION = f"{Emojis.HOURGLASS} Duration"
-    SET_DURATION = f"{Emojis.HOURGLASS} Set duration"
     LOCK_ON_START = "Lock on start"
 
     # Settings — Default Options buttons
@@ -142,7 +172,11 @@ class ButtonMessages(MessageBase):
     # Collaborate / Patreon buttons
     LINK_PATREON = f"{Emojis.HEART} Link Patreon account"
     BECOME_PATRON = f"{Emojis.DONATE} Become a Host"
-    UNLINK_PATREON = "Unlink Patreon account"
+    # Chip on the section title that names the linked account.
+    UNLINK = "Unlink"
+    # Chips inside the Collaborate sentences, each opening a docs page.
+    COLLABORATE_PAGE = f"{Emojis.BOOK} Ways to support"
+    LIMITS_PAGE = f"{Emojis.CHART} Limits and perks"
     # The link-confirmation pair. The confirming label names the act rather than reading as the
     # flow's natural "next", so tapping it is a decision instead of a reflex, and the declining
     # label is a neutral way out rather than one that sounds like abandoning setup.
@@ -154,41 +188,38 @@ class ButtonMessages(MessageBase):
     CONFIRM_PATREON_UNLINK = "Unlink this account"
     DECLINE_PATREON_UNLINK = "Keep it connected"
     HOSTS_GROUP_JOIN = f"{Emojis.PEOPLE} Join the Hosts-Only Group"
-    HOSTS_GROUP_OPEN = f"{Emojis.PEOPLE} Open the Hosts-Only Group"
+    # Chip on the Hosts-Only Group section; OPEN is its counterpart for a host already in it.
+    JOIN_GROUP = "Join"
 
     def back(self, lang: str, **kwargs: str) -> str:
-        return f"{self.GO_BACK} {self.get(lang=lang, **kwargs)}"
+        return f"{self.GO_BACK} {self.text(lang=lang, **kwargs)}"
 
 
 # --- Main menu and meeting lists ---
 
 
 class MainMenuMessages(MessageBase):
-    # No "choose an option" prompt: the keyboard below IS the menu, not a follow-up to the text.
-    DESCRIPTION = "Welcome to Mitup Bot!"
+    WELCOME = "Welcome to Mitup!"
+    TAGLINE = "Create meetings and share them with your friends."
+    MEETINGS_SECTION = "Meetings"
+    ACCOUNT_SECTION = "Account"
 
 
 class HelpMessages(MessageBase):
-    # The email is written bare: Telegram auto-links it, and mailto: URLs are rejected on
-    # inline-keyboard buttons, so it cannot become a button like the other two channels.
-    DESCRIPTION = (
-        "<b>Help</b>\n\n"
-        "Three ways to get help with Mitup:\n\n"
-        f"{Emojis.BOOK} The user guide walks through every screen, page by page. The best place to start.\n\n"
-        f"{Emojis.PEOPLE} The community group is open to anyone who uses Mitup. Come in and ask anything.\n\n"
-        f"{Emojis.MAIL} For anything private, write to support@mitup.social. A person reads it."
-    )
+    INTRO = "Where to get help with Mitup:"
+    # Each button placeholder is the channel's url chip, riding the sentence as its noun.
+    USER_GUIDE = "The ${button_guide} walks through every screen, page by page. The best place to start."
+    COMMUNITY_GROUP = "The ${button_group} is open to anyone who uses Mitup. Come in and ask anything."
+    NEWS_CHANNEL = "The ${button_channel} announces every release and what changed. Follow it to hear first."
+    # Plain text: Telegram rejects a mailto: URL on a button and clients ignore a mailto: anchor.
+    EMAIL = f"{Emojis.MAIL} For anything private, write to support@mitup.social. A person reads it."
 
 
 class MeetingListMessages(MessageBase):
-    ACTIVE_DESCRIPTION = "These are all your active meetings."
-    ACTIVE_EMPTY = (
-        "You don't have any meetings yet.\n\nClick on <b>${new_meeting_button}</b> in the main menu to create one."
-    )
-    JOINED_DESCRIPTION = "These are the meetings you have joined."
-    JOINED_EMPTY = "<i>You have not joined any meeting yet.</i>"
-    PAST_DESCRIPTION = "These are all your past meetings."
-    PAST_EMPTY = "<i>You have no past meetings yet.</i>"
+    # Callback-query alerts, which Telegram caps at 200 characters and renders without formatting.
+    ACTIVE_EMPTY_ALERT = "You have no active meetings. Tap New meeting to create one."
+    JOINED_EMPTY_ALERT = "You have not joined any meeting yet."
+    PAST_EMPTY_ALERT = "You have no past meetings yet."
 
 
 # --- Cross-screen / shared messages ---
@@ -197,6 +228,9 @@ class MeetingListMessages(MessageBase):
 class CommonMessages(MessageBase):
     # Stale cancel button alert
     STALE_CANCEL_ALERT = "You've already answered this question"
+    # Shown above the editor when a button no current screen renders brought the user here, so
+    # the unfamiliar screen explains itself.
+    EDITING_REVAMP_BANNER = f"{Emojis.SPARKLES} Editing got a revamp! Everything now happens right on the meeting card."
     # Positive-integer validation for flows without an upper bound (notification time)
     POSITIVE_INTEGER_INVALID = (
         "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
@@ -208,12 +242,9 @@ class CommonMessages(MessageBase):
         "Try again with a time that has valid hours (00-23) and minutes (00-59), "
         f"I am sure I can work with that {Emojis.BRAIN}."
     )
-    TIME_INVALID_FORMAT = (
-        f"Not sure I understand that time {Emojis.THINK}...\n\n"
-        "Please, send the time in the format <i>HH:MM</i>, for example <i>15:30</i> or <i>09:15</i>"
-    )
-    DATETIME_INVALID = (
-        "Tap <b>Date</b> or <b>Time</b> to update them, or send a message with a ${datetime_link} to set both at once."
+    DATETIME_INPUT_INVALID = (
+        "I could not read a date or time in that message. Pick a day from the calendar, send the time in "
+        "<i>HH:MM</i> format, or send a message using ${datetime_link} to set the date and time at once."
     )
     # Raised from guards.py across access paths
     DELETED_MEETING_ALERT = "This meeting has been deleted"
@@ -309,10 +340,11 @@ class SupporterMessages(MessageBase):
         "schedule as far out as you like. Collaborate below has all the details."
     )
     # Free owner trying to set a participant limit above the free-tier capacity. Gamemaster-tier
-    # owners are uncapped, so there is no Gamemaster counterpart.
-    PARTICIPANT_CAPACITY = (
+    # owners are uncapped, so there is no Gamemaster counterpart. Shown only as a sent message,
+    # never as an alert, so it can carry the Collaborate button inline where the upsell names it.
+    PARTICIPANT_CAPACITY_EXCEEDED = (
         "Free meetings can host up to ${cap} participants. Send a lower number, or become a Mitup "
-        "Host on Patreon to host bigger meetings. Collaborate below has all the details."
+        "Host on Patreon to host bigger meetings: ${button_collaborate}"
     )
 
 
@@ -346,8 +378,6 @@ class RegistrationMessages(MessageBase):
 
 
 class SettingsMessages(MessageBase):
-    DESCRIPTION = "Configure Mitup."
-
     # Timezone settings
     TIMEZONE_PROMPT = (
         "Your timezone is set to <b>${timezone}</b>.\n"
@@ -357,47 +387,20 @@ class SettingsMessages(MessageBase):
     TIMEZONE_SUCCESS = "Your timezone has been set to: <b>${timezone}</b>"
     # On-exit prompt shown when an unexpected message interrupts timezone edit
     TIMEZONE_ON_EXIT = (
-        "You were in the middle of changing your timezone. "
-        "Send me either the name of your city or your location to continue.  "
-        "If you don't want to continue, tap Cancel to exit."
+        "<i>You were in the middle of changing your timezone.</i>\n"
+        "Send the name of your city or your location to continue, or ${button_cancel} to exit."
     )
 
     # Language settings
-    LANGUAGE_PROMPT = "Current language: <b>${language}</b>.\n\nSelect a language."
-    # NOTE: shares the English "Language set." with MeetingEditLanguageMessages.SUCCESS
-    # by design — distinct namespace, do not de-dup in the catalogs.
     LANGUAGE_SUCCESS = "Language set."
 
     # Default meeting default options
-    DEFAULT_OPTIONS_DESCRIPTION = (
-        "Here you can configure the default options used when creating a meeting. "
-        "Do you usually create public meetings? Set it here. "
-        "Are you always allowing people to invite other people or to share the meeting in other chats? Do it here. "
-        "All your meetings will inherit this configuration.\n\n"
-        "You can configure different aspects of your meeting:\n\n"
-        "<b>Waiting list</b>: allow users to join the meeting even when it is full. "
-        "Users joining when it is full will be added to a waiting list and added to the participants "
-        "list as soon as a spot is available in the order they joined.\n\n"
-        "<b>Public</b>: activate this to allow everyone that receives the meeting to share it again. "
-        "Perfect to reach more people.\n\n"
-        "<b>Open invitations</b>: activate this option to allow users who have joined the meeting to add friends "
-        "even if those friends are not in Telegram.\n\n"
-        "<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. "
-        "Only the number of participants will be shown. You will still be able to see the participants.\n\n"
-        "<b>Lock on start</b>: when enabled and a meeting has a duration set, "
-        "participants cannot join or leave once the meeting starts. "
-        "When disabled, participants can still join or leave freely."
-    )
+    DEFAULT_OPTIONS_LEAD = "Every meeting you create starts with these settings."
+    TOGGLE_HINT = "Tap a setting's state to turn it on or off."
 
     # Timeout messages
-    TIMEOUT_PROMPT = (
-        "Timeout defines how long after a meeting starts it is kept active. "
-        "Meetings without a set duration are deactivated once this time has passed. "
-        "After deactivation, you can reactivate a meeting from <b>Past meetings</b>.\n\n"
-        "The current timeout is <b>${timeout} minutes</b>\n\n"
-        "Send the timeout (in minutes) you would like to use or touch Cancel to go back. "
-        "The maximum is <b>${max_timeout} minutes</b>, which is one day."
-    )
+    TIMEOUT_VALUE = "A meeting without an end time stays active ${minutes} minutes after it starts."
+    TIMEOUT_PROMPT = "Send the new timeout in minutes, up to <b>${max_timeout}</b> (one day), or tap Cancel to go back."
     TIMEOUT_INVALID = (
         "That doesn't look like a valid timeout. Send a positive whole number of minutes, "
         "up to <b>${max_timeout}</b> (one day). No decimals allowed!"
@@ -405,33 +408,31 @@ class SettingsMessages(MessageBase):
     TIMEOUT_SUCCESS = "Timeout set to: <b>${timeout} minutes</b>"
 
     # Notification settings
-    NOTIFICATIONS_DESCRIPTION = (
-        "Configure Mitup notifications.\n\n"
-        "Notifications: ${notifications_status}\n"
-        "When notifications are enabled, Mitup will notify "
-        "you <b>${notifications_time} minutes</b> before a meeting starts."
-    )
+    NOTIFICATION_LEAD = "${minutes} minutes before a meeting starts ${button_change}"
     NOTIFICATIONS_TIME_PROMPT = (
         "Send how long before a meeting starts (in minutes) you would like to be notified or touch Cancel to go back."
     )
     NOTIFICATIONS_TIME_SUCCESS = "Notification time set to <b>${notifications_time} minutes</b>."
 
-    # Generic status labels used in notifications settings
-    ENABLED = f"Enabled {Emojis.CHECK}"
-    DISABLED = f"Disabled {Emojis.CANCEL}"
+    # Card lines for the sections that only open another screen
+    DEFAULT_OPTIONS_LINE = "What every meeting you create starts with."
+    PRIVACY_LINE = "Your data, the policy, export and deletion."
 
 
 class PrivacyMessages(MessageBase):
-    DESCRIPTION = (
-        "<b>Privacy</b>\n\n"
-        "Your data belongs to you. Read the privacy policy to see what Mitup stores and why, "
-        "download a copy of your data, or request the permanent deletion of everything Mitup "
-        "knows about you."
-    )
-    # Sent as the caption of the exported JSON document.
-    EXPORT_CAPTION = (
-        "Here is a copy of everything Mitup stores about you. "
+    INTRO = "Your data belongs to you."
+    POLICY_TITLE = "Privacy policy"
+    POLICY = "What Mitup stores about you, why, and for how long."
+    EXPORT_TITLE = "Your data"
+    EXPORT = (
+        "Download a copy of everything Mitup stores about you, as a JSON file. "
         "Other people in your meetings appear by display name only."
+    )
+    EXPORT_ATTACHED = "Your copy is attached to this message."
+    DELETE_TITLE = "Deletion"
+    DELETE = (
+        "Permanently remove everything linked to your account. Meetings you created disappear for "
+        "everyone who joined them."
     )
     DELETE_WARNING = (
         "<b>Delete all your data?</b>\n\n"
@@ -474,11 +475,10 @@ class MeetingCreationMessages(MessageBase):
         "Let's create a meeting. What is the title?\n\n"
         "<i>Tip: you can also use ${datetime_link} to include a date and time directly.</i>"
     )
-    SUCCESS = (
+    CREATED = (
         "Meeting created: <b>${title}</b>\n\n"
-        "You can add more information to the meeting with the options below. "
-        "The information which has not been added won't be shown when the meeting is shared.\n\n"
-        f"When finished click on {Emojis.CHECK} Done"
+        "You can complete the meeting with the options on its card below. "
+        "The information which has not been added won't be shown when the meeting is shared."
     )
     INVALID_TITLE = (
         f"I did not recognize what you sent as a valid title {Emojis.THINK}.\n\n"
@@ -491,25 +491,36 @@ class MeetingCreationMessages(MessageBase):
     )
     # On-exit prompt shown when an unexpected message interrupts create-meeting
     ON_EXIT = (
-        "You were in the middle of creating a meeting. Send the title of the meeting to continue. "
-        "If you would not like to continue, tap Cancel to exit."
+        "<i>You were in the middle of creating a meeting.</i>\n"
+        "Send the title of the meeting to continue, or ${button_cancel} to exit."
     )
 
 
+class MeetingCardSectionMessages(MessageBase):
+    """Section titles and section-local lines on a meeting card. The view renders the titles bold;
+    the count rides the Participants title line, which is what lets it carry bare numbers.
+
+    They live in their own class so a title is free to repeat a string held elsewhere: two members
+    of one class holding the same string become a single member with two names, and the second
+    never reaches the catalogs as a string a translator can inflect on its own.
+    """
+
+    DESCRIPTION = "Description"
+    IMAGES = "Images"
+    WHEN = "When"
+    WHERE = "Where"
+    PARTICIPANTS = "Participants"
+    COUNT_OF_MAX = "${count} of ${max}"
+    # The two rows of the owner card's When section; ${when} is the moment written out.
+    START_TIME = "Start time: ${when}"
+    END_TIME = "End time: ${when}"
+
+
 class MeetingDisplayMessages(MessageBase):
-    # Entity-type label for an EntityDateTime (both start & end), not a visible heading
-    DATETIME_ENTITY_LABEL = "Meeting time"
-    START_LABEL = "Starts"
-    END_LABEL = "Ends"
     CREATED_BY = "Created by: ${owner}"
-    # Owner-view placeholders
-    DESCRIPTION_NOT_SET = f"{Emojis.PROHIB} No description defined {Emojis.PROHIB}"
     DATE_NOT_SET = f"{Emojis.PROHIB} No time defined {Emojis.PROHIB}"
-    LOCATION_NOT_SET = f"{Emojis.PROHIB} No location defined {Emojis.PROHIB}"
     # Participant-count empty fragment
     PARTICIPANT_COUNT_EMPTY = "Empty"
-    PARTICIPANT_LABEL = "Participant"
-    PARTICIPANTS_LABEL = "Participants"
     MAX_PARTICIPANTS_LABEL = "(Max: ${max_participants})"
     # Closes a participants list the card had to cut short. The list can collapse with no name left
     # above it, so this line reads on its own rather than referring back to the names above, and its
@@ -517,17 +528,25 @@ class MeetingDisplayMessages(MessageBase):
     # says names: calling them participants would overstate what the number represents.
     PARTICIPANTS_TRUNCATED = "${count} names not shown"
     INVITED_BY = "<i>invited by ${user}</i>"
+    # Says where the owner stands on their own meeting, and gives the join and invite chips beside
+    # it something to attach to: hosting a meeting is not attending it, and a pair of chips under
+    # the attendee list with no sentence to read them against looks like a stray control.
+    NOT_PART_OF_MEETING = "<i>You are not part of this meeting.</i>"
     # Shared-view empty-state sentences
     DESCRIPTION_EMPTY = "<i>This meeting has no description yet</i>"
-    # Standalone state banners shown on the meeting card
-    IN_PROGRESS_BANNER = "▶️ This meeting is in progress ▶️"
-    FINISHED_SUMMARY_BANNER = (
-        "✅ This meeting has finished ✅\n\n"
-        "<b>From:</b> ${start_datetime} · <b>To:</b> ${end_datetime} · "
-        "<b>Attendees:</b> ${attendee_count}"
-    )
+    # Stands in for the title of a meeting whose own title has no visible text.
+    UNTITLED = "<i>Untitled meeting</i>"
+    # Quiet status line closing the schedule block on a shared card while the meeting runs. A
+    # state, not news: it reads the same on every redraw of a long-lived card.
+    IN_PROGRESS_STATUS = "<i>This meeting is in progress.</i>"
+    FINISHED_STATUS = "<i>This meeting has finished.</i>"
+    # Standalone state banners replacing a card whose meeting can no longer be reached
     DELETED_BANNER = f"{Emojis.PROHIB} This meeting has been deleted {Emojis.PROHIB}"
     FINISHED_BANNER = f"{Emojis.CHECK} This meeting has finished {Emojis.CHECK}"
+    # Closes a card shared outside the bot, where most readers have never opened it. The product
+    # name is substituted rather than written into the string: it is a brand term no catalog
+    # translates, and it carries the link that opens the bot.
+    BUILT_WITH = "Built with ${mitup}"
 
 
 # --- Meeting join / leave / invite ---
@@ -544,6 +563,9 @@ class MeetingJoinMessages(MessageBase):
         "receive notifications and create new meetings!"
     )
     LEAVE_SUCCESS = "You have left the meeting"
+    # Shown under the meeting's title after the user taps Leave in the private chat with the bot.
+    # LEAVE_SUCCESS is the alert that answers the tap itself.
+    LEFT_CONFIRMATION = "You're no longer in this meeting."
     LEAVE_NOT_JOINED = "You cannot leave a meeting you have not joined"
     LEAVE_UNREGISTERED = (
         "You have left the meeting, ${user}! "
@@ -560,8 +582,8 @@ class MeetingJoinMessages(MessageBase):
 
 class MeetingInviteMessages(MessageBase):
     ON_EXIT = (
-        "Sorry, I was expecting the name of the person you want to invite. "
-        "Would you like to send it? If not, tap Cancel to exit."
+        "<i>You were in the middle of inviting someone.</i>\n"
+        "Send the name of the person to continue, or ${button_cancel} to exit."
     )
     PROMPT = "<b>Add to Guest List</b>\n\nPlease reply with the name of the person you want to add."
     CONFIRMATION = (
@@ -605,8 +627,12 @@ class MeetingLifecycleMessages(MessageBase):
 
 
 class MeetingAttachMessages(MessageBase):
-    FOOTNOTE_INACTIVE = f"{Emojis.SEARCH} Make this meeting searchable in this chat."
-    FOOTNOTE_ACTIVE = f"{Emojis.CHECK} This meeting is now searchable in this chat."
+    # Where a shared card stands in the chat it sits in, as the muted line closing it. Both read as
+    # a state rather than as news: a card is redrawn on every join, so an announcement would report
+    # itself as fresh long after the tap that made it true. They share a glyph, so the two states
+    # occupy the same slot and only the words tell them apart.
+    STATE_NOT_SEARCHABLE = f"{Emojis.SEARCH} Not searchable in this chat yet"
+    STATE_SEARCHABLE = f"{Emojis.SEARCH} Searchable in this chat"
     ENABLED_ALERT = (
         f"{Emojis.CHECK} Now Searchable!\n\n"
         "This meeting is now attached to this chat. It will be included in your search "
@@ -624,20 +650,21 @@ class MeetingAttachMessages(MessageBase):
 
 class MeetingEditContentMessages(MessageBase):
     TITLE_PROMPT = "This is the current title of your meeting:\n<b>${title}</b>\n\nSend me the new one"
-    TITLE_SUCCESS = "Title updated to: <b>${title}</b>"
     TITLE_ON_EXIT = (
-        "Sorry, I was expecting the title of your meeting. Would you like to send it? If not, tap Cancel to exit."
+        "<i>You were in the middle of renaming your meeting.</i>\n"
+        "Send the new title to continue, or ${button_cancel} to exit."
     )
     TITLE_TOO_LONG = "That title is ${length} characters, over the limit of ${limit}. Send me a shorter one."
     DESCRIPTION_PROMPT = "This is the current description of your meeting:\n${description}\n\nSend me the new one"
-    # The user-supplied description is intentionally wrapped in bold so the newly set value
-    # is visually highlighted in the confirmation message.
-    DESCRIPTION_SUCCESS = "Description updated to: <b>${description}</b>"
     DESCRIPTION_ON_EXIT = (
-        "Sorry, I was expecting the description of your meeting. Would you like to send it? If not, tap Cancel to exit."
+        "<i>You were in the middle of changing the description.</i>\n"
+        "Send the new description to continue, or ${button_cancel} to exit."
     )
     DESCRIPTION_TOO_LONG = (
         "That description is ${length} characters, over the limit of ${limit}. Send me a shorter one."
+    )
+    REMOVE_DESCRIPTION_CONFIRMATION = (
+        "Are you sure you want to remove the description of your meeting?\n\n${description}"
     )
 
 
@@ -645,51 +672,43 @@ class MeetingEditContentMessages(MessageBase):
 
 
 class MeetingEditLocationMessages(MessageBase):
-    DESCRIPTION = (
-        "A meeting can have a location associated. "
-        "You can just set the name of the place or you can also attach the location. "
-        "Choose any of the two options."
-    )
     NAME_PROMPT = "Send me the name of the place."
     COORDINATES_PROMPT = (
         f"<i>Only from the phone {Emojis.PHONE}</i>\n\n"
         f"Send the location of the meeting. Touch on the {Emojis.CLIP} icon and then choose location. "
         "You can send whatever location you want, not just your current location."
     )
-    NAME_SUCCESS = "Location name set to: <b>${name}</b>"
-    COORDINATES_SUCCESS = "Location saved."
     COORDINATES_INVALID = "Send me the location again. Remember to touch on the clip icon and choose location."
     NAME_ON_EXIT = (
-        "Sorry, I was expecting the name of the location. Would you like to send it? If not, tap Cancel to exit."
+        "<i>You were in the middle of naming the location.</i>\n"
+        "Send the name of the location to continue, or ${button_cancel} to exit."
     )
     LOCATION_NAME_TOO_LONG = (
         "That place name is ${length} characters, over the limit of ${limit}. Send me a shorter one."
     )
     COORDINATES_ON_EXIT = (
-        "Sorry, I was expecting the location of your meeting. Would you like to send it? If not, tap Cancel to exit."
+        "<i>You were in the middle of setting the map pin.</i>\n"
+        "Send the location of your meeting to continue, or ${button_cancel} to exit."
     )
+    REMOVE_NAME_CONFIRMATION = "This removes the meeting's place name. Are you sure?"
+    REMOVE_COORDINATES_CONFIRMATION = "This removes the meeting's map pin. Are you sure?"
 
 
 # --- Meeting edit: participants ---
 
 
 class MeetingEditParticipantsMessages(MessageBase):
-    DESCRIPTION = (
-        "Here you will be able to manage the participants of the meeting: you can set the "
-        "maximum number of people that can attend the meeting as well as kick out any of the "
-        "participants that joined the meeting."
-    )
-    MAX_PROMPT = (
-        "Send me the maximum number of participants allowed in the meeting (must be a number greater than 0) "
-        "or tap <i>No limit</i> to allow an unlimited number of participants."
-    )
-    # Shown instead of MAX_PROMPT when the owner's plan caps participant capacity: promising
-    # "unlimited" would be false, since the effective capacity clamps to the plan's cap.
-    MAX_PROMPT_CAPPED = (
-        "Send me the maximum number of participants allowed in the meeting (must be a number greater than 0) "
-        "or tap <i>Max (${cap})</i> to allow your plan's maximum of ${cap} participants."
+    LIMIT_PROMPT = (
+        "Send me the maximum number of participants allowed in the meeting (must be a number greater than 0)."
     )
     MAX_SUCCESS = "Max participants set to: <b>${max_participants}</b>"
+    # Shown to capped owners only: their removed limit resolves to the plan's cap
+    # (Meetup.effective_max_members), so removing it must not read as "unlimited".
+    REMOVE_LIMIT_CONFIRMATION = (
+        "Removing the limit sets it back to <b>${cap}</b>, the most participants your meetings can have. "
+        "Do you want to continue?\n\n"
+        "Need bigger meetings? Become a Mitup Host on Patreon to raise the ceiling: ${button_collaborate}"
+    )
     NO_LIMIT_LABEL = "No limit"
     MAX_INVALID = "The maximum number of participants must be a number greater than 0. Please, try again"
     KICK_OUT_DESCRIPTION = "These are the users that joined the meeting. Choose who you want to kick out."
@@ -697,39 +716,74 @@ class MeetingEditParticipantsMessages(MessageBase):
         "Are you sure you want to kick out <b>${participant}</b> from the meeting <b>${meeting_title}</b>?"
     )
     KICK_OUT_NOT_IN_MEETING = "The participant you tried to kick out is no longer in the meeting."
-    KICK_OUT_SUCCESS = "<b>${participant}</b> removed."
-    KICK_OUT_SUCCESS_NO_MORE = "<b>${participant}</b> removed. No more participants to manage."
     MAX_ON_EXIT = (
-        "Sorry, I was expecting the maximum number of participants. "
-        "Would you like to send it? If not, tap Cancel to exit."
+        "<i>You were in the middle of setting the participant limit.</i>\n"
+        "Send the maximum number of participants to continue, or ${button_cancel} to exit."
     )
 
 
-# --- Meeting edit: language / settings ---
-
-
-class MeetingEditLanguageMessages(MessageBase):
-    DESCRIPTION = (
-        "Choose the language of your meeting. This will change the language used when sharing the meeting.\n\n"
-        "Current language: <b>${language}</b>."
-    )
-    # NOTE: shares the English "Language set." with SettingsMessages.LANGUAGE_SUCCESS
-    # by design — distinct namespace, do not de-dup in the catalogs.
-    SUCCESS = "Language set."
+# --- Meeting edit: settings ---
 
 
 class MeetingEditSettingsMessages(MessageBase):
-    DESCRIPTION = (
-        "You can configure different aspects of your meeting:\n\n"
-        "<b>Waiting list</b>: allow users to join the meeting even when it is full. "
-        "Users joining when it is full will be added to a waiting list and added to the participants "
-        "list as soon as a spot is available in the order they joined.\n\n"
-        "<b>Public</b>: activate this to allow everyone that receives the meeting to share it again. "
-        "Perfect to reach more people.\n\n"
-        "<b>Open invitations</b>: activate this option to allow users who have joined the meeting to add friends "
-        "even if those friends are not in Telegram.\n\n"
-        "<b>Incognito</b>: a meeting with incognito enabled won't show the people that joined the meeting when shared. "
-        "Only the number of participants will be shown. You will still be able to see the participants."
+    WAITING_LIST_EXPLANATION = (
+        "When the meeting is full, new joiners land on a waiting list and move into the meeting "
+        "automatically as spots free up, in the order they joined."
+    )
+    PUBLIC_EXPLANATION = "Anyone who receives the meeting can share it again. Perfect to reach more people."
+    OPEN_INVITATIONS_EXPLANATION = "Participants can bring friends along, even friends who are not on Telegram."
+    INCOGNITO_EXPLANATION = (
+        "The shared meeting shows only how many people joined, not who. As the host, you still see everyone."
+    )
+    LOCK_ON_START_EXPLANATION = (
+        "The moment the meeting starts, the attendee list is locked: nobody can join or leave while it is "
+        "in progress. Takes effect once the meeting has a start time."
+    )
+    BEHAVIOR_GROUP = "Behavior"
+    BEHAVIOR_LINE = "How the meeting behaves: who can join and share it, invitations, privacy, and locking on start."
+    TIME_FORMAT_GROUP = "Time format"
+    TIME_FORMAT_LINE = "How the meeting's date and time are written for everyone who sees it."
+    SHOW_TIMEZONE_EXPLANATION = (
+        "Writes the meeting's timezone next to its times, so people elsewhere know which clock they are reading."
+    )
+    CLOCK_24H_EXPLANATION = "Shows the meeting's times as 22:45 instead of 10:45 PM."
+    DATE_FORMAT_EXPLANATION = "How the meeting's dates are written, for everyone who sees them."
+
+
+# --- Meeting images ---
+
+
+class MeetingImagesMessages(MessageBase):
+    """The Images screen, where the owner manages the photos a meeting card shows.
+
+    `LOCKED` is the screen's whole body when the owner is not a Host, so it is written in the same
+    tone as the plan-limit notices in `SupporterMessages`.
+    """
+
+    TITLE = "Images"
+    LEAD = (
+        "Send one or more photos to show them on the meeting card, in the order they should "
+        "appear. A meeting holds up to ${limit} photos, and wide ones look best."
+    )
+    REPLACING = "Send the photo that replaces image ${number}."
+    IMAGE_LABEL = "Image ${number}"
+    LAYOUT = "Layout"
+    LAYOUT_EXPLANATION = (
+        "How several photos are drawn on the card: a collage shows them all at once, a slideshow shows one at a time."
+    )
+    LOCKED = (
+        "Photos on the meeting card are one of the extras Hosts get. Become a Mitup Host on "
+        "Patreon to bring them to your meetings. Collaborate below has all the details."
+    )
+    LIMIT_REACHED = "This meeting already holds its ${limit} photos. Remove one to make room for another."
+    REMOVE_CONFIRMATION = "This removes image ${number} from the card. Are you sure?"
+    REMOVE_ALL_CONFIRMATION = "This removes every photo from the card. Are you sure?"
+    SEND_AS_PHOTO = "That arrived as a file. Send it as a photo to put it on the card."
+    # Draft shown while the photos of an album are still arriving; the Images screen replaces it.
+    ADDING_PHOTOS = "Adding your photos"
+    ON_EXIT = (
+        "<i>You were in the middle of changing your meeting's photos.</i>\n"
+        "Send a photo to continue, or ${button_cancel} to exit."
     )
 
 
@@ -737,81 +791,46 @@ class MeetingEditSettingsMessages(MessageBase):
 
 
 class MeetingEditDateTimeMessages(MessageBase):
-    DESCRIPTION = (
-        "Choose what you want to set for your meeting.\n\n"
+    EXPLANATION = (
+        "Select the date and time of your meeting from the calendar.\n\n"
         "<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
     )
-    DATE_EDIT_PROMPT = (
-        f"Select the new date. Press <b>{ButtonMessages.DELETE_DATE}</b> if you want to "
-        "unset the date and time of the meeting."
-    )
-    DATE_ADD_PROMPT = "Select the date."
-    # Shown alongside CommonMessages.TIME_PROMPT in the time-first flow
-    TIME_DATE_DEFAULT_NOTE = "The date defaults to today, but you can set a different one."
-    # Sets date AND prompts for time
-    DATE_ADDED_TIME_PROMPT = (
-        "The date has been set to <b>${datetime}</b>. "
-        "The time defaults to 23:59, just before midnight.\n\n"
-        "Send a different time in <i>HH:MM</i> format, or tap Done to keep 23:59."
-    )
-    DATE_UPDATED = "Date set to: ${datetime}"
-    TIME_SUCCESS = "Time set to ${datetime}"
+    CURRENT_TIME = f"{Emojis.CLOCK} Current time: <b>${{time}}</b> ${{button_edit}}"
+    TIME_NEEDS_DATE = "Select a date first, then set the time."
     ON_EXIT = (
-        "Sorry, I was expecting the new time for your meeting. Would you like to send it? If not, tap Cancel to exit."
+        "<i>You were in the middle of changing the start time.</i>\n"
+        "Send the new time to continue, or ${button_cancel} to exit."
     )
     END_CLEARED_BY_START = "The new start time is after the end time, so the end time has been cleared."
     START_IN_PAST = "The start time must be in the future."
 
 
-# --- Meeting edit: when (start/end times sub-screen) ---
+# --- Meeting edit: start/end time removal ---
 
 
 class MeetingEditWhenMessages(MessageBase):
-    DESCRIPTION_NO_TIMES = (
-        "Set when your meeting happens. You can set a start time, an end time, or both. "
-        "You can also lock the attendees list when the meeting starts, "
-        "so no one can join or leave once it is underway."
-    )
-    DESCRIPTION_START_ONLY = (
-        "Meeting starts at: <b>${start_datetime}</b>\n\n"
-        "You can set an end time or lock the attendees list when the meeting starts, "
-        "so no one can join or leave once it is underway."
-    )
-    DESCRIPTION_BOTH = (
-        "Meeting starts at: <b>${start_datetime}</b>\n"
-        "Meeting ends at: <b>${end_datetime}</b>\n\n"
-        "You can change the times or lock the attendees list when the meeting starts, "
-        "so no one can join or leave once it is underway."
-    )
-    CLEAR_CONFIRMATION = "Are you sure you want to clear the start and end times?"
-    CLEAR_DECLINED = "The times won't be cleared."
-    CLEAR_SUCCESS = "Times removed."
+    # The start's remove chip clears the whole schedule: an end time cannot exist without a start,
+    # so the confirmation states the full effect. The start lock is a standing setting and stays.
+    REMOVE_TIMES_CONFIRMATION = "This removes the meeting's start time, and the end time along with it. Are you sure?"
+    REMOVE_END_CONFIRMATION = "This removes the meeting's end time. Are you sure?"
 
 
 # --- Meeting edit: duration (end-time sub-screen) ---
 
 
 class MeetingEditDurationMessages(MessageBase):
-    END_PROMPT = (
-        "Meeting starts at <b>${start_datetime}</b>. Set when it ends.\n\n"
-        "<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
-    )
-    END_EDIT_PROMPT = (
-        "Meeting starts at <b>${start_datetime}</b>. The meeting currently ends at <b>${end_datetime}</b>.\n\n"
-        "Set the new end time.\n\n"
+    EXPLANATION = (
+        "The meeting starts at <b>${start_datetime}</b>. Select the date and time it ends from the calendar.\n\n"
         "<i>Tip: you can also send a message using ${datetime_link} to set the date and time at once.</i>"
     )
     END_BEFORE_START = "The end time must be after the start time."
     END_IN_PAST = "The end time must be in the future."
     END_MAX_DURATION = "A meeting can last a week at most. Set an end within a week of the start."
-    # Sets end date AND prompts for time
-    END_DATE_ADDED_TIME_PROMPT = (
-        "The end date has been set to <b>${datetime}</b>. "
-        "The time defaults to 23:59.\n\n"
-        "Send the time in <i>HH:MM</i> format to change it, or tap Done to keep 23:59."
-    )
     END_STALE_ALERT = "The start time was cleared. Set it again before choosing an end time."
-    ON_EXIT = "Sorry, I was expecting the end time. Would you like to send it? If not, tap Cancel to exit."
+    ON_EXIT = (
+        "<i>You were in the middle of setting the end time.</i>\n"
+        "Send the end time to continue, or ${button_cancel} to exit."
+    )
 
 
 # --- Inline query results ---
@@ -845,62 +864,71 @@ class NotificationMessages(MessageBase):
         "If you do not want to reactivate the meeting, you can ignore this message."
     )
     DELETED = "The meeting <b>${meeting_title}</b> has been permanently deleted."
-    STARTING_SOON = "The meeting <b>${meeting_title}</b> is starting soon!"
-    STARTED = "The meeting <b>${meeting_title}</b> has started!"
+    STARTING_SOON_HEADING = f"{Emojis.NOTIF} Starting soon"
+    STARTED_HEADING = f"{Emojis.GREEN_CIRCLE} Started"
+    CANNOT_MAKE_IT = "Can't make it? ${button_leave}"
+    # The countdown line both reminders open on. `${when}` is how far the start is, written as
+    # "in 25 minutes" or "5 minutes ago" in the reader's language.
+    STARTS_IN = "Starts ${when}"
+    STARTED_AGO = "Started ${when}"
+    STARTED_JUST_NOW = "Started just now"
 
 
 class CollaborateMessages(MessageBase):
-    # Collaborate view, shown when Patreon is configured and the account is not linked yet.
-    # `${collaborate_page}` receives a linked "ways to support" label (COLLABORATE_PAGE_LABEL).
-    NOT_LINKED = (
-        "<b>Help keep Mitup running</b>\n\n"
+    # Pitch under the Collaborate title, read by anyone who has not linked an account yet.
+    PITCH = (
         "Mitup is built by a pair of brothers, not a big company, and it is free for everyone. "
-        "Your support is what pays for the servers, the database, and the late-night debugging. "
-        "Any help counts: telling your friends, translating, reporting bugs, or backing the "
-        "project. The ${collaborate_page} page on our website walks through every way to pitch "
-        "in.\n\n"
-        "The most direct way to help is becoming a Mitup Host on Patreon. As a thank you, Hosts "
-        "get a badge next to their name, a members-only group, and raised limits depending on "
-        "the tier: Brewer, Gamemaster, or Commissioner. The ${limits_page} page shows what each "
-        "tier unlocks.\n\n"
-        "Link your Patreon account to get started, and thank you for being here."
+        "Your support pays for the servers, the database and the late-night debugging."
     )
-    # Label for the inline docs link embedded in NOT_LINKED.
-    COLLABORATE_PAGE_LABEL = "ways to support"
-    # Label for the inline docs link to the limits page, embedded in NOT_LINKED and
-    # LINKED_NOT_PATRON. The perks themselves live on that page, not in the chat copy, so tier
-    # changes never mean a copy-and-translation sweep here.
-    LIMITS_PAGE_LABEL = "limits and Host perks"
-    # Collaborate view, shown when the account is linked but not an active Host of the campaign.
-    LINKED_NOT_PATRON = (
-        "<b>Patreon account linked</b>\n\n"
+    # "Ways to help" section, on every Collaborate screen. `${button_collaborate_page}` is the chip
+    # opening the docs page that lists every way to pitch in.
+    WAYS_TO_HELP_TITLE = "Ways to help"
+    WAYS_TO_HELP = (
+        "Tell your friends, translate, report bugs, or back the project. "
+        "The ${button_collaborate_page} page walks through every one."
+    )
+    # "Become a Host" section, shown to anyone who is not a Host yet: the lead sentence, then the
+    # tier table, then a closing line whose `${button_limits_page}` chip opens the docs limits page.
+    BECOME_HOST_TITLE = "Become a Host"
+    BECOME_HOST = (
+        "The most direct way to help. Hosts get a badge, a members-only group and raised limits depending on the tier."
+    )
+    LIMITS_PAGE_LINE = "The ${button_limits_page} page has the numbers."
+    # Column headings of the tier table. The first column holds the tier names and has none.
+    TABLE_BADGE = "Badge"
+    TABLE_GROUP = "Group"
+    TABLE_LIMITS = "Limits"
+    # The Limits cell of the tier table, one per tier: free-tier limits, raised limits, no limits.
+    TIER_LIMITS_FREE = "free"
+    TIER_LIMITS_RAISED = "raised"
+    TIER_LIMITS_NONE = "none"
+    # Status section of the Collaborate screen for a linked account with no active pledge.
+    LINKED_TITLE = "Patreon account linked"
+    LINKED_NOT_HOST = (
         "You're all set, thanks for taking the first step! You're not a Host yet, so your Host "
-        "perks are still off.\n\n"
-        "Hosts get a badge next to their name, a members-only group, and raised limits depending "
-        "on the tier: Brewer, Gamemaster, or Commissioner. The ${limits_page} page shows what "
-        "each tier unlocks.\n\n"
-        "Become a Host and your perks turn on automatically, with no need to link again."
+        "perks are still off. Become a Host and they turn on automatically, with no need to link again."
     )
-    # Collaborate view, shown to a linked active Brewer.
-    LINKED_PATRON_SUPPORTER = (
-        f"<b>{Emojis.HOST_1} You're a Brewer</b>\n\n"
-        "Thanks for backing Mitup. Your Brewer badge shows on your profile, and your support "
-        "helps keep Mitup running for everyone. You can unlink your Patreon account whenever you want."
+    # Status section of the Collaborate screen for a linked Host, one title and one body per tier.
+    STATUS_TITLE_HOST_1 = "You're a Brewer"
+    STATUS_HOST_1 = (
+        "Thanks for backing Mitup. Your Brewer badge shows next to your name, and your support "
+        "helps keep Mitup running for everyone."
     )
-    # Collaborate view, shown to a linked active Gamemaster.
-    LINKED_PATRON_PATRON = (
-        f"<b>{Emojis.HOST_2} You're a Gamemaster</b>\n\n"
-        "Thanks for backing Mitup. Your Gamemaster badge is on, and you can run up to ${active_meetings} "
-        "active meetings at once, schedule up to ${scheduling_days} days ahead, and invite unlimited "
-        "participants per meeting. You can unlink your Patreon account whenever you want."
+    STATUS_TITLE_HOST_2 = "You're a Gamemaster"
+    STATUS_HOST_2 = (
+        "Thanks for backing Mitup. Your Gamemaster badge is on, and you can run up to "
+        "${active_meetings} active meetings at once, schedule up to ${scheduling_days} days ahead, "
+        "and invite unlimited participants per meeting."
     )
-    # Collaborate view, shown to a linked active Commissioner.
-    LINKED_PATRON_ORGANIZER = (
-        f"<b>{Emojis.HOST_3} You're a Commissioner</b>\n\n"
-        "Thanks for backing Mitup. Your Commissioner badge is on, and every limit is off: "
-        "run as many meetings as you want, schedule them as far ahead as you need, "
-        "and invite as many people as you like to each one. You can unlink your Patreon account whenever you want."
+    STATUS_TITLE_HOST_3 = "You're a Commissioner"
+    STATUS_HOST_3 = (
+        "Thanks for backing Mitup. Your Commissioner badge is on, and every limit is off: run as "
+        "many meetings as you want, schedule them as far ahead as you need, and invite as many "
+        "people as you like to each one."
     )
+    # Hosts-Only Group section, shown to a linked Host once the group is configured.
+    HOSTS_GROUP_TITLE = "Hosts-Only Group"
+    HOSTS_GROUP = "The members-only group where Hosts meet the people behind Mitup and each other."
     # Context line edited onto the view right after the user unlinks.
     UNLINKED = "Your Patreon account has been unlinked."
     # Unlink-confirmation prompt for an account with no active Host perks. Unlinking only
@@ -1001,19 +1029,49 @@ class CollaborateMessages(MessageBase):
 
     @classmethod
     def status_for(cls, level: SupporterLevel) -> CollaborateMessages:
-        """The persistent status screen message for a linked, active paying tier.
+        """The status body on the Collaborate screen of a linked, active paying tier.
 
         NONE never reaches here: a non-Host never sees the linked Host screen, so it raises
         rather than inventing copy for the free tier."""
         match level:
             case SupporterLevel.HOST_1:
-                return cls.LINKED_PATRON_SUPPORTER
+                return cls.STATUS_HOST_1
             case SupporterLevel.HOST_2:
-                return cls.LINKED_PATRON_PATRON
+                return cls.STATUS_HOST_2
             case SupporterLevel.HOST_3:
-                return cls.LINKED_PATRON_ORGANIZER
+                return cls.STATUS_HOST_3
             case SupporterLevel.NONE:
                 raise ValueError("No status message exists for the NONE tier")
+            case _ as unreachable:
+                assert_never(unreachable)
+
+    @classmethod
+    def status_title_for(cls, level: SupporterLevel) -> CollaborateMessages:
+        """The title of the section `status_for` fills, raising on NONE for the same reason."""
+        match level:
+            case SupporterLevel.HOST_1:
+                return cls.STATUS_TITLE_HOST_1
+            case SupporterLevel.HOST_2:
+                return cls.STATUS_TITLE_HOST_2
+            case SupporterLevel.HOST_3:
+                return cls.STATUS_TITLE_HOST_3
+            case SupporterLevel.NONE:
+                raise ValueError("No status title exists for the NONE tier")
+            case _ as unreachable:
+                assert_never(unreachable)
+
+    @classmethod
+    def tier_limits_for(cls, level: SupporterLevel) -> CollaborateMessages:
+        """The Limits cell of the tier table, raising on NONE, which the table never lists."""
+        match level:
+            case SupporterLevel.HOST_1:
+                return cls.TIER_LIMITS_FREE
+            case SupporterLevel.HOST_2:
+                return cls.TIER_LIMITS_RAISED
+            case SupporterLevel.HOST_3:
+                return cls.TIER_LIMITS_NONE
+            case SupporterLevel.NONE:
+                raise ValueError("No tier limits exist for the NONE tier")
             case _ as unreachable:
                 assert_never(unreachable)
 
@@ -1203,46 +1261,6 @@ class SupporterNotificationMessages(MessageBase):
                 assert_never(unreachable)
 
 
-class Weekday(MessageBase):
-    MONDAY = "Mon"
-    TUESDAY = "Tue"
-    WEDNESDAY = "Wed"
-    THURSDAY = "Thu"
-    FRIDAY = "Fri"
-    SATURDAY = "Sat"
-    SUNDAY = "Sun"
-
-
-class Month(MessageBase):
-    JANUARY = "January"
-    FEBRUARY = "February"
-    MARCH = "March"
-    APRIL = "April"
-    MAY = "May"
-    JUNE = "June"
-    JULY = "July"
-    AUGUST = "August"
-    SEPTEMBER = "September"
-    OCTOBER = "October"
-    NOVEMBER = "November"
-    DECEMBER = "December"
-
-
-class MonthShort(MessageBase):
-    JANUARY = "Jan"
-    FEBRUARY = "Feb"
-    MARCH = "Mar"
-    APRIL = "Apr"
-    MAY = "May"
-    JUNE = "Jun"
-    JULY = "Jul"
-    AUGUST = "Aug"
-    SEPTEMBER = "Sep"
-    OCTOBER = "Oct"
-    NOVEMBER = "Nov"
-    DECEMBER = "Dec"
-
-
 class Languages(MessageBase):
     SPANISH = "🇪🇸 Spanish"
     GALICIAN = "🇪🇸 Galician"
@@ -1250,36 +1268,6 @@ class Languages(MessageBase):
     GERMAN = "🇩🇪 German"
     PORTUGUESE = "🇧🇷 Portuguese"
     ITALIAN = "🇮🇹 Italian"
-
-
-MonthList = [
-    Month.JANUARY,
-    Month.FEBRUARY,
-    Month.MARCH,
-    Month.APRIL,
-    Month.MAY,
-    Month.JUNE,
-    Month.JULY,
-    Month.AUGUST,
-    Month.SEPTEMBER,
-    Month.OCTOBER,
-    Month.NOVEMBER,
-    Month.DECEMBER,
-]
-MonthShortList = [
-    MonthShort.JANUARY,
-    MonthShort.FEBRUARY,
-    MonthShort.MARCH,
-    MonthShort.APRIL,
-    MonthShort.MAY,
-    MonthShort.JUNE,
-    MonthShort.JULY,
-    MonthShort.AUGUST,
-    MonthShort.SEPTEMBER,
-    MonthShort.OCTOBER,
-    MonthShort.NOVEMBER,
-    MonthShort.DECEMBER,
-]
 
 
 # --- Broadcast (operator-only) ---
@@ -1318,6 +1306,12 @@ class BroadcastOperatorMessages(MessageBase):
         f"{Emojis.PROHIB} "
         "The message for <b>${language}</b> is ${length} characters, over the limit of ${limit}. "
         "Shorten it and resend."
+    )
+    # Shown when a preview could not be sent, which is where Telegram parses the body.
+    ERROR_PREVIEW_REJECTED = (
+        f"{Emojis.PROHIB} "
+        "The <b>${language}</b> message could not be sent, so nothing was queued.\n\n"
+        "<code>${reason}</code>\n\nFix it and send it again."
     )
     ERROR_DOCUMENT_TOO_LARGE = f"{Emojis.PROHIB} That file is too large. The limit is ${{limit_kb}} KB."
     ERROR_DOCUMENT_DECODE = f"{Emojis.PROHIB} I could not read that file as UTF-8 text. Save it as UTF-8 and resend."

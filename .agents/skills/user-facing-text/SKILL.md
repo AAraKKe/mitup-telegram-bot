@@ -1,6 +1,6 @@
 ---
 name: user-facing-text
-description: How to write every user-facing string in mitup_bot — both the copy (tone, voice, anti-patterns, button-label wording) and the technical plumbing in `libs/telegram/mitup_bot/utils/messages.py` (MessageBase subclasses like `ButtonMessages`, `MainMenuMessages`, `MeetingCreationMessages`, `NotificationMessages`; `.get()` / `.get_text()` / `.back()`; `${var}` template substitution; inline `<b>`/`<i>`/`<u>`/`<s>`/`<code>`/`<pre>`/`<spoiler>` formatting tags). Use this skill whenever the work touches *any* user-visible message, button label, alert text, callback-query answer, or notification — whether the request is about wording ("make this friendlier", "rewrite the error"), button text ("rename this button"), structure ("add a new menu string"), or implementation ("how do I substitute a name into this message"). If in doubt, load it — it is the single source of truth for bot copy and for the MessageBase API.
+description: How to write every user-facing string in mitup_bot: both the copy (tone, voice, anti-patterns, button-label wording) and the technical plumbing in `libs/telegram/mitup_bot/utils/messages.py` (MessageBase subclasses like `ButtonMessages`, `MainMenuMessages`, `MeetingCreationMessages`, `NotificationMessages`; `.rich()` / `.text()` / `.back()`; `${var}` template substitution; inline `<b>`/`<i>`/`<u>`/`<s>`/`<code>`/`<pre>`/`<spoiler>` formatting tags). Use this skill whenever the work touches *any* user-visible message, button label, alert text, callback-query answer, or notification, whether the request is about wording ("make this friendlier", "rewrite the error"), button text ("rename this button"), structure ("add a new menu string"), or implementation ("how do I substitute a name into this message"). If in doubt, load it: it is the single source of truth for bot copy and for the MessageBase API.
 user-invocable: false
 ---
 
@@ -45,7 +45,6 @@ All user-facing strings are `StrEnum` members of `MessageBase` subclasses in `li
 | `MeetingCreationMessages`, `MeetingDisplayMessages`, `MeetingJoinMessages`, `MeetingInviteMessages`, `MeetingLifecycleMessages`, `MeetingEdit*Messages` | Meeting creation, join/leave, edit, delete, invitations |
 | `InlineQueryMessages` | Inline query result UI text |
 | `NotificationMessages` | Meeting deletion and start notifications |
-| `Weekday`, `Month`, `MonthShort` | Date formatting |
 | `Languages` | Language selection labels |
 
 The list above is illustrative — treat `messages.py` as the source of truth and grep for the actual class before adding a new member, because new classes (or merges between existing ones) happen over time.
@@ -54,43 +53,45 @@ The list above is illustrative — treat `messages.py` as the source of truth an
 
 <critical_rules>
   <rule>NEVER hardcode user-facing text in handlers, views, or any other module. Every string shown to a user must resolve through a `MessageBase` member so it is translatable.</rule>
-  <rule>NEVER hardcode the `lang` argument to `.get()` / `.get_text()` / `.back()` (e.g., `lang="en"`). Always derive it from `user.lang` or `meeting.lang`.</rule>
+  <rule>NEVER hardcode the `lang` argument to `.rich()` / `.text()` / `.back()` (e.g., `lang="en"`). Always derive it from `user.lang` or `meeting.lang`.</rule>
   <rule>NEVER write button text inline. All button labels come from `ButtonMessages`.</rule>
-  <rule>NEVER extract `.text` from a `FormattedText` result and pass it to `with_context`, `with_footnote`, or any view description — that strips entities. Pass the full `FormattedText`.</rule>
+  <rule>NEVER extract `.text` from a `RichContent` result and pass it to `with_context`, `with_footnote`, or any view description, since that strips the formatting. Pass the full `RichContent`.</rule>
   <rule>NEVER use MarkdownV2 syntax (`*bold*`, `_italic_`) in message values. Use the HTML-like tags listed below.</rule>
   <rule>Template placeholders use `${variable_name}` syntax — not `{variable_name}` or `%s`.</rule>
-  <rule>Unclosed inline-formatting tags are silently dropped at runtime — no error is raised. Always close every tag you open.</rule>
+  <rule>An unclosed or unbalanced inline-formatting tag raises when the message renders, which in a catalog nobody reads in every language means a screen that fails for one language alone. Always close every tag you open.</rule>
   <rule>A short status or label string (e.g. "Enabled") may render in exactly ONE sentence context. Gendered languages must inflect it to agree with what it describes, so reusing it under a second referent makes correct translation impossible. When a new screen needs the same English word, add a new enum member instead of reusing the existing one.</rule>
 </critical_rules>
 
-## Rendering strings — `.get()` / `.get_text()` / `.back()`
+## Rendering strings: `.rich()` / `.text()` / `.back()`
 
-`MessageBase.get(lang=..., **substitutions)` returns a `FormattedText` with translation, placeholder substitution, and inline formatting applied. Pass it directly wherever a view accepts `FormattedText`:
-
-```python
-MeetingCreationMessages.SUCCESS.get(lang=user.lang, title=meeting.title)
-
-# Pass to with_context — never extract .text first
-view.with_context(MeetingCreationMessages.SUCCESS.get(lang=user.lang, title=meeting.title))
-```
-
-Substitution values accept `str`, `int`, `float`, `None`, or another `FormattedText`. A `FormattedText` substitution preserves its entities at the correct offset, which is how you embed one formatted message inside another:
+`MessageBase.rich(lang=..., **substitutions)` returns a `RichContent` with translation, placeholder substitution, and inline formatting applied. Pass it directly wherever a view accepts content:
 
 ```python
-invited_by = MeetingDisplayMessages.INVITED_BY.get(lang=lang, user=inviter.inline_name)
-# invited_by is FormattedText with an italic entity
-full_name = render(t"{name} ({invited_by})")  # entities preserved
+MeetingCreationMessages.SUCCESS.rich(lang=user.lang, title=meeting.title)
+
+# Pass to with_context, never a hand-flattened string
+view.with_context(MeetingCreationMessages.SUCCESS.rich(lang=user.lang, title=meeting.title))
 ```
 
-`MessageBase.get_text(lang=..., **substitutions)` returns a plain `str` and raises `ValueError` if the rendered result carries entities. Use it only in plain-text contexts where Telegram ignores entities, such as callback-query alert text:
+Substitution values accept `str`, `int`, `float`, an `Emojis` glyph, a `ButtonConfig` (or a row or whole keyboard, under a `${button_*}` placeholder), a t-string, and another `RichContent`. A `RichContent` substitution keeps its own markup, which is how you embed one rendered message inside another:
+
+```python
+invited_by = MeetingDisplayMessages.INVITED_BY.rich(lang=lang, user=inviter.inline_name)
+# invited_by is RichContent carrying the italic markup of the catalog string
+full_name = render_rich(t"{name} ({invited_by})")  # formatting preserved
+```
+
+`MessageBase.text(lang=..., **substitutions)` returns a plain `str`. Use it for the surfaces Telegram gives no formatting at all: button labels, callback-query alerts, inline-picker titles and descriptions.
 
 ```python
 await api.answer_callback_query(
     update,
-    text=MeetingInviteMessages.MEETING_NOT_FOUND.get_text(lang=lang),
+    text=MeetingInviteMessages.MEETING_NOT_FOUND.text(lang=lang),
     show_alert=True,
 )
 ```
+
+It substitutes through the same strict path `rich` uses, so a placeholder you forgot to pass raises instead of shipping the literal `${var}` to a reader. It also raises `FormattedMessageAsText` when the message renders with any formatting, rather than quietly dropping it: reach for `rich(...).text` at the call site when giving the formatting up is what you actually mean.
 
 `ButtonMessages.back(lang=...)` returns a plain `str` with a `"≪ "` arrow prepended, for the back-button variant. Button labels don't render entities, so the plain-string return type is intentional:
 
@@ -100,7 +101,7 @@ ButtonMessages.MAIN_MENU.back(lang=user.lang)  # → "≪ Main Menu"
 
 ## Inline formatting in message bodies
 
-Embed formatting with HTML-like tags; `parse_format_tags` converts them to `MessageEntity` objects at render time.
+Embed formatting with HTML-like tags; `rich` turns each one into the rich-HTML markup Telegram parses, and a tag with no rich equivalent raises rather than reaching a reader with its emphasis quietly gone.
 
 ```python
 MEETING_NOT_FOUND = (
@@ -113,10 +114,10 @@ Supported tags: `<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<spoiler>`. Tags
 
 ## Button labels
 
-Button labels are plain text — Telegram ignores entities on buttons. `.get(lang=...)` returns `FormattedText`; `ButtonConfig` validates that the `FormattedText` carries no entities and unwraps it to plain text — since button-label values never use formatting tags, this is safe in practice, but a labeled value with entities raises a `ValueError` rather than being silently stripped. For the "≪ Label" back-button variant, use `.back(lang=...)`, which is already plain `str`:
+Button labels are plain text: Telegram renders no formatting on a button, and `ButtonConfig.text` accepts a `str` and only a `str`. Render the label with `.text(lang=...)`, which raises if a translation ever grows a formatting tag rather than letting one be stripped unseen. For the "≪ Label" back-button variant, use `.back(lang=...)`, which is already plain `str`:
 
 ```python
-ButtonConfig(text=ButtonMessages.JOIN.get_text(lang=lang), callback_data=cb.JOIN)
+ButtonConfig(text=ButtonMessages.JOIN.text(lang=lang), callback_data=cb.JOIN)
 ButtonMessages.MAIN_MENU.back(lang=lang)  # → "≪ Main Menu"
 ```
 

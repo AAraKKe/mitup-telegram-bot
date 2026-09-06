@@ -229,6 +229,251 @@ def test_ensure_all_translations_reports_missing_msgids(
     assert "extra_en" in output
 
 
+@pytest.mark.parametrize(
+    "line, expected",
+    [('"hola"', "hola"), ('  "hola"  ', "hola"), ('""', ""), ("hola", "hola"), ('"unterminated', '"unterminated')],
+    ids=["quoted", "padded", "empty", "unquoted", "unterminated"],
+)
+def test_unquote_po_line_drops_only_a_matched_pair_of_quotes(line: str, expected: str):
+    assert locales_ops.unquote_po_line(line) == expected
+
+
+def test_msgstr_from_block_returns_none_without_msgstr():
+    assert locales_ops.msgstr_from_block(["# comment", 'msgid "hello"']) is None
+
+
+def test_msgstr_from_block_reads_a_single_line_value():
+    assert locales_ops.msgstr_from_block(['msgid "hello"', 'msgstr "hola ${name}"']) == "hola ${name}"
+
+
+def test_msgstr_from_block_glues_continuation_lines_without_a_separator():
+    block = ['msgid "hello"', 'msgstr ""', '"hola "', '"${name}"']
+
+    assert locales_ops.msgstr_from_block(block) == "hola ${name}"
+
+
+def test_msgstr_from_block_ignores_continuation_lines_of_the_msgid():
+    block = ['msgid ""', '"long.id"', 'msgstr "value"']
+
+    assert locales_ops.msgstr_from_block(block) == "value"
+
+
+def test_entries_for_language_maps_msgids_to_translations(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    po_file = tmp_path / "es_ES.po"
+    po_file.write_text('msgid ""\nmsgstr "header"\n\nmsgid "greeting"\nmsgstr "hola"\n')
+    monkeypatch.setattr(locales_ops, "po_file_for_language", lambda lang: po_file)
+
+    assert locales_ops.entries_for_language("es_ES") == {'"greeting"': "hola"}
+
+
+def test_entries_for_language_skips_blocks_without_a_translation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    po_file = tmp_path / "es_ES.po"
+    po_file.write_text('msgid "orphan"\n\nmsgid "greeting"\nmsgstr "hola"\n')
+    monkeypatch.setattr(locales_ops, "po_file_for_language", lambda lang: po_file)
+
+    assert locales_ops.entries_for_language("es_ES") == {'"greeting"': "hola"}
+
+
+@pytest.mark.parametrize(
+    "source, translation, expected_missing, expected_extra",
+    [
+        ("up to ${cap}", "hasta ${cap}", set(), set()),
+        ("up to ${cap}", "hasta el limite", {"cap"}, set()),
+        ("no placeholders", "sin ${cap}", set(), {"cap"}),
+        ("${cap} of ${total}", "${cap} de ${totals}", {"total"}, {"totals"}),
+    ],
+    ids=["in-sync", "dropped", "invented", "renamed"],
+)
+def test_placeholder_mismatches_reports_each_side_of_the_difference(
+    source: str, translation: str, expected_missing: set[str], expected_extra: set[str]
+):
+    mismatches = locales_ops.placeholder_mismatches({'"id"': source}, {'"id"': translation})
+
+    if not expected_missing and not expected_extra:
+        assert mismatches == []
+        return
+    assert mismatches == [('"id"', expected_missing, expected_extra)]
+
+
+def test_placeholder_mismatches_ignores_an_untranslated_entry():
+    """An empty msgstr is left out of the compiled catalog, so the reader is served English."""
+    assert locales_ops.placeholder_mismatches({'"id"': "up to ${cap}"}, {'"id"': ""}) == []
+
+
+def test_placeholder_mismatches_ignores_an_entry_the_translation_does_not_carry():
+    assert locales_ops.placeholder_mismatches({'"id"': "up to ${cap}"}, {}) == []
+
+
+def test_placeholder_mismatches_are_ordered_by_msgid():
+    english = {'"b"': "${x}", '"a"': "${x}"}
+    translated = {'"b"': "nada", '"a"': "nada"}
+
+    assert [msgid for msgid, _, _ in locales_ops.placeholder_mismatches(english, translated)] == ['"a"', '"b"']
+
+
+def test_ensure_all_translations_reports_mismatched_placeholders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    en_po = tmp_path / "en.po"
+    en_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "cap"\nmsgstr "up to ${cap} meetings"\n')
+    es_po = tmp_path / "es_ES.po"
+    es_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "cap"\nmsgstr "hasta ${limite} quedadas"\n')
+
+    monkeypatch.setattr(locales_ops, "po_file_for_language", lambda lang: es_po if lang == "es_ES" else en_po)
+
+    assert locales_ops.ensure_all_translations() == 1
+    output = combined(capsys)
+    assert "es_ES has 1 entry(s) with mismatched placeholders:" in output
+    assert "- cap" in output
+    assert "missing: cap" in output
+    assert "unexpected: limite" in output
+
+
+@pytest.mark.parametrize(
+    "translated, reported, unreported",
+    [("hasta el limite", "missing: cap", "unexpected:"), ("hasta ${cap} de ${total}", "unexpected: total", "missing:")],
+    ids=["only-dropped", "only-invented"],
+)
+def test_ensure_all_translations_reports_only_the_side_that_differs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    translated: str,
+    reported: str,
+    unreported: str,
+):
+    en_po = tmp_path / "en.po"
+    en_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "cap"\nmsgstr "up to ${cap}"\n')
+    es_po = tmp_path / "es_ES.po"
+    es_po.write_text(f'msgid ""\nmsgstr ""\n\nmsgid "cap"\nmsgstr "{translated}"\n')
+
+    monkeypatch.setattr(locales_ops, "po_file_for_language", lambda lang: es_po if lang == "es_ES" else en_po)
+
+    assert locales_ops.ensure_all_translations() == 1
+    output = combined(capsys)
+    assert reported in output
+    assert unreported not in output
+
+
+def test_ensure_all_translations_passes_when_placeholders_match(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    en_po = tmp_path / "en.po"
+    en_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "cap"\nmsgstr "up to ${cap} meetings"\n')
+    es_po = tmp_path / "es_ES.po"
+    es_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "cap"\nmsgstr "hasta ${cap} quedadas"\n')
+
+    monkeypatch.setattr(locales_ops, "po_file_for_language", lambda lang: es_po if lang == "es_ES" else en_po)
+
+    assert locales_ops.ensure_all_translations() == 0
+    assert "es_ES is in sync with en" in combined(capsys)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "",
+        "no tags at all",
+        "<b>x</b>",
+        "<b>a<i>b</i></b>",
+        "<b>${name}</b>",
+        "a < b and <3 and ${var}",
+        '<a href="https://x.io">x</a>',
+        '<span class="tg-spoiler">x</span>',
+        '<tg-emoji emoji-id="1">x</tg-emoji>',
+    ],
+    ids=[
+        "empty",
+        "no-tags",
+        "one-tag",
+        "nested",
+        "around-a-placeholder",
+        "not-tags-at-all",
+        "anchor",
+        "span-spoiler",
+        "custom-emoji",
+    ],
+)
+def test_tag_fault_accepts_well_formed_text(text: str):
+    assert locales_ops.tag_fault(text) is None
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("<b>never closed", "<b> is never closed"),
+        ("<b>a</b><i>b", "<i> is never closed"),
+        ("a</i>", "</i> closes a tag that was never opened"),
+        ("<b>a</b></b>", "</b> closes a tag that was never opened"),
+        ("<b>a<i>b</b>c</i>", "</b> crosses <i>, which is still open"),
+        ("<marquee>x</marquee>", "<marquee> is not a tag the dialect knows"),
+        ("<b>fine</b> <blink>no</blink>", "<blink> is not a tag the dialect knows"),
+    ],
+    ids=[
+        "unclosed",
+        "second-unclosed",
+        "close-without-open",
+        "double-close",
+        "crossing",
+        "unknown",
+        "unknown-after-valid",
+    ],
+)
+def test_tag_fault_describes_what_cannot_nest(text: str, expected: str):
+    assert locales_ops.tag_fault(text) == expected
+
+
+def test_tag_fault_describes_only_the_first_problem():
+    """After one tag is out of place the rest of the string cannot be read reliably."""
+    assert locales_ops.tag_fault("</u><b>x") == "</u> closes a tag that was never opened"
+
+
+def test_ensure_all_translations_reports_an_unbalanced_translation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    en_po = tmp_path / "en.po"
+    en_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "greeting"\nmsgstr "<b>Hello</b>"\n')
+    es_po = tmp_path / "es_ES.po"
+    es_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "greeting"\nmsgstr "<b>Hola"\n')
+
+    monkeypatch.setattr(locales_ops, "po_file_for_language", lambda lang: es_po if lang == "es_ES" else en_po)
+
+    assert locales_ops.ensure_all_translations() == 1
+    output = combined(capsys)
+    assert "es_ES has 1 entry(s) with unusable formatting tags:" in output
+    assert "- greeting: <b> is never closed" in output
+
+
+def test_ensure_all_translations_reports_an_unbalanced_english_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    en_po = tmp_path / "en.po"
+    en_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "greeting"\nmsgstr "<b>Hello"\n')
+    monkeypatch.setattr(locales_ops, "po_file_for_language", lambda lang: en_po)
+
+    assert locales_ops.ensure_all_translations() == 1
+    assert "en has 1 entry(s) with unusable formatting tags:" in combined(capsys)
+
+
+def test_ensure_all_translations_ignores_tags_in_an_untranslated_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    en_po = tmp_path / "en.po"
+    en_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "greeting"\nmsgstr "<b>Hello</b>"\n')
+    es_po = tmp_path / "es_ES.po"
+    es_po.write_text('msgid ""\nmsgstr ""\n\nmsgid "greeting"\nmsgstr ""\n')
+
+    monkeypatch.setattr(locales_ops, "po_file_for_language", lambda lang: es_po if lang == "es_ES" else en_po)
+
+    assert locales_ops.ensure_all_translations() == 0
+    assert "es_ES is in sync with en" in combined(capsys)
+
+
+def test_ensure_all_translations_accepts_the_repository_catalogs():
+    """The check runs against the catalogs as they are shipped, not only against fixtures."""
+    assert locales_ops.ensure_all_translations() == 0
+
+
 def test_compile_locales_creates_mo_directories(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, recorder: CommandRecorder, capsys: pytest.CaptureFixture[str]
 ):

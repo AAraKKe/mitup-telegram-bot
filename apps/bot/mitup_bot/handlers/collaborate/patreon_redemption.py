@@ -149,7 +149,7 @@ async def command_start_patreon_link(session: AsyncSession, update: Update, cont
 
     if user is not None and user.status is UserStatus.DELETION_REQUESTED:
         # The account is mid-deletion, so there is nothing to link to and nothing to set up.
-        await context.api.send_message(update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.get(lang=lang))
+        await context.api.send_message(update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.rich(lang=lang))
         refuse(RedemptionRefusal.PENDING_DELETION)
         return
 
@@ -278,7 +278,7 @@ async def answer_link_outcome(
             # nothing was written — the answer is the same alert every surface shows a dying
             # account, never a screen implying a link happened.
             await context.api.edit_message(
-                update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.get(lang=user.lang)
+                update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.rich(lang=user.lang)
             )
             refuse(RedemptionRefusal.PENDING_DELETION)
         case LinkOutcome.LINKED_SUPPORTER | LinkOutcome.LINKED_NO_PATRON:

@@ -134,7 +134,7 @@ def forget_meeting(mock_session: MockDbSession, meeting: Meetup):
 
 def context_lost_view(lang: str) -> MitupView:
     """The screen a handler produces when it reaches for conversation data that is no longer there."""
-    return factory.main_menu_view(RenderContext(lang=lang), message=CommonMessages.CONTEXT_LOST.get(lang=lang))
+    return factory.main_menu_view(RenderContext(lang=lang), message=CommonMessages.CONTEXT_LOST.rich(lang=lang))
 
 
 async def start_title_edit_then_lose_the_meeting(
@@ -193,8 +193,8 @@ async def test_title_after_rejection_reaches_the_create_meeting_flow(
     created = [obj for obj in mock_session.objects_added if isinstance(obj, Meetup)]
     assert len(created) == 1
     assert created[0].title == "Board games night"
-    success = meeting_views.edit_view(created[0]).with_context(
-        MeetingCreationMessages.SUCCESS.get(title=created[0].title, lang=user_with_settings.lang)
+    success = meeting_views.owner_view(created[0]).with_context(
+        MeetingCreationMessages.CREATED.rich(title=created[0].title, lang=user_with_settings.lang)
     )
     assert views_sent_for(created_title) == [success]
     assert create_meeting._conversations.get(CONVERSATION_KEY) is None
@@ -257,8 +257,10 @@ async def test_end_editor_button_taps_reopen_the_flow(
         tg_user,
     )
 
-    assert views_sent_for(tapped) == [screens.end_editor_view(meeting, user_with_settings.lang)]
-    assert conversation._conversations.get(CONVERSATION_KEY) == EditMeetingState.END_EDITOR
+    assert meeting.datetime is not None
+    month = meeting.owner.datetime_in_tz(meeting.datetime).date()
+    assert views_sent_for(tapped) == [screens.end_datetime_card(meeting, user_with_settings.lang, month=month)]
+    assert conversation._conversations.get(CONVERSATION_KEY) == EditMeetingState.END_DATETIME_CARD
 
 
 async def test_end_editor_button_returns_from_the_calendar_mid_flow(
@@ -268,10 +270,10 @@ async def test_end_editor_button_returns_from_the_calendar_mid_flow(
     tg_chat: Chat,
     tg_user: TgUser,
 ):
-    """The same button taken mid-flow goes back to the editor instead of restarting anything.
+    """The same button taken mid-flow redraws the card instead of restarting anything.
 
-    It is the calendar's back button there, and the flow it returns to is the one already running:
-    reentry at the entry point resolves to the state the owner would have reached anyway.
+    Reentry at the entry point resolves to the state the owner would have reached anyway, so a
+    reopen while the flow is live is indistinguishable from one after it ended.
     """
     meeting = meeting_with_start_time(mock_session, user_with_settings)
     conversation = conversation_for(EditMeetingHandlerId.END_EDITOR_CONVERSATION)
@@ -285,7 +287,7 @@ async def test_end_editor_button_returns_from_the_calendar_mid_flow(
         tg_chat,
         tg_user,
     )
-    assert conversation._conversations.get(CONVERSATION_KEY) == EditMeetingState.END_CALENDAR
+    assert conversation._conversations.get(CONVERSATION_KEY) == EditMeetingState.END_DATETIME_CARD
 
     went_back = await process(
         routing_app,
@@ -294,8 +296,10 @@ async def test_end_editor_button_returns_from_the_calendar_mid_flow(
         tg_user,
     )
 
-    assert views_sent_for(went_back) == [screens.end_editor_view(meeting, user_with_settings.lang)]
-    assert conversation._conversations.get(CONVERSATION_KEY) == EditMeetingState.END_EDITOR
+    assert meeting.datetime is not None
+    month = meeting.owner.datetime_in_tz(meeting.datetime).date()
+    assert views_sent_for(went_back) == [screens.end_datetime_card(meeting, user_with_settings.lang, month=month)]
+    assert conversation._conversations.get(CONVERSATION_KEY) == EditMeetingState.END_DATETIME_CARD
 
 
 async def test_start_editor_button_taps_reopen_the_flow(
@@ -321,6 +325,7 @@ async def test_start_editor_button_taps_reopen_the_flow(
         tg_user,
     )
 
-    today = meeting.owner.now_in_tz().date()
-    assert views_sent_for(tapped) == [screens.start_editor_view(meeting, user_with_settings.lang, today)]
-    assert conversation._conversations.get(CONVERSATION_KEY) == EditMeetingState.START_EDITOR
+    assert meeting.datetime is not None
+    month = meeting.owner.datetime_in_tz(meeting.datetime).date()
+    assert views_sent_for(tapped) == [screens.start_datetime_card(meeting, user_with_settings.lang, month=month)]
+    assert conversation._conversations.get(CONVERSATION_KEY) == EditMeetingState.START_DATETIME_CARD

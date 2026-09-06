@@ -17,7 +17,7 @@ from mitup_bot.utils import MeetingInviteMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.factory import confirmation_view, main_menu_view
-from mitup_bot.views.meeting_text import rich_title
+from mitup_bot.views.meeting_text import title_content
 
 from .enums import ConversationInviteState, MeetingHandlerId
 
@@ -36,7 +36,7 @@ async def handle_invite_from_external_chat(
     """
     await send_request_for_invite_name(context, user, meeting_id)
     await context.api.answer_callback_query(
-        update, text=MeetingInviteMessages.GO_PRIVATE.get_text(lang=user.lang), show_alert=True
+        update, text=MeetingInviteMessages.GO_PRIVATE.text(lang=user.lang), show_alert=True
     )
 
 
@@ -46,7 +46,7 @@ async def send_request_for_invite_name(context: TMitupContext, user: User, meeti
     """
     view = views.factory.request_information_with_cancel_view(
         views.RenderContext(lang=user.lang),
-        message=MeetingInviteMessages.PROMPT.get(lang=user.lang),
+        message=MeetingInviteMessages.PROMPT.rich(lang=user.lang),
         callback_data=cb.CANCEL_INVITE_USER.with_id(meeting_id),
     )
 
@@ -80,9 +80,7 @@ async def ensure_invitations_open(context: TMitupContext, user: User, meeting: M
         step=step,
         conversation_state_cleared=True,
     )
-    await context.api.answer_callback_query(
-        context.get_update(), text=message.get_text(lang=user.lang), show_alert=True
-    )
+    await context.api.answer_callback_query(context.get_update(), text=message.text(lang=user.lang), show_alert=True)
     context.clean_user_data([ContextId.INVITE_USERS])
     return False
 
@@ -121,9 +119,7 @@ async def callback_query_invite_users(
     # Keep track of the meeting id to follow up the conversation
     context.store_meeting_id(ContextId.INVITE_USERS, meeting_id)
     context.store_on_exit(
-        ContextId.INVITE_USERS,
-        MeetingInviteMessages.ON_EXIT.get(lang=user.lang),
-        cb.CANCEL_INVITE_USER.with_id(meeting_id),
+        ContextId.INVITE_USERS, MeetingInviteMessages.ON_EXIT, cb.CANCEL_INVITE_USER.with_id(meeting_id), lang=user.lang
     )
 
     return ConversationInviteState.NAME
@@ -150,7 +146,7 @@ async def abort_invitation(
     # Clean the stored data related to the conversation
     context.clean_user_data([ContextId.INVITE_USERS])
 
-    message = MeetingInviteMessages.CANCELED.get(lang=user.lang)
+    message = MeetingInviteMessages.CANCELED.rich(lang=user.lang)
 
     meeting_id = guards.valid_callback_data(callback_data.parse(context.match), handler_id).id
     # An optional lookup, not an access check: it only picks the screen the cancellation lands on, and
@@ -162,7 +158,9 @@ async def abort_invitation(
         assert meeting is not None, "returns_to_meeting is only True once the lookup resolved"
         view = meeting_views.view_for(meeting, user).with_context(message=message)
     else:
-        view = main_menu_view(guards.render_context(user, update, context), message=message)
+        view = main_menu_view(
+            guards.render_context(user, update, context), message=message, counts=await user.meeting_counts(session)
+        )
 
     # No guard resolved this meeting — the lookup only picks a screen — so the id is named here.
     log.info(
@@ -221,13 +219,15 @@ async def invite_users_name_message_handler(
             # The alert says why; the user cannot continue mid conversation, so go back to the main menu
             await context.api.edit_message(
                 update=update,
-                view=main_menu_view(guards.render_context(user, update, context)),
+                view=main_menu_view(
+                    guards.render_context(user, update, context), counts=await user.meeting_counts(session)
+                ),
             )
             return ConversationHandler.END
 
         context.store_text(ContextId.INVITE_USERS, invited_user_name)
-        message = MeetingInviteMessages.CONFIRMATION.get(
-            lang=user.lang, name=invited_user_name, meeting_title=rich_title(meeting)
+        message = MeetingInviteMessages.CONFIRMATION.rich(
+            lang=user.lang, name=invited_user_name, meeting_title=title_content(meeting)
         )
 
         view = confirmation_view(
@@ -259,7 +259,7 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             # still names the meeting authorized when this conversation was entered. Without this the
             # conversation state of any meeting could be redirected onto an arbitrary one.
             await context.api.answer_callback_query(
-                update, text=MeetingInviteMessages.MEETING_NOT_FOUND.get_text(lang=user.lang), show_alert=True
+                update, text=MeetingInviteMessages.MEETING_NOT_FOUND.text(lang=user.lang), show_alert=True
             )
             # The counter this emits is a security series; without a line beside it there is no way
             # to tell which meeting was aimed at from which conversation. Neither id is trusted, and
@@ -285,7 +285,9 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             # The alert says why; the user cannot continue mid conversation, so go back to the main menu
             await context.api.edit_message(
                 update=update,
-                view=main_menu_view(guards.render_context(user, update, context)),
+                view=main_menu_view(
+                    guards.render_context(user, update, context), counts=await user.meeting_counts(session)
+                ),
             )
             return ConversationHandler.END
 
@@ -311,7 +313,7 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             )
             await context.api.answer_callback_query(
                 update,
-                text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get_text(lang=user.lang),
+                text=MeetingJoinMessages.JOIN_ALREADY_JOINED.text(lang=user.lang),
                 show_alert=True,
             )
             context.clean_user_data([ContextId.INVITE_USERS])
@@ -329,8 +331,8 @@ async def callback_query_confirm_user_invitation(session: AsyncSession, update: 
             outcome="membership_created",
         )
 
-        message = MeetingInviteMessages.SUCCESS.get(
-            lang=user.lang, name=invited_user_name, meeting_title=rich_title(meeting)
+        message = MeetingInviteMessages.SUCCESS.rich(
+            lang=user.lang, name=invited_user_name, meeting_title=title_content(meeting)
         )
         await context.api.edit_message(
             update=update, view=meeting_views.view_for(meeting, user).with_context(message=message)
@@ -360,8 +362,10 @@ async def callback_query_fallback_invite_user(session: AsyncSession, update: Upd
     # Clean the stored data related to the conversation
     context.clean_user_data([ContextId.INVITE_USERS])
 
-    message = MeetingInviteMessages.ADD_FAILED_RETRY.get(lang=user.lang)
-    view = main_menu_view(guards.render_context(user, update, context), message=message)
+    message = MeetingInviteMessages.ADD_FAILED_RETRY.rich(lang=user.lang)
+    view = main_menu_view(
+        guards.render_context(user, update, context), message=message, counts=await user.meeting_counts(session)
+    )
 
     await context.api.send_message_to_user(user, view)
 

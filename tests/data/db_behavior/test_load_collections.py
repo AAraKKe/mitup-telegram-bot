@@ -8,7 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram import User as TgUser
 
-from mitup_bot import guards
+from mitup_bot import db, guards
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
 from tests.helpers import UpdateRequest
 from tests.helpers.fixtures import create_update
@@ -98,7 +98,7 @@ async def test_current_user_loads_no_collections_by_default(db_session: AsyncSes
 
 
 async def test_current_user_opt_in_loads_both_collections(db_session: AsyncSession):
-    """`load_collections=True` is what the list screens and the cap checks ride on."""
+    """`load_collections=True` is what the cap checks ride on."""
     async with AsyncSession(async_engine(db_session)) as session:
         await seed_user_with_collections(session)
         session.expunge_all()
@@ -107,3 +107,18 @@ async def test_current_user_opt_in_loads_both_collections(db_session: AsyncSessi
 
         assert len(joiner.meetups) == 1
         assert len(joiner.joined_links) == 1
+
+
+async def test_current_user_deep_opt_in_reaches_the_leaves_a_card_reads(db_session: AsyncSession):
+    """The list screens render every row as a card section, which reads each meeting's owner and
+    its joined links; selectin does not reach them through the user-rooted cycle."""
+    async with AsyncSession(async_engine(db_session)) as session:
+        await seed_user_with_collections(session)
+        session.expunge_all()
+
+        joiner = await guards.current_user(joiner_update(), session, load_collections=True, load_participants=True)
+
+        for meeting in (joiner.meetups[0], joiner.joined_links[0].meetup):
+            loaded = db.loaded_attributes(meeting)
+            assert "owner" in loaded
+            assert "joined_links" in loaded

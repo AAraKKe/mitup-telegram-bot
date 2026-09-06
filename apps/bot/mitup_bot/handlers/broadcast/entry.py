@@ -46,11 +46,11 @@ def upload_prompt_view(lang: str) -> MitupView:
     never stranded on a keyboard-less message. The Cancel button carries no draft id (none exists
     yet); its `action="cancel"` routes it to the conversation's cancel handler."""
     return MitupView(
-        BroadcastOperatorMessages.UPLOAD_PROMPT.get(lang=lang),
+        BroadcastOperatorMessages.UPLOAD_PROMPT.rich(lang=lang),
         [
             [
                 ButtonConfig(
-                    text=BroadcastOperatorMessages.BUTTON_CANCEL.get_text(lang=lang),
+                    text=BroadcastOperatorMessages.BUTTON_CANCEL.text(lang=lang),
                     callback_data=cb.CANCEL_BROADCAST,
                 )
             ]

@@ -20,10 +20,12 @@ async def callback_query_send_main_menu(session: AsyncSession, update: Update, c
     # NEW message so the tapped message stays in the chat. Unlike MAIN_MENU this neither edits nor
     # clears user data, so it never disturbs an unrelated in-progress conversation.
 
-    # The main menu renders only `user.lang` and the admin flag; it never traverses the
+    # The menu sizes its list chips with counting queries, never by traversing the
     # meetups/joined_links collections, so skip loading them.
     user = await guards.current_user(update, session)
-    view = views.factory.main_menu_view(guards.render_context(user, update, context))
+    view = views.factory.main_menu_view(
+        guards.render_context(user, update, context), counts=await user.meeting_counts(session)
+    )
 
     log_screen_shown(user, Screen.MAIN_MENU, ScreenDelivery.SEND)
     await context.api.send_message(update=update, view=view)

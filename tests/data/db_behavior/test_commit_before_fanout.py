@@ -1,7 +1,7 @@
 """Empirical proof of #188's acceptance criterion: under ``with_session(write=True)`` the
 per-meeting row lock from #187 is released at commit, BEFORE any queued Telegram call runs.
 
-The probe bot's ``send_message`` executes during the outbox drain and, from a second
+The probe bot's ``do_api_request`` executes during the outbox drain and, from a second
 ``db.begin()`` transaction, takes the same ``SELECT … FOR UPDATE`` the handler held. If the
 decorator still held the handler's transaction across the fan-out, that locked read would
 block until RACE_TIMEOUT and fail the test; committed-before-drain, it acquires the lock
@@ -37,7 +37,7 @@ class ProbeBot:
         self.order: list[str] = []
         self.participants_seen_under_lock: int | None = None
 
-    async def send_message(self, **kwargs: object):
+    async def do_api_request(self, endpoint: str, **kwargs: object):
         self.order.append("fanout-started")
         # Take the same row lock the handler held. This blocks (and times the test out)
         # if the handler's transaction were still open around the fan-out.

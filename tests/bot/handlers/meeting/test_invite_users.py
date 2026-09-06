@@ -8,7 +8,7 @@ from mitup_bot import views
 from mitup_bot.api_wrapper import CALLBACK_QUERY_TEXT_LIMIT
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.enums import ConversationInviteState, MeetingHandlerId
-from mitup_bot.models import Meetup, User
+from mitup_bot.models import MeetingCounts, Meetup, User
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.monitoring import Feature, MetricsClient, MetricUnit
 from mitup_bot.monitoring.metric_keys import MetricKey
@@ -91,14 +91,14 @@ async def test_invite_users_by_registered_user(
 
     expected_view = views.factory.request_information_with_cancel_view(
         RenderContext(lang=user_with_settings.lang),
-        message=MeetingInviteMessages.PROMPT.get(lang=user_with_settings.lang),
+        message=MeetingInviteMessages.PROMPT.rich(lang=user_with_settings.lang),
         callback_data=cb.CANCEL_INVITE_USER.with_id(MEETING_ID),
     )
 
     if external_chat:
         context.api.assert_answer_callback_query_called(
             handler_context.update,
-            text=MeetingInviteMessages.GO_PRIVATE.get_text(lang=user_with_settings.lang),
+            text=MeetingInviteMessages.GO_PRIVATE.text(lang=user_with_settings.lang),
             show_alert=True,
         )
     context.api.assert_send_message_to_user_called(user_with_settings, expected_view)
@@ -124,7 +124,7 @@ async def test_invite_users_by_unregistered_user(
 
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingInviteMessages.OPEN_CHAT.get_text(lang=user_with_settings.lang),
+        text=MeetingInviteMessages.OPEN_CHAT.text(lang=user_with_settings.lang),
         show_alert=True,
     )
 
@@ -152,8 +152,8 @@ async def test_invite_with_id_of_meeting_does_not_exist(
     result.last_context.api.assert_edit_message_called(
         update=result.last_context.get_update(),
         view=MitupView(
-            description=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
-            keyboard=views_factory.main_menu_back_rows(user_with_settings.lang),
+            message=MeetingDisplayMessages.DELETED_BANNER.rich(lang=user_with_settings.lang),
+            menu=views_factory.main_menu_back_rows(user_with_settings.lang),
         ),
     )
 
@@ -186,7 +186,7 @@ async def test_invite_users_ask_for_name(
     # User has been asked to confirm the name
     expected_view = views_factory.confirmation_view(
         RenderContext(lang=user_with_settings.lang),
-        message=MeetingInviteMessages.CONFIRMATION.get(
+        message=MeetingInviteMessages.CONFIRMATION.rich(
             lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title
         ),
         confirm_callback_data=cb.CONFIRM_INVITE_USER.with_id(MEETING_ID),
@@ -234,13 +234,15 @@ async def test_cancel_name_request(
     assert callback_step.state is ConversationInviteState.NAME
     assert cancel_step.state is None  # Conversation has ended
 
-    message = MeetingInviteMessages.CANCELED.get(lang=user_with_settings.lang)
+    message = MeetingInviteMessages.CANCELED.rich(lang=user_with_settings.lang)
 
     # Owners are returned to their meeting; everyone else lands on the main menu
     if owner_id == 123:
         expected_view = meeting_views.view_for(meeting, user_with_settings).with_context(message)
     else:
-        expected_view = views.factory.main_menu_view(RenderContext(lang=user_with_settings.lang), message=message)
+        expected_view = views.factory.main_menu_view(
+            RenderContext(lang=user_with_settings.lang), message=message, counts=MeetingCounts(0, 0, 0)
+        )
 
     cancel_step.context.api.assert_edit_message_called(
         update=cancel_step.context.get_update(),
@@ -278,9 +280,11 @@ async def test_complete_user_invitation(
 
     # User has been sent confirmation of the invitation
     # With the proper view depending on who invited the user
-    expected_view = meeting_views.main_view(meeting) if owner_id == 123 else meeting_views.external_view(meeting)
+    expected_view = meeting_views.owner_view(meeting) if owner_id == 123 else meeting_views.external_view(meeting)
     expected_view = expected_view.with_context(
-        MeetingInviteMessages.SUCCESS.get(lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title)
+        MeetingInviteMessages.SUCCESS.rich(
+            lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title
+        )
     )
 
     confirm_context.api.assert_edit_message_called(confirm_context.get_update(), expected_view)
@@ -356,7 +360,7 @@ async def test_concurrent_duplicate_invitation_is_idempotent_noop(
     # The inviter is told the user is already joined, and the conversation ends.
     confirm_context.api.assert_answer_callback_query_called(
         update=confirm_context.get_update(),
-        text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get_text(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.JOIN_ALREADY_JOINED.text(lang=user_with_settings.lang),
         show_alert=True,
     )
     assert result.last_state is None
@@ -400,14 +404,13 @@ async def test_invite_user_decline_confirmation(
 
     cancel_context = result.last_context
 
-    message = MeetingInviteMessages.CANCELED.get(lang=user_with_settings.lang)
+    message = MeetingInviteMessages.CANCELED.rich(lang=user_with_settings.lang)
 
     if owner_id == 123:
         expected_view = meeting_views.view_for(meeting, user_with_settings).with_context(message)
     else:
         expected_view = views.factory.main_menu_view(
-            RenderContext(lang=user_with_settings.lang),
-            message=message,
+            RenderContext(lang=user_with_settings.lang), message=message, counts=MeetingCounts(0, 0, 0)
         )
 
     cancel_context.api.assert_edit_message_called(
@@ -452,8 +455,10 @@ async def test_invite_user_adds_to_the_waiting_list(
     confirm_context = result.last_context
 
     # User has been sent confirmation of the invitation to the waiting list
-    expected_view = meeting_views.main_view(meeting).with_context(
-        MeetingInviteMessages.SUCCESS.get(lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title)
+    expected_view = meeting_views.owner_view(meeting).with_context(
+        MeetingInviteMessages.SUCCESS.rich(
+            lang=user_with_settings.lang, name="Bruce Wayne", meeting_title=meeting.title
+        )
     )
 
     confirm_context.api.assert_edit_message_called(confirm_context.get_update(), expected_view)
@@ -547,11 +552,13 @@ async def test_meeting_does_not_accept_invitations_after_conversation_started(
 
     # In all these cases the user should have been sent to the main menu with the expected message
     final_context = result.last_context
-    expected_view = views.factory.main_menu_view(RenderContext(lang=user_with_settings.lang))
+    expected_view = views.factory.main_menu_view(
+        RenderContext(lang=user_with_settings.lang), counts=MeetingCounts(0, 0, 0)
+    )
 
     final_context.api.assert_answer_callback_query_called(
         update=final_context.get_update(),
-        text=expected_message.get_text(lang=user_with_settings.lang),
+        text=expected_message.text(lang=user_with_settings.lang),
         show_alert=True,
     )
 
@@ -622,7 +629,7 @@ async def test_meeting_disappears_mid_conversation(
     else:
         final_context.api.assert_send_message_called(
             update=update,
-            view=expected_view.with_footnote(MeetingInviteMessages.FLOW_CONTEXT.get(lang=lang)),
+            view=expected_view.with_footnote(MeetingInviteMessages.FLOW_CONTEXT.rich(lang=lang)),
         )
 
     assert len(meeting.joined_links) == 0
@@ -649,7 +656,7 @@ async def test_invite_on_finished_meeting_replaces_the_card(
 
     context.api.assert_edit_message_called(
         update=handler_context.update,
-        view=MitupView(description=MeetingDisplayMessages.FINISHED_BANNER.get(lang=meeting.lang), keyboard=[]),
+        view=MitupView(message=MeetingDisplayMessages.FINISHED_BANNER.rich(lang=meeting.lang), menu=[]),
     )
 
 
@@ -686,7 +693,7 @@ async def test_meeting_not_allowing_invitations_on_callback_query(
 
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=expected_message.get_text(lang=user_with_settings.lang),
+        text=expected_message.text(lang=user_with_settings.lang),
         show_alert=True,
     )
 
@@ -711,10 +718,11 @@ def test_invite_alert_copy_renders_as_plain_text(lang: str, message: MeetingInvi
     asserted per language: a tag or an overlong string in a single catalog breaks that language
     alone and nothing in English would show it.
     """
-    rendered = message.get(lang=lang)
+    # `text` refuses any message that renders with formatting, so the call standing at all is what
+    # asserts this translation carries none.
+    rendered = message.text(lang=lang)
 
-    assert rendered.entities == []
-    assert len(rendered.text) <= CALLBACK_QUERY_TEXT_LIMIT
+    assert len(rendered) <= CALLBACK_QUERY_TEXT_LIMIT
 
 
 @pytest.mark.parametrize(
@@ -759,7 +767,7 @@ async def test_invite_rejection_alert_is_sendable_plain_text(
 
     answered = context.api.call_args("answer_callback_query").kwargs
     assert isinstance(answered["text"], str)
-    assert answered["text"] == expected_message.get_text(lang=user_with_settings.lang)
+    assert answered["text"] == expected_message.text(lang=user_with_settings.lang)
     assert answered["show_alert"] is True
 
     record = log_record(caplog, "Meeting invitation blocked")
@@ -815,7 +823,8 @@ async def test_abort_invitation_when_meeting_no_longer_allows_invitations(
 
     expected_view = views_factory.main_menu_view(
         RenderContext(lang=user_with_settings.lang),
-        message=MeetingInviteMessages.CANCELED.get(lang=user_with_settings.lang),
+        message=MeetingInviteMessages.CANCELED.rich(lang=user_with_settings.lang),
+        counts=MeetingCounts(0, 0, 0),
     )
     context.api.assert_edit_message_called(handler_context.update, expected_view)
 
@@ -845,7 +854,8 @@ async def test_fallback_invite_user_clears_context_and_sends_main_menu(
     # Main menu should have been sent with the unexpected-updates message
     expected_view = views_factory.main_menu_view(
         RenderContext(lang=user_with_settings.lang),
-        message=MeetingInviteMessages.ADD_FAILED_RETRY.get(lang=user_with_settings.lang),
+        message=MeetingInviteMessages.ADD_FAILED_RETRY.rich(lang=user_with_settings.lang),
+        counts=MeetingCounts(0, 0, 0),
     )
     context.api.assert_send_message_to_user_called(user_with_settings, expected_view)
 

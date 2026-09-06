@@ -6,7 +6,7 @@ import structlog
 from rich.console import Console
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from telegram import Chat, Update
+from telegram import Update
 from telegram.error import BadRequest, Forbidden
 
 from mitup_bot import db, guards
@@ -122,17 +122,6 @@ def fault_error_type(error: Exception) -> str:
     return f"{type(error).__module__}.{type(error).__qualname__}"
 
 
-def in_bot_chat(update: Update) -> bool:
-    """Whether `update` came from the user's own chat with the bot.
-
-    An update acting on an inline message carries no chat at all (Telegram sends only the
-    `inline_message_id`), and an inline message can sit in any chat — so an absent chat counts as
-    "not the bot's chat".
-    """
-    chat = update.effective_chat
-    return chat is not None and chat.type == Chat.PRIVATE
-
-
 @db.with_session
 async def handle_inactive_user(session: AsyncSession, tg_user_id: int):
     """Flip the user who just proved unreachable from MEMBER to LEFT.
@@ -172,13 +161,13 @@ async def handle_pending_deletion_user(context: TMitupContext, error: UserPendin
     try:
         if update.callback_query is not None:
             await context.api.answer_callback_query(
-                update=update, text=PrivacyMessages.PENDING_DELETION_ALERT.get_text(lang=error.lang), show_alert=True
+                update=update, text=PrivacyMessages.PENDING_DELETION_ALERT.text(lang=error.lang), show_alert=True
             )
         elif update.inline_query is not None:
             await context.api.answer_inline_query(update=update, results=[], cache_time=0)
         else:
             await context.api.send_message(
-                update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.get(lang=error.lang)
+                update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.rich(lang=error.lang)
             )
     except Exception:
         log.warning(
@@ -212,7 +201,7 @@ async def handle_user_not_found(context: TMitupContext, update: Update):
     log.warning("Rejected interaction from unregistered user", reason="user_row_not_found")
 
     try:
-        notice = CommonMessages.ACCOUNT_NOT_FOUND.get(lang=unregistered_caller_lang(update))
+        notice = CommonMessages.ACCOUNT_NOT_FOUND.rich(lang=unregistered_caller_lang(update))
         if update.callback_query is not None:
             await context.api.edit_message(update=update, view=notice)
         else:
@@ -266,7 +255,7 @@ async def handle_unreachable_user(context: TMitupContext, update: Update, reason
     try:
         await context.api.answer_callback_query(
             update=update,
-            text=CommonMessages.BOT_BLOCKED_ALERT.get_text(lang=await resolve_lang(update)),
+            text=CommonMessages.BOT_BLOCKED_ALERT.text(lang=await resolve_lang(update)),
             show_alert=True,
         )
     except Exception:
@@ -296,7 +285,7 @@ async def answer_unregistered_caller(context: TMitupContext, update: Update | No
         if update.callback_query is not None:
             await context.api.answer_callback_query(
                 update=update,
-                text=CommonMessages.UNEXPECTED_ERROR_ALERT.get_text(lang=unregistered_caller_lang(update)),
+                text=CommonMessages.UNEXPECTED_ERROR_ALERT.text(lang=unregistered_caller_lang(update)),
                 show_alert=True,
             )
         elif update.inline_query is not None:
@@ -326,7 +315,7 @@ def meeting_access_view(error: MeetingAccessError, ctx: RenderContext) -> MitupV
 
     if error.flow_context is None:
         return view
-    return view.with_footnote(error.flow_context.get(lang=error.lang))
+    return view.with_footnote(error.flow_context.rich(lang=error.lang))
 
 
 def shared_banner_keyboard(update: Update, lang: str) -> Keyboard:
@@ -336,7 +325,7 @@ def shared_banner_keyboard(update: Update, lang: str) -> Keyboard:
     way back to the main menu. Anywhere else the card sits in a conversation between people: the
     banner replaces it in place, keyboard-free, and the main menu is not a screen that belongs there.
     """
-    return factory.main_menu_back_rows(lang) if in_bot_chat(update) else []
+    return factory.main_menu_back_rows(lang) if guards.in_bot_chat(update) else []
 
 
 async def deliver_shared_meeting_answer(context: TMitupContext, update: Update, error: SharedMeetingError):
@@ -351,7 +340,7 @@ async def deliver_shared_meeting_answer(context: TMitupContext, update: Update, 
     if isinstance(error, SharedMeetingDeniedError):
         await context.api.answer_callback_query(
             update=update,
-            text=MeetingDisplayMessages.DELETED_BANNER.get_text(lang=error.lang),
+            text=MeetingDisplayMessages.DELETED_BANNER.text(lang=error.lang),
             show_alert=True,
         )
         return
@@ -363,7 +352,7 @@ async def deliver_shared_meeting_answer(context: TMitupContext, update: Update, 
     )
     await context.api.edit_message(
         update=update,
-        view=MitupView(description=banner.get(lang=error.lang), keyboard=shared_banner_keyboard(update, error.lang)),
+        view=MitupView(message=banner.rich(lang=error.lang), menu=shared_banner_keyboard(update, error.lang)),
     )
 
 
@@ -478,7 +467,7 @@ async def send_guard_notification(context: TMitupContext, update: Update, lang: 
     # update and context are available here, so an admin keeps seeing the Admin row on the redirect.
     view = factory.main_menu_view(
         RenderContext(lang=lang, is_admin=guards.is_admin(update, context)),
-        message=message.get(lang=lang),
+        message=message.rich(lang=lang),
     )
     if update.callback_query is not None:
         await context.api.answer_callback_query(update=update, text="", show_alert=False)
@@ -537,7 +526,7 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
     # means the path was left unguarded: it falls through to the fault classification below, where
     # the caller gets an alert instead of a /start that would land in somebody else's chat.
     update = context.telegram_update
-    if isinstance(error, UserNotFound) and update is not None and in_bot_chat(update):
+    if isinstance(error, UserNotFound) and update is not None and guards.in_bot_chat(update):
         await handle_user_not_found(context, update)
         return HANDLED_OUTCOME
 
@@ -548,7 +537,7 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
     if (
         (unreachable_reason := unreachable_caller_reason(error)) is not None
         and update is not None
-        and in_bot_chat(update)
+        and guards.in_bot_chat(update)
     ):
         await handle_unreachable_user(context, update, unreachable_reason)
         return HANDLED_OUTCOME

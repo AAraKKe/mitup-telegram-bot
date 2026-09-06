@@ -28,6 +28,15 @@ Mitup talks like a friend, not a product. Friendly and a little playful, never t
 | `Click here` | `Tap *➕ New meeting*{.button-like}` |
 | `Welcome! We're so excited to have you!` | `First time? Here's how it works.` |
 
+## Guide, don't describe
+
+The user guide is for someone who has never seen the bot. It explains what a meeting is made of, what each setting does and where a control lives, and goes into detail only where something specific matters (a permission a group needs, a limit, a behaviour the screen does not make obvious). It is not an inventory of screens.
+
+* **No walkthrough of every chip and every state.** Readers will see the screen. Name the fields and the concepts; skip the narration.
+* **Never quote a bot message verbatim.** No `!!! quote` blocks with screen text, no "the bot says: ...". Copy changes, and a stale quote confuses instead of helping. Say what the bot does ("asks you to confirm", "asks for an earlier date").
+* **No before-and-after framing.** The reader never saw the old bot. Nothing about what changed or moved, and no paragraph that only exists because a screen looks different from before. Release news goes to `docs/news/`.
+* **Short pages over many pages.** One page covering a subject in a few short sections beats a page per screen.
+
 ## Anti-patterns
 
 These show up across `docs/user-guide/*.md`, `docs/collaborate/donation.md`, and `docs/collaborate/translator.md`. They are AI tells. Treat them as bugs and remove them when you see them, even in sections you weren't sent to edit (see the proactive-cleanup rule in the docs-writer agent).
@@ -371,6 +380,10 @@ Minimal template for the phone bezel (drops straight into a Markdown page becaus
   </div>
 </div>
 ```
+
+**Generate, never hand-draw.** Every showcase of a bot screen is produced by `tools/docs_mockups` from the real view output and its annotation positions are measured from the built page; the `view-to-component` skill has the workflow. A hand-written mockup drifts from the screen and its annotations end up pointing at nothing.
+
+**Rich cards**: a screen sent as a rich message draws its controls inside the bubble. Inside `.mitup-bot-msg__text`, use `.mitup-card__title` for the heading, `.mitup-card__section` for a section title line, `.mitup-card__rule` for a rule, `.mitup-card__footer` for the muted closing line, `.mitup-chip` (with `--primary`, `--success`, `--danger`, `--muted`) for a button drawn in the text, `.mitup-time` for a tappable date or time, `.mitup-card__photos` + `.mitup-card__photo` for photos and `.mitup-card__map` for an embedded map. The `view-to-component` skill has the markup-to-class table.
 
 **Inline keyboard rows**: multi-column rows use `.mitup-bot-msg__row--2` or `.mitup-bot-msg__row--3` on the row element.
 

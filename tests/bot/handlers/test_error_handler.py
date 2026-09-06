@@ -39,7 +39,6 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import (
     CommonMessages,
     MeetingDisplayMessages,
@@ -47,6 +46,7 @@ from mitup_bot.utils.messages import (
     MessageBase,
     PrivacyMessages,
 )
+from mitup_bot.utils.rich_message import RichContent
 from mitup_bot.views import MitupView, RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
@@ -159,7 +159,7 @@ async def test_pending_deletion_answers_callback_query_with_alert(
     await context.metrics.flush()
 
     context.api.assert_answer_callback_query_called(
-        context.telegram_update, text=PrivacyMessages.PENDING_DELETION_ALERT.get_text(lang="es"), show_alert=True
+        context.telegram_update, text=PrivacyMessages.PENDING_DELETION_ALERT.text(lang="es"), show_alert=True
     )
     context.api.assert_send_message_not_called()
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
@@ -175,7 +175,7 @@ async def test_pending_deletion_replies_to_message_updates(
     await context.metrics.flush()
 
     context.api.assert_send_message_called(
-        context.telegram_update, PrivacyMessages.PENDING_DELETION_ALERT.get(lang="en")
+        context.telegram_update, PrivacyMessages.PENDING_DELETION_ALERT.rich(lang="en")
     )
     context.api.assert_method_just_called("answer_callback_query", times=0)
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
@@ -251,10 +251,10 @@ async def test_user_not_found_replaces_the_bot_chat_screen_without_a_keyboard(
     await context.metrics.flush()
 
     context.api.assert_edit_message_called(
-        context.telegram_update, CommonMessages.ACCOUNT_NOT_FOUND.get(lang=TranslationEngine.FALLBACK_LANG)
+        context.telegram_update, CommonMessages.ACCOUNT_NOT_FOUND.rich(lang=TranslationEngine.FALLBACK_LANG)
     )
     delivered = context.api.call_args("edit_message").kwargs["view"]
-    assert isinstance(delivered, FormattedText), "a bare FormattedText is what leaves the replacement keyboard-free"
+    assert isinstance(delivered, RichContent), "bare content is what leaves the replacement keyboard-free"
     context.api.assert_method_just_called("answer_callback_query", times=0)
     assert outcome == FaultOutcome(0)
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
@@ -270,7 +270,7 @@ async def test_user_not_found_replies_to_bot_chat_message_updates(
     await context.metrics.flush()
 
     context.api.assert_send_message_called(
-        context.telegram_update, CommonMessages.ACCOUNT_NOT_FOUND.get(lang=TranslationEngine.FALLBACK_LANG)
+        context.telegram_update, CommonMessages.ACCOUNT_NOT_FOUND.rich(lang=TranslationEngine.FALLBACK_LANG)
     )
     context.api.assert_method_just_called("answer_callback_query", times=0)
     assert outcome == FaultOutcome(0)
@@ -284,7 +284,7 @@ async def test_user_not_found_renders_in_the_client_language(app: StubMitupApp, 
 
     await error_handler.handler(context, UserNotFound(DEFAULT_USER_ID), Env.PROD)
 
-    context.api.assert_edit_message_called(context.telegram_update, CommonMessages.ACCOUNT_NOT_FOUND.get(lang="es_ES"))
+    context.api.assert_edit_message_called(context.telegram_update, CommonMessages.ACCOUNT_NOT_FOUND.rich(lang="es_ES"))
 
 
 async def test_user_not_found_is_recorded_as_a_handled_rejection(app: StubMitupApp, mock_session: MockDbSession):
@@ -368,7 +368,7 @@ async def test_unreachable_user_tap_is_answered_with_the_alert_and_no_fault(
     await context.metrics.flush()
 
     context.api.assert_answer_callback_query_called(
-        context.telegram_update, text=CommonMessages.BOT_BLOCKED_ALERT.get_text(lang="es"), show_alert=True
+        context.telegram_update, text=CommonMessages.BOT_BLOCKED_ALERT.text(lang="es"), show_alert=True
     )
     context.api.assert_send_message_not_called()
     assert outcome == FaultOutcome(0)
@@ -531,7 +531,7 @@ async def test_user_not_found_on_a_card_outside_the_bot_chat_alerts_and_faults(
 
     context.api.assert_answer_callback_query_called(
         context.telegram_update,
-        text=CommonMessages.UNEXPECTED_ERROR_ALERT.get_text(lang=TranslationEngine.FALLBACK_LANG),
+        text=CommonMessages.UNEXPECTED_ERROR_ALERT.text(lang=TranslationEngine.FALLBACK_LANG),
         show_alert=True,
     )
     context.api.assert_edit_message_not_called()
@@ -880,10 +880,10 @@ async def test_flow_context_adds_one_sentence_to_the_same_screen(
     await error_handler.handler(context, error, Env.PROD)
 
     delivered: MitupView = context.api.call_args("edit_message").kwargs["view"]
-    assert delivered.description.text == (f"{plain_view.description.text}\n\n{INVITE_FLOW_CONTEXT.get_text(lang='en')}")
+    assert delivered.message.text == (f"{plain_view.message.text}\n\n{INVITE_FLOW_CONTEXT.text(lang='en')}")
     # The screen itself is untouched: same buttons, and the formatting of the original copy survives.
-    assert delivered.keyboard == plain_view.keyboard
-    assert delivered.description.entities == plain_view.description.entities
+    assert delivered.menu == plain_view.menu
+    assert delivered.message.html.startswith(plain_view.message.html)
     context.api.assert_method_just_called("edit_message", times=1)
     context.api.assert_send_message_not_called()
 
@@ -912,8 +912,8 @@ async def test_flow_context_renders_in_the_language_the_rejection_carries(
     await error_handler.handler(context, error, Env.PROD)
 
     delivered: MitupView = context.api.call_args("edit_message").kwargs["view"]
-    assert delivered.description.text.endswith(INVITE_FLOW_CONTEXT.get_text(lang="es"))
-    assert delivered.keyboard == factory.deleted_meeting_view(RenderContext(lang="es")).keyboard
+    assert delivered.message.text.endswith(INVITE_FLOW_CONTEXT.text(lang="es"))
+    assert delivered.menu == factory.deleted_meeting_view(RenderContext(lang="es")).menu
 
 
 async def test_flow_context_is_not_added_to_the_unavailable_inline_card(app: StubMitupApp, mock_session: MockDbSession):
@@ -959,8 +959,8 @@ async def test_shared_meeting_gone_replaces_the_card(context: StubMitupContext, 
     context.api.assert_edit_message_called(
         context.telegram_update,
         MitupView(
-            description=MeetingDisplayMessages.DELETED_BANNER.get(lang="en"),
-            keyboard=factory.main_menu_back_rows("en"),
+            message=MeetingDisplayMessages.DELETED_BANNER.rich(lang="en"),
+            menu=factory.main_menu_back_rows("en"),
         ),
     )
     assert outcome == FaultOutcome(0)
@@ -979,8 +979,8 @@ async def test_shared_meeting_finished_replaces_the_card_with_the_finished_banne
     context.api.assert_edit_message_called(
         context.telegram_update,
         MitupView(
-            description=MeetingDisplayMessages.FINISHED_BANNER.get(lang="es"),
-            keyboard=factory.main_menu_back_rows("es"),
+            message=MeetingDisplayMessages.FINISHED_BANNER.rich(lang="es"),
+            menu=factory.main_menu_back_rows("es"),
         ),
     )
     metrics.assert_not_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)
@@ -1014,9 +1014,7 @@ async def test_shared_banner_carries_no_keyboard_outside_the_bot_chat(
 
     await error_handler.handler(context, error, Env.PROD)
 
-    context.api.assert_edit_message_called(
-        context.telegram_update, MitupView(description=banner.get(lang="en"), keyboard=[])
-    )
+    context.api.assert_edit_message_called(context.telegram_update, MitupView(message=banner.rich(lang="en"), menu=[]))
 
 
 @pytest.mark.parametrize("error, banner", SHARED_BANNER_PARAMS)
@@ -1030,7 +1028,7 @@ async def test_shared_banner_offers_the_main_menu_in_the_bot_chat(
 
     context.api.assert_edit_message_called(
         context.telegram_update,
-        MitupView(description=banner.get(lang="en"), keyboard=factory.main_menu_back_rows("en")),
+        MitupView(message=banner.rich(lang="en"), menu=factory.main_menu_back_rows("en")),
     )
 
 
@@ -1044,9 +1042,7 @@ async def test_shared_banner_carries_no_keyboard_on_an_inline_card(
 
     await error_handler.handler(context, error, Env.PROD)
 
-    context.api.assert_edit_message_called(
-        context.telegram_update, MitupView(description=banner.get(lang="en"), keyboard=[])
-    )
+    context.api.assert_edit_message_called(context.telegram_update, MitupView(message=banner.rich(lang="en"), menu=[]))
 
 
 async def test_shared_meeting_denied_keeps_the_card_untouched_in_the_bot_chat(
@@ -1059,7 +1055,7 @@ async def test_shared_meeting_denied_keeps_the_card_untouched_in_the_bot_chat(
     await error_handler.handler(context, error, Env.PROD)
 
     context.api.assert_answer_callback_query_called(
-        context.telegram_update, text=MeetingDisplayMessages.DELETED_BANNER.get_text(lang="en"), show_alert=True
+        context.telegram_update, text=MeetingDisplayMessages.DELETED_BANNER.text(lang="en"), show_alert=True
     )
     context.api.assert_edit_message_not_called()
 
@@ -1075,7 +1071,7 @@ async def test_shared_meeting_denied_alerts_over_the_card_without_touching_it(
     await context.metrics.flush()
 
     context.api.assert_answer_callback_query_called(
-        context.telegram_update, text=MeetingDisplayMessages.DELETED_BANNER.get_text(lang="en"), show_alert=True
+        context.telegram_update, text=MeetingDisplayMessages.DELETED_BANNER.text(lang="en"), show_alert=True
     )
     context.api.assert_edit_message_not_called()
     metrics.assert_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)
@@ -1221,7 +1217,7 @@ async def test_guard_error_emits_fault_metrics_and_notifies_user(
 
     fallback = TranslationEngine.FALLBACK_LANG
     expected_view = factory.main_menu_view(
-        RenderContext(lang=fallback), message=CommonMessages.UNEXPECTED_ERROR.get(lang=fallback)
+        RenderContext(lang=fallback), message=CommonMessages.UNEXPECTED_ERROR.rich(lang=fallback)
     )
     context.api.assert_send_message_called(context.telegram_update, expected_view)
 
@@ -1238,7 +1234,7 @@ async def test_guard_error_uses_resolved_user_language(
     await context.metrics.flush()
 
     expected_view = factory.main_menu_view(
-        RenderContext(lang="es"), message=CommonMessages.UNEXPECTED_ERROR.get(lang="es")
+        RenderContext(lang="es"), message=CommonMessages.UNEXPECTED_ERROR.rich(lang="es")
     )
     context.api.assert_send_message_called(context.telegram_update, expected_view)
 
@@ -1257,7 +1253,7 @@ async def test_non_guard_error_emits_fault_and_notifies(
 
     fallback = TranslationEngine.FALLBACK_LANG
     expected_view = factory.main_menu_view(
-        RenderContext(lang=fallback), message=CommonMessages.UNEXPECTED_ERROR.get(lang=fallback)
+        RenderContext(lang=fallback), message=CommonMessages.UNEXPECTED_ERROR.rich(lang=fallback)
     )
     context.api.assert_send_message_called(context.telegram_update, expected_view)
 
@@ -1295,7 +1291,7 @@ async def test_context_lost_notifies_user_and_emits_dedicated_metric(
 
     fallback = TranslationEngine.FALLBACK_LANG
     expected_view = factory.main_menu_view(
-        RenderContext(lang=fallback), message=CommonMessages.CONTEXT_LOST.get(lang=fallback)
+        RenderContext(lang=fallback), message=CommonMessages.CONTEXT_LOST.rich(lang=fallback)
     )
     context.api.assert_send_message_called(context.telegram_update, expected_view)
 
@@ -1312,7 +1308,9 @@ async def test_context_lost_uses_resolved_user_language(
     )
     await context.metrics.flush()
 
-    expected_view = factory.main_menu_view(RenderContext(lang="es"), message=CommonMessages.CONTEXT_LOST.get(lang="es"))
+    expected_view = factory.main_menu_view(
+        RenderContext(lang="es"), message=CommonMessages.CONTEXT_LOST.rich(lang="es")
+    )
     context.api.assert_send_message_called(context.telegram_update, expected_view)
 
 
@@ -1373,7 +1371,7 @@ async def test_notify_guard_error_callback_query_answers_then_sends(app: StubMit
     fallback = TranslationEngine.FALLBACK_LANG
     context.api.assert_answer_callback_query_called(update, text="", show_alert=False)
     expected_view = factory.main_menu_view(
-        RenderContext(lang=fallback), message=CommonMessages.UNEXPECTED_ERROR.get(lang=fallback)
+        RenderContext(lang=fallback), message=CommonMessages.UNEXPECTED_ERROR.rich(lang=fallback)
     )
     context.api.assert_send_message_called(update, expected_view)
 

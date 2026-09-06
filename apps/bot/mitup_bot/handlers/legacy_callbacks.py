@@ -3,12 +3,13 @@ import json
 import structlog
 from telegram import Update
 
+from mitup_bot import guards
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages
 from mitup_bot.views import MitupView
 
-from .error_handler import in_bot_chat, stored_lang, unregistered_caller_lang
+from .error_handler import stored_lang, unregistered_caller_lang
 
 log = structlog.get_logger(__name__)
 
@@ -58,7 +59,7 @@ def legacy_notice_view(lang: str) -> MitupView:
     It is the whole screen the user is left looking at, and every button it replaces is dead, so the
     main menu is the only way on from here.
     """
-    return MitupView(description=CommonMessages.OLD_VERSION_MESSAGE.get(lang=lang), keyboard=[]).with_back_button(
+    return MitupView(message=CommonMessages.OLD_VERSION_MESSAGE.rich(lang=lang), menu=[]).with_back_button(
         ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU
     )
 
@@ -75,13 +76,13 @@ async def deliver_legacy_notice(context: TMitupContext, update: Update):
     message.
     """
     lang = await legacy_caller_lang(update)
-    if in_bot_chat(update):
+    if guards.in_bot_chat(update):
         await context.api.answer_callback_query(update=update, text="", show_alert=False)
         await context.api.edit_message(update=update, view=legacy_notice_view(lang))
         return
 
     await context.api.answer_callback_query(
-        update=update, text=CommonMessages.OLD_VERSION_MESSAGE.get_text(lang=lang), show_alert=True
+        update=update, text=CommonMessages.OLD_VERSION_MESSAGE.text(lang=lang), show_alert=True
     )
 
 

@@ -8,7 +8,9 @@ from telegram.error import BadRequest
 
 from mitup_bot.api_wrapper import (
     EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS,
+    EDIT_MESSAGE_TEXT_ENDPOINT,
     MESSAGE_NOT_FOUND_ERROR_PATTERNS,
+    SEND_RICH_MESSAGE_ENDPOINT,
     ContextOrBotAdapter,
     TelegramApi,
 )
@@ -16,10 +18,10 @@ from mitup_bot.exceptions import NoMessageAvailable
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, Message, MessageButtons, User
 from mitup_bot.monitoring import MetricsClient
-from mitup_bot.utils.entities import FormattedText
+from mitup_bot.utils.rich_message import RichContent
 from mitup_bot.views import MitupView
 from mitup_bot.views import meeting as meeting_views
-from tests.helpers import StubMitupContext, create_meetup
+from tests.helpers import StubMitupContext, create_meetup, only_rich_call, rich_call, rich_calls
 from tests.helpers.context import build_context
 from tests.helpers.monitoring import MetricAssertions
 
@@ -57,20 +59,6 @@ async def test_edit_message_without_inline_message_id(context: StubMitupContext)
         await context.api.edit_message(update=update, view=message)
 
 
-async def test_clear_reply_markup_raises_no_message_available_with_callback_query_without_inline_id(
-    context: StubMitupContext,
-):
-    """Raises NoMessageAvailable when callback_query exists but both message refs are None."""
-    update = mock.MagicMock(spec=Update)
-    update.effective_message = None
-    update.callback_query = mock.MagicMock()
-    update.callback_query.inline_message_id = None
-    update.callback_query.message = None
-
-    with pytest.raises(NoMessageAvailable):
-        await context.api.clear_reply_markup(update)
-
-
 async def test_send_message_with_a_view(
     context: StubMitupContext, update: Update, default_view: MitupView, metrics: MetricAssertions
 ):
@@ -78,27 +66,23 @@ async def test_send_message_with_a_view(
 
     await context.api.send_message(update=update, view=default_view)
 
-    context.bot.send_message.assert_called_once_with(
-        chat_id=context.telegram_update.effective_chat.id,
-        text=default_view.description.text,
-        entities=None,
-        reply_markup=default_view.markup,
-        disable_web_page_preview=True,
-    )
+    call = only_rich_call(context.bot)
+    assert call.endpoint == SEND_RICH_MESSAGE_ENDPOINT
+    assert call.chat_id == context.telegram_update.effective_chat.id
+    assert call.body_html == default_view.message.text
+    assert call.button_rows
 
 
 async def test_send_message_without_view(context: StubMitupContext, update: Update, metrics: MetricAssertions):
     assert context.telegram_update.effective_chat is not None
 
-    await context.api.send_message(update=update, view="Hello, World")
+    await context.api.send_message(update=update, view=RichContent("Hello, World"))
 
-    context.bot.send_message.assert_called_once_with(
-        chat_id=context.telegram_update.effective_chat.id,
-        text="Hello, World",
-        entities=None,
-        reply_markup=None,
-        disable_web_page_preview=True,
-    )
+    call = only_rich_call(context.bot)
+    assert call.api_kwargs == {
+        "chat_id": context.telegram_update.effective_chat.id,
+        "rich_message": {"html": "Hello, World", "skip_entity_detection": True},
+    }
 
 
 async def test_send_message_with_entities(
@@ -108,13 +92,9 @@ async def test_send_message_with_entities(
 
     await context.api.send_message(update=update, view=view_with_entities)
 
-    context.bot.send_message.assert_called_once_with(
-        chat_id=context.telegram_update.effective_chat.id,
-        text=view_with_entities.description.text,
-        entities=view_with_entities.description.entities,
-        reply_markup=view_with_entities.markup,
-        disable_web_page_preview=True,
-    )
+    call = only_rich_call(context.bot)
+    assert call.chat_id == context.telegram_update.effective_chat.id
+    assert call.html == view_with_entities.rich_message().html
 
 
 async def test_edit_message_with_entities(
@@ -124,15 +104,10 @@ async def test_edit_message_with_entities(
 
     await context.api.edit_message(update=update, view=view_with_entities)
 
-    context.bot.edit_message_text.assert_called_once_with(
-        text=view_with_entities.description.text,
-        entities=view_with_entities.description.entities,
-        chat_id=123,
-        message_id=123,
-        inline_message_id=None,
-        reply_markup=view_with_entities.markup,
-        disable_web_page_preview=True,
-    )
+    call = only_rich_call(context.bot)
+    assert call.endpoint == EDIT_MESSAGE_TEXT_ENDPOINT
+    assert (call.chat_id, call.message_id) == (123, 123)
+    assert call.html == view_with_entities.rich_message().html
 
 
 async def test_edit_message_with_a_view(
@@ -142,29 +117,21 @@ async def test_edit_message_with_a_view(
 
     await context.api.edit_message(update=update, view=default_view)
 
-    context.bot.edit_message_text.assert_called_once_with(
-        text=default_view.description.text,
-        entities=None,
-        chat_id=123,
-        message_id=123,
-        inline_message_id=None,
-        reply_markup=default_view.markup,
-        disable_web_page_preview=True,
-    )
+    call = only_rich_call(context.bot)
+    assert (call.chat_id, call.message_id) == (123, 123)
+    assert call.body_html == default_view.message.text
+    assert call.button_rows
 
 
 async def test_edit_message_without_view(update: Update, context: StubMitupContext, metrics: MetricAssertions):
-    await context.api.edit_message(update=update, view="Hello, World")
+    await context.api.edit_message(update=update, view=RichContent("Hello, World"))
 
-    context.bot.edit_message_text.assert_called_once_with(
-        text="Hello, World",
-        entities=None,
-        chat_id=123,
-        message_id=123,
-        inline_message_id=None,
-        reply_markup=None,
-        disable_web_page_preview=True,
-    )
+    call = only_rich_call(context.bot)
+    assert call.api_kwargs == {
+        "chat_id": 123,
+        "message_id": 123,
+        "rich_message": {"html": "Hello, World", "skip_entity_detection": True},
+    }
 
 
 async def test_edit_meetup_messages(user_with_settings: User, context: StubMitupContext, metrics: MetricAssertions):
@@ -181,54 +148,20 @@ async def test_edit_meetup_messages(user_with_settings: User, context: StubMitup
 
     await context.api.update_meeting_messages(meeting=meeting)
 
-    edit: mock.MagicMock = context.bot.edit_message_text
     inline_view = meeting_views.inline_view(meeting)
-    main_view = meeting_views.main_view(meeting)
-    expected_call_params = {
-        "text": inline_view.description.text,
-        "entities": inline_view.description.entities or None,
-        "chat_id": 123,
-        "message_id": None,
-        "inline_message_id": None,
-        "reply_markup": inline_view.markup,
-        "disable_web_page_preview": True,
-    }
+    owner_card = meeting_views.owner_view(meeting)
+    calls = rich_calls(context.bot)
 
-    assert edit.call_count == 3
-    edit.assert_has_calls(
-        [
-            mock.call(
-                **(
-                    expected_call_params
-                    | {
-                        "text": main_view.description.text,
-                        "entities": main_view.description.entities or None,
-                        "message_id": 123,
-                        "reply_markup": main_view.markup,
-                    }
-                )
-            ),
-            mock.call(
-                **(
-                    expected_call_params
-                    | {
-                        "inline_message_id": "456",
-                    }
-                )
-            ),
-            mock.call(
-                **(
-                    expected_call_params
-                    | {
-                        "text": inline_view.description.text,
-                        "entities": inline_view.description.entities or None,
-                        "message_id": 123,
-                        "chat_id": 234,
-                    }
-                )
-            ),
-        ]
-    )
+    assert len(calls) == 3
+    # The owner's own card renders the owner view; the shared ones render the inline view.
+    assert (calls[0].chat_id, calls[0].message_id) == (123, 123)
+    assert calls[0].html == owner_card.rich_message().html
+    assert calls[1].inline_message_id == "456"
+    # The inline-addressed card splits: buttonless body, classic keyboard beside it.
+    assert calls[1].html == inline_view.rich_message(inline_addressed=True).html
+    assert calls[1].reply_markup == inline_view.rich_message(inline_addressed=True).reply_markup
+    assert (calls[2].chat_id, calls[2].message_id) == (234, 123)
+    assert calls[2].html == inline_view.rich_message().html
 
 
 @pytest.mark.parametrize("bad_request_message", [pat.pattern for pat in MESSAGE_NOT_FOUND_ERROR_PATTERNS])
@@ -249,10 +182,10 @@ async def test_edit_meetup_messages_records_dead_message_and_continues(
     )
     meeting.messages.append(Message(id=456, inline_message_id="456", chat_id=123, buttons=buttons))
 
-    edit: mock.MagicMock = context.bot.edit_message_text
+    edit: mock.MagicMock = context.bot.do_api_request
 
     def raise_error(*args, **kwargs):
-        if kwargs.get("message_id") == 123:
+        if kwargs["api_kwargs"].get("message_id") == 123:
             raise BadRequest(bad_request_message)
 
     edit.side_effect = raise_error
@@ -282,11 +215,11 @@ async def test_edit_meetup_messages_ignore_unchanged_message(
     )
     meeting.messages.append(Message(id=456, inline_message_id="456", chat_id=123, buttons=buttons))
 
-    edit: mock.MagicMock = context.bot.edit_message_text
+    edit: mock.MagicMock = context.bot.do_api_request
 
     # Make the call fail for one call, the other one should still be edited properly
     def raise_error(*args, **kwargs):
-        if kwargs.get("message_id") == 123:
+        if kwargs["api_kwargs"].get("message_id") == 123:
             raise BadRequest(bad_request_message)
 
     edit.side_effect = raise_error
@@ -301,57 +234,55 @@ BOLD_ENTITY = MessageEntity(type=MessageEntity.BOLD, offset=3, length=4)
 
 
 async def test_send_message_retries_without_custom_emoji_on_rejection(context: StubMitupContext, update: Update):
-    context.bot.send_message.side_effect = [BadRequest("Custom emoji entities are not allowed"), None]
-    view = MitupView(FormattedText("😀 bold", [CUSTOM_EMOJI_ENTITY, BOLD_ENTITY]), [])
+    context.bot.do_api_request.side_effect = [BadRequest("Custom emoji entities are not allowed"), None]
+    view = MitupView(RichContent.from_markup('<tg-emoji emoji-id="123456">😀</tg-emoji> <b>bold</b>'), [])
 
     await context.api.send_message(update=update, view=view)
 
-    assert context.bot.send_message.call_count == 2
-    retry_kwargs = context.bot.send_message.call_args_list[1].kwargs
-    assert retry_kwargs["entities"] == [BOLD_ENTITY]
-    assert retry_kwargs["text"] == "😀 bold"
+    assert context.bot.do_api_request.call_count == 2
+    assert rich_call(context.bot, 1).html == "😀 <b>bold</b>"
 
 
 async def test_send_message_retry_sends_no_entities_when_only_custom_emoji(context: StubMitupContext, update: Update):
-    context.bot.send_message.side_effect = [BadRequest("can't parse custom emoji entity"), None]
-    view = MitupView(FormattedText("😀", [CUSTOM_EMOJI_ENTITY]), [])
+    context.bot.do_api_request.side_effect = [BadRequest("can't parse custom emoji entity"), None]
+    view = MitupView(RichContent.from_markup('<tg-emoji emoji-id="123456">😀</tg-emoji>'), [])
 
     await context.api.send_message(update=update, view=view)
 
-    assert context.bot.send_message.call_count == 2
-    assert context.bot.send_message.call_args_list[1].kwargs["entities"] is None
+    assert context.bot.do_api_request.call_count == 2
+    assert rich_call(context.bot, 1).html == "😀"
 
 
 async def test_send_message_does_not_retry_when_error_is_not_about_custom_emoji(
     context: StubMitupContext, update: Update
 ):
-    context.bot.send_message.side_effect = BadRequest("Chat not found")
-    view = MitupView(FormattedText("😀", [CUSTOM_EMOJI_ENTITY]), [])
+    context.bot.do_api_request.side_effect = BadRequest("Chat not found")
+    view = MitupView(RichContent.from_markup('<tg-emoji emoji-id="123456">😀</tg-emoji>'), [])
 
     with pytest.raises(BadRequest):
         await context.api.send_message(update=update, view=view)
 
-    assert context.bot.send_message.call_count == 1
+    assert context.bot.do_api_request.call_count == 1
 
 
 async def test_send_message_does_not_retry_without_custom_emoji_entities(context: StubMitupContext, update: Update):
-    context.bot.send_message.side_effect = BadRequest("Custom emoji entities are not allowed")
-    view = MitupView(FormattedText("no emoji", [MessageEntity(type=MessageEntity.BOLD, offset=0, length=2)]), [])
+    context.bot.do_api_request.side_effect = BadRequest("Custom emoji entities are not allowed")
+    view = MitupView(RichContent.from_markup("<b>" + "no emoji"[:2] + "</b>" + "no emoji"[2:]), [])
 
     with pytest.raises(BadRequest):
         await context.api.send_message(update=update, view=view)
 
-    assert context.bot.send_message.call_count == 1
+    assert context.bot.do_api_request.call_count == 1
 
 
 async def test_edit_message_retries_without_custom_emoji_on_rejection(context: StubMitupContext, update: Update):
-    context.bot.edit_message_text.side_effect = [BadRequest("Custom emoji entities are not allowed"), None]
-    view = MitupView(FormattedText("😀 bold", [CUSTOM_EMOJI_ENTITY, BOLD_ENTITY]), [])
+    context.bot.do_api_request.side_effect = [BadRequest("Custom emoji entities are not allowed"), None]
+    view = MitupView(RichContent.from_markup('<tg-emoji emoji-id="123456">😀</tg-emoji> <b>bold</b>'), [])
 
     await context.api.edit_message(update=update, view=view)
 
-    assert context.bot.edit_message_text.call_count == 2
-    assert context.bot.edit_message_text.call_args_list[1].kwargs["entities"] == [BOLD_ENTITY]
+    assert context.bot.do_api_request.call_count == 2
+    assert rich_call(context.bot, 1).html == "😀 <b>bold</b>"
 
 
 async def test_update_meeting_messages_retries_without_custom_emoji_on_rejection(
@@ -360,11 +291,11 @@ async def test_update_meeting_messages_retries_without_custom_emoji_on_rejection
     meeting = create_meetup(id=123, owner=user_with_settings, title='Party <tg-emoji emoji-id="123456">😀</tg-emoji>')
     meeting.messages.append(Message(id=123, message_id=123, chat_id=123))
 
-    edit: mock.MagicMock = context.bot.edit_message_text
+    edit: mock.MagicMock = context.bot.do_api_request
     edit.side_effect = [BadRequest("Custom emoji entities are not allowed"), None]
 
     await context.api.update_meeting_messages(meeting=meeting)
 
     assert edit.call_count == 2
-    retry_entities = edit.call_args_list[1].kwargs["entities"]
-    assert all(entity.type != MessageEntity.CUSTOM_EMOJI for entity in retry_entities)
+    assert "<tg-emoji" in rich_call(context.bot, 0).html
+    assert "<tg-emoji" not in rich_call(context.bot, 1).html

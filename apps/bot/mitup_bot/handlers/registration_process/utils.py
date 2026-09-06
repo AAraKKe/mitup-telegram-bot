@@ -11,13 +11,13 @@ from mitup_bot import docs_links, guards
 from mitup_bot.acquisition import normalize_acquisition_source
 from mitup_bot.exceptions import EffectiveUserNotSet
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import Settings, User
+from mitup_bot.models import MeetingCounts, Settings, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.timezone_api import TimezoneInputMethod, TimezoneLookupFailure
 from mitup_bot.translations import locale_for_language_code
-from mitup_bot.utils.entities import Link, render
 from mitup_bot.utils.messages import RegistrationMessages
+from mitup_bot.utils.rich_message import RichContent
 from mitup_bot.views import factory
 from mitup_bot.views.mitup_view import MitupView
 
@@ -78,13 +78,14 @@ async def get_or_create_onboarding_user(
         )
         return existing_user, False
 
+    language = locale_for_language_code(update.effective_user.language_code)
     new_user = User(
         first_name=update.effective_user.first_name,
         tg_user_id=update.effective_user.id,
         last_name=update.effective_user.last_name,
         username=update.effective_user.username,
         acquisition_source=acquisition_source,
-        settings=Settings(language=locale_for_language_code(update.effective_user.language_code)),
+        settings=Settings(language=language),
     )
     session.add(new_user)
     # Flushed here so the row's id exists for the rest of the funnel: every later line names the
@@ -101,20 +102,20 @@ async def get_or_create_onboarding_user(
     return new_user, True
 
 
-def registration_complete_view(user: User, update: Update, context: TMitupContext) -> MitupView:
+def registration_complete_view(user: User, update: Update, context: TMitupContext, counts: MeetingCounts) -> MitupView:
     """Main-menu view whose description is the registration-complete welcome.
 
     One cohesive message: the welcome, the timezone confirmation, an inline link to the user
     guide, and the Collaborate pointer, with the main-menu keyboard (Collaborate included)
     directly below.
     """
-    user_guide_link = render(
-        t"{Link(RegistrationMessages.USER_GUIDE_LABEL.get_text(lang=user.lang), docs_links.user_guide_url())}"
+    user_guide_link = RichContent.link(
+        RegistrationMessages.USER_GUIDE_LABEL.text(lang=user.lang), docs_links.user_guide_url()
     )
-    message = RegistrationMessages.REGISTRATION_COMPLETE.get(
+    message = RegistrationMessages.REGISTRATION_COMPLETE.rich(
         timezone=user.settings.timezone, user_guide=user_guide_link, lang=user.lang
     )
-    return factory.main_menu_view(guards.render_context(user, update, context), message=message)
+    return factory.main_menu_view(guards.render_context(user, update, context), message=message, counts=counts)
 
 
 def promote_onboarded_user(user: User):
@@ -161,7 +162,10 @@ async def complete_onboarding(
 
     promote_onboarded_user(user)
 
-    await context.api.send_message(update=update, view=registration_complete_view(user, update, context))
+    await context.api.send_message(
+        update=update,
+        view=registration_complete_view(user, update, context, await user.meeting_counts(session)),
+    )
     log.info(
         "Onboarding completed",
         user_id=user.db_id,
@@ -195,7 +199,7 @@ async def retry_timezone_step(
         **input_facts,
     )
 
-    await context.api.send_message(update=update, view=RegistrationMessages.TIMEZONE_FAIL.get(lang=user.lang))
+    await context.api.send_message(update=update, view=RegistrationMessages.TIMEZONE_FAIL.rich(lang=user.lang))
 
     context.put_feature_metric(
         Feature.SET_TIMEZONE, name=MetricKey.ERROR, value=1, properties={"InputMethod": input_method.value}

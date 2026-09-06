@@ -29,7 +29,7 @@ async def answer_stale_conversation_button(context: TMitupContext, update: Updat
         lang = await stored_lang(update) or unregistered_caller_lang(update)
         view = factory.main_menu_view(
             RenderContext(lang=lang, is_admin=guards.is_admin(update, context)),
-            message=CommonMessages.STALE_BUTTONS_NOTICE.get(lang=lang),
+            message=CommonMessages.STALE_BUTTONS_NOTICE.rich(lang=lang),
         )
         await context.api.answer_callback_query(update=update, text="", show_alert=False)
         await context.api.edit_message(update=update, view=view)

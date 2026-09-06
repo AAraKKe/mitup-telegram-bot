@@ -45,7 +45,7 @@ def inactive_meeting(user_with_settings: User):
 @pytest.mark.parametrize(
     "update", [UpdateRequest(callback_query=cb.REACTIVATE_MEETING.with_id(MEETING_ID))], indirect=True
 )
-async def test_reactivate_meeting_restarts_the_meeting_and_shows_edit_view(
+async def test_reactivate_meeting_restarts_the_meeting_and_shows_the_owner_card(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
@@ -72,10 +72,10 @@ async def test_reactivate_meeting_restarts_the_meeting_and_shows_edit_view(
     assert inactive_meeting.lock_on_start is False
     assert before <= inactive_meeting.activated_time <= dt.datetime.now(dt.UTC)
 
-    success_message = MeetingLifecycleMessages.REACTIVATE_SUCCESS.get(lang=user_with_settings.lang)
+    success_message = MeetingLifecycleMessages.REACTIVATE_SUCCESS.rich(lang=user_with_settings.lang)
     context.api.assert_edit_message_called(
         update,
-        meeting_views.edit_view(inactive_meeting).with_context(success_message),
+        meeting_views.owner_view(inactive_meeting).with_context(success_message),
     )
     metrics.assert_emitted(name=MetricKey.COUNT, value=1, dimensions={"Feature": str(Feature.REACTIVATE_MEETING)})
 
@@ -92,7 +92,7 @@ async def test_reactivate_meeting_leaves_an_already_active_meeting_untouched(
     metrics: MetricAssertions,
 ):
     """A second tap on a Reactivate button the owner already used must not restart a live meeting:
-    the dates they set after the first tap survive, and the owner just lands on the edit screen."""
+    the dates they set after the first tap survive, and the owner just lands on the meeting card."""
     inactive_meeting.active = True
     scheduled_start = dt.datetime(2030, 5, 1, 17, 0, tzinfo=dt.UTC)
     inactive_meeting.datetime = scheduled_start
@@ -104,7 +104,7 @@ async def test_reactivate_meeting_leaves_an_already_active_meeting_untouched(
 
     assert inactive_meeting.datetime == scheduled_start
     assert inactive_meeting.activated_time == activated
-    context.api.assert_edit_message_called(update, meeting_views.edit_view(inactive_meeting))
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(inactive_meeting))
     metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.REACTIVATE_MEETING)})
 
 
@@ -155,7 +155,7 @@ async def test_reactivate_meeting_blocked_when_at_active_meetings_cap(
     context.api.assert_edit_message_called(
         update,
         supporter_upsell_view(
-            SupporterMessages.ACTIVE_MEETINGS_CAP.get(lang=user_with_settings.lang, cap=1),
+            SupporterMessages.ACTIVE_MEETINGS_CAP.rich(lang=user_with_settings.lang, cap=1),
             user_with_settings.lang,
         ).with_context_menu([[past_meetings_button]]),
     )

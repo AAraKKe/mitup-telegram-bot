@@ -26,6 +26,7 @@ from mitup_bot.monitoring.backend import EmfBackend
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.utils.entities import FormattedText
+from mitup_bot.utils.messages import MessageBase
 
 # Key under which the runtime stashes BotConfig in `application.bot_data` at startup (see
 # MitupRuntime), so handlers can reach it via `context.bot_config` without a module singleton.
@@ -44,6 +45,8 @@ class ContextId(CamelCaseStrEnum):
     EDIT_MEETING_KICK_OUT_PARTICIPANTS = auto()
     EDIT_MEETING_START = auto()
     EDIT_MEETING_END = auto()
+    EDIT_MEETING_IMAGES = auto()
+    REPLACE_MEETING_IMAGE = auto()
 
     # Create Meeting
     CREATE_MEETING = auto()
@@ -57,10 +60,11 @@ class ContextId(CamelCaseStrEnum):
 
 @dataclass
 class OnExit:
-    """Data class that holds the information to show when a conversation is unexpectedly interrupted."""
+    """What to answer when a message the active conversation does not expect arrives."""
 
-    message: FormattedText
+    notice: MessageBase
     cancel_callback: CallbackData
+    lang: str
 
 
 @dataclass
@@ -69,6 +73,8 @@ class ContextData:
 
     meeting_id: int | None = None
     text: FormattedText | None = None
+    # The position, counting from zero, that the next message fills.
+    position: int | None = None
     on_exit: OnExit | None = None
 
 
@@ -91,13 +97,19 @@ class MitupUserData:
         ftext = text if isinstance(text, FormattedText) else FormattedText(text)
         self.registry.setdefault(context, ContextData()).text = ftext
 
+    def store_position(self, context: ContextId, position: int):
+        self.registry.setdefault(context, ContextData()).position = position
+
+    def pending_position(self, context: ContextId) -> int | None:
+        entry = self.registry.get(context)
+        return entry.position if entry is not None else None
+
     def has_meeting_id(self, context: ContextId) -> bool:
         return context in self.registry and self.registry[context].meeting_id is not None
 
-    def store_on_exit(self, context: ContextId, message: str | FormattedText, cancel_callback: CallbackData):
-        fmessage = message if isinstance(message, FormattedText) else FormattedText(message)
+    def store_on_exit(self, context: ContextId, notice: MessageBase, cancel_callback: CallbackData, *, lang: str):
         entry = self.registry.setdefault(context, ContextData())
-        entry.on_exit = OnExit(message=fmessage, cancel_callback=cancel_callback)
+        entry.on_exit = OnExit(notice=notice, cancel_callback=cancel_callback, lang=lang)
         self.active_context = context
 
     def get_active_on_exit(self) -> OnExit | None:
@@ -281,11 +293,20 @@ class MitupContext(
         # The stored text is raw user input; log only its length to keep it out of the log stream.
         self.log.debug("Stored text in user data", context_id=context.value, text_length=len(ftext.text))
 
-    def store_on_exit(self, context: ContextId, message: str | FormattedText, cancel_callback: CallbackData):
-        fmessage = message if isinstance(message, FormattedText) else FormattedText(message)
+    def store_position(self, context: ContextId, position: int):
         if self.user_data is None:  # pragma: no cover
             raise InvalidUserData("User data requested but not set")
-        self.user_data.store_on_exit(context, fmessage, cancel_callback)
+
+        self.user_data.store_position(context, position)
+        self.log.debug("Stored position in user data", context_id=context.value, position=position)
+
+    def pending_position(self, context: ContextId) -> int | None:
+        return None if self.user_data is None else self.user_data.pending_position(context)
+
+    def store_on_exit(self, context: ContextId, notice: MessageBase, cancel_callback: CallbackData, *, lang: str):
+        if self.user_data is None:  # pragma: no cover
+            raise InvalidUserData("User data requested but not set")
+        self.user_data.store_on_exit(context, notice, cancel_callback, lang=lang)
 
     def get_active_on_exit(self) -> OnExit | None:
         """Return the on-exit data for the most recently entered conversation, if any."""

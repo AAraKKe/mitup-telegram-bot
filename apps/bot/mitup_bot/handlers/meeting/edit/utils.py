@@ -6,7 +6,7 @@ from mitup_bot.custom_context import ContextId
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
 from mitup_bot.monitoring import Feature, MetricKey
-from mitup_bot.utils.entities import FormattedText
+from mitup_bot.utils.rich_message import RichContent, as_rich_content
 
 log = structlog.get_logger(__name__)
 
@@ -32,15 +32,14 @@ def log_length_rejection(context: TMitupContext, user: User, *, field: str, leng
     context.put_feature_metric(Feature.EDIT_MEETING, name=MetricKey.ERROR, properties={"reason": "too_long"})
 
 
-def prepend_error(base: str | FormattedText, error: str | FormattedText) -> FormattedText:
+def prepend_error(base: RichContent | str, error: RichContent | str) -> RichContent:
     """Prepend an error paragraph (error text, blank line) to a prompt body, preserving entities.
 
     Used when a message-triggered edit fails validation: the prompt the user was answering is resent
     with the error on top, so the prompt's buttons stay reachable instead of the user being stranded
     with a bare error and no controls to continue.
     """
-    prefix = error if isinstance(error, FormattedText) else FormattedText(error)
-    return prefix.append("\n\n").append(base)
+    return as_rich_content(error).append("\n\n").append(base)
 
 
 class DateTimeEntityFilter(filters.MessageFilter):
@@ -59,5 +58,18 @@ def cleanup_states(context: TMitupContext):
             ContextId.EDIT_MEETING_LOCATION_COORDINATES,
             ContextId.EDIT_MEETING_START,
             ContextId.EDIT_MEETING_END,
+            ContextId.EDIT_MEETING_IMAGES,
+            ContextId.REPLACE_MEETING_IMAGE,
         ]
     )
+
+
+# One event name covers every tap on a navigation button no current screen renders, so a single
+# query answers "does anything still tap these?" and decides when the rescue handlers can go. The
+# tapped control is the `callback` facet.
+STALE_NAVIGATION_EVENT = "Stale navigation callback routed"
+
+
+def log_stale_navigation(user: User, callback: str):
+    """Record a tap on a dead submenu's button, rescued by rendering the editor instead."""
+    log.info(STALE_NAVIGATION_EVENT, user_id=user.db_id, callback=callback)

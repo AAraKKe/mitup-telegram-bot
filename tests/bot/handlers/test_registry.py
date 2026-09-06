@@ -54,6 +54,7 @@ from tests.helpers import (
     create_member,
     log_record,
     make_test_metrics_client,
+    rich_call,
 )
 from tests.helpers.constants import (
     DEFAULT_CHAT_ID,
@@ -283,7 +284,7 @@ async def test_an_unmatched_callback_closes_the_invocation_as_a_fault(
 
     fallback_lang = TranslationEngine.FALLBACK_LANG
     expected_view = factory.main_menu_view(
-        RenderContext(lang=fallback_lang), message=CommonMessages.UNEXPECTED_ERROR.get(lang=fallback_lang)
+        RenderContext(lang=fallback_lang), message=CommonMessages.UNEXPECTED_ERROR.rich(lang=fallback_lang)
     )
     context.api.assert_send_message_called(update, expected_view)
 
@@ -354,8 +355,8 @@ def old_version_notice(lang: str) -> MitupView:
     pins that the notice carries the main-menu row and nothing else.
     """
     return MitupView(
-        description=CommonMessages.OLD_VERSION_MESSAGE.get(lang=lang),
-        keyboard=[[ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)]],
+        message=CommonMessages.OLD_VERSION_MESSAGE.rich(lang=lang),
+        menu=[[ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), callback_data=cb.MAIN_MENU)]],
     )
 
 
@@ -403,7 +404,7 @@ async def test_a_legacy_button_tapped_outside_the_bot_chat_is_answered_with_an_a
 
     context.api.assert_answer_callback_query_called(
         update,
-        text=CommonMessages.OLD_VERSION_MESSAGE.get_text(lang=TranslationEngine.FALLBACK_LANG),
+        text=CommonMessages.OLD_VERSION_MESSAGE.text(lang=TranslationEngine.FALLBACK_LANG),
         show_alert=True,
     )
     context.api.assert_method_just_called("edit_message", times=0)
@@ -510,7 +511,7 @@ STALE_CONVERSATION_BUTTON = str(cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(3)
 def stale_buttons_screen(lang: str) -> MitupView:
     """The screen a stale conversation tap is expected to leave behind: the main menu, with the
     notice saying why the prompt was taken over."""
-    return factory.main_menu_view(RenderContext(lang=lang), message=CommonMessages.STALE_BUTTONS_NOTICE.get(lang=lang))
+    return factory.main_menu_view(RenderContext(lang=lang), message=CommonMessages.STALE_BUTTONS_NOTICE.rich(lang=lang))
 
 
 def test_conversation_scoped_wire_forms_are_recognised():
@@ -976,7 +977,7 @@ async def test_post_commit_drain_failure_never_reaches_the_error_handler(
     context.api = cast(MockApi, build_api(context))
     edits = 0
 
-    def edit_message_text(**kwargs: Any) -> object:
+    def edit_message(*args: Any, **kwargs: Any) -> object:
         nonlocal edits
         edits += 1
         # Only the user's own screen is reachable; the shared cards time out.
@@ -984,7 +985,7 @@ async def test_post_commit_drain_failure_never_reaches_the_error_handler(
             return mock.MagicMock()
         raise TimedOut()
 
-    context.bot.edit_message_text.side_effect = edit_message_text
+    context.bot.do_api_request.side_effect = edit_message
 
     @db.with_session(write=True)
     async def leave_meeting(session: AsyncSession, update: Update, context: StubMitupContext):
@@ -998,7 +999,7 @@ async def test_post_commit_drain_failure_never_reaches_the_error_handler(
     await context.flush_metrics()
 
     error_handler.assert_not_called()
-    assert context.bot.edit_message_text.await_args_list[0].kwargs["text"] == "You left the meeting"
+    assert rich_call(context.bot, 0).html == "You left the meeting"
     # The interaction is counted as completed; the drain records its own failure separately.
     metrics.assert_emitted(name=MetricKey.FAULT, value=0)
     metrics.assert_emitted(name=MetricKey.POST_COMMIT_API_FAULT)

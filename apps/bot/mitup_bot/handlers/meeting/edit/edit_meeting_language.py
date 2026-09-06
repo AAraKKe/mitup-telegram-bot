@@ -2,16 +2,17 @@ import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
-from mitup_bot import guards, views
+from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.translations import SUPPORTED_LANGUAGES
+from mitup_bot.utils import CommonMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import MeetingEditLanguageMessages
 from mitup_bot.views import meeting as meeting_views
 
 from .enums import EditMeetingHandlerId
+from .utils import log_stale_navigation
 
 log = structlog.get_logger(__name__)
 
@@ -28,9 +29,14 @@ async def callback_edit_meeting_language(session: AsyncSession, update: Update, 
     user = await guards.current_user(update, session)
     meeting = await guards.meeting(session, user, valid_data.id, "Edit meeting language", context)
 
+    # No current screen renders this button; it survives only on old messages, so the tap lands
+    # on the settings card, which owns the language chips.
+    log_stale_navigation(user, "edit_meeting_language")
     await context.api.edit_message(
         update=update,
-        view=views.factory.meeting_set_language_view(guards.render_context(user, update, context), meeting=meeting),
+        view=meeting_views.settings_view(meeting).with_context(
+            CommonMessages.EDITING_REVAMP_BANNER.rich(lang=user.lang)
+        ),
     )
 
 
@@ -64,15 +70,17 @@ async def callback_set_meeting_language(session: AsyncSession, update: Update, c
     meeting.language = SUPPORTED_LANGUAGES[valid_data.id]
     for message in meeting.messages:
         message.buttons.keyboard = meeting_views.build_inline_keyboard(
-            meeting, is_searchable=message.chat_instance is not None
+            meeting,
+            is_searchable=message.chat_instance is not None,
+            is_locked_and_in_progress=not meeting.attendance_is_open,
         )
 
-    await context.api.edit_message(
-        update=update,
-        view=views.factory.meeting_set_language_view(
-            guards.render_context(user, update, context), meeting=meeting
-        ).with_context(MeetingEditLanguageMessages.SUCCESS.get(lang=meeting.user_language)),
-    )
+    await context.api.edit_message(update=update, view=meeting_views.settings_view(meeting))
 
-    # Since the language has changed, we need to update the messages of the meeting
-    await context.api.update_meeting_messages(meeting=meeting)
+    # The language changed on every stored card, but the message the user is on shows the settings
+    # card with the new selection highlighted: skipping it keeps them on this screen.
+    await context.api.update_meeting_messages(
+        meeting=meeting,
+        current_message=meeting.message_from_update(update),
+        skip_current=True,
+    )

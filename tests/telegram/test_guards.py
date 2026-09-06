@@ -197,7 +197,7 @@ BACK_KEYBOARDS = [
     lambda lang: [
         [
             ButtonConfig(
-                text=ButtonMessages.ACTIVE_MEETINGS.get_text(lang=lang),
+                text=ButtonMessages.ACTIVE_MEETINGS.text(lang=lang),
                 callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
             ),
         ]
@@ -1024,7 +1024,7 @@ async def test_context_manager_for_registered_user(
         else:
             context.api.assert_answer_callback_query_called(
                 update,
-                MeetingInviteMessages.OPEN_CHAT.get_text(lang="en"),
+                MeetingInviteMessages.OPEN_CHAT.text(lang="en"),
                 show_alert=True,
             )
 

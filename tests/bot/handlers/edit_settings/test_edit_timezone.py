@@ -33,7 +33,9 @@ async def test_callback_query_settings_is_called_with_settings_view(
 
     await callback_query_settings(update, context)
 
-    context.api.assert_edit_message_called(update, factory.settings_view(RenderContext(lang=user_with_settings.lang)))
+    context.api.assert_edit_message_called(
+        update, factory.settings_view(RenderContext(lang=user_with_settings.lang), user_with_settings)
+    )
 
 
 async def test_callback_query_timezone_with_correct_view(
@@ -48,7 +50,7 @@ async def test_callback_query_timezone_with_correct_view(
 
     view = factory.change_settings_element_view(
         RenderContext(lang=user_with_settings.lang),
-        message=SettingsMessages.TIMEZONE_PROMPT.get(
+        message=SettingsMessages.TIMEZONE_PROMPT.rich(
             lang=user_with_settings.lang, timezone=user_with_settings.settings.timezone
         ),
     )
@@ -74,7 +76,8 @@ async def test_callback_query_timezone_stores_on_exit(
     assert context.user_data is not None
     on_exit = context.user_data.registry[ContextId.EDIT_SETTINGS_TIMEZONE].on_exit
     assert on_exit is not None
-    assert on_exit.message == SettingsMessages.TIMEZONE_ON_EXIT.get(lang=user_with_settings.lang)
+    assert on_exit.notice is SettingsMessages.TIMEZONE_ON_EXIT
+    assert on_exit.lang == user_with_settings.lang
     assert on_exit.cancel_callback == cb.CANCEL_SETTINGS
 
 
@@ -100,15 +103,14 @@ async def test_settings_timezone_message_handler_set_the_correct_timezone_and_vi
 
     result = await settings_timezone_text_message_handler(update, context)
 
-    view = factory.settings_view(
-        RenderContext(lang=user_with_settings.lang),
-        message=SettingsMessages.TIMEZONE_SUCCESS.get(
-            lang=user_with_settings.lang, timezone=update.effective_message.text
-        ),
-    )
-
     mock_session.assert_flushed()
     assert user_with_settings.settings.timezone == update.effective_message.text
+
+    view = factory.settings_view(RenderContext(lang=user_with_settings.lang), user_with_settings).with_context(
+        SettingsMessages.TIMEZONE_SUCCESS.rich(
+            lang=user_with_settings.lang or "", timezone=update.effective_message.text or ""
+        )
+    )
     context.api.assert_send_message_called(update, view)
     assert result == ConversationHandler.END
 
@@ -135,11 +137,11 @@ async def test_settings_timezone_message_handler_log_with_incorrect_timezone(
     assert caplog.records[0].__dict__["user_id"] == user_with_settings.db_id
 
     view = MitupView(
-        description=RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
-        keyboard=[
+        message=RegistrationMessages.TIMEZONE_FAIL.rich(lang=user_with_settings.lang),
+        menu=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.text(lang=user_with_settings.lang),
                     callback_data=cb.CANCEL_SETTINGS,
                 )
             ]
@@ -165,13 +167,12 @@ async def test_edit_timezone_with_location_update_correctly(
 
     result = await settings_timezone_location_message_handler(update, context)
 
-    view = factory.settings_view(
-        RenderContext(lang=user_with_settings.lang),
-        message=SettingsMessages.TIMEZONE_SUCCESS.get(lang=user_with_settings.lang, timezone="Europe/Madrid"),
-    )
-
     mock_session.assert_flushed()
     assert user_with_settings.settings.timezone == "Europe/Madrid"
+
+    view = factory.settings_view(RenderContext(lang=user_with_settings.lang), user_with_settings).with_context(
+        SettingsMessages.TIMEZONE_SUCCESS.rich(lang=user_with_settings.lang, timezone="Europe/Madrid")
+    )
     context.api.assert_send_message_called(update, view)
     assert result == ConversationHandler.END
 
@@ -202,11 +203,11 @@ async def test_edit_timezone_location_log_excludes_coordinates(
     assert caplog.records[0].__dict__["user_id"] == user_with_settings.db_id
 
     view = MitupView(
-        description=RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
-        keyboard=[
+        message=RegistrationMessages.TIMEZONE_FAIL.rich(lang=user_with_settings.lang),
+        menu=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get_text(lang=user_with_settings.lang),
+                    text=ButtonMessages.CANCEL.text(lang=user_with_settings.lang),
                     callback_data=cb.CANCEL_SETTINGS,
                 )
             ]
@@ -227,12 +228,12 @@ async def test_settings_timezone_rich_message_reprompts_and_keeps_state(
 
     state = await settings_timezone_rich_message_handler(update, context)
 
-    message = SettingsMessages.TIMEZONE_PROMPT.get(
+    message = SettingsMessages.TIMEZONE_PROMPT.rich(
         lang=user_with_settings.lang, timezone=user_with_settings.settings.timezone
     )
     expected = factory.change_settings_element_view(
         RenderContext(lang=user_with_settings.lang), message=message
-    ).with_context(CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=user_with_settings.lang))
+    ).with_context(CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.rich(lang=user_with_settings.lang))
     context.api.assert_send_message_called(update, expected)
     assert state == ConversationSettingsState.TIMEZONE
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.RICH_MESSAGE)})

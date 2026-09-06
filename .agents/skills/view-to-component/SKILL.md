@@ -31,6 +31,20 @@ Load all three when both writing the doc *and* changing the underlying view. Thi
 
 ---
 
+## 0. Generate the showcase, then verify it
+
+Showcases of bot screens are generated, not typed. `tools/docs_mockups/` holds the pipeline:
+
+1. `dump_screens.py` renders every screen with sample data into `tools/docs_mockups/screens/<name>.txt` (text, the exact rich-message html, the closing button rows). Add a screen there when a page needs one that is missing.
+2. `pages.py` lists, per page, the `<!-- mock:NAME --> ... <!-- /mock -->` slots and the showcase that fills each one: the dump name, the annotations as `(marker text, label, side)`, sample-name replacements, and `classic=True` for a card shared into a chat, whose buttons stay a classic keyboard.
+3. `refresh.py` runs it end to end: dumps, fills the slots (`showcase.py` translates the markup tag by tag with the table in section 3b), builds the site, measures every annotation's `top` in headless Chrome (`measure.py`) and builds again.
+
+```bash
+uv run python tools/docs_mockups/refresh.py
+```
+
+Then screenshot every page you touched with headless Chrome and look at it: labels on their targets, rows aligned, nothing wrapping or clipped. A showcase nobody looked at is not done.
+
 ## 1. Pick the wrapper
 
 | Goal | Use |
@@ -57,7 +71,7 @@ If the user asks for a screen by feature name ("the language picker", "the kick-
 
 ## 3. Resolve the description
 
-The factory passes a `<Screen>Messages.X` constant (e.g. `SettingsMessages.DESCRIPTION`, `MainMenuMessages.DESCRIPTION`, `PrivacyMessages.DESCRIPTION`) — each screen has its own `MessageBase` subclass in `libs/telegram/mitup_bot/utils/messages.py` — as the description. To render:
+The factory passes a `<Screen>Messages.X` constant as the description (e.g. `MainMenuMessages.TAGLINE`, `PrivacyMessages.INTRO`). Each screen has its own `MessageBase` subclass in `libs/telegram/mitup_bot/utils/messages.py`. To render:
 
 1. Open `libs/telegram/mitup_bot/utils/messages.py` and copy the **English** value of the constant (the bot is multilingual; docs are English).
 2. Substitute `${var}` placeholders with realistic example values. For user names, use the fictitious canon: `Ana`, `Ana Marín`, `Marta`, `Diego`, `Sara`, `Tomás`. Never use real maintainer names.
@@ -76,9 +90,29 @@ If the description is a literal string in the factory (rare, but happens for `cr
 
 ---
 
+## 3b. Rich message cards
+
+Most screens are now sent as Telegram rich messages: the controls sit inside the bubble, next to the value they act on, and only the rows that close the message are classic buttons. Render the body with the rich-card classes from `mitup-components.css` inside `.mitup-bot-msg__text`, and keep the closing rows in `.mitup-bot-msg__keyboard` as before. The exact markup of a screen is what `view.message.html` returns; translate it tag by tag:
+
+| Rich message markup | Doc HTML |
+|---------------------|----------|
+| `<h2>Title …</h2>` | `<span class="mitup-card__title">Title …</span>` |
+| `🕒 <b>When</b>` (a section title line) | `<span class="mitup-card__section">🕒 When</span>` |
+| `<hr/>` | `<hr class="mitup-card__rule"/>` |
+| `<footer>…</footer>` | `<span class="mitup-card__footer">…</span>` |
+| `<tg-button …>Label</tg-button>` inside the text | `<span class="mitup-chip">Label</span>`; add `mitup-chip--primary`, `mitup-chip--success`, `mitup-chip--danger` for a `style="…"` attribute and `mitup-chip--muted` for `disabled` |
+| `<tg-button-row>` rows that close the message | the classic `.mitup-bot-msg__row` rows in `.mitup-bot-msg__keyboard` |
+| `<tg-time …>Sep 1</tg-time>` | `<span class="mitup-time">Sep 1</span>` |
+| `<tg-collage>` / `<tg-slideshow>` / a lone `<img>` | `<div class="mitup-card__photos">` with one `<div class="mitup-card__photo"></div>` per photo (`--1` / `--2` for one or two) |
+| `<tg-map …/>` | `<div class="mitup-card__map"></div>` |
+| `<ul><li>…</li></ul>` | the same list tags |
+| `<br/>` | `<br/>` |
+
+A chip that opens an editor keeps its emoji (`✏️ Edit`); chips are the one place a mockup shows emojis, like `.mitup-key`. Blank lines between rows of one section are `<br/><br/>`, as in the source markup.
+
 ## 4. Resolve each button label
 
-Every `ButtonConfig.text` is sourced from `ButtonMessages.<NAME>.get_text(lang=...)` in `libs/telegram/mitup_bot/utils/messages.py`. The enum value **already includes the emoji**:
+Every `ButtonConfig.text` is sourced from `ButtonMessages.<NAME>.text(lang=...)` in `libs/telegram/mitup_bot/utils/messages.py`. The enum value **already includes the emoji**:
 
 ```python
 NEW_MEETING = f"{Emojis.NEW_MEETING} New meeting"  # → "➕ New meeting"
@@ -90,8 +124,6 @@ So the `.mitup-key` content is the rendered string, emoji included. Look up the 
 **Emojis are raw Unicode glyphs, not Twemoji shortcodes.** Mockups mirror what users see in Telegram, so the glyph in `.mitup-key` must match the glyph the bot actually sends. Do not convert to `:shortcode:` form — shortcodes can render a different image from the real button (e.g. `:heart:` renders as `❤️` but `ButtonMessages.COLLABORATE` is `♥`). This matches the same rule for `.button-like` chips in prose; see the `.button-like` recipe in `docs-style`.
 
 Back-button rule: `view.with_back_button(ButtonMessages.MAIN_MENU, …)` renders as `≪ Main Menu` (the `GO_BACK` glyph is `≪`). The same applies to `ButtonMessages.<X>.back(lang=...)` called inside a factory.
-
-If a button is built with `options_button(...)` from `factory.py`, the label is prefixed with ✅ (true) or 🔴 (false). Pick the state you want to illustrate.
 
 ---
 
@@ -155,22 +187,23 @@ Every chat showcase MUST use:
 
 ---
 
-## 9. Worked example: `settings_view()` → annotated showcase
+## 9. Worked example: a keyboard-menu screen → annotated showcase
 
-Source (`libs/telegram/mitup_bot/views/factory.py`):
+A screen whose body is one description and whose menu is a grid of buttons. The source below is
+illustrative, not copied from a factory:
 
 ```python
-def settings_view(ctx: RenderContext, *, message: str | FormattedText | None = None) -> MitupView:
+def menu_screen_view(ctx: RenderContext, *, message: RichContent) -> MitupView:
     lang = ctx.lang
     return MitupView(
-        message or SettingsMessages.DESCRIPTION.get(lang=lang),
+        message,
         [
-            [ButtonConfig(text=ButtonMessages.LANGUAGE.get(lang=lang), ...),
-             ButtonConfig(text=ButtonMessages.TIMEOUT.get(lang=lang), ...)],
-            [ButtonConfig(text=ButtonMessages.NOTIFICATIONS.get(lang=lang), ...),
-             ButtonConfig(text=ButtonMessages.TIMEZONE.get(lang=lang), ...)],
-            [ButtonConfig(text=ButtonMessages.DEFAULT_OPTIONS.get(lang=lang), ...),
-             ButtonConfig(text=ButtonMessages.PRIVACY.get(lang=lang), ...)],
+            [ButtonConfig(text=ButtonMessages.LANGUAGE.text(lang=lang), ...),
+             ButtonConfig(text=ButtonMessages.TIMEOUT.text(lang=lang), ...)],
+            [ButtonConfig(text=ButtonMessages.NOTIFICATIONS.text(lang=lang), ...),
+             ButtonConfig(text=ButtonMessages.TIMEZONE.text(lang=lang), ...)],
+            [ButtonConfig(text=ButtonMessages.DEFAULT_OPTIONS.text(lang=lang), ...),
+             ButtonConfig(text=ButtonMessages.PRIVACY.text(lang=lang), ...)],
             [ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=lang), ...)],
         ],
     )
@@ -178,7 +211,7 @@ def settings_view(ctx: RenderContext, *, message: str | FormattedText | None = N
 
 Look-ups:
 
-* `SettingsMessages.DESCRIPTION` = `"Configure MitUp."`
+* The description renders as `"Configure MitUp."`
 * `ButtonMessages.LANGUAGE` = `"🔣 Language"`, `TIMEOUT` = `"⌛ Timeout"`, `NOTIFICATIONS` = `"⏰ Notifications"`, `TIMEZONE` = `"🌐 Timezone"`, `DEFAULT_OPTIONS` = `"👥 Default Options"`, `PRIVACY` = `"🛡️ Privacy"`, `MAIN_MENU.back(...)` = `"≪ Main Menu"`.
 
 Rendered as an annotated showcase:
@@ -237,7 +270,7 @@ Note how four Python keyboard rows became four `.mitup-bot-msg__row` elements, t
 
 ## 10. Worked example: `PaginatedMitupView` — language picker, page 1 of 1
 
-`set_language_view` builds a `GridMitupView` with one button per supported language and `column_size = min(n, 3)`. `GridMitupView` is never paginated — it arranges the flat button list into as many rows as the button count needs, with no nav row.
+A `GridMitupView` with one button per supported language and `column_size = min(n, 3)` renders like this. `GridMitupView` is never paginated. It arranges the flat button list into as many rows as the button count needs, with no nav row.
 
 ```html
 <div class="mitup-bot-msg__keyboard">

@@ -59,7 +59,7 @@ Every interaction, a tapped button, a typed command, a shared location, arrives 
   <div class="uflow__node">
     <span class="uflow__title">view</span>
     <span class="uflow__src">libs/telegram/mitup_bot/views/</span>
-    <span class="uflow__desc">Builds the message text and inline keyboard for the screen to show.</span>
+    <span class="uflow__desc">Builds the rich message for the screen to show: its text, the chips inside it and the button rows that close it.</span>
   </div>
   <div class="uflow__gap"><span class="uflow__arrow">&darr;</span></div>
 

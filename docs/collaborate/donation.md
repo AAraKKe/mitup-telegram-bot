@@ -1,5 +1,5 @@
 ---
-description: "Back Mitup on Patreon for a Host badge, the members-only Telegram group, and higher limits, and see where the money actually goes."
+description: "Back Mitup on Patreon for a Host badge, the members-only Telegram group, and higher limits, and see where the money goes."
 icon: material/gift-outline
 ---
 
@@ -9,7 +9,7 @@ Your contribution keeps the bot online. It pays for the servers, the database, t
 
 ## Become a Host on Patreon
 
-Mitup is funded by monthly members on Patreon. We call them Hosts. Every Host gets a badge next to their name in Mitup and a seat in the members-only Telegram group, and the two bigger tiers raise the [limits](../user-guide/limits.md) on your account.
+Mitup is funded by monthly members on Patreon. We call them Hosts. Every Host gets a badge next to their name in Mitup, a seat in the members-only Telegram group, and photos on their meeting cards, and the two bigger tiers raise the [limits](../user-guide/limits.md) on your account.
 
 [:fontawesome-brands-patreon: Become a Host on Patreon](https://www.patreon.com/cw/MitupBot/membership){.md-button .md-button--primary}
 
@@ -47,6 +47,7 @@ Mitup is funded by monthly members on Patreon. We call them Hosts. Every Host ge
 
 * A Brewer badge next to your name in Mitup
 * The members-only Telegram group
+* Up to 5 [photos on each meeting card](../user-guide/limits.md#photos-on-the-meeting-card) you make
 * The warm fuzzies, monthly
 
 The Brewer tier keeps the same [limits](../user-guide/limits.md) as a free account. It's for backing the bot, not for unlocking it.

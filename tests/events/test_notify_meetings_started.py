@@ -9,8 +9,8 @@ from mitup_bot.events.service import EventType
 from mitup_bot.models import Meetup
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricsClient
-from mitup_bot.utils.messages import NotificationMessages
-from mitup_bot.views import MitupView
+from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.datetime_format import relative_time_content
 from tests.helpers import (
     MockApi,
     MockDbSession,
@@ -60,7 +60,8 @@ def test_meetings_to_notify_started_query(mock_session: MockDbSession):
         "SELECT meetups.id, meetups.owner_id, meetups.title, meetups.waiting_list,"
         " meetups.public, meetups.allow_invitation, meetups.incognito,"
         " meetups.expiration_notification_sent, meetups.end_datetime,"
-        " meetups.started_notification_sent, meetups.lock_on_start, meetups.description,"
+        " meetups.started_notification_sent, meetups.lock_on_start, meetups.show_timezone,"
+        " meetups.clock_24h, meetups.date_format, meetups.image_layout, meetups.description,"
         " meetups.created_time, meetups.updated_time, meetups.activated_time, meetups.expiration_time,"
         " meetups.warned_time, meetups.datetime, meetups.max_members, meetups.language, meetups.location,"
         " meetups.active\n"
@@ -98,28 +99,24 @@ async def test_started_notification_sent_to_participants(
     meeting = create_meetup(id=1, title="Demo meetup")
     participant_a = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
     participant_b = create_user(id=2, tg_user_id=2, settings=create_settings(id=2, language=lang))
-    create_joined_link(user=participant_a, meetup=meeting, id=1, is_waiting_list=False)
-    create_joined_link(user=participant_b, meetup=meeting, id=2, is_waiting_list=False)
+    link_a = create_joined_link(user=participant_a, meetup=meeting, id=1, is_waiting_list=False)
+    link_b = create_joined_link(user=participant_b, meetup=meeting, id=2, is_waiting_list=False)
 
     register_due_meetings(mock_session, meeting)
 
     await notify_meetings_started.run(api, metrics_client)
     await metrics_client.flush()
 
-    # Both participants received the notification
-    view_a = MitupView(
-        description=NotificationMessages.STARTED.get(lang=participant_a.lang, meeting_title=meeting.title),
-        keyboard=[],
-    )
-    view_b = MitupView(
-        description=NotificationMessages.STARTED.get(lang=participant_b.lang, meeting_title=meeting.title),
-        keyboard=[],
-    )
     # Both assertions use times=2 because the mock tracks all calls to send_message_to_user
     # and there are 2 total calls (one per participant); assert_send_message_to_user_called
     # checks call_count against `times` regardless of which user was targeted.
-    api.assert_send_message_to_user_called(user=participant_a, view=view_a, times=2)
-    api.assert_send_message_to_user_called(user=participant_b, view=view_b, times=2)
+    now = dt.datetime.now(dt.UTC)
+    api.assert_send_message_to_user_called(
+        user=participant_a, view=meeting_views.started_view(link_a, now=now), times=2
+    )
+    api.assert_send_message_to_user_called(
+        user=participant_b, view=meeting_views.started_view(link_b, now=now), times=2
+    )
 
     # The started flag is set
     assert meeting.started_notification_sent is True
@@ -127,6 +124,25 @@ async def test_started_notification_sent_to_participants(
     # update_meeting_messages was called for this meeting
     call_kwargs = api.mock_method("update_meeting_messages").call_args.kwargs
     assert call_kwargs["meeting"] is meeting
+
+
+async def test_the_started_card_counts_up_from_the_clock_it_is_sent_at(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str
+):
+    """The card carries how long ago the meeting began, which only the job can know: the view is
+    handed the moment it is being sent at rather than reading a clock of its own."""
+    started_at = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=5)
+    owner = create_user(id=99, tg_user_id=99, settings=create_settings(id=99, language=lang))
+    meeting = create_meetup(id=7, title="Demo meetup", datetime=started_at, owner=owner)
+    participant = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
+    create_joined_link(user=participant, meetup=meeting, id=1, is_waiting_list=False)
+
+    register_due_meetings(mock_session, meeting)
+    await notify_meetings_started.run(api, metrics_client)
+    await metrics_client.flush()
+
+    countdown = relative_time_content(started_at, now=dt.datetime.now(dt.UTC), lang=lang)
+    assert countdown.text in api.call_args("send_message_to_user").kwargs["view"].message.text
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +284,8 @@ async def test_each_participant_decision_is_recorded(mock_session: MockDbSession
     """Both exclusions the Python participant filter makes are user-visible — someone on the
     waiting list is deliberately not told the meeting began — so each is named per user and
     counted, rather than disappearing into the gap between nominated and sent."""
-    meeting = create_meetup(id=9, title="Test meetup", datetime=dt.datetime.now(dt.UTC))
+    owner = create_user(id=9, tg_user_id=109, settings=create_settings(id=9))
+    meeting = create_meetup(id=9, title="Test meetup", datetime=dt.datetime.now(dt.UTC), owner=owner)
     member = create_user(id=1, tg_user_id=101, settings=create_settings(id=1))
     waiting = create_user(id=2, tg_user_id=102, settings=create_settings(id=2))
     left = create_user(id=3, tg_user_id=103, settings=create_settings(id=3), status=UserStatus.LEFT)

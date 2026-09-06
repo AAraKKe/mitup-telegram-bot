@@ -9,6 +9,7 @@ from mitup_bot.db import with_session
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.utils.messages import CommonMessages
+from mitup_bot.views import MitupView
 
 from .registry import HandlersRegistry
 
@@ -29,10 +30,13 @@ class StaleCancelHandlerId(HandlerId):
 )
 @with_session
 async def callback_query_stale_cancel(session: AsyncSession, update: Update, context: TMitupContext):
-    # Only reads `user.lang` for the alert text; never traverses the meetups/joined_links collections.
+    # Only reads `user.lang` to render in; never traverses the meetups/joined_links collections.
     user = await guards.current_user(update, session)
 
-    alert_text = CommonMessages.STALE_CANCEL_ALERT.get_text(lang=user.lang)
+    alert_text = CommonMessages.STALE_CANCEL_ALERT.text(lang=user.lang)
     await context.api.answer_callback_query(update, text=alert_text, show_alert=True)
 
-    await context.api.clear_reply_markup(update)
+    # Replacing the screen is what takes its buttons away: a message renders exactly the buttons
+    # its content names, and a keyboard-less view names none.
+    expired = MitupView(message=CommonMessages.STALE_CANCEL_ALERT.rich(lang=user.lang), menu=[])
+    await context.api.edit_message(update, expired)

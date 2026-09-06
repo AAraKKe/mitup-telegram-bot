@@ -6,6 +6,7 @@ from . import (
     create_meeting,
     join_leave,
     invite_users,
+    refresh_meeting,
     show_past_meeting,
     reactivate_meeting,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "MeetingHandlerId",
     "join_leave",
     "invite_users",
+    "refresh_meeting",
     "show_past_meeting",
     "reactivate_meeting",
 ]

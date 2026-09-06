@@ -50,4 +50,4 @@ async def chosen_inline_result_handler(session: AsyncSession, update: Update, co
         # `Message.from_update`.
         return
 
-    session.add(Message.for_shared_card(inline_message_id, meeting, meeting_views.inline_view(meeting).keyboard))
+    session.add(Message.for_shared_card(inline_message_id, meeting, meeting_views.inline_view(meeting).menu))

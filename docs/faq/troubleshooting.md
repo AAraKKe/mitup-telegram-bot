@@ -1,41 +1,37 @@
 ---
-description: "Why a Mitup button says you already answered, why an edit vanished, why a card is in another language, and who can edit a meeting."
+description: "Why the Mitup inline menu keeps loading in a group, why your meeting card looks out of date, why an edit vanished, and who can edit a meeting."
 icon: material/wrench-outline
 ---
 
 # When Mitup looks broken
 
-Most of the moments that feel like a bug are Mitup doing exactly what it should. Here are the common ones and what's really happening.
+Most of the moments that feel like a bug are Mitup doing what it should. Here are the common ones.
 
 ## Mitup says I've already answered this
 
-You tapped a button on a message and got a small popup along the lines of "You've already answered this question." That message is an old one, and its buttons no longer belong to any conversation.
-
-Mitup keeps track of the flow you're currently in. When you tap a button that belongs to a flow you already finished or abandoned, there's nothing left for it to act on, so the bot tells you the question is closed and clears the leftover buttons from that message. Scroll to the most recent message from mitupbot and continue from there.
+You tapped a button on an old message and got a popup saying that question is closed. The buttons on that message belong to an earlier question, one you already answered or walked away from, so the bot clears them. Scroll to the most recent message from mitupbot and continue from there.
 
 ## My half-finished edit vanished
 
 You were partway through editing a meeting, opened the main menu or sent something else, and came back to find that step gone.
 
-This only happens while the bot is waiting for you to *type* something: a title, a description, a location, a maximum number of people, a date, or a guest's name. If you tap away to the main menu or send an unrelated message right then, Mitup lets go of the half-typed answer and there's nothing left to save.
+This only happens while the bot is waiting for a typed answer. If you tap away to the main menu or send an unrelated message right then, Mitup lets go of the half-typed answer and there's nothing left to save. Tapping buttons is never affected. Start that step again and Mitup picks up from the meeting's current state.
 
-Tapping buttons is never affected. Toggles, navigation, joining or leaving, sharing, and confirming all act the moment you tap, so nothing is lost there. It also doesn't happen at every step of an edit, only the ones where you're typing an answer. Start that step again and Mitup picks up from the meeting's current state.
+## The inline menu spins, or the card won't post in a group
+
+That's a group permission, not the bot. Inline mode in a group needs the **Send Stickers & GIFs** permission, and a card with photos also needs **Send Photos**. Group owners and admins have both, which is why it works for whoever set the group up and not for everyone else. Ask an admin to turn them on for members. See [group permissions](../user-guide/sharing_and_joining.md#group-permissions).
+
+## The card in my chat with the bot looks out of date
+
+Cards sitting in a group redraw themselves as people join and leave. [Your own copy](../user-guide/create_a_meeting.md#the-meeting-card), the one you open from *📂 Active*{.button-like} or *👥 Joined*{.button-like}, doesn't. Tap *🔄 Refresh*{.button-like} on it.
 
 ## The meeting card is in the wrong language
 
-The language on a shared meeting card is not your language. It's the meeting's language, and only the owner controls it.
-
-Every meeting carries its own language, set by the person who created it. If the owner never picked one, the card falls back to the owner's own language. Your personal language setting only changes the private replies mitupbot sends you, not the card that everyone sees. If you own the meeting and want to change it, open the meeting, tap *✏️ Edit*{.button-like}, and change the meeting's *🔣 Language*{.button-like}.
-
-!!! note "Two different language settings"
-
-    The one in *⚙️ Settings*{.button-like} is yours and only affects your private chat with the bot. The one inside a meeting's *✏️ Edit*{.button-like} screen belongs to the meeting and changes the shared card for everyone.
+The language on a shared meeting card is the meeting's language, and only the owner controls it. If the owner never picked one, the card falls back to the owner's own language. Your personal language setting only changes the private replies mitupbot sends you, not the card that everyone sees. If you own the meeting, open it, tap *⚙️ Settings*{.button-like} and pick a flag; see [meeting language](../user-guide/meeting_settings.md#language).
 
 ## I can't edit this meeting
 
-Only the owner of a meeting can edit it. If you joined a meeting someone else created, you can see it and change your own RSVP, but the title, time, location, and options belong to the owner.
-
-If you tap an edit action on a meeting you don't own, Mitup sends you back to the main menu instead. That's the expected outcome, not a failure. To run your own version, create a new meeting and invite the same people.
+Only the owner of a meeting can edit it. If you joined a meeting someone else created, you can see it and change your own RSVP, but the title, time, location, and options belong to the owner. If you tap an edit action on a meeting you don't own, Mitup sends you back to the main menu. To run your own version, create a new meeting and invite the same people.
 
 ## Still stuck
 

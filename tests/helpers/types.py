@@ -11,7 +11,7 @@ from .stub_bot import StubBot
 
 if TYPE_CHECKING:  # pragma: no cover
     from mitup_bot.config import BotConfig
-    from mitup_bot.models import Broadcast, Meetup, Message, User
+    from mitup_bot.models import Broadcast, MeetingCounts, Meetup, Message, User
 
 StubMitupContext = MitupContext[StubBot, MockApi]
 """MitupContext type for testing purposes"""
@@ -69,3 +69,9 @@ class RegisterGrantTarget(Protocol):
     row, for both the numeric-id and the username lookup."""
 
     def __call__(self, target: User) -> None: ...
+
+
+class SeedMeetingCounts(Protocol):
+    """Factory-fixture callable that makes `User.meeting_counts` answer with the given counts."""
+
+    def __call__(self, user: User, counts: MeetingCounts) -> None: ...

@@ -12,11 +12,11 @@ from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_han
 
 def expected_view(lang: str) -> MitupView:
     return MitupView(
-        description=InlineQueryMessages.READY_TO_SEARCH_MESSAGE.get(lang=lang),
-        keyboard=[
+        message=InlineQueryMessages.READY_TO_SEARCH_MESSAGE.rich(lang=lang),
+        menu=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.SEARCH_CHAT_MEETINGS.get_text(lang=lang),
+                    text=ButtonMessages.SEARCH_CHAT_MEETINGS.text(lang=lang),
                     switch_inline_query_current_chat=f"{SEARCH_QUERY_PREFIX}someinstance",
                 )
             ],

@@ -3,10 +3,11 @@ description: "Set your language, timezone, reminders, timeout, and default meeti
 icon: material/cog-outline
 ---
 
-# Settings
+# Your settings
 
-Open *⚙️ Settings*{.button-like} from the main menu to set your language, timezone, reminders, and the defaults every new meeting starts from.
+Open *⚙️ Settings*{.button-like} from the main menu. Everything about your account is on one card, and each setting carries its own chip next to the value it changes.
 
+<!-- mock:user_settings -->
 <div class="mitup-annotated">
   <div class="mitup-annotated__chat">
     <div class="mitup-chat-header">
@@ -18,69 +19,44 @@ Open *⚙️ Settings*{.button-like} from the main menu to set your language, ti
       </div>
     </div>
     <div class="mitup-annotated__body">
-      <div class="mitup-bot-msg">
-        <div class="mitup-bot-msg__content">
-          <div class="mitup-bot-msg__sender">mitupbot</div>
-          <div class="mitup-bot-msg__text">Configure MitUp.</div>
-        </div>
-        <div class="mitup-bot-msg__keyboard">
-          <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
-            <div class="mitup-key">🔣 Language</div>
-            <div class="mitup-key">⌛ Timeout</div>
-          </div>
-          <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
-            <div class="mitup-key">⏰ Notifications</div>
-            <div class="mitup-key">🌐 Timezone</div>
-          </div>
-          <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
-            <div class="mitup-key">👥 Default Options</div>
-            <div class="mitup-key">🛡️ Privacy</div>
-          </div>
-          <div class="mitup-bot-msg__row">
-            <div class="mitup-key">≪ Main Menu</div>
-          </div>
-        </div>
-      </div>
+      <div class="mitup-bot-msg"><div class="mitup-bot-msg__content"><div class="mitup-bot-msg__sender">mitupbot</div><div class="mitup-bot-msg__text"><span class="mitup-card__title">⚙️ Settings</span><hr class="mitup-card__rule"/><span class="mitup-card__section"><strong>🔣 Language</strong></span><div class="mitup-bot-msg__row" style="--cols: 3"><div class="mitup-key mitup-key--rich mitup-key--primary">🇺🇸 English</div><div class="mitup-key mitup-key--rich">🇪🇸 Spanish</div><div class="mitup-key mitup-key--rich">🇪🇸 Galician</div></div><div class="mitup-bot-msg__row" style="--cols: 3"><div class="mitup-key mitup-key--rich">🇩🇪 German</div><div class="mitup-key mitup-key--rich">🇧🇷 Portuguese</div><div class="mitup-key mitup-key--rich">🇮🇹 Italian</div></div><hr class="mitup-card__rule"/><span class="mitup-card__section"><strong>🌐 <span data-note="0">Timezone</strong></span></span> <span class="mitup-chip">✏️ Change</span><br/>Europe/Madrid<br/><br/><span class="mitup-card__section"><strong>⏰ Notifications</strong></span> <span class="mitup-chip mitup-chip--success">Enabled</span><br/>5 minutes before a meeting starts <span class="mitup-chip">✏️ Change</span><br/><br/><span class="mitup-card__section"><strong>⌛ Timeout</strong></span> <span class="mitup-chip">✏️ Change</span><br/>A meeting without an end time stays active 5 minutes after it starts.<hr class="mitup-card__rule"/><span class="mitup-card__section"><strong>👥 <span data-note="1">Default Options</strong></span></span> <span class="mitup-chip">Open</span><br/>What every meeting you create starts with.<br/><br/><span class="mitup-card__section"><strong>🛡️ Privacy</strong></span> <span class="mitup-chip">Open</span><br/>Your data, the policy, export and deletion.<hr class="mitup-card__rule"/><div class="mitup-bot-msg__row"><div class="mitup-key mitup-key--rich">≪ Main Menu</div></div></div></div></div>
     </div>
   </div>
-  <span class="mitup-annotation mitup-annotation--left" style="top: 60px;">
-    <span class="mitup-annotation__label">Description</span>
+  <span class="mitup-annotation mitup-annotation--right" data-for="0" style="top: 277px;">
+    <span class="mitup-annotation__label">Change chips</span>
     <span class="mitup-annotation__line"></span>
   </span>
-  <span class="mitup-annotation mitup-annotation--right" style="top: 120px;">
-    <span class="mitup-annotation__label">Your settings</span>
+  <span class="mitup-annotation mitup-annotation--left" data-for="1" style="top: 482px;">
+    <span class="mitup-annotation__label">Defaults</span>
     <span class="mitup-annotation__line"></span>
   </span>
 </div>
+<!-- /mock -->
 
 ## Language
 
-Tap *🔣 Language*{.button-like} to pick your language. Every bot message, button, and reminder switches to it.
+Tap another flag and every message, button and reminder switches to that language.
 
 ## Timezone
 
-Tap *🌐 Timezone*{.button-like} to set where you are. Send a city name or share your location through Telegram, and Mitup shows every meeting time in your local hours. This keeps things straight when you join a meeting someone set up on the other side of the world.
+Tap *✏️ Change*{.button-like} under Timezone and send a city name, or share your location through Telegram for a more exact answer. Mitup then shows every meeting time on your clock. The location is only used for the lookup; the [privacy page](../faq/privacy.md) says exactly what is kept.
 
-## Reminders
+## Notifications
 
-Tap *⏰ Notifications*{.button-like} to turn reminders on or off and choose how many minutes before a meeting you want the nudge.
+Reminders can be turned off, and you choose how many minutes before a meeting they arrive.
 
 ## Timeout
 
-Tap *⌛ Timeout*{.button-like} to set how long a meeting stays in your active list after it finishes. Mitup counts from the end time, or from the start time if you didn't set an end. When that grace period passes, the meeting becomes inactive and moves to *💾 Past meetings*{.button-like}, where you can reactivate it.
-
-Send the number of minutes you want. It's five by default, and [a day (1440 minutes) is the ceiling](limits.md#the-timeout-grace-period), so a meeting can stay up through the day after it ended but not longer.
+A meeting doesn't become inactive the second it ends. It stays active for a grace period first, counted from the end time, or from the start when the meeting has no end. That grace period is your timeout, five minutes by default. Tap *✏️ Change*{.button-like} and send the number of minutes you want, [up to a day](limits.md#the-timeout-grace-period). When it runs out the meeting moves to *💾 Past*{.button-like}, where you can bring it back.
 
 ## Default meeting options
 
-Tap *👥 Default Options*{.button-like} to choose what every new meeting you create starts with: waiting list, public, open invitations, incognito, and lock on start. Set them once and each meeting you make begins the same way. You can still change any option on an individual meeting afterwards, and changing your defaults never touches meetings you already made.
-
-For what each option does, see [Meeting settings](meeting_settings.md).
+These are the [meeting settings](meeting_settings.md) every new meeting starts with: the five switches under Behavior and the time format. Set them once and each meeting you create begins that way. You can still change any of them on a meeting's own settings afterwards, and changing your defaults never touches meetings you already made.
 
 ## Privacy
 
-Tap *🛡️ Privacy*{.button-like} to manage the data Mitup keeps about you:
+*Open*{.button-like} next to Privacy is where your data lives:
 
-* *🛡️ Privacy policy*{.button-like} opens the [privacy policy](../faq/privacy.md) in your browser. It describes exactly what Mitup stores and the rights you have over it.
-* *📦 Export my data*{.button-like} sends you a JSON file with a copy of everything Mitup stores about you.
-* *🗑️ Delete my data*{.button-like} permanently deletes your account and everything linked to it, after a double confirmation. See [Erasure](../faq/privacy.md#your-rights-and-how-to-exercise-them) before you tap it. There is no undo.
+* *Read*{.button-like} opens the [privacy policy](../faq/privacy.md).
+* *Export*{.button-like} sends you a copy of everything Mitup holds on you.
+* *🗑️ Delete*{.button-like} removes your account and everything linked to it, after a confirmation. See [Erasure](../faq/privacy.md#your-rights-and-how-to-exercise-them) first. There is no undo.

@@ -293,7 +293,7 @@ async def link_patreon_account(
     )
     # The confirmation DM carries a Main-menu button so the user is never stranded on a
     # button-less message.
-    await api.send_message_to_user(user, link_confirmation_view(message.get(lang=user.lang), user.lang))
+    await api.send_message_to_user(user, link_confirmation_view(message.rich(lang=user.lang), user.lang))
     if outcome is LinkOutcome.LINKED_SUPPORTER:
         await readmit_to_hosts_group(api, user, trigger=HostsGroupTrigger.LINK)
     return outcome

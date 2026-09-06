@@ -80,6 +80,17 @@ def is_admin(update: Update, context: TMitupContext) -> bool:
     return update.effective_user is not None and update.effective_user.id in context.bot_config.admin_tg_ids
 
 
+def in_bot_chat(update: Update) -> bool:
+    """Whether `update` came from the user's own chat with the bot.
+
+    An update acting on an inline message carries no chat at all (Telegram sends only the
+    `inline_message_id`), and an inline message can sit in any chat, so an absent chat counts as
+    "not the bot's chat".
+    """
+    chat = update.effective_chat
+    return chat is not None and chat.type == Chat.PRIVATE
+
+
 def render_context(user: User, update: Update, context: TMitupContext) -> RenderContext:
     """Build the `RenderContext` for the acting user from the current update.
 
@@ -91,18 +102,24 @@ def render_context(user: User, update: Update, context: TMitupContext) -> Render
     return RenderContext(lang=user.lang, is_admin=is_admin(update, context))
 
 
-async def current_user(update: Update, session: AsyncSession, *, load_collections: bool = False) -> User:
+async def current_user(
+    update: Update, session: AsyncSession, *, load_collections: bool = False, load_participants: bool = False
+) -> User:
     # `load_collections` forwards to `User.by_tg_user_id`. The default loads no collections: the vast
     # majority of screens act on a single meeting they resolve through `guards.meeting`, so paying for
     # the user's meetups/joined_links everywhere would be waste. The screens that do traverse them
     # (the meeting lists, and the paths reading `own_meeting`/`joined_meeting`) pass
     # `load_collections=True` and say at the call site what reads them. Both collections are
     # `lazy="raise"`, so a missing opt-in surfaces as an `InvalidRequestError` rather than silent I/O.
+    # `load_participants` adds the owner and participant chains behind those collections, for the
+    # screens that render a meeting card straight off them (the meeting lists).
     if update.effective_user is None:
         raise EffectiveUserNotSet(update)
 
     # If we have an effective user, get the user from DB
-    if user := await User.by_tg_user_id(session, update.effective_user.id, load_collections=load_collections):
+    if user := await User.by_tg_user_id(
+        session, update.effective_user.id, load_collections=load_collections, load_participants=load_participants
+    ):
         # A user marked for deletion is rejected everywhere until the cleanup run purges the row;
         # the error handler answers the interaction with the standardized pending-deletion alert.
         if user.status is UserStatus.DELETION_REQUESTED:
@@ -605,5 +622,5 @@ async def user_registered(
             raise CallbackQueryNotSet(update) from e
 
         await context.api.answer_callback_query(
-            update=update, text=alert_message.get_text(lang=user.language_code or "en"), show_alert=True
+            update=update, text=alert_message.text(lang=user.language_code or "en"), show_alert=True
         )

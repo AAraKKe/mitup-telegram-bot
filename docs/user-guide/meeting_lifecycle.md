@@ -5,9 +5,7 @@ icon: material/calendar-clock-outline
 
 # Meeting lifecycle
 
-Every meeting has two lives. While it's active, people can join, leave, and see it in the cards you shared into your chats. Once it finishes it becomes inactive: read-only, kept under *💾 Past meetings*{.button-like} until you reactivate it, delete it, or the time Mitup keeps it for runs out. That button is where your inactive meetings live.
-
-This page covers when a meeting switches from active to inactive, what happens to it then, and how long you have to bring it back before it's gone for good.
+Every meeting has two lives. While it's active, people can join, leave, and see it in the cards you shared into your chats. Once it finishes it becomes inactive: read-only, kept under *💾 Past*{.button-like} until you reactivate it, delete it, or the time Mitup keeps it for runs out.
 
 <div class="mlc">
   <div class="mlc__row">
@@ -38,146 +36,30 @@ This page covers when a meeting switches from active to inactive, what happens t
   </div>
 </div>
 
-<style>
-.mlc {
-  border: 1px solid var(--mitup-line);
-  border-radius: 14px;
-  background: var(--mitup-paper);
-  padding: 1.5rem;
-  margin: 1.5rem 0;
-}
-.mlc__row {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: stretch;
-  justify-content: center;
-  gap: 0.6rem;
-}
-.mlc__stage {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: 220px;
-  background: #ffffff;
-  border: 1px solid var(--mitup-line);
-  border-top: 4px solid var(--mitup-ink-3);
-  border-radius: 12px;
-  padding: 0.9rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-.mlc__stage--active   { border-top-color: var(--mitup-green); }
-.mlc__stage--inactive { border-top-color: var(--mitup-blue); }
-.mlc__stage--deleted  { border-top-color: var(--mitup-ink-3); }
-.mlc__badge {
-  font-weight: 800;
-  color: var(--mitup-ink);
-  font-size: 1rem;
-}
-.mlc__stage--active .mlc__badge   { color: var(--mitup-green-deep); }
-.mlc__stage--inactive .mlc__badge { color: var(--mitup-blue-deep); }
-.mlc__desc {
-  color: var(--mitup-ink-2);
-  font-size: 0.8rem;
-  line-height: 1.4;
-}
-.mlc__arrow {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.2rem;
-  flex: 0 0 72px;
-  min-width: 0;
-}
-.mlc__arrow-glyph {
-  color: var(--mitup-ink-3);
-  font-size: 1.5rem;
-  line-height: 1;
-}
-.mlc__arrow-label {
-  color: var(--mitup-ink-3);
-  font-size: 0.7rem;
-  text-align: center;
-  line-height: 1.3;
-}
-.mlc__notes {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin-top: 1.25rem;
-}
-.mlc__note {
-  font-size: 0.82rem;
-  line-height: 1.4;
-  color: var(--mitup-ink-2);
-  padding: 0.6rem 0.85rem;
-  border-radius: 10px;
-  border: 1px solid var(--mitup-line);
-}
-.mlc__note--loop {
-  border-left: 4px solid var(--mitup-green);
-  background: rgba(79, 178, 134, 0.08);
-}
-.mlc__note--flag {
-  border-left: 4px solid var(--mitup-yellow);
-  background: rgba(255, 200, 80, 0.10);
-}
-@media (max-width: 620px) {
-  .mlc__row { flex-direction: column; }
-  .mlc__stage { max-width: none; width: 100%; }
-  .mlc__arrow { flex-direction: row; }
-  .mlc__arrow-glyph { transform: rotate(90deg); }
-}
-</style>
-
 ## When a meeting becomes inactive
 
-You don't mark a meeting as finished by hand. Mitup does it for you once the meeting's clock has run out and your grace period on top of it has passed. That grace period is your *⌛ Timeout*{.button-like} setting: five minutes by default, a day at most, and you change it under [Your settings](settings.md#timeout). Which clock Mitup watches depends on the times you set:
+You don't mark a meeting as finished by hand. Mitup does it once the meeting's clock has run out and your [timeout](settings.md#timeout) has passed on top of it:
 
-* **Start and end time set.** It becomes inactive once the timeout has passed after the end time. Start to end can [cover a week at most](limits.md#how-long-one-meeting-can-last), so a whole weekend away fits in one meeting.
-* **Start time only.** It becomes inactive once the timeout has passed after the start time. There's no separate duration that keeps it open.
-* **No date at all.** It stays active so you can still add a date later. If you don't, Mitup closes it out [90 days after you created it, or a year](limits.md#meetings-with-no-date) if you're a Gamemaster or a Commissioner. Bringing the meeting back from *💾 Past meetings*{.button-like} starts that count again.
-
-!!! warning "A meeting with no end time closes right after it starts"
-
-    If you set only a start time, the meeting doesn't stay open for the whole evening. It
-    becomes inactive as soon as your timeout has passed. A board game night that starts at
-    20:00 with no end time and the default five-minute timeout is inactive by around 20:05.
-
-    To keep it joinable through the meeting, set an end time. Mitup then waits until after the
-    end instead.
+* **Start and end time set.** The timeout counts from the end. Start to end can [cover a week at most](limits.md#how-long-one-meeting-can-last).
+* **Start time only.** The timeout counts from the start, so the meeting goes inactive shortly after it begins. Set an end time to keep it joinable through the evening.
+* **No date at all.** It stays active so you can add a date later, for [90 days, or a year for Gamemasters and Commissioners](limits.md#meetings-with-no-date).
 
 ## If you leave the bot
 
-Leaving the bot, by blocking it or deleting your chat with it, doesn't pull you out of your meetings. You stay the owner of the ones you made and stay on the lists of the ones you joined, so the plans you set up don't fall apart the moment you step away.
-
-Meetings with no date wind down sooner, though. One normally waits 90 days for you to come back and give it a date, or a year if you're a Gamemaster or a Commissioner. With you unreachable there's nobody to add that date, so Mitup closes the meeting a month after you created it or last brought it back. Once none of the meetings you own are active, and you're not holding a spot in someone else's, your account is cleaned up along with them.
-
-If a month goes by and the only thing still tying you to Mitup is a spot in someone else's meeting, the bot keeps the spot and lets the rest go: the finished meetings you own are deleted, and your account reads like that of someone who only ever tapped *✅ Join*{.button-like} in a group. Your name stays on that list until the meeting ends. Send `/start` before then and you're a full account again, with your language and timezone where you left them.
+Blocking the bot or deleting your chat with it doesn't pull you out of your meetings: you stay the owner of the ones you made and on the lists of the ones you joined. Meetings with no date that you own close a month after you created them or last brought them back, since nobody is left to add the date. Send `/start` and you're back, with your language and timezone where you left them.
 
 ## What happens when it becomes inactive
 
-Becoming inactive is tidy, not destructive. Here's what changes:
-
-* The cards you shared into chats pick up a "finished" note and lose their buttons, so no one can still tap Join.
-* The meeting moves into your *💾 Past meetings*{.button-like} list, where you can still open it and read everything you wrote.
-* Its date and time stay exactly as you set them, so the meeting reads as it happened. Reactivating it later is what clears them.
-* The participant list is cleared. The gathering is over, so everyone's spot is released, and the temporary entries for guests you invited by name go with it.
+* The cards you shared into chats keep their layout, lose their buttons and say the meeting has finished.
+* The meeting moves to *💾 Past*{.button-like}, where you can still open it and read everything you wrote.
+* Its date and time stay as you set them, so the meeting reads as it happened.
+* The participant list is cleared, guests you invited by name included.
 
 ## Reminders around the start
 
-Reminders are for the people who joined, not for you as the owner. They go out only to participants who have notifications on, and only when the meeting has a start time.
+Everyone on the list with notifications on gets two reminders, you included if you joined: one ahead of the start, as many minutes before as each person chose under [Notifications](settings.md#notifications), and one when the meeting starts. Both carry the schedule and the place, and the first lets you leave from the card if your plans changed.
 
-* A reminder lands shortly before the start. How far ahead is each person's own choice under *⚙️ Settings*{.button-like} then *⏰ Notifications*{.button-like}, five minutes by default, and anyone can turn it off.
-* A second message lands when the start time arrives.
-
-Both land in each participant's own timezone, so a meeting at 19:00 in Madrid reminds someone in Lisbon at 18:00 their time.
-
-## Reactivating an inactive meeting
-
-A meeting isn't gone once it's inactive. Open *💾 Past meetings*{.button-like} from the main menu, pick the one you want, and you'll see it with two choices.
-
+<!-- mock:reminder -->
 <div class="mitup-annotated">
   <div class="mitup-annotated__chat">
     <div class="mitup-chat-header">
@@ -189,53 +71,59 @@ A meeting isn't gone once it's inactive. Open *💾 Past meetings*{.button-like}
       </div>
     </div>
     <div class="mitup-annotated__body">
-      <div class="mitup-bot-msg">
-        <div class="mitup-bot-msg__content">
-          <div class="mitup-bot-msg__sender">mitupbot</div>
-          <div class="mitup-bot-msg__text">
-            This meeting is no longer active. Reactivate it to share it again, or delete it permanently.<br/><br/>
-            <strong>Weekend Hike Prep</strong> (Created by: Ana Marín)<br/><br/>
-            --- 📄 Bring water and sturdy boots.<br/>
-            --- ▶️ Starts: Sat, 12 Jul, 09:00<br/>
-            --- ⏹️ Ends: Sat, 12 Jul, 13:00<br/>
-            --- 🗺️ Trailhead car park 📍<br/>
-            --- 👥 3 participants (No limit)<br/>
-            &nbsp;&nbsp;Ana Marín<br/>
-            &nbsp;&nbsp;Diego<br/>
-            &nbsp;&nbsp;Sara
-          </div>
-        </div>
-        <div class="mitup-bot-msg__keyboard">
-          <div class="mitup-bot-msg__row mitup-bot-msg__row--2">
-            <div class="mitup-key">Reactivate meeting</div>
-            <div class="mitup-key">🗑️ Delete</div>
-          </div>
-          <div class="mitup-bot-msg__row">
-            <div class="mitup-key">≪ 💾 Past meetings</div>
-          </div>
-        </div>
-      </div>
+      <div class="mitup-bot-msg"><div class="mitup-bot-msg__content"><div class="mitup-bot-msg__sender">mitupbot</div><div class="mitup-bot-msg__text"><span class="mitup-card__title">⏰ Starting soon</span>Weekend hike prep<br/><span data-note="0">Starts in</span> 15 minutes<hr class="mitup-card__rule"/><span class="mitup-card__section">🕒 <strong>When</strong></span><br/>Tue, <span class="mitup-time">Sep 1</span>, <span class="mitup-time">18:00</span> - <span class="mitup-time">21:00</span><br/><br/><span class="mitup-card__section">🗺️ <strong>Where</strong></span><br/>Trailhead car park<div class="mitup-card__map"></div><hr class="mitup-card__rule"/>Can't make it? <span class="mitup-chip mitup-chip--danger" data-note="1">❌ Leave</span><hr class="mitup-card__rule"/><div class="mitup-bot-msg__row"><div class="mitup-key mitup-key--rich mitup-key--primary">📂 Open meeting</div></div><div class="mitup-bot-msg__row"><div class="mitup-key mitup-key--rich">≪ Main Menu</div></div></div></div></div>
     </div>
   </div>
-  <span class="mitup-annotation mitup-annotation--left" style="top: 101px;">
+  <span class="mitup-annotation mitup-annotation--left" data-for="0" style="top: 135px;">
+    <span class="mitup-annotation__label">Counts down</span>
+    <span class="mitup-annotation__line"></span>
+  </span>
+  <span class="mitup-annotation mitup-annotation--right" data-for="1" style="top: 407px;">
+    <span class="mitup-annotation__label">Can't make it</span>
+    <span class="mitup-annotation__line"></span>
+  </span>
+</div>
+<!-- /mock -->
+
+The schedule is written in the owner's timezone, the same as on the shared card. Tap the date or the time and your client shows it on your own clock.
+
+## Reactivating an inactive meeting
+
+Open *💾 Past*{.button-like} from the main menu, then *Open*{.button-like} on the meeting you want.
+
+<!-- mock:past_meeting -->
+<div class="mitup-annotated">
+  <div class="mitup-annotated__chat">
+    <div class="mitup-chat-header">
+      <div class="mitup-chat-header__back">‹</div>
+      <div class="mitup-avatar"><img src="../../assets/images/brand/mark-256.png" alt="Mitup"></div>
+      <div>
+        <div class="mitup-chat-header__name">mitupbot</div>
+        <div class="mitup-chat-header__sub">bot · online</div>
+      </div>
+    </div>
+    <div class="mitup-annotated__body">
+      <div class="mitup-bot-msg"><div class="mitup-bot-msg__content"><div class="mitup-bot-msg__sender">mitupbot</div><div class="mitup-bot-msg__text">This meeting is no longer active. Reactivate it to share it again, or delete it permanently.<hr class="mitup-card__rule"/><span class="mitup-card__title">Weekend hike prep</span><span class="mitup-card__footer">Created by: Ana Marín</span><hr class="mitup-card__rule"/><span class="mitup-card__section">📄 <strong>Description</strong></span><br/>Bring water and sturdy boots.<hr class="mitup-card__rule"/><span class="mitup-card__section">🕒 <strong>When</strong></span><br/>Tue, <span class="mitup-time">Sep 1</span>, <span class="mitup-time">18:00</span> - <span class="mitup-time">21:00</span><br/><em data-note="0">This meeting has finished.</em><br/><br/><span class="mitup-card__section">🗺️ <strong>Where</strong></span><br/>Trailhead car park<div class="mitup-card__map"></div><hr class="mitup-card__rule"/><span class="mitup-card__section">👥 <strong>Participants</strong></span> · 3 of 20<ul><li>Ana Marín</li><li>Diego</li><li>Sara</li></ul><hr class="mitup-card__rule"/><div class="mitup-bot-msg__row" style="--cols: 2"><div class="mitup-key mitup-key--rich" data-note="1">Reactivate meeting</div><div class="mitup-key mitup-key--rich">🗑️ Delete</div></div><div class="mitup-bot-msg__row"><div class="mitup-key mitup-key--rich">≪ 💾 Past meetings</div></div></div></div></div>
+    </div>
+  </div>
+  <span class="mitup-annotation mitup-annotation--left" data-for="0" style="top: 357px;">
     <span class="mitup-annotation__label">Finished</span>
     <span class="mitup-annotation__line"></span>
   </span>
-  <span class="mitup-annotation mitup-annotation--right" style="top: 333px;">
+  <span class="mitup-annotation mitup-annotation--right" data-for="1" style="top: 682px;">
     <span class="mitup-annotation__label">Bring it back</span>
     <span class="mitup-annotation__line"></span>
   </span>
 </div>
+<!-- /mock -->
 
-Tap *Reactivate meeting*{.button-like} and the meeting comes back as a fresh start, not a rerun. Everything you wrote stays: title, description, location, language, and every option you picked. The date and time are cleared, so the bot opens the edit screen and you set a new one for whenever you're doing this again. Lock on start goes with the times, since it needs a start time to mean anything.
+*Reactivate meeting*{.button-like} brings it back as a fresh start, not a rerun. Everything you wrote stays: title, description, location, language and every option you picked. The date, the time and lock on start are cleared, and the sign-up list starts empty, so share the card again and everyone taps *✅ Join*{.button-like} for the new round.
 
-The sign-up list starts empty: it was cleared when the meeting finished, guests you added by name included. Share the card into your chats again and everyone taps *✅ Join*{.button-like} for the new round.
-
-A reactivated meeting counts towards your [active meetings](limits.md#active-meetings) again, and it's off the deletion clock described below. Until you give it a date it counts as a meeting with no date, which buys it 90 days, or a year as a Gamemaster or Commissioner, before Mitup closes it out again.
+A reactivated meeting counts towards your [active meetings](limits.md#active-meetings) again and is off the deletion clock below. Until you give it a date it is a meeting with no date, with [that window](limits.md#meetings-with-no-date) to set one.
 
 ## Deleting a meeting
 
-You can delete an active meeting from its card with *🗑️ Delete*{.button-like}, or an inactive one from the screen above. Either way Mitup asks you to confirm with *✅ Confirm*{.button-like} before anything happens.
+You can delete an active meeting from its card with *🗑️ Delete*{.button-like}, an inactive one from the screen above, or either straight from its list. Mitup asks you to confirm before anything happens.
 
 !!! warning "Deletion is permanent"
 
@@ -245,9 +133,9 @@ You can delete an active meeting from its card with *🗑️ Delete*{.button-lik
 
 ## How long an inactive meeting is kept
 
-An inactive meeting doesn't sit around forever. Mitup keeps it for 90 days, or a year if you're a [Gamemaster or a Commissioner](limits.md#how-long-a-finished-meeting-is-kept), counting from the day it became inactive. Then it's deleted permanently.
+Mitup keeps an inactive meeting for 90 days, or a year if you're a [Gamemaster or a Commissioner](limits.md#how-long-a-finished-meeting-is-kept), counting from the day it became inactive. Then it's deleted permanently.
 
-A week before that, the bot sends you a one-time heads-up naming the meeting, with a *Reactivate meeting*{.button-like} button so bringing it back is one tap away. Reactivating takes the meeting off the clock entirely, so the meetings that get removed are the ones left untouched for the whole window.
+A week before that, the bot sends you a one-time heads-up naming the meeting, with a *Reactivate meeting*{.button-like} button. Reactivating takes the meeting off the clock entirely.
 
 !!! warning "The deletion doesn't wait for the heads-up"
 
@@ -255,5 +143,3 @@ A week before that, the bot sends you a one-time heads-up naming the meeting, wi
     you. If you blocked it or deleted the chat, the message doesn't arrive and the deletion
     happens on schedule anyway. Unblock the bot and send `/start` if you want to keep getting
     those.
-
-Deleting a meeting yourself skips all of this. It's removed right away, as described above.

@@ -23,11 +23,11 @@ from mitup_bot.handlers.registration_process.enums import (
     ConversationRegistrationProcessState,
     RegistrationProcessHandlerId,
 )
-from mitup_bot.models import User
+from mitup_bot.models import MeetingCounts, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.utils import RegistrationMessages
-from mitup_bot.utils.entities import build_datetime_link
+from mitup_bot.utils.rich_message import datetime_link_content
 from mitup_bot.views import RenderContext
 from mitup_bot.views.factory import create_meeting_view, main_menu_view
 from tests.helpers import (
@@ -149,7 +149,7 @@ async def test_command_start_with_new_user(
     mock_session.assert_added()
     context.api.assert_send_message_called(
         update,
-        RegistrationMessages.TIMEZONE_PROMPT.get(first_name=update.effective_user.first_name),
+        RegistrationMessages.TIMEZONE_PROMPT.rich(first_name=update.effective_user.first_name),
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
 
@@ -186,7 +186,7 @@ async def test_commands_to_show_main_menu(
 
     result = await command(update, context)
 
-    expected_view = main_menu_view(RenderContext(lang=user_with_settings.lang))
+    expected_view = main_menu_view(RenderContext(lang=user_with_settings.lang), counts=MeetingCounts(0, 0, 0))
     context.api.assert_send_message_called(update, expected_view)
     assert result == ConversationHandler.END
 
@@ -210,7 +210,7 @@ async def test_start_inline_deep_link_sends_create_meeting_view(
     context, result = await call_handler(CommandsId.START_WITH_EXISTING_USER, handler_context=handler_context)
 
     expected_view = create_meeting_view(
-        RenderContext(lang=user_with_settings.lang), datetime_link=build_datetime_link()
+        RenderContext(lang=user_with_settings.lang), datetime_link=datetime_link_content()
     )
     context.api.assert_send_message_called(update, expected_view)
     assert result == ConversationMeetingState.TITLE

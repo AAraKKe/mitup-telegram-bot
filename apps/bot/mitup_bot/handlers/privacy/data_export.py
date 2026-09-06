@@ -14,6 +14,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
+from mitup_bot.datetimes import in_timezone
 from mitup_bot.models import JoinedUsers, Meetup, PatreonPendingLink, Settings, SupporterSubscription, User
 
 EXPORT_BOT_NAME = "Mitup"
@@ -23,8 +24,7 @@ def iso_utc(value: dt.datetime | None) -> str | None:
     """ISO 8601 in UTC; naive values are stored as UTC in the database, so the offset is made explicit."""
     if value is None:
         return None
-    aware = value if value.tzinfo else value.replace(tzinfo=dt.UTC)
-    return aware.astimezone(dt.UTC).isoformat()
+    return in_timezone(value, dt.UTC).isoformat()
 
 
 def owned_meetings_statement(user: User) -> SelectOfScalar[Meetup]:
@@ -100,6 +100,9 @@ def settings_section(settings: Settings) -> dict[str, Any]:
         "default_allow_invitation": settings.default_allow_invitation,
         "default_incognito": settings.default_incognito,
         "default_lock_on_start": settings.default_lock_on_start,
+        "default_show_timezone": settings.default_show_timezone,
+        "default_clock_24h": settings.default_clock_24h,
+        "default_date_format": settings.default_date_format.value,
     }
 
 
@@ -119,6 +122,9 @@ def owned_meeting_section(meeting: Meetup) -> dict[str, Any]:
         "allow_invitations": meeting.allow_invitation,
         "incognito": meeting.incognito,
         "lock_on_start": meeting.lock_on_start,
+        "show_timezone": meeting.show_timezone,
+        "clock_24h": meeting.clock_24h,
+        "date_format": meeting.date_format.value,
         "participants": [link.user.display_name for link in meeting.joined_links if not link.is_waiting_list],
         "waiting_list": [link.user.display_name for link in meeting.joined_links if link.is_waiting_list],
     }

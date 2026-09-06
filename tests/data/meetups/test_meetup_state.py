@@ -1,16 +1,18 @@
 import datetime as dt
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from mitup_bot.emojis import Emojis
+from mitup_bot.datetimes import DateFormat, TimeFormat
 from mitup_bot.keyboards import ButtonConfig
-from mitup_bot.models import User
+from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages
-from mitup_bot.views import MitupView
+from mitup_bot.utils.rich_message import RichContent
 from mitup_bot.views import meeting as meeting_views
-from mitup_bot.views.meeting_text import datetime_section, inline_message, meeting_message, plain_datetime
+from mitup_bot.views.meeting_text import plain_datetime
+from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import create_meetup, create_user
 
 
@@ -18,151 +20,38 @@ def test_external_view():
     owner = create_user(id=1, first_name="Owner")
     meeting = create_meetup(id=1, owner=owner, invitation=True)
 
-    expected_view = MitupView(
-        inline_message(meeting),
+    view = meeting_views.external_view(meeting)
+
+    assert view.menu == [
         [
-            [
-                ButtonConfig(
-                    text=ButtonMessages.JOIN.get_text(lang=meeting.user_language),
-                    callback_data=cb.JOIN.with_id(meeting.db_id),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.INVITE.get_text(lang=meeting.user_language),
-                    callback_data=cb.INVITE.with_id(meeting.db_id),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.LEAVE.get_text(lang=meeting.user_language),
-                    callback_data=cb.LEAVE.with_id(meeting.db_id),
-                ),
-            ],
-            [
-                ButtonConfig(
-                    text=ButtonMessages.MAIN_MENU.back(lang=meeting.user_language),
-                    callback_data=cb.MAIN_MENU,
-                ),
-            ],
+            ButtonConfig(
+                text=ButtonMessages.JOIN.text(lang=meeting.user_language),
+                callback_data=cb.JOIN.with_id(meeting.db_id),
+                style="success",
+            ),
+            ButtonConfig(
+                text=ButtonMessages.INVITE.text(lang=meeting.user_language),
+                callback_data=cb.INVITE.with_id(meeting.db_id),
+            ),
+            ButtonConfig(
+                text=ButtonMessages.LEAVE.text(lang=meeting.user_language),
+                callback_data=cb.LEAVE.with_id(meeting.db_id),
+                style="danger",
+            ),
         ],
-    )
-
-    assert expected_view == meeting_views.external_view(meeting)
-
-
-def test_edit_view(user_with_settings: User):
-    meeting = user_with_settings.meetups[0]
-
-    # Row 2 is [When → EDIT_MEETING_WHEN] — a single button replaces "Date & Time" + "Duration".
-    expected_view = MitupView(
-        meeting_message(meeting),
         [
-            [
-                ButtonConfig(
-                    text=ButtonMessages.TITLE.get_text(lang=meeting.user_language),
-                    callback_data=cb.EDIT_MEETING_TITLE.with_id(meeting.db_id),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.DESCRIPTION.get_text(lang=meeting.user_language),
-                    callback_data=cb.EDIT_MEETING_DESCRIPTION.with_id(meeting.db_id),
-                ),
-            ],
-            [
-                ButtonConfig(
-                    text=ButtonMessages.WHEN.get_text(lang=meeting.user_language),
-                    callback_data=cb.EDIT_MEETING_WHEN.with_id(meeting.db_id),
-                ),
-            ],
-            [
-                ButtonConfig(
-                    text=ButtonMessages.PARTICIPANTS.get_text(lang=meeting.user_language),
-                    callback_data=cb.EDIT_MEETING_PARTICIPANTS.with_id(meeting.db_id),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.LOCATION.get_text(lang=meeting.user_language),
-                    callback_data=cb.EDIT_MEETING_LOCATION.with_id(meeting.db_id),
-                ),
-            ],
-            [
-                ButtonConfig(
-                    text=ButtonMessages.LANGUAGE.get_text(lang=meeting.user_language),
-                    callback_data=cb.EDIT_MEETING_LANGUAGE.with_id(meeting.db_id),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.SETTINGS.get_text(lang=meeting.user_language),
-                    callback_data=cb.EDIT_MEETING_SETTINGS.with_id(meeting.db_id),
-                ),
-            ],
-            [
-                ButtonConfig(
-                    text=ButtonMessages.DONE.get_text(lang=meeting.user_language),
-                    callback_data=cb.SHOW_MEETING.with_id(meeting.db_id),
-                ),
-            ],
-            [
-                ButtonConfig(
-                    text=ButtonMessages.MAIN_MENU.back(lang=meeting.user_language),
-                    callback_data=cb.MAIN_MENU,
-                ),
-            ],
+            ButtonConfig(
+                text=ButtonMessages.REFRESH.text(lang=meeting.user_language),
+                callback_data=cb.REFRESH_MEETING.with_id(meeting.db_id),
+            ),
         ],
-    )
-
-    assert expected_view == meeting_views.edit_view(meeting)
-
-
-# ---------------------------------------------------------------------------
-# datetime_section: single clock line vs start/stop lines
-# ---------------------------------------------------------------------------
-
-
-def test_datetime_section_no_datetime_shows_single_clock_line(user_with_settings: User):
-    from mitup_bot.utils import render
-
-    meeting = create_meetup(id=1, owner=user_with_settings)
-    meeting.datetime = None
-    meeting.end_datetime = None
-
-    text = render(datetime_section(meeting)).text
-
-    # A single "--- CLOCK <not set>" line followed by \n
-    assert text.startswith(f"--- {Emojis.CLOCK.value} ")
-    assert MeetingDisplayMessages.DATE_NOT_SET.get_text(lang=meeting.lang) in text
-    assert Emojis.START.value not in text
-    assert Emojis.STOP.value not in text
-
-
-def test_datetime_section_with_datetime_no_duration_shows_single_clock_line(user_with_settings: User):
-    from mitup_bot.utils import render
-
-    meeting = create_meetup(id=1, owner=user_with_settings)
-    meeting.datetime = datetime(2024, 6, 15, 10, 0, tzinfo=UTC)
-    meeting.end_datetime = None
-
-    text = render(datetime_section(meeting)).text
-
-    # Single clock line: "--- CLOCK Meeting time\n"
-    assert text.startswith(f"--- {Emojis.CLOCK.value} ")
-    assert text.endswith("\n")
-    assert Emojis.START.value not in text
-    assert Emojis.STOP.value not in text
-
-
-def test_datetime_section_with_datetime_and_duration_shows_start_stop_lines(user_with_settings: User):
-    from mitup_bot.utils import render
-
-    meeting = create_meetup(id=1, owner=user_with_settings)
-    meeting.datetime = datetime(2024, 6, 15, 10, 0, tzinfo=UTC)
-    meeting.end_datetime = datetime(2024, 6, 15, 11, 0, tzinfo=UTC)  # 60 minutes later
-
-    text = render(datetime_section(meeting)).text
-
-    # Two lines: start line and stop line; no plain clock
-    assert Emojis.CLOCK.value not in text
-    assert Emojis.START.value in text
-    assert Emojis.STOP.value in text
-    # Both lines are present
-    start_label = MeetingDisplayMessages.START_LABEL.get_text(lang=meeting.lang)
-    stop_label = MeetingDisplayMessages.END_LABEL.get_text(lang=meeting.lang)
-    assert start_label in text
-    assert stop_label in text
+        [
+            ButtonConfig(
+                text=ButtonMessages.MAIN_MENU.back(lang=meeting.user_language),
+                callback_data=cb.MAIN_MENU,
+            ),
+        ],
+    ]
 
 
 # --- plain_datetime fallback branch ---
@@ -176,43 +65,30 @@ def test_plain_datetime_fallback_when_no_datetime_set(user_with_settings: User):
     result = plain_datetime(meeting)
 
     # Line 251: the else-branch returning the localised "date not set" string
-    expected = MeetingDisplayMessages.DATE_NOT_SET.get_text(lang=meeting.lang)
+    expected = MeetingDisplayMessages.DATE_NOT_SET.text(lang=meeting.lang)
     assert result == expected  # plain str, not FormattedText
 
 
 def test_plain_datetime_formatted_when_datetime_set(user_with_settings: User):
-    """plain_datetime must return a UTC-formatted string when meeting.datetime is set."""
-    meeting = create_meetup(id=1, owner=user_with_settings)
+    """plain_datetime must write the stored UTC moment out in the meeting's language and timezone.
+
+    The owner's timezone is Madrid's, an hour ahead of the stored 12:30, and the meeting was
+    created in the year it takes place in, which keeps the year out of the text.
+    """
+    meeting = create_meetup(
+        id=1,
+        owner=user_with_settings,
+        language="en",
+        created_time=datetime(2024, 1, 2, 9, 0, tzinfo=UTC),
+    )
     meeting.datetime = datetime(2024, 1, 12, 12, 30, tzinfo=UTC)
 
     result = plain_datetime(meeting)
 
-    assert result == "2024-01-12 12:30"  # f"{self.datetime:%Y-%m-%d %H:%M}"
+    assert result == "Fri, Jan 12, 13:30"
 
 
-# --- main_view and external_view: join/leave row hidden when locked and in-progress ---
-
-
-def test_main_view_hides_join_leave_row_when_locked_and_in_progress(user_with_settings: User):
-    """main_view must omit the join/leave row when lock_on_start=True and the meeting is in progress."""
-    import datetime as dt
-    from datetime import timedelta
-
-    now = dt.datetime.now(dt.UTC)
-    meeting = create_meetup(id=1, owner=user_with_settings)
-    # Set datetime to 5 minutes ago and end_datetime to 55 min from now so is_in_progress is True
-    meeting.datetime = now - timedelta(minutes=5)
-    meeting.end_datetime = now + timedelta(minutes=55)  # total 60 min, still in progress
-    meeting.lock_on_start = True
-
-    assert meeting.is_in_progress  # guard: the branch condition must be True
-
-    view = meeting_views.main_view(meeting)
-
-    join_cb = cb.JOIN.with_id(meeting.db_id)
-    join_buttons = [btn for row in view.keyboard for btn in row if btn.callback_data == join_cb]
-    # Lines 427→429: the join/leave row is skipped when locked and in progress
-    assert len(join_buttons) == 0
+# --- external_view: join/leave row hidden when locked and in-progress ---
 
 
 def test_external_view_hides_join_leave_row_when_locked_and_in_progress(user_with_settings: User):
@@ -231,7 +107,7 @@ def test_external_view_hides_join_leave_row_when_locked_and_in_progress(user_wit
     view = meeting_views.external_view(meeting)
 
     join_cb = cb.JOIN.with_id(meeting.db_id)
-    join_buttons = [btn for row in view.keyboard for btn in row if btn.callback_data == join_cb]
+    join_buttons = [btn for row in view.menu for btn in row if btn.callback_data == join_cb]
     # Lines 461→463: the join/leave row is skipped when locked and in progress
     assert len(join_buttons) == 0
 
@@ -271,23 +147,32 @@ def make_not_in_progress_meeting(owner: User):
     return meeting
 
 
-@pytest.mark.parametrize(
-    "get_view",
-    [
-        lambda m: meeting_views.main_view(m),
-        lambda m: meeting_views.external_view(m),
-    ],
-    ids=["main_view", "external_view"],
-)
-def test_view_includes_in_progress_label_when_in_progress(user_with_settings: User, get_view):
+# Each card closes its schedule with the status line in its own language: the owner's card in the
+# owner's, and a card nobody reading it owns in the meeting's own.
+IN_PROGRESS_LABELS = [
+    (
+        meeting_views.owner_view,
+        lambda meeting: MeetingDisplayMessages.IN_PROGRESS_STATUS.rich(lang=meeting.user_language),
+    ),
+    (
+        meeting_views.external_view,
+        lambda meeting: MeetingDisplayMessages.IN_PROGRESS_STATUS.rich(lang=meeting.lang),
+    ),
+]
+
+
+@pytest.mark.parametrize("get_view, get_label", IN_PROGRESS_LABELS, ids=["owner_view", "external_view"])
+def test_view_includes_in_progress_label_when_in_progress(
+    user_with_settings: User,
+    get_view: Callable[[Meetup], MitupView],
+    get_label: Callable[[Meetup], RichContent],
+):
     meeting = make_in_progress_meeting(user_with_settings)
 
     assert meeting.is_in_progress  # guard: precondition for the branch under test
 
     view = get_view(meeting)
-    # main_view and external_view always use the owner's settings language
-    expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.user_language)
-    assert expected_text in view.description.text
+    assert get_label(meeting).text in view.message.text
 
 
 def test_inline_view_includes_in_progress_label_when_meeting_has_language(user_with_settings: User):
@@ -300,8 +185,8 @@ def test_inline_view_includes_in_progress_label_when_meeting_has_language(user_w
 
     view = meeting_views.inline_view(meeting)
     # meeting.lang resolves to meeting.language ("en") since it is explicitly set
-    expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.lang)
-    assert expected_text in view.description.text
+    expected_text = MeetingDisplayMessages.IN_PROGRESS_STATUS.rich(lang=meeting.lang).text
+    assert expected_text in view.message.text
 
 
 def test_inline_view_includes_in_progress_label_when_meeting_has_no_language(user_with_settings: User):
@@ -316,27 +201,22 @@ def test_inline_view_includes_in_progress_label_when_meeting_has_no_language(use
 
     view = meeting_views.inline_view(meeting)
     # meeting.lang falls through to meeting.user_language when language is None
-    expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.lang)
-    assert expected_text in view.description.text
+    expected_text = MeetingDisplayMessages.IN_PROGRESS_STATUS.rich(lang=meeting.lang).text
+    assert expected_text in view.message.text
 
 
-@pytest.mark.parametrize(
-    "get_view",
-    [
-        lambda m: meeting_views.main_view(m),
-        lambda m: meeting_views.external_view(m),
-    ],
-    ids=["main_view", "external_view"],
-)
-def test_view_excludes_in_progress_label_when_not_in_progress(user_with_settings: User, get_view):
+@pytest.mark.parametrize("get_view, get_label", IN_PROGRESS_LABELS, ids=["owner_view", "external_view"])
+def test_view_excludes_in_progress_label_when_not_in_progress(
+    user_with_settings: User,
+    get_view: Callable[[Meetup], MitupView],
+    get_label: Callable[[Meetup], RichContent],
+):
     meeting = make_not_in_progress_meeting(user_with_settings)
 
     assert not meeting.is_in_progress  # guard: precondition
 
     view = get_view(meeting)
-    # main_view and external_view always use the owner's settings language
-    expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.user_language)
-    assert expected_text not in view.description.text
+    assert get_label(meeting).text not in view.message.text
 
 
 def test_inline_view_excludes_in_progress_label_when_not_in_progress(user_with_settings: User):
@@ -346,8 +226,8 @@ def test_inline_view_excludes_in_progress_label_when_not_in_progress(user_with_s
 
     view = meeting_views.inline_view(meeting)
     # inline_view uses meeting.lang (meeting.language or meeting.user_language)
-    expected_text = MeetingDisplayMessages.IN_PROGRESS_BANNER.get_text(lang=meeting.lang)
-    assert expected_text not in view.description.text
+    expected_text = MeetingDisplayMessages.IN_PROGRESS_STATUS.rich(lang=meeting.lang).text
+    assert expected_text not in view.message.text
 
 
 # ---------------------------------------------------------------------------
@@ -480,3 +360,45 @@ def test_is_in_progress_bounded_false_before_start(user_with_settings: User):
     meeting.end_datetime = now + timedelta(minutes=90)
 
     assert meeting.is_in_progress is False
+
+
+# ---------------------------------------------------------------------------
+# attendance_is_open: the lock only bites while the meeting runs
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "lock_on_start,running,expected",
+    [
+        (True, True, False),
+        (True, False, True),
+        (False, True, True),
+        (False, False, True),
+    ],
+    ids=["locked_running", "locked_not_running", "unlocked_running", "unlocked_not_running"],
+)
+def test_attendance_is_open(user_with_settings: User, lock_on_start: bool, running: bool, expected: bool):
+    now = dt.datetime.now(dt.UTC)
+    meeting = create_meetup(id=1, owner=user_with_settings)
+    meeting.lock_on_start = lock_on_start
+    start = now - timedelta(minutes=5) if running else now + timedelta(minutes=30)
+    meeting.datetime = start
+    meeting.end_datetime = start + timedelta(minutes=60)
+
+    assert meeting.is_in_progress is running  # guard: the clock half of the predicate
+    assert meeting.attendance_is_open is expected
+
+
+def test_a_new_meeting_names_the_time_format_it_writes_its_moments_with():
+    meeting = create_meetup(id=1)
+
+    assert meeting.time_format == TimeFormat(show_timezone=False, clock_24h=True, date_format=DateFormat.DEFAULT)
+
+
+def test_the_time_format_reads_the_three_stored_settings():
+    meeting = create_meetup(id=1)
+    meeting.show_timezone = False
+    meeting.clock_24h = False
+    meeting.date_format = DateFormat.LONG
+
+    assert meeting.time_format == TimeFormat(show_timezone=False, clock_24h=False, date_format=DateFormat.LONG)

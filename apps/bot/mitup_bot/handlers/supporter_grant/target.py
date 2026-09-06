@@ -43,7 +43,7 @@ async def grant_target_message_handler(
             identifier_len=len(identifier),
         )
         await context.api.send_message(
-            update=update, view=GrantOperatorMessages.TARGET_NOT_FOUND.get(lang=operator.lang, identifier=identifier)
+            update=update, view=GrantOperatorMessages.TARGET_NOT_FOUND.rich(lang=operator.lang, identifier=identifier)
         )
         return ConversationGrantState.AWAITING_TARGET
 
@@ -73,7 +73,7 @@ async def grant_invalid_target_message_handler(
     if operator is None:
         log.warning(TARGET_IGNORED_EVENT, stage="target", outcome="ignored", reason="operator_not_member_user")
         return ConversationGrantState.AWAITING_TARGET
-    await context.api.send_message(update=update, view=GrantOperatorMessages.TARGET_PROMPT.get(lang=operator.lang))
+    await context.api.send_message(update=update, view=GrantOperatorMessages.TARGET_PROMPT.rich(lang=operator.lang))
     log.info(
         "Supporter grant target prompt re-sent",
         user_id=operator.db_id,

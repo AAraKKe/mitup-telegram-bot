@@ -1,87 +1,27 @@
-from mitup_bot import limits
-from mitup_bot.callback_data import MeetingCallbackData
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingEditLocationMessages, MeetingEditParticipantsMessages
-from mitup_bot.views import MitupView, PaginatedMitupView, RenderContext, factory
-
-
-def edit_location_view(meeting: Meetup) -> MitupView:
-    extra_options = [
-        [
-            ButtonConfig(
-                text=ButtonMessages.MEETING_LOCATION_NAME.get_text(lang=meeting.lang),
-                callback_data=cb.EDIT_MEETING_LOCATION_NAME.with_id(meeting.db_id),
-            ),
-            ButtonConfig(
-                text=ButtonMessages.MEETING_LOCATION_COORDINATES.get_text(lang=meeting.lang),
-                callback_data=cb.EDIT_MEETING_LOCATION_COORDINATES.with_id(meeting.db_id),
-            ),
-        ]
-    ]
-
-    return factory.edit_meeting_property_view(
-        RenderContext(lang=meeting.lang),
-        message=MeetingEditLocationMessages.DESCRIPTION.get(lang=meeting.lang),
-        meeting_id=meeting.db_id,
-        extra_buttons=extra_options,
-    )
-
-
-def edit_participants_view(meeting: Meetup) -> MitupView:
-    buttons = [
-        ButtonConfig(
-            text=ButtonMessages.MEETING_MAX_PARTICIPANTS.get_text(lang=meeting.owner.lang),
-            callback_data=cb.EDIT_MEETING_MAX_PARTICIPANTS.with_id(meeting.db_id),
-        )
-    ]
-
-    participants_to_kick_out = [
-        participant for participant in meeting.participants if participant.user.db_id != meeting.owner.db_id
-    ]
-    if participants_to_kick_out:
-        buttons.append(
-            ButtonConfig(
-                text=ButtonMessages.MEETING_KICK_OUT.get_text(lang=meeting.owner.lang),
-                callback_data=cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.with_ids(meeting_id=meeting.db_id, id=1),
-            )
-        )
-
-    return factory.edit_meeting_property_view(
-        RenderContext(lang=meeting.lang),
-        message=MeetingEditParticipantsMessages.DESCRIPTION.get(lang=meeting.owner.lang),
-        meeting_id=meeting.db_id,
-        extra_buttons=[buttons],
-    )
+from mitup_bot.utils.messages import ButtonMessages, MeetingEditParticipantsMessages
+from mitup_bot.utils.rich_message import RichContent
+from mitup_bot.utils.rich_template import render_rich
+from mitup_bot.views import MitupView
+from mitup_bot.views.meeting_text import participant_name
 
 
 def edit_max_participants_view(meeting: Meetup, fail: bool = False) -> MitupView:
-    # A capped owner never gets "unlimited": clearing the limit resolves to the plan's cap
-    # (see Meetup.effective_max_members), so the prompt and the button state the cap instead
-    # of promising a no-limit meeting.
-    cap = limits.participant_capacity(meeting.owner)
-    if fail:
-        description = MeetingEditParticipantsMessages.MAX_INVALID.get(lang=meeting.lang)
-    elif cap is None:
-        description = MeetingEditParticipantsMessages.MAX_PROMPT.get(lang=meeting.lang)
-    else:
-        description = MeetingEditParticipantsMessages.MAX_PROMPT_CAPPED.get(lang=meeting.lang, cap=cap)
-    limit_button_text = (
-        ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS.get_text(lang=meeting.lang)
-        if cap is None
-        else ButtonMessages.MEETING_MAX_CAP_PARTICIPANTS.get_text(lang=meeting.lang, cap=cap)
+    # Removing an existing limit lives on the editor card as its own control, so this prompt only
+    # asks for the number.
+    description = (
+        MeetingEditParticipantsMessages.MAX_INVALID.rich(lang=meeting.lang)
+        if fail
+        else MeetingEditParticipantsMessages.LIMIT_PROMPT.rich(lang=meeting.lang)
     )
     return MitupView(
-        description=description,
-        keyboard=[
+        message=description,
+        menu=[
             [
                 ButtonConfig(
-                    text=limit_button_text,
-                    callback_data=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(meeting.db_id),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.CANCEL.get_text(lang=meeting.lang),
+                    text=ButtonMessages.CANCEL.text(lang=meeting.lang),
                     callback_data=cb.CANCEL_EDIT_MEETING_PARTICIPANS.with_id(meeting.db_id),
                 ),
             ]
@@ -89,35 +29,26 @@ def edit_max_participants_view(meeting: Meetup, fail: bool = False) -> MitupView
     )
 
 
-def kick_out_users_view(
-    meeting: Meetup,
-    current_user: User,
-    page_number: int = 1,
-) -> PaginatedMitupView:
-    """
-    Build the view that shows the list of users to kick out as a paginated view on the selected page.
-    """
-    return PaginatedMitupView(
-        description=MeetingEditParticipantsMessages.KICK_OUT_DESCRIPTION.get(lang=current_user.lang),
-        buttons=[
-            factory.user_button(
-                participant.user, cb.EDIT_MEETING_KICK_OUT_ACTION.with_ids(meeting.db_id, participant.user.db_id)
-            )
-            for participant in meeting.participants
-            if participant.user.db_id != current_user.db_id
-        ],
-        page_number=page_number,
-        column_size=2,
-        row_size=5,
-        # Use the kickout callback using the entity as the page instead of user to maintain meeting id information
-        navigation_callback_data=MeetingCallbackData(entity="kickout_page", action="show", meeting_id=meeting.db_id),
-    ).with_context_menu(
-        [
-            [
-                ButtonConfig(
-                    text=f"{ButtonMessages.EDIT.back(lang=current_user.lang)}",
-                    callback_data=cb.EDIT_MEETING_PARTICIPANTS.with_id(meeting.db_id),
-                )
-            ]
-        ]
+def kick_out_users_view(meeting: Meetup, current_user: User) -> MitupView:
+    """The kick-out list: every participant except the owner on their own line, a kick chip
+    beside the name. The whole list fits one message because a long rich body folds behind the
+    client's "Show more" control instead of needing pages."""
+    lines = []
+    for participant in meeting.participants:
+        if participant.user.db_id == current_user.db_id:
+            continue
+        name = participant_name(participant)
+        chip = ButtonConfig(
+            text=ButtonMessages.REMOVE.text(lang=current_user.lang),
+            callback_data=cb.EDIT_MEETING_KICK_OUT_ACTION.with_ids(meeting.db_id, participant.user.db_id),
+            style="danger",
+        )
+        lines.append(render_rich(t"{name} {chip}"))
+    body = (
+        MeetingEditParticipantsMessages.KICK_OUT_DESCRIPTION.rich(lang=current_user.lang)
+        .append("\n\n")
+        .append(RichContent.join("\n", lines))
+    )
+    return MitupView(body).with_back_button(
+        ButtonMessages.MEETING, current_user.lang, cb.EDIT_MEETING.with_id(meeting.db_id)
     )

@@ -64,7 +64,7 @@ async def test_show_meeting_calls_to_meeting_view_when_meeting_is_set(
 
     context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
 
-    expected_view = meeting_views.main_view(target_meeting)
+    expected_view = meeting_views.owner_view(target_meeting)
     context.api.assert_edit_message_called(update, expected_view)
 
 
@@ -197,7 +197,7 @@ async def test_show_meeting_deleted_fallback_returns_to_originating_page(
     context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
 
     view = context.api.call_args("edit_message").kwargs["view"]
-    back_button = view.keyboard[-1][-1]
+    back_button = view.menu[-1][-1]
     assert back_button.callback_data == cb.SHOW_ACTIVE_MEETING_PAGE.with_id(3)
 
 
@@ -241,7 +241,7 @@ async def test_show_meeting_back_button_targets_originating_list_page(
     context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
 
     view = context.api.call_args("edit_message").kwargs["view"]
-    back_button = view.keyboard[-1][-1]
+    back_button = view.menu[-1][-1]
     assert back_button.text == expected_text.back(lang=user_with_settings.lang)
     assert back_button.callback_data == expected_callback
 
@@ -264,5 +264,5 @@ async def test_show_meeting_deleted_fallback_targets_joined_list(
     context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
 
     view = context.api.call_args("edit_message").kwargs["view"]
-    back_button = view.keyboard[-1][-1]
+    back_button = view.menu[-1][-1]
     assert back_button.callback_data == cb.SHOW_JOINED_MEETINGS_PAGE.with_id(3)

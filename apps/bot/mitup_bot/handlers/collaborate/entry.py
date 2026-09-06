@@ -108,7 +108,7 @@ async def callback_query_confirm_unlink_patreon(session: AsyncSession, update: U
     # The pending delete flushes before build_collaborate_view re-reads the subscription, so the
     # view resolves to the not-linked state; the context line confirms the unlink above it.
     view = (await build_collaborate_view(session, user, context)).with_context(
-        CollaborateMessages.UNLINKED.get(lang=user.lang)
+        CollaborateMessages.UNLINKED.rich(lang=user.lang)
     )
     await context.api.edit_message(update=update, view=view)
 

@@ -11,8 +11,7 @@ from mitup_bot.models.broadcasts import BroadcastStatus
 from mitup_bot.models.users import UserStatus
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.messages import Languages
-
-from .validation import strip_html
+from mitup_bot.utils.rich_message import rich_text
 
 log = structlog.get_logger(__name__)
 
@@ -64,8 +63,10 @@ def recipients_per_language(members_by_language: dict[str, int], provided_langua
 
 
 def derive_name(english_body: str) -> str:
-    collapsed = " ".join(strip_html(english_body).split())
-    return collapsed[:BROADCAST_NAME_MAX_LENGTH] or "Broadcast"
+    """The first non-empty line of the English body, tags removed, names the broadcast."""
+    lines = (" ".join(line.split()) for line in rich_text(english_body).splitlines())
+    first_line = next((line for line in lines if line), "")
+    return first_line[:BROADCAST_NAME_MAX_LENGTH] or "Broadcast"
 
 
 async def discard_author_drafts(session: AsyncSession, author_tg_id: int, *, reason: str):

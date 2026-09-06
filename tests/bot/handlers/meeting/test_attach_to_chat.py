@@ -61,7 +61,7 @@ async def test_attach_to_chat_new_message(
     # The alert should be the "now searchable" one
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingAttachMessages.ENABLED_ALERT.get_text(),
+        text=MeetingAttachMessages.ENABLED_ALERT.text(),
         show_alert=True,
     )
 
@@ -103,7 +103,7 @@ async def test_attach_to_chat_existing_message_without_chat_instance(
 
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingAttachMessages.ENABLED_ALERT.get_text(),
+        text=MeetingAttachMessages.ENABLED_ALERT.text(),
         show_alert=True,
     )
 
@@ -153,7 +153,7 @@ async def test_attach_to_chat_already_attached_in_other_chat(
     # The alert should be "now searchable" (not "already searchable")
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingAttachMessages.ENABLED_ALERT.get_text(),
+        text=MeetingAttachMessages.ENABLED_ALERT.text(),
         show_alert=True,
     )
 
@@ -189,7 +189,7 @@ async def test_attach_to_chat_already_attached_in_same_chat(
     # The "already searchable" alert should be shown
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingAttachMessages.ALREADY_ENABLED_ALERT.get_text(),
+        text=MeetingAttachMessages.ALREADY_ENABLED_ALERT.text(),
         show_alert=True,
     )
 
@@ -223,9 +223,7 @@ async def test_attach_to_chat_meeting_not_found(
     # which can sit in any chat, so the banner that replaces it carries no navigation.
     context.api.assert_edit_message_called(
         update=handler_context.update,
-        view=MitupView(
-            description=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang), keyboard=[]
-        ),
+        view=MitupView(message=MeetingDisplayMessages.DELETED_BANNER.rich(lang=user_with_settings.lang), menu=[]),
     )
 
     metrics.assert_emitted(name=MetricKey.FAULT, value=0.0, times=1)
@@ -352,7 +350,7 @@ async def test_attach_to_chat_by_unregistered_user(
     assert shared_card.chat_instance == "someinstance"
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingAttachMessages.ENABLED_ALERT.get_text(),
+        text=MeetingAttachMessages.ENABLED_ALERT.text(),
         show_alert=True,
     )
     context.api.assert_update_meeting_messages_called(
@@ -389,7 +387,7 @@ async def test_attach_to_chat_by_unregistered_user_on_unclaimed_card_is_rejected
     context.api.assert_update_meeting_messages_not_called()
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingDisplayMessages.DELETED_BANNER.get_text(lang=TranslationEngine.FALLBACK_LANG),
+        text=MeetingDisplayMessages.DELETED_BANNER.text(lang=TranslationEngine.FALLBACK_LANG),
         show_alert=True,
     )
     metrics.assert_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)
@@ -419,7 +417,7 @@ async def test_attach_to_chat_by_pending_deletion_user(
     assert shared_card.chat_instance == "someinstance"
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingAttachMessages.ENABLED_ALERT.get_text(),
+        text=MeetingAttachMessages.ENABLED_ALERT.text(),
         show_alert=True,
     )
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.ATTACH_TO_CHAT)})
@@ -449,7 +447,7 @@ async def test_attach_to_chat_by_pending_deletion_owner_is_rejected(
     context.api.assert_update_meeting_messages_not_called()
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingDisplayMessages.DELETED_BANNER.get_text(lang=TranslationEngine.FALLBACK_LANG),
+        text=MeetingDisplayMessages.DELETED_BANNER.text(lang=TranslationEngine.FALLBACK_LANG),
         show_alert=True,
     )
     metrics.assert_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK, value=1)

@@ -154,7 +154,7 @@ async def test_claiming_prompts_and_writes_nothing(
     assert prompted["granted_level"] == SupporterLevel.HOST_2.value
     metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
     view = context.api.call_args("send_message").kwargs["view"]
-    assert PATREON_NAME in view.description.text
+    assert PATREON_NAME in view.message.text
 
 
 @pytest.mark.parametrize("update", [REDEEM_UPDATE], indirect=True)
@@ -172,11 +172,11 @@ async def test_prompt_leads_with_the_patreon_account_name(
     context, _ = await call_handler(CollaborateHandlerId.PATREON_LINK_REDEEM, handler_context=handler_context)
 
     view = context.api.call_args("send_message").kwargs["view"]
-    assert view.description.text.startswith(PATREON_NAME)
-    assert view.description == CollaborateMessages.LINK_CONFIRM.get(
+    assert view.message.text.startswith(PATREON_NAME)
+    assert view.message == CollaborateMessages.LINK_CONFIRM.rich(
         lang=user_with_settings.lang, patreon_name=PATREON_NAME
     )
-    assert "${" not in view.description.text
+    assert "${" not in view.message.text
 
 
 @pytest.mark.parametrize("update", [REDEEM_UPDATE], indirect=True)
@@ -196,13 +196,13 @@ async def test_prompt_warns_louder_when_a_different_patreon_is_already_linked(
     context, _ = await call_handler(CollaborateHandlerId.PATREON_LINK_REDEEM, handler_context=handler_context)
 
     view = context.api.call_args("send_message").kwargs["view"]
-    assert view.description == CollaborateMessages.LINK_CONFIRM_REPLACES.get(
+    assert view.message == CollaborateMessages.LINK_CONFIRM_REPLACES.rich(
         lang=user_with_settings.lang,
         patreon_name=PATREON_NAME,
-        current_tier=CollaborateMessages.TIER_NAME_HOST_2.get_text(lang=user_with_settings.lang),
+        current_tier=CollaborateMessages.TIER_NAME_HOST_2.text(lang=user_with_settings.lang),
     )
-    assert "Gamemaster" in view.description.text
-    assert "${" not in view.description.text
+    assert "Gamemaster" in view.message.text
+    assert "${" not in view.message.text
 
 
 # --- The two properties the prompt copy has to hold, in every language ---
@@ -215,7 +215,7 @@ async def test_prompt_warns_louder_when_a_different_patreon_is_already_linked(
 # pinning English alone would leave the property guarded where it needs guarding least.
 #
 # Every fragment below is a hardcoded literal. Building the expected text through
-# `CollaborateMessages...get(lang=...)` would produce it with the same call the handler makes, and
+# `CollaborateMessages...rich(lang=...)` would produce it with the same call the handler makes, and
 # the assertion could then never fail; these tables are an independent statement of what the copy
 # has to say. Each language's phrases are read off *its own* sentences rather than translated from a
 # shared template, because the line between a forbidden framing and a correct one falls in a
@@ -399,7 +399,7 @@ async def test_both_prompt_variants_anchor_on_something_the_attacker_cannot_forg
 
     context, _ = await call_handler(CollaborateHandlerId.PATREON_LINK_REDEEM, handler_context=handler_context)
 
-    text = context.api.call_args("send_message").kwargs["view"].description.text
+    text = context.api.call_args("send_message").kwargs["view"].message.text
     assert missing_anchor_fragments(text, user_with_settings.lang) == []
 
 
@@ -432,7 +432,7 @@ async def test_prompt_never_calls_the_incoming_account_the_readers_own(
 
     context, _ = await call_handler(CollaborateHandlerId.PATREON_LINK_REDEEM, handler_context=handler_context)
 
-    text = context.api.call_args("send_message").kwargs["view"].description.text
+    text = context.api.call_args("send_message").kwargs["view"].message.text
     assert possessive_violations(text, user_with_settings.lang) == []
 
 
@@ -459,7 +459,7 @@ async def test_prompt_buttons_carry_the_code_and_no_row_id(
 
     context, _ = await call_handler(CollaborateHandlerId.PATREON_LINK_REDEEM, handler_context=handler_context)
 
-    confirm, decline = context.api.call_args("send_message").kwargs["view"].keyboard[0]
+    confirm, decline = context.api.call_args("send_message").kwargs["view"].menu[0]
     assert confirm.callback_data == cb.CONFIRM_PATREON_LINK.with_code(PAIRING_CODE)
     assert decline.callback_data == cb.DECLINE_PATREON_LINK.with_code(PAIRING_CODE)
     # A row id in the callback would be a small guessable integer; the code is the address instead.
@@ -545,7 +545,7 @@ async def test_a_code_from_an_account_being_deleted_is_refused(
     context, _ = await call_handler(CollaborateHandlerId.PATREON_LINK_REDEEM, handler_context=handler_context)
 
     context.api.assert_send_message_called(
-        update, PrivacyMessages.PENDING_DELETION_ALERT.get(lang=user_with_settings.lang)
+        update, PrivacyMessages.PENDING_DELETION_ALERT.rich(lang=user_with_settings.lang)
     )
     assert not added_subscriptions(mock_session)
 
@@ -595,7 +595,7 @@ async def test_confirming_grants_the_tier_from_the_row(
     context.api.assert_send_message_to_user_called(
         user=user_with_settings,
         view=link_confirmation_view(
-            SupporterNotificationMessages.unlocked_for(SupporterLevel.HOST_1).get(lang=user_with_settings.lang),
+            SupporterNotificationMessages.unlocked_for(SupporterLevel.HOST_1).rich(lang=user_with_settings.lang),
             user_with_settings.lang,
         ),
     )
@@ -686,8 +686,8 @@ async def test_already_linked_elsewhere_explains_itself(
 
     view = context.api.call_args("edit_message").kwargs["view"]
     assert view == patreon_already_linked_elsewhere_view(user_with_settings.lang)
-    assert view.description == CollaborateMessages.LINK_ALREADY_LINKED_ELSEWHERE.get(lang=user_with_settings.lang)
-    assert "${" not in view.description.text
+    assert view.message == CollaborateMessages.LINK_ALREADY_LINKED_ELSEWHERE.rich(lang=user_with_settings.lang)
+    assert "${" not in view.message.text
     assert user_with_settings.supporter_level is SupporterLevel.NONE
     metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
 
@@ -778,7 +778,7 @@ async def test_a_link_refused_for_pending_deletion_never_renders_as_completed(
     context, _ = await call_handler(CollaborateHandlerId.PATREON_LINK_CONFIRM, handler_context=handler_context)
 
     context.api.assert_edit_message_called(
-        update, PrivacyMessages.PENDING_DELETION_ALERT.get(lang=user_with_settings.lang)
+        update, PrivacyMessages.PENDING_DELETION_ALERT.rich(lang=user_with_settings.lang)
     )
     metrics.assert_not_emitted(name=MetricKey.FLOW_COMPLETED)
 

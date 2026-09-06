@@ -12,9 +12,7 @@ from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricsClient
-from mitup_bot.utils.messages import NotificationMessages
-from mitup_bot.views import MitupView
-from mitup_bot.views.meeting_text import rich_title
+from mitup_bot.views import meeting as meeting_views
 
 from .telemetry import error_type_name
 
@@ -23,6 +21,9 @@ log = structlog.get_logger(__name__)
 # The ON clauses are explicit because FK inference picks the users join through
 # meetups.owner_id, silently evaluating every per-user condition (status, notification
 # toggle, lead-time window) against the meeting OWNER instead of the participant.
+#
+# The selectin cascade loads the meeting, its owner and their settings, and stops at
+# `meetup.joined_links`: a caller needing the participant list must chain it on here.
 USERS_TO_NOTIFY_STATEMENT: SelectOfScalar[JoinedUsers] = (
     select(JoinedUsers)
     .join(Meetup, col(JoinedUsers.meetup_id) == col(Meetup.id))
@@ -108,24 +109,6 @@ async def skip_reason(session: AsyncSession, joined_link_id: int) -> str:
     return "outside_lead_time_window"
 
 
-def starting_soon_view(link: JoinedUsers) -> MitupView:
-    """Render the reminder from the columns the re-check already loaded.
-
-    Reads only `link.user.lang` and the title columns of `link.meetup`, both loaded (the JoinedUsers
-    root loads `user` and `meetup` via mapper-level selectin). `link.meetup.joined_links` is NOT
-    loaded: from a JoinedUsers root the cascade revisits the JoinedUsers mapper on
-    `meetup -> joined_links` and stops, and unlike `meetup` this collection has no identity-map
-    rescue — any access emits SQL and raises MissingGreenlet here. A future `update_meeting_messages`
-    call (which iterates the participant list) must therefore chain
-    `JoinedUsers.meetup -> Meetup.joined_links -> JoinedUsers.user`/`invited_by` onto the re-query
-    first; the shared `USERS_TO_NOTIFY_STATEMENT` stays lean because the nomination reads no more.
-    """
-    return MitupView(
-        description=NotificationMessages.STARTING_SOON.get(lang=link.user.lang, meeting_title=rich_title(link.meetup)),
-        keyboard=[],
-    )
-
-
 async def notify_joined_link(due: DueLink, api: TelegramApiWrapper) -> bool:
     """Send one participant's starting-soon notification and flag the link; returns False
     when it is no longer due.
@@ -147,7 +130,9 @@ async def notify_joined_link(due: DueLink, api: TelegramApiWrapper) -> bool:
                 log.info("Skip starting-soon notification", reason=await skip_reason(session, due.joined_link_id))
                 return False
 
-            await api.send_message_to_user(link.user, starting_soon_view(link))
+            await api.send_message_to_user(
+                link.user, meeting_views.starting_soon_view(link, now=dt.datetime.now(dt.UTC))
+            )
             link.notification_sent = True
             log.info(
                 "Send starting-soon notification",

@@ -70,8 +70,6 @@ and register. They take priority over existing `.po` entries when there is a con
   "dieses Treffen", "das Treffen wurde gelöscht"
 - After a colon that introduces a complete sentence, capitalize ("Tipp: Du kannst ...")
 - "tippen" takes "auf": "Tippe auf den Button", never "Tippe den Button"
-- Weekday abbreviations are the standard two-letter forms (Mo, Di, Mi, Do, Fr, Sa, So);
-  short month for März is "Mär"
 - Language names in the language picker are translated into German ("Spanisch", "Englisch", ...),
   matching the other catalogs
 

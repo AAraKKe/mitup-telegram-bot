@@ -1,8 +1,10 @@
 __all__ = (
     "utils",
     "User",
+    "MeetingCounts",
     "Settings",
     "Meetup",
+    "MeetingImage",
     "Message",
     "MessageButtons",
     "MeetupLocation",
@@ -20,6 +22,7 @@ __all__ = (
 )
 
 from .messages import Message, MessageButtons
+from .meeting_images import MeetingImage
 from .meetups import Meetup, MeetupLocation
 from .joined_users import JoinedUsers
 from .subscriptions import (
@@ -30,6 +33,6 @@ from .subscriptions import (
     configure_token_encryption,
 )
 from .settings import Settings
-from .users import User
+from .users import MeetingCounts, User
 from .broadcasts import Broadcast, BroadcastDelivery, BroadcastDeliveryStatus, BroadcastMessage, BroadcastStatus
 from . import utils

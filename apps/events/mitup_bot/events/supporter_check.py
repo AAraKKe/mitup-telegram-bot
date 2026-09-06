@@ -25,6 +25,7 @@ from sqlmodel.sql.expression import SelectOfScalar
 from mitup_bot import db, hosts_group, patreon, supporter
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.config import PatreonConfig
+from mitup_bot.datetimes import as_utc
 from mitup_bot.exceptions import PatreonTokenRevoked
 from mitup_bot.models import SupporterSubscription, User
 from mitup_bot.models.users import UserStatus
@@ -138,13 +139,8 @@ LIVE_LINKED_SUBSCRIPTIONS: SelectOfScalar[SupporterSubscription] = (
 
 
 def days_until(expiration: dt.datetime) -> float:
-    """Whole and fractional days from now until ``expiration`` (negative once expired).
-
-    Coerces a naive timestamp (as read back from the DB) to UTC so the subtraction never mixes
-    aware and naive datetimes."""
-    if expiration.tzinfo is None:
-        expiration = expiration.replace(tzinfo=dt.UTC)
-    return (expiration - dt.datetime.now(dt.UTC)).total_seconds() / dt.timedelta(days=1).total_seconds()
+    """Whole and fractional days from now until ``expiration`` (negative once expired)."""
+    return (as_utc(expiration) - dt.datetime.now(dt.UTC)).total_seconds() / dt.timedelta(days=1).total_seconds()
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,7 +248,7 @@ async def advance_grace_flow(
     if not subscription.expiration_notified:
         subscription.expiration_notified = True
         subscription.support_expiration = dt.datetime.now(dt.UTC) + GRACE_PERIOD
-        await api.send_message_to_user(user, SupporterNotificationMessages.GRACE_STARTED.get(lang=user.lang))
+        await api.send_message_to_user(user, SupporterNotificationMessages.GRACE_STARTED.rich(lang=user.lang))
         log.info("Supporter grace started", grace_until=subscription.support_expiration, reason="not_in_active_patrons")
         return DueOutcome.GRACE_STARTED
 
@@ -272,10 +268,10 @@ async def advance_grace_flow(
         reason="grace_expired_and_not_active_patron",
     )
     if not supporter.is_supporter(target):
-        await api.send_message_to_user(user, SupporterNotificationMessages.SUPPORT_LOST.get(lang=user.lang))
+        await api.send_message_to_user(user, SupporterNotificationMessages.SUPPORT_LOST.rich(lang=user.lang))
         await remove_from_hosts_group(api, user)
     elif target is not previous:
-        await api.send_message_to_user(user, SupporterNotificationMessages.downgraded_to(target).get(lang=user.lang))
+        await api.send_message_to_user(user, SupporterNotificationMessages.downgraded_to(target).rich(lang=user.lang))
     return DueOutcome.SUPPORT_LOST
 
 
@@ -343,7 +339,7 @@ async def apply_target_level(
         if upgraded
         else SupporterNotificationMessages.downgraded_to(target)
     )
-    await api.send_message_to_user(user, message.get(lang=user.lang))
+    await api.send_message_to_user(user, message.rich(lang=user.lang))
     return LevelSyncOutcome.UPGRADED if upgraded else LevelSyncOutcome.DOWNGRADED
 
 

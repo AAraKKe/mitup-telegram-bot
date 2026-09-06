@@ -1,6 +1,7 @@
 import datetime as dt
 from typing import cast
 
+from mitup_bot.datetimes import as_utc
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup
 from mitup_bot.utils import ButtonMessages
@@ -16,9 +17,17 @@ def search_chat_meetings_button(*, lang: str, chat_instance: str) -> ButtonConfi
     includes the zero-results message, which would otherwise be a dead end.
     """
     return ButtonConfig(
-        text=ButtonMessages.SEARCH_CHAT_MEETINGS.get_text(lang=lang),
+        text=ButtonMessages.SEARCH_CHAT_MEETINGS.text(lang=lang),
         switch_inline_query_current_chat=f"{SEARCH_QUERY_PREFIX}{chat_instance}",
     )
+
+
+def start_key(meeting: Meetup) -> dt.datetime:
+    return as_utc(cast(dt.datetime, meeting.datetime))
+
+
+def creation_key(meeting: Meetup) -> dt.datetime:
+    return as_utc(cast(dt.datetime, meeting.created_time))
 
 
 def sort_meetings(meetings: list[Meetup]) -> list[Meetup]:
@@ -32,13 +41,13 @@ def sort_meetings(meetings: list[Meetup]) -> list[Meetup]:
     for meeting in meetings:
         if meeting.datetime is None:
             no_datetime.append(meeting)
-        elif meeting.datetime >= now:
+        elif start_key(meeting) >= now:
             future.append(meeting)
         else:
             past.append(meeting)
 
-    future.sort(key=lambda m: cast(dt.datetime, m.datetime))
-    no_datetime.sort(key=lambda m: cast(dt.datetime, m.created_time))
-    past.sort(key=lambda m: cast(dt.datetime, m.datetime))
+    future.sort(key=start_key)
+    no_datetime.sort(key=creation_key)
+    past.sort(key=start_key)
 
     return [*future, *no_datetime, *past]

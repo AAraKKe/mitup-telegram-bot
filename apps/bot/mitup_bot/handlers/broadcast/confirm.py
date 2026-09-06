@@ -55,7 +55,7 @@ async def callback_query_confirm_broadcast(session: AsyncSession, update: Update
             reason=broadcast.value,
         )
         await context.api.edit_message(
-            update=update, view=BroadcastOperatorMessages.DRAFT_NOT_FOUND.get(lang=operator.lang)
+            update=update, view=BroadcastOperatorMessages.DRAFT_NOT_FOUND.rich(lang=operator.lang)
         )
         return ConversationHandler.END
 
@@ -63,7 +63,7 @@ async def callback_query_confirm_broadcast(session: AsyncSession, update: Update
     broadcast.status = BroadcastStatus.QUEUED
     await context.api.edit_message(
         update=update,
-        view=BroadcastOperatorMessages.QUEUED_CONFIRMATION.get(
+        view=BroadcastOperatorMessages.QUEUED_CONFIRMATION.rich(
             lang=operator.lang, name=broadcast.name, broadcast_id=broadcast.db_id
         ),
     )
@@ -104,7 +104,7 @@ async def callback_query_cancel_broadcast(session: AsyncSession, update: Update,
     await context.api.edit_message(
         update=update,
         view=views.factory.admin_menu_view(guards.render_context(operator, update, context)).with_context(
-            BroadcastOperatorMessages.CANCELLED_CONFIRMATION.get(lang=operator.lang)
+            BroadcastOperatorMessages.CANCELLED_CONFIRMATION.rich(lang=operator.lang)
         ),
     )
     return ConversationHandler.END

@@ -12,6 +12,7 @@ from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
+from mitup_bot.datetimes import as_utc
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Meetup, User
@@ -19,7 +20,7 @@ from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
 from mitup_bot.views import MitupView
-from mitup_bot.views.meeting_text import rich_title
+from mitup_bot.views.meeting_text import title_content
 
 from .lifecycle_queries import loggable_windows, owner_tier_window_elapsed
 from .telemetry import supporter_level_counts
@@ -127,17 +128,10 @@ def window_days(meetup: Meetup, duration_of: Callable[[LifecyclePolicy], dt.time
     return LifecyclePolicy.interval_days(duration_of(owner_policy(meetup)))
 
 
-def as_utc(stamp: dt.datetime | None) -> dt.datetime | None:
-    """A stored timestamp as an aware UTC value; the columns are naive UTC, so one reads back bare."""
-    if stamp is None:
-        return None
-    return stamp if stamp.tzinfo else stamp.replace(tzinfo=dt.UTC)
-
-
 def warning_due_time(meetup: Meetup) -> dt.datetime | None:
     """When the warning became due, or None when the meetup never expired."""
-    expiration = as_utc(meetup.expiration_time)
-    return None if expiration is None else expiration + owner_policy(meetup).deletion_warning_delay
+    expiration = meetup.expiration_time
+    return None if expiration is None else as_utc(expiration) + owner_policy(meetup).deletion_warning_delay
 
 
 def deletion_due_time(meetup: Meetup) -> dt.datetime | None:
@@ -150,10 +144,10 @@ def deletion_due_time(meetup: Meetup) -> dt.datetime | None:
     """
     policy = owner_policy(meetup)
     gates = [
-        stamp + duration
+        as_utc(stamp) + duration
         for stamp, duration in (
-            (as_utc(meetup.expiration_time), policy.inactive_retention),
-            (as_utc(meetup.warned_time), policy.deletion_warning_lead),
+            (meetup.expiration_time, policy.inactive_retention),
+            (meetup.warned_time, policy.deletion_warning_lead),
         )
         if stamp is not None
     ]
@@ -214,19 +208,19 @@ def failed_meeting_properties(meetups: Sequence[Meetup]) -> dict[str, Any] | Non
 
 def deletion_warning_view(meetup: Meetup) -> MitupView:
     return MitupView(
-        description=NotificationMessages.DELETION_WARNING.get(
+        message=NotificationMessages.DELETION_WARNING.rich(
             lang=meetup.lang,
-            meeting_title=rich_title(meetup),
+            meeting_title=title_content(meetup),
             # The message promises a deadline, so the lead has to be the owner's own: the free
             # policy's value is only right for a free owner.
             days_until_deletion=window_days(meetup, lambda policy: policy.deletion_warning_lead),
-            past_meetings_button=ButtonMessages.PAST_MEETINGS.get(lang=meetup.user_language),
-            reactivate_meeting_button=ButtonMessages.REACTIVATE_MEETING.get(lang=meetup.user_language),
+            past_meetings_button=ButtonMessages.PAST_MEETINGS.text(lang=meetup.user_language),
+            reactivate_meeting_button=ButtonMessages.REACTIVATE_MEETING.text(lang=meetup.user_language),
         ),
-        keyboard=[
+        menu=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.REACTIVATE_MEETING.get_text(lang=meetup.user_language),
+                    text=ButtonMessages.REACTIVATE_MEETING.text(lang=meetup.user_language),
                     callback_data=cb.REACTIVATE_MEETING.with_id(cast(int, meetup.id)),
                 ),
                 ButtonConfig(
@@ -240,8 +234,8 @@ def deletion_warning_view(meetup: Meetup) -> MitupView:
 
 def deletion_notice_view(meetup: Meetup) -> MitupView:
     return MitupView(
-        description=NotificationMessages.DELETED.get(lang=meetup.lang, meeting_title=rich_title(meetup)),
-        keyboard=[],
+        message=NotificationMessages.DELETED.rich(lang=meetup.lang, meeting_title=title_content(meetup)),
+        menu=[],
     )
 
 

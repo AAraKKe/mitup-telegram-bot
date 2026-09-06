@@ -3,10 +3,9 @@ from telegram import CallbackQuery, Message, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState, EditSettingsHandlerId
-from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, CommonMessages, SettingsMessages
+from mitup_bot.utils.messages import CommonMessages, SettingsMessages
 from mitup_bot.views import MitupView, RenderContext, factory
 from tests.helpers import (
     HandlerContext,
@@ -18,55 +17,8 @@ from tests.helpers import (
 )
 
 
-def expected_view(user: User, notifications_enabled: bool, notifications_time: int) -> MitupView:
-    return MitupView(
-        description=SettingsMessages.NOTIFICATIONS_DESCRIPTION.get(
-            lang=user.lang,
-            notifications_status=SettingsMessages.ENABLED.get(lang=user.lang)
-            if notifications_enabled
-            else SettingsMessages.DISABLED.get(lang=user.lang),
-            notifications_time=notifications_time,
-        ),
-        keyboard=[
-            [
-                ButtonConfig(
-                    text=ButtonMessages.DISABLE.get_text(lang=user.lang)
-                    if notifications_enabled
-                    else ButtonMessages.ENABLE.get_text(lang=user.lang),
-                    callback_data=cb.TOGGLE_NOTIFICATIONS,
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.NOTIFICATIONS_TIME.get_text(lang=user.lang),
-                    callback_data=cb.SET_NOTIFICATION_TIME,
-                ),
-            ],
-        ],
-    ).with_back_button(ButtonMessages.SETTINGS, lang=user.lang, callback_data=cb.SETTINGS)
-
-
-@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_NOTIFICATIONS)], indirect=True)
-@pytest.mark.parametrize(
-    "notifications_enabled",
-    [True, False],
-    ids=["enabled", "disabled"],
-)
-async def test_callback_query_notifications(
-    mock_session: MockDbSession,
-    user_with_settings: User,
-    update: Update,
-    handler_context: HandlerContext,
-    notifications_enabled: bool,
-):
-    user_with_settings.settings.notification = notifications_enabled
-    mock_session.add_object(user_with_settings, query_field="tg_user_id")
-
-    context, result = await call_handler(EditSettingsHandlerId.NOTIFICATIONS_CALLBACK, handler_context=handler_context)
-
-    context.api.assert_edit_message_called(
-        update,
-        expected_view(user_with_settings, notifications_enabled, user_with_settings.settings.notification_time),
-    )
-    assert result is None
+def settings_card(user: User) -> MitupView:
+    return factory.settings_view(RenderContext(lang=user.lang), user)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.TOGGLE_NOTIFICATIONS)], indirect=True)
@@ -87,13 +39,10 @@ async def test_callback_query_toggle_notifications(
 
     context, result = await call_handler(EditSettingsHandlerId.TOGGLE_NOTIFICATIONS, handler_context=handler_context)
 
-    user_with_settings.settings.notification = not notifications_enabled
+    assert user_with_settings.settings.notification is not notifications_enabled
     mock_session.assert_flushed()
 
-    context.api.assert_edit_message_called(
-        update,
-        expected_view(user_with_settings, not notifications_enabled, user_with_settings.settings.notification_time),
-    )
+    context.api.assert_edit_message_called(update, settings_card(user_with_settings))
     assert result is None
 
 
@@ -107,8 +56,7 @@ async def test_callback_query_set_notification_time(
 
     expected_view = factory.change_settings_element_view(
         RenderContext(lang=user_with_settings.lang),
-        message=SettingsMessages.NOTIFICATIONS_TIME_PROMPT.get(lang=user_with_settings.lang),
-        callback_data=cb.EDIT_NOTIFICATIONS,
+        message=SettingsMessages.NOTIFICATIONS_TIME_PROMPT.rich(lang=user_with_settings.lang),
     )
 
     context.api.assert_edit_message_called(update, expected_view)
@@ -125,12 +73,12 @@ async def test_settings_notification_time_text_message_handler(
         EditSettingsHandlerId.NOTIFICATION_TIME_MESSAGE_WITH_TEXT, handler_context=handler_context
     )
 
-    expected_success_view = expected_view(
-        user_with_settings, user_with_settings.settings.notification, 10
-    ).with_context(SettingsMessages.NOTIFICATIONS_TIME_SUCCESS.get(lang=user_with_settings.lang, notifications_time=10))
-
     mock_session.assert_flushed()
     assert user_with_settings.settings.notification_time == 10
+
+    expected_success_view = settings_card(user_with_settings).with_context(
+        SettingsMessages.NOTIFICATIONS_TIME_SUCCESS.rich(lang=user_with_settings.lang, notifications_time=10)
+    )
     context.api.assert_send_message_called(update, expected_success_view)
     assert result == ConversationHandler.END
 
@@ -177,8 +125,7 @@ async def test_settings_notification_time_invalid_input_handler(
     # Check we have sent the proper message
     expected_view = factory.change_settings_element_view(
         RenderContext(lang=user_with_settings.lang),
-        message=CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user_with_settings.lang),
-        callback_data=cb.EDIT_NOTIFICATIONS,
+        message=CommonMessages.POSITIVE_INTEGER_INVALID.rich(lang=user_with_settings.lang),
     )
     context.api.assert_send_message_called(update, expected_view)
 

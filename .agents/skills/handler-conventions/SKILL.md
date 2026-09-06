@@ -134,7 +134,7 @@ from mitup_bot.utils import callbacks as cb
 @HandlersRegistry.register_callback_query(handler_id=MyId.SHOW, callback_data=cb.SHOW_MEETING)
 
 # In a ButtonConfig
-ButtonConfig(text=ButtonMessages.SHOW.get(lang=lang), callback_data=cb.SHOW_MEETING.with_id(meeting_id))
+ButtonConfig(text=ButtonMessages.SHOW.text(lang=lang), callback_data=cb.SHOW_MEETING.with_id(meeting_id))
 ```
 
 ## Handler function naming
@@ -177,7 +177,7 @@ When deleting a handler entirely:
 
 ## Localization
 
-Fetch the user early in the handler — before branching on meeting existence — so `user.lang` is available in all code paths. The "never hardcode `lang=`" rule itself lives in the `user-facing-text` skill; the handler-side concern is *when* to fetch the user so the language is in scope at every `.get()` call.
+Fetch the user early in the handler, before branching on meeting existence, so `user.lang` is available in all code paths. The "never hardcode `lang=`" rule itself lives in the `user-facing-text` skill; the handler-side concern is *when* to fetch the user so the language is in scope at every render call.
 
 ## `chat_instance`
 

@@ -6,6 +6,8 @@ from mitup_bot.models import User
 
 log = structlog.get_logger(__name__)
 
+MEETINGS_PER_PAGE = 5
+
 
 class MeetingList(StrEnum):
     """Which of the three list screens a line describes, as the `list` facet."""

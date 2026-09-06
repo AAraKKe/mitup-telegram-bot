@@ -1,96 +1,67 @@
 import pytest
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 import mitup_bot.utils.callbacks as cb
-from mitup_bot.keyboards import ButtonConfig
+from mitup_bot.keyboards import ButtonConfig, Keyboard
+from mitup_bot.utils.rich_message import RichContent
 from mitup_bot.views import GridMitupView
 from mitup_bot.views.mitup_view import arrange_in_grid
 
 
+def grid_button(index: int) -> ButtonConfig:
+    return ButtonConfig(text=f"action_button{index}", callback_data=cb.SHOW_MEETING.with_id(index))
+
+
 def grid_buttons(count: int) -> list[ButtonConfig]:
-    return [
-        ButtonConfig(text=f"action_button{i}", callback_data=cb.SHOW_MEETING.with_id(i)) for i in range(1, count + 1)
-    ]
+    return [grid_button(index) for index in range(1, count + 1)]
 
 
-GRID_VIEW_EVEN = GridMitupView(description="even", buttons=grid_buttons(4), column_size=2)
-GRID_VIEW_PARTIAL = GridMitupView(description="partial", buttons=grid_buttons(5), column_size=2)
-GRID_VIEW_THREE_COLUMNS = GridMitupView(description="three", buttons=grid_buttons(5), column_size=3)
-GRID_VIEW_DEFAULT = GridMitupView(description="default", buttons=grid_buttons(3))
+GRID_VIEW_EVEN = GridMitupView(message=RichContent("even"), buttons=grid_buttons(4), column_size=2)
+GRID_VIEW_PARTIAL = GridMitupView(message=RichContent("partial"), buttons=grid_buttons(5), column_size=2)
+GRID_VIEW_THREE_COLUMNS = GridMitupView(message=RichContent("three"), buttons=grid_buttons(5), column_size=3)
+GRID_VIEW_DEFAULT = GridMitupView(message=RichContent("default"), buttons=grid_buttons(3))
 
-EXPECTED_MARKUP_EVEN = InlineKeyboardMarkup(
-    [
-        [
-            InlineKeyboardButton("action_button1", callback_data="show;meeting:1"),
-            InlineKeyboardButton("action_button2", callback_data="show;meeting:2"),
-        ],
-        [
-            InlineKeyboardButton("action_button3", callback_data="show;meeting:3"),
-            InlineKeyboardButton("action_button4", callback_data="show;meeting:4"),
-        ],
-    ]
-)
+EXPECTED_MENU_EVEN = [
+    [grid_button(1), grid_button(2)],
+    [grid_button(3), grid_button(4)],
+]
 
 # Five buttons in columns of two: the final row holds the single leftover button (no padding).
-EXPECTED_MARKUP_PARTIAL = InlineKeyboardMarkup(
-    [
-        [
-            InlineKeyboardButton("action_button1", callback_data="show;meeting:1"),
-            InlineKeyboardButton("action_button2", callback_data="show;meeting:2"),
-        ],
-        [
-            InlineKeyboardButton("action_button3", callback_data="show;meeting:3"),
-            InlineKeyboardButton("action_button4", callback_data="show;meeting:4"),
-        ],
-        [InlineKeyboardButton("action_button5", callback_data="show;meeting:5")],
-    ]
-)
+EXPECTED_MENU_PARTIAL = [
+    [grid_button(1), grid_button(2)],
+    [grid_button(3), grid_button(4)],
+    [grid_button(5)],
+]
 
-EXPECTED_MARKUP_THREE_COLUMNS = InlineKeyboardMarkup(
-    [
-        [
-            InlineKeyboardButton("action_button1", callback_data="show;meeting:1"),
-            InlineKeyboardButton("action_button2", callback_data="show;meeting:2"),
-            InlineKeyboardButton("action_button3", callback_data="show;meeting:3"),
-        ],
-        [
-            InlineKeyboardButton("action_button4", callback_data="show;meeting:4"),
-            InlineKeyboardButton("action_button5", callback_data="show;meeting:5"),
-        ],
-    ]
-)
+EXPECTED_MENU_THREE_COLUMNS = [
+    [grid_button(1), grid_button(2), grid_button(3)],
+    [grid_button(4), grid_button(5)],
+]
 
 # Default column_size is 2, so three buttons produce a full row of two plus a final single-button row.
-EXPECTED_MARKUP_DEFAULT = InlineKeyboardMarkup(
-    [
-        [
-            InlineKeyboardButton("action_button1", callback_data="show;meeting:1"),
-            InlineKeyboardButton("action_button2", callback_data="show;meeting:2"),
-        ],
-        [InlineKeyboardButton("action_button3", callback_data="show;meeting:3")],
-    ]
-)
+EXPECTED_MENU_DEFAULT = [
+    [grid_button(1), grid_button(2)],
+    [grid_button(3)],
+]
 
 
 @pytest.mark.parametrize(
-    "view, expected_markup",
+    "view, expected_menu",
     [
-        (GRID_VIEW_EVEN, EXPECTED_MARKUP_EVEN),
-        (GRID_VIEW_PARTIAL, EXPECTED_MARKUP_PARTIAL),
-        (GRID_VIEW_THREE_COLUMNS, EXPECTED_MARKUP_THREE_COLUMNS),
-        (GRID_VIEW_DEFAULT, EXPECTED_MARKUP_DEFAULT),
+        (GRID_VIEW_EVEN, EXPECTED_MENU_EVEN),
+        (GRID_VIEW_PARTIAL, EXPECTED_MENU_PARTIAL),
+        (GRID_VIEW_THREE_COLUMNS, EXPECTED_MENU_THREE_COLUMNS),
+        (GRID_VIEW_DEFAULT, EXPECTED_MENU_DEFAULT),
     ],
     ids=["even", "partial_final_row", "three_columns", "default_column_size"],
 )
-def test_grid_mitup_view_markup(view: GridMitupView, expected_markup: InlineKeyboardMarkup):
-    assert view.markup == expected_markup
+def test_grid_mitup_view_menu(view: GridMitupView, expected_menu: Keyboard):
+    assert view.menu == expected_menu
 
 
 def test_grid_mitup_view_empty_button_list_produces_empty_keyboard():
-    view = GridMitupView(description="empty", buttons=[], column_size=2)
-    # No buttons means no rows, and a keyboard with no rows yields no markup.
-    assert view.keyboard == []
-    assert view.markup is None
+    view = GridMitupView(message=RichContent("empty"), buttons=[], column_size=2)
+    # No buttons means no rows, so the message closes on its body alone.
+    assert view.menu == []
 
 
 @pytest.mark.parametrize(

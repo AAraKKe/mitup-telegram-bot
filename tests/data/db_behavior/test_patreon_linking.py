@@ -13,7 +13,7 @@ import asyncio
 import contextlib
 import datetime as dt
 from collections.abc import AsyncIterator, Iterator
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from cryptography.fernet import Fernet
@@ -34,6 +34,7 @@ from mitup_bot.patreon import pairing, pending_links
 from mitup_bot.patreon.pending_links import ClaimedLink, claim_pending_link, consume_pending_link
 from mitup_bot.patreon_link import LinkOutcome, link_patreon_account
 from mitup_bot.supporter import SupporterLevel
+from tests.helpers import RichCall
 
 pytestmark = pytest.mark.db_test
 
@@ -69,10 +70,10 @@ class RecordingBot:
     """Captures the confirmation DM the write lifecycle drains after commit."""
 
     def __init__(self):
-        self.sent: list[dict[str, object]] = []
+        self.sent: list[RichCall] = []
 
-    async def send_message(self, **kwargs: object):
-        self.sent.append(kwargs)
+    async def do_api_request(self, endpoint: str, api_kwargs: dict[str, Any] | None = None, **kwargs: object):
+        self.sent.append(RichCall(endpoint, api_kwargs or {}))
 
 
 def make_api(bot: RecordingBot) -> TelegramApi:

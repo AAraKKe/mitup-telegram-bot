@@ -11,8 +11,9 @@ from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
-from mitup_bot.handlers.meeting.edit.views import edit_max_participants_view, edit_participants_view
-from mitup_bot.models import Message, User
+from mitup_bot.handlers.meeting.edit.views import edit_max_participants_view
+from mitup_bot.keyboards import ButtonConfig
+from mitup_bot.models import MeetingCounts, Message, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
@@ -23,6 +24,7 @@ from mitup_bot.utils.messages import (
     SupporterMessages,
 )
 from mitup_bot.views import RenderContext, factory
+from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.collaborate import collaborate_button
 from tests.helpers import (
     AnyFloat,
@@ -34,9 +36,9 @@ from tests.helpers import (
     call_handler,
     create_meetup,
     create_member,
-    create_user,
     owner_with_meeting,
 )
+from tests.helpers.conversation import ConversationStep, ConversationTester
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
@@ -85,7 +87,12 @@ async def test_edit_meeting_participants_works(
 
     context, _ = await call_handler(EditMeetingHandlerId.PARTICIPANTS_CALLBACK, handler_context=handler_context)
 
-    context.api.assert_edit_message_called(update, edit_participants_view(user_with_settings.meetups[1]))
+    context.api.assert_edit_message_called(
+        update,
+        meeting_views.owner_view(user_with_settings.meetups[1]).with_context(
+            CommonMessages.EDITING_REVAMP_BANNER.rich(lang=user_with_settings.lang)
+        ),
+    )
 
 
 @pytest.mark.parametrize(
@@ -163,7 +170,7 @@ async def test_edit_meeting_max_participants_works(
         EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CALLBACK, handler_context=handler_context
     )
 
-    context.api.assert_send_message_called(update, edit_max_participants_view(user_with_settings.meetups[0]))
+    context.api.assert_edit_message_called(update, edit_max_participants_view(user_with_settings.meetups[0]))
 
     assert result is ConversationMeetingState.EDIT_MAX_PARTICIPANTS
     with context.meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS) as meeting_id:
@@ -262,8 +269,8 @@ async def test_edit_meeting_no_limit_participants_reports_cap_for_capped_owner(
     mock_session.assert_not_flushed()
     assert not meeting.max_members
 
-    response_view = edit_participants_view(user_with_settings.meetups[0]).with_context(
-        MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants="20")
+    response_view = meeting_views.owner_view(user_with_settings.meetups[0]).with_context(
+        MeetingEditParticipantsMessages.MAX_SUCCESS.rich(max_participants="20")
     )
     context.api.assert_send_message_called(update, response_view)
     assert result is ConversationHandler.END
@@ -291,9 +298,9 @@ async def test_edit_meeting_no_limit_participants_reports_no_limit_for_uncapped_
     )
 
     assert not meeting.max_members
-    response_view = edit_participants_view(user_with_settings.meetups[0]).with_context(
-        MeetingEditParticipantsMessages.MAX_SUCCESS.get(
-            max_participants=MeetingEditParticipantsMessages.NO_LIMIT_LABEL.get(lang=user_with_settings.lang)
+    response_view = meeting_views.owner_view(user_with_settings.meetups[0]).with_context(
+        MeetingEditParticipantsMessages.MAX_SUCCESS.rich(
+            max_participants=MeetingEditParticipantsMessages.NO_LIMIT_LABEL.rich(lang=user_with_settings.lang)
         )
     )
     context.api.assert_send_message_called(update, response_view)
@@ -470,7 +477,7 @@ async def test_callback_cancel_edit_meeting_participants_property_works(
         EditMeetingHandlerId.PARTICIPANTS_CANCEL_CALLBACK, handler_context=handler_context
     )
 
-    context.api.assert_edit_message_called(update, edit_participants_view(user_with_settings.meetups[1]))
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(user_with_settings.meetups[1]))
     assert result is ConversationHandler.END
 
 
@@ -523,9 +530,7 @@ async def test_edit_meeting_max_participants_message_works(
         with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
     )
 
-    expected_view = edit_participants_view(meeting).with_context(
-        MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=meeting.max_members)
-    )
+    expected_view = meeting_views.owner_view(meeting)
 
     assert meeting.max_members == 4
     # No explicit flush: the capacity change lands at commit, before the queued sends run.
@@ -559,18 +564,59 @@ async def test_edit_max_participants_free_owner_over_cap_is_rejected(
     )
 
     # The banner is addressed to the acting owner, so it renders in their language with the cap,
-    # and the re-prompt carries the Collaborate upsell button.
-    rejection = SupporterMessages.PARTICIPANT_CAPACITY.get_text(lang=user_with_settings.lang, cap=20)
-    expected_view = (
-        edit_max_participants_view(meeting)
-        .with_context_menu([[collaborate_button(user_with_settings.lang)]])
-        .with_context(rejection)
+    # and carries the Collaborate upsell button inline where the text names it.
+    rejection = SupporterMessages.PARTICIPANT_CAPACITY_EXCEEDED.rich(
+        lang=user_with_settings.lang, cap=20, button_collaborate=collaborate_button(user_with_settings.lang)
     )
+    expected_view = edit_max_participants_view(meeting).with_context(rejection)
 
     assert meeting.max_members == 5  # unchanged
     mock_session.assert_not_flushed()
     context.api.assert_send_message_called(update, expected_view)
     assert result is ConversationMeetingState.EDIT_MAX_PARTICIPANTS
+
+    # The retry the banner invites lands in this same handler and needs the stored meeting id, so
+    # a refusal must leave it behind.
+    assert context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
+
+
+async def test_edit_max_participants_retry_after_a_refusal_sets_the_limit(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    conversation: ConversationTester,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A refused number followed by a valid one succeeds on the second try.
+
+    The whole point of keeping the owner in the state is that they can answer the banner, so the
+    refusal and the retry run through the real conversation here rather than as isolated calls:
+    the retry only works if the first pass left the stored meeting id alone.
+    """
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=20))
+    meeting = user_with_settings.meetups[0]
+    meeting.max_members = 5
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    steps = [
+        ConversationStep.callback(
+            cb.EDIT_MEETING_MAX_PARTICIPANTS.with_id(1),
+            expected_state=ConversationMeetingState.EDIT_MAX_PARTICIPANTS,
+        ),
+        ConversationStep.message("99999", expected_state=ConversationMeetingState.EDIT_MAX_PARTICIPANTS),
+        ConversationStep.message("16", expected_state=None),
+    ]
+
+    result = await conversation.run(
+        handler_id=EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_CONVERSATION,
+        steps=steps,
+    )
+
+    assert meeting.max_members == 16
+    retry = result.get_step(2)
+    retry.context.api.assert_send_message_called(retry.context.get_update(), meeting_views.owner_view(meeting))
+    # The flow is over, so the stored id goes with it.
+    assert not retry.context.has_meeting_id(ContextId.EDIT_MEETING_MAX_PARTICIPANTS)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="20")], indirect=True)
@@ -593,9 +639,7 @@ async def test_edit_max_participants_free_owner_at_cap_is_accepted(
         with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
     )
 
-    expected_view = edit_participants_view(meeting).with_context(
-        MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=meeting.max_members)
-    )
+    expected_view = meeting_views.owner_view(meeting)
 
     assert meeting.max_members == 20
     context.api.assert_send_message_called(update, expected_view)
@@ -623,9 +667,7 @@ async def test_edit_max_participants_patron_owner_over_cap_is_accepted(
         with_meeting_id={ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1},
     )
 
-    expected_view = edit_participants_view(meeting).with_context(
-        MeetingEditParticipantsMessages.MAX_SUCCESS.get(max_participants=meeting.max_members)
-    )
+    expected_view = meeting_views.owner_view(meeting)
 
     assert meeting.max_members == 500
     context.api.assert_send_message_called(update, expected_view)
@@ -656,7 +698,8 @@ async def test_edit_max_participants_message_fails_if_context_not_saved(
         update,
         factory.main_menu_view(
             RenderContext(lang=user_with_settings.lang),
-            message=CommonMessages.CONTEXT_LOST.get(lang=user_with_settings.lang),
+            message=CommonMessages.CONTEXT_LOST.rich(lang=user_with_settings.lang),
+            counts=MeetingCounts(0, 0, 0),
         ),
     )
 
@@ -715,7 +758,8 @@ async def test_edit_meeting_wrong_max_participants_fails_if_context_not_saved(
         update,
         factory.main_menu_view(
             RenderContext(lang=user_with_settings.lang),
-            message=CommonMessages.CONTEXT_LOST.get(lang=user_with_settings.lang),
+            message=CommonMessages.CONTEXT_LOST.rich(lang=user_with_settings.lang),
+            counts=MeetingCounts(0, 0, 0),
         ),
     )
 
@@ -779,44 +823,6 @@ async def test_edit_wrong_max_participants_stops_when_meeting_not_owned(
     context.api.assert_edit_message_not_called()
 
 
-def test_edit_meeting_participants_view_without_participants():
-    owner = create_user(id=1, username="owner", first_name="Owner")
-    meeting = create_meetup(id=1, owner=owner)
-
-    # The owner can be a participant but if no one else is, it should not show the kick out button
-    meeting.create_joined_link(owner, is_waiting_list=False)
-
-    view = edit_participants_view(meeting)
-
-    # Without any participants the view only has the max participants button
-    # The keyboard has the max participants button and the back button
-    assert len(view.keyboard) == 2
-    # The first row only has one
-    assert len(view.keyboard[0]) == 1
-    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get_text(lang=owner.lang)
-
-    # And the owner is a participant
-    assert owner in [participant.user for participant in meeting.participants]
-
-
-def test_edit_meeting_participants_view_with_participants_shows_kick_out_button():
-    owner = create_user(id=1, username="owner", first_name="Owner")
-    meeting = create_meetup(id=1, owner=owner)
-    other_user = create_user(id=2, username="other_user", first_name="Other User")
-    meeting.create_joined_link(other_user, is_waiting_list=False)
-    other_user = create_user(id=3, username="other_user", first_name="Other User")
-    meeting.create_joined_link(other_user, is_waiting_list=False)
-
-    view = edit_participants_view(meeting)
-
-    # The keyboard has the 2 rows of buttons
-    assert len(view.keyboard) == 2
-    # The first row now has 2 buttons
-    assert len(view.keyboard[0]) == 2
-    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_PARTICIPANTS.get_text(lang=owner.lang)
-    assert view.keyboard[0][1].text == ButtonMessages.MEETING_KICK_OUT.get_text(lang=owner.lang)
-
-
 # ---------------------------------------------------------------------------
 # PARTICIPANTS_MAXIMUM_MESSAGE — ContextPropertyNotSetError path
 # ---------------------------------------------------------------------------
@@ -855,7 +861,11 @@ async def test_edit_meeting_max_participants_message_sends_main_menu_when_contex
     assert state == ConversationHandler.END
     context.api.assert_send_message_called(
         update,
-        factory.main_menu_view(RenderContext(lang=user.lang), message=CommonMessages.CONTEXT_LOST.get(lang=user.lang)),
+        factory.main_menu_view(
+            RenderContext(lang=user.lang),
+            message=CommonMessages.CONTEXT_LOST.rich(lang=user.lang),
+            counts=MeetingCounts(0, 0, 0),
+        ),
     )
 
 
@@ -894,29 +904,142 @@ async def test_edit_meeting_wrong_max_participants_message_sends_main_menu_when_
     assert state == ConversationHandler.END
     context.api.assert_send_message_called(
         update,
-        factory.main_menu_view(RenderContext(lang=user.lang), message=CommonMessages.CONTEXT_LOST.get(lang=user.lang)),
+        factory.main_menu_view(
+            RenderContext(lang=user.lang),
+            message=CommonMessages.CONTEXT_LOST.rich(lang=user.lang),
+            counts=MeetingCounts(0, 0, 0),
+        ),
     )
 
 
-def test_edit_max_participants_view_capped_owner_shows_plan_max(
-    user_with_settings: User, monkeypatch: pytest.MonkeyPatch
+def test_edit_max_participants_view_asks_only_for_the_number(user_with_settings: User):
+    """Removing a limit lives on the editor card, so the prompt carries no shortcut button."""
+    meeting = user_with_settings.meetups[0]
+
+    view = edit_max_participants_view(meeting)
+
+    assert view.message == MeetingEditParticipantsMessages.LIMIT_PROMPT.rich(lang=meeting.lang)
+    assert view.menu == [
+        [
+            ButtonConfig(
+                text=ButtonMessages.CANCEL.text(lang=meeting.lang),
+                callback_data=cb.CANCEL_EDIT_MEETING_PARTICIPANS.with_id(meeting.db_id),
+            )
+        ]
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Remove limit: direct clear for uncapped owners, confirmation for capped ones
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DELETE_MEETING_LIMIT.with_id(1))], indirect=True)
+async def test_remove_limit_uncapped_owner_clears_it_outright(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
 ):
-    """A capped owner is offered the plan's maximum, never a false "No limit"."""
-    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=20))
-    meeting = user_with_settings.meetups[0]
-
-    view = edit_max_participants_view(meeting)
-
-    assert view.description == MeetingEditParticipantsMessages.MAX_PROMPT_CAPPED.get(lang=meeting.lang, cap=20)
-    assert view.keyboard[0][0].text == ButtonMessages.MEETING_MAX_CAP_PARTICIPANTS.get_text(lang=meeting.lang, cap=20)
-
-
-def test_edit_max_participants_view_uncapped_owner_shows_no_limit(user_with_settings: User):
-    """An uncapped (Gamemaster) owner keeps the true no-limit prompt and button."""
     user_with_settings.supporter_level = supporter.SupporterLevel.HOST_2
+    mock_session.add_object(user_with_settings, "tg_user_id")
     meeting = user_with_settings.meetups[0]
+    meeting.max_members = 10
+    mock_session.add_object(meeting)
 
-    view = edit_max_participants_view(meeting)
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_CALLBACK, handler_context=handler_context
+    )
 
-    assert view.description == MeetingEditParticipantsMessages.MAX_PROMPT.get(lang=meeting.lang)
-    assert view.keyboard[0][0].text == ButtonMessages.MEETING_NO_LIMIT_PARTICIPANTS.get_text(lang=meeting.lang)
+    assert meeting.max_members is None
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(meeting))
+    context.api.assert_update_meeting_messages_called(
+        meeting=meeting,
+        current_message=meeting.message_from_update(update),
+        skip_current=True,
+    )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DELETE_MEETING_LIMIT.with_id(1))], indirect=True)
+async def test_remove_limit_capped_owner_gets_the_cap_confirmation(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The removed limit resolves to the plan's cap, so the dialog states that number and carries
+    the Collaborate button inline where the upsell mentions it."""
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=20))
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    meeting = user_with_settings.meetups[0]
+    meeting.max_members = 10
+    mock_session.add_object(meeting)
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_CALLBACK, handler_context=handler_context
+    )
+
+    assert meeting.max_members == 10
+    context.api.assert_edit_message_called(
+        update,
+        factory.confirmation_view(
+            RenderContext(lang=user_with_settings.lang),
+            message=MeetingEditParticipantsMessages.REMOVE_LIMIT_CONFIRMATION.rich(
+                lang=user_with_settings.lang, cap=20, button_collaborate=collaborate_button(user_with_settings.lang)
+            ),
+            confirm_callback_data=cb.CONFIRM_DELETE_MEETING_LIMIT.with_id(1),
+            decline_callback_data=cb.DECLINE_DELETE_MEETING_LIMIT.with_id(1),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_LIMIT.with_id(1))], indirect=True
+)
+async def test_confirm_remove_limit_clears_it_and_returns_to_the_editor(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    meeting = user_with_settings.meetups[0]
+    meeting.max_members = 10
+    mock_session.add_object(meeting)
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_CONFIRM_CALLBACK, handler_context=handler_context
+    )
+
+    assert meeting.max_members is None
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(meeting))
+    context.api.assert_update_meeting_messages_called(
+        meeting=meeting,
+        current_message=meeting.message_from_update(update),
+        skip_current=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.DECLINE_DELETE_MEETING_LIMIT.with_id(1))], indirect=True
+)
+async def test_decline_remove_limit_keeps_it(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    meeting = user_with_settings.meetups[0]
+    meeting.max_members = 10
+    mock_session.add_object(meeting)
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_DECLINE_CALLBACK, handler_context=handler_context
+    )
+
+    assert meeting.max_members == 10
+    mock_session.assert_not_added()
+    mock_session.assert_not_flushed()
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(meeting))

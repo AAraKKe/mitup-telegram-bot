@@ -4,7 +4,18 @@ import structlog
 import uvicorn
 from telegram.ext import Application, ContextTypes
 
-from mitup_bot import api_guards, db, docs_links, hosts_group, patreon, reconcile, supporter, timezone_api
+from mitup_bot import (
+    api_guards,
+    api_wrapper,
+    bot_links,
+    db,
+    docs_links,
+    hosts_group,
+    patreon,
+    reconcile,
+    supporter,
+    timezone_api,
+)
 from mitup_bot.bootstrap import load_config
 from mitup_bot.card_refresh import WorkerLimits
 from mitup_bot.config import Env, RunModes
@@ -44,6 +55,8 @@ class MitupRuntime:
         self.__setup_supporter_limits()
         self.__setup_hosts_group()
         self.__setup_docs_links()
+        self.__setup_bot_links()
+        api_wrapper.silence_modelled_endpoint_advisory()
         self.app = self.__build_application()
         # The api rendering layer validates incoming Updates through an injected guards slot;
         # wire the guards-backed validators before any update is processed.
@@ -90,6 +103,11 @@ class MitupRuntime:
         """Point docs-site links at this environment's docs host, derived from the bot domain."""
         docs_links.configure(self.config.bot.domain)
         log.info("Configured the docs links", docs_base_url=docs_links.DocsState.base_url)
+
+    def __setup_bot_links(self):
+        """Point the deep links a shared card closes on at this deployment's own bot."""
+        bot_links.configure(self.config.bot.username)
+        log.info("Configured the bot links", bot_username=bot_links.BotLinkState.username)
 
     def __setup_patreon(self):
         """Wire the token cipher and the Patreon runtime holder from the required config section."""

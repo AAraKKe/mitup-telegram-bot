@@ -12,7 +12,8 @@ from mitup_bot.models import JoinedUsers, Meetup, User
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import ButtonMessages, SupporterMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views.collaborate import supporter_upsell_view
+from mitup_bot.utils.rich_message import RichContent
+from mitup_bot.views.collaborate import collaborate_button, supporter_upsell_view
 
 log = structlog.get_logger(__name__)
 
@@ -98,7 +99,7 @@ async def active_meetings_cap_reached(
     )
     below_patron = not supporter.meets(user.supporter_level, SupporterLevel.HOST_2)
     message = SupporterMessages.ACTIVE_MEETINGS_CAP if below_patron else SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON
-    view = supporter_upsell_view(message.get(lang=user.lang, cap=cap), user.lang).with_context_menu([[back_button]])
+    view = supporter_upsell_view(message.rich(lang=user.lang, cap=cap), user.lang).with_context_menu([[back_button]])
     if update.callback_query is not None:
         await context.api.edit_message(update=update, view=view)
     else:
@@ -144,14 +145,14 @@ def scheduling_horizon_rejection(user: User, when: dt.datetime, *, field: str) -
         )
     else:
         message = SupporterMessages.SCHEDULING_HORIZON if below_patron else SupporterMessages.SCHEDULING_HORIZON_PATRON
-    return message.get_text(lang=user.lang, days=days)
+    return message.text(lang=user.lang, days=days)
 
 
-def participant_capacity_rejection(user: User, max_members: int) -> str | None:
-    """Plain-text rejection when a capped owner sets a participant limit above their cap, else None.
+def participant_capacity_rejection(user: User, max_members: int) -> RichContent | None:
+    """Rejection when a capped owner sets a participant limit above their cap, else None.
 
     Patron and Organizer owners are uncapped, so they never hit this; a capped owner is pointed at
-    Collaborate. Returned as plain text so it fits both a sent message and a callback-query alert.
+    Collaborate through the button the text itself carries.
     """
     cap = limits.participant_capacity(user)
     if cap is None or max_members <= cap:
@@ -164,7 +165,9 @@ def participant_capacity_rejection(user: User, max_members: int) -> str | None:
         cap=cap,
         supporter_level=user.supporter_level.value,
     )
-    return SupporterMessages.PARTICIPANT_CAPACITY.get_text(lang=user.lang, cap=cap)
+    return SupporterMessages.PARTICIPANT_CAPACITY_EXCEEDED.rich(
+        lang=user.lang, cap=cap, button_collaborate=collaborate_button(user.lang)
+    )
 
 
 def meeting_list_button(source: MeetingListSource | None, page: int, lang: str) -> ButtonConfig:
@@ -175,10 +178,10 @@ def meeting_list_button(source: MeetingListSource | None, page: int, lang: str) 
     """
     if source is MeetingListSource.JOINED:
         return ButtonConfig(
-            text=ButtonMessages.JOINED_MEETINGS.get_text(lang=lang),
+            text=ButtonMessages.JOINED_MEETINGS.text(lang=lang),
             callback_data=cb.SHOW_JOINED_MEETINGS_PAGE.with_id(page),
         )
     return ButtonConfig(
-        text=ButtonMessages.ACTIVE_MEETINGS.get_text(lang=lang),
+        text=ButtonMessages.ACTIVE_MEETINGS.text(lang=lang),
         callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(page),
     )

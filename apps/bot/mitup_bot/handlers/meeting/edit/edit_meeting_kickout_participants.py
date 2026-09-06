@@ -10,11 +10,12 @@ from mitup_bot.models import JoinedUsers, Meetup, User
 from mitup_bot.utils import MeetingEditParticipantsMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import factory
-from mitup_bot.views.meeting_text import rich_title
+from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.meeting_text import title_content
 
 from ..utils import log_waiting_list_promotions
 from .enums import EditMeetingHandlerId
-from .views import edit_participants_view, kick_out_users_view
+from .views import kick_out_users_view
 
 log = structlog.get_logger(__name__)
 
@@ -28,8 +29,8 @@ log = structlog.get_logger(__name__)
 async def edit_meeting_kickout_participants(session: AsyncSession, update: Update, context: TMitupContext):
     """
     Handle the kick out of a participant from a meeting. Once the user clicks in the kick out button,
-    the next view shows a list of participants as buttons. The user selects the participant to be kicked out from
-    the list and, after a confirmation message, the participant is removed from the meeting.
+    the next view lists the participants with a kick chip beside each name. The owner taps the chip
+    and, after a confirmation message, the participant is removed from the meeting.
     """
     callback_data = guards.valid_meeting_callback_data(
         cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.parse(context.match), EditMeetingHandlerId.PARTICIPANTS_KICK_OUT_CALLBACK
@@ -48,18 +49,10 @@ async def edit_meeting_kickout_participants(session: AsyncSession, update: Updat
     participants = [participant for participant in meeting.participants if participant.user.db_id != current_user.db_id]
 
     if not participants:
-        await context.api.edit_message(update=update, view=edit_participants_view(meeting))
+        await context.api.edit_message(update=update, view=meeting_views.owner_view(meeting))
         return
 
-    # Use a paginated view in case there are many participants so it does not turn into
-    # an unusable list of buttons
-    view = kick_out_users_view(
-        page_number=callback_data.id,
-        meeting=meeting,
-        current_user=current_user,
-    )
-
-    await context.api.edit_message(update=update, view=view)
+    await context.api.edit_message(update=update, view=kick_out_users_view(meeting=meeting, current_user=current_user))
 
 
 @HandlersRegistry.register_callback_query(
@@ -97,8 +90,8 @@ async def edit_meeting_kickout_participant(session: AsyncSession, update: Update
         return
 
     participant_name = participant.user.inline_name
-    confirmation_message = MeetingEditParticipantsMessages.KICK_OUT_CONFIRMATION.get(
-        lang=current_user.lang, participant=participant_name, meeting_title=rich_title(meeting)
+    confirmation_message = MeetingEditParticipantsMessages.KICK_OUT_CONFIRMATION.rich(
+        lang=current_user.lang, participant=participant_name, meeting_title=title_content(meeting)
     )
     confirmation_callback_data = cb.CONFIRM_KICK_OUT.with_ids(meeting_id=meeting.db_id, id=callback_data.id)
     decline_callback_data = cb.EDIT_MEETING_KICK_OUT_PARTICIPANTS.with_ids(meeting_id=meeting.db_id, id=1)
@@ -131,10 +124,10 @@ async def participant_no_longer_in_meeting(
         reason="participant_left_before_confirm",
         step=step,
     )
-    participant_no_longer_exists = MeetingEditParticipantsMessages.KICK_OUT_NOT_IN_MEETING.get(lang=current_user.lang)
+    participant_no_longer_exists = MeetingEditParticipantsMessages.KICK_OUT_NOT_IN_MEETING.rich(lang=current_user.lang)
     await context.api.edit_message(
         update=update,
-        view=edit_participants_view(meeting).with_context(participant_no_longer_exists),
+        view=meeting_views.owner_view(meeting).with_context(participant_no_longer_exists),
     )
     return
 
@@ -230,26 +223,15 @@ async def edit_meeting_kickout_participant_confirm(session: AsyncSession, update
 async def kickout_user_to_edit_participants(
     meeting: Meetup, update: Update, context: TMitupContext, current_user: User, participant: JoinedUsers
 ):
-    success_message = MeetingEditParticipantsMessages.KICK_OUT_SUCCESS_NO_MORE.get(
-        lang=current_user.lang, participant=participant.user.inline_name
-    )
-    await context.api.edit_message(
-        update=update,
-        view=edit_participants_view(meeting).with_context(success_message),
-    )
+    await context.api.edit_message(update=update, view=meeting_views.owner_view(meeting))
     return
 
 
 async def kickout_user_to_kickout_participants(
     meeting: Meetup, update: Update, context: TMitupContext, current_user: User, participant: JoinedUsers
 ):
-    success_message = MeetingEditParticipantsMessages.KICK_OUT_SUCCESS.get(
-        lang=current_user.lang, participant=participant.user.inline_name
-    )
     await context.api.edit_message(
         update=update,
-        view=kick_out_users_view(meeting=meeting, current_user=current_user, page_number=1).with_context(
-            success_message
-        ),
+        view=kick_out_users_view(meeting=meeting, current_user=current_user),
     )
     return

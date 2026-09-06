@@ -10,7 +10,7 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.utils import ButtonMessages, MeetingLifecycleMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import MitupView, factory
-from mitup_bot.views.meeting_text import meeting_message
+from mitup_bot.views import meeting as meeting_views
 
 from ..registry import HandlersRegistry
 from .enums import MeetingHandlerId
@@ -22,17 +22,17 @@ DELETE_PAST_MEETING_ACTION = "delete_past_meeting"
 
 
 def past_meeting_view(meeting: Meetup, user: User, page: int) -> MitupView:
-    description = MeetingLifecycleMessages.PAST_DESCRIPTION.get(lang=user.lang)
+    description = MeetingLifecycleMessages.PAST_DESCRIPTION.rich(lang=user.lang)
     return MitupView(
-        meeting_message(meeting),
+        meeting_views.shared_body(meeting, finished=True),
         [
             [
                 ButtonConfig(
-                    text=ButtonMessages.REACTIVATE_MEETING.get_text(lang=user.lang),
+                    text=ButtonMessages.REACTIVATE_MEETING.text(lang=user.lang),
                     callback_data=cb.REACTIVATE_MEETING.with_id(meeting.db_id),
                 ),
                 ButtonConfig(
-                    text=ButtonMessages.DELETE.get_text(lang=user.lang),
+                    text=ButtonMessages.DELETE.text(lang=user.lang),
                     callback_data=cb.DELETE_PAST_MEETING.with_page(meeting.db_id, page),
                 ),
             ],
@@ -43,6 +43,7 @@ def past_meeting_view(meeting: Meetup, user: User, page: int) -> MitupView:
                 ),
             ],
         ],
+        photos=meeting_views.meeting_photos(meeting),
     ).with_context(description)
 
 
@@ -72,7 +73,7 @@ async def callback_query_delete_past_meeting(session: AsyncSession, update: Upda
         update=update,
         view=factory.confirmation_view(
             guards.render_context(user, update, context),
-            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.get(lang=user.lang),
+            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.rich(lang=user.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_PAST_MEETING.with_page(callback_data.id, callback_data.page),
             decline_callback_data=cb.DECLINE_DELETE_PAST_MEETING.with_page(callback_data.id, callback_data.page),
         ),
@@ -144,8 +145,8 @@ async def callback_query_confirm_delete_past_meeting(session: AsyncSession, upda
     await session.delete(meeting)
 
     view = MitupView(
-        description=MeetingLifecycleMessages.DELETE_SUCCESS.get(lang=user.lang),
-        keyboard=[
+        message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user.lang),
+        menu=[
             [
                 ButtonConfig(
                     text=ButtonMessages.PAST_MEETINGS.back(lang=user.lang),

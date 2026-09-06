@@ -304,7 +304,7 @@ async def test_write_mode_commits_before_any_queued_call_runs(
     events: list[str] = []
     # The transaction context manager's __aexit__ is db.begin()'s commit point.
     mock_session.begin.return_value.__aexit__.side_effect = lambda *exc_info: events.append("commit")
-    fanout_bot.send_message.side_effect = lambda **kwargs: events.append("bot-send")
+    fanout_bot.do_api_request.side_effect = lambda *args, **kwargs: events.append("bot-send")
     user = create_user(id=1, tg_user_id=100)
 
     @db.with_session(write=True)
@@ -331,7 +331,7 @@ async def test_write_mode_handler_exception_discards_queue(
         await handler(write_context)
 
     # Nothing about the rolled-back state was rendered to anyone...
-    fanout_bot.send_message.assert_not_called()
+    fanout_bot.do_api_request.assert_not_called()
     assert mock_session.begin.return_value.__aexit__.await_args.args[0] is RuntimeError
     # ...and capture mode was torn down: the next write handler can start its own.
     write_context.api.begin_capture()
@@ -341,7 +341,7 @@ async def test_write_mode_immediate_failure_aborts_transaction_and_queue(
     mock_session: MockDbSession, write_context: SimpleNamespace, fanout_bot: mock.AsyncMock
 ):
     user = create_user(id=1, tg_user_id=100)
-    fanout_bot.send_message.side_effect = RuntimeError("telegram down")
+    fanout_bot.do_api_request.side_effect = RuntimeError("telegram down")
 
     @db.with_session(write=True)
     async def handler(session: AsyncSession, context: SimpleNamespace):
@@ -353,7 +353,7 @@ async def test_write_mode_immediate_failure_aborts_transaction_and_queue(
 
     # Only the immediate call reached the bot; its in-transaction failure rolled the
     # transaction back and the queued call was discarded with it.
-    fanout_bot.send_message.assert_awaited_once()
+    fanout_bot.do_api_request.assert_awaited_once()
     assert mock_session.begin.return_value.__aexit__.await_args.args[0] is RuntimeError
 
 
@@ -396,7 +396,7 @@ async def test_begin_write_commits_before_queued_calls_drain(
     commit-before-fanout ordering the write-mode decorator provides."""
     events: list[str] = []
     mock_session.begin.return_value.__aexit__.side_effect = lambda *exc_info: events.append("commit")
-    fanout_bot.send_message.side_effect = lambda **kwargs: events.append("bot-send")
+    fanout_bot.do_api_request.side_effect = lambda *args, **kwargs: events.append("bot-send")
     user = create_user(id=1, tg_user_id=100)
     api: TelegramApi = write_context.api
 
@@ -419,7 +419,7 @@ async def test_begin_write_body_exception_discards_queue(
             raise RuntimeError("sweep blew up")
 
     # Nothing about the rolled-back state was rendered to anyone...
-    fanout_bot.send_message.assert_not_called()
+    fanout_bot.do_api_request.assert_not_called()
     assert mock_session.begin.return_value.__aexit__.await_args.args[0] is RuntimeError
     # ...and capture mode was torn down: the next critical section can start its own.
     api.begin_capture()
@@ -447,7 +447,7 @@ async def test_write_mode_reconcile_marks_unreachable_user(
 ):
     user = create_user(id=1, tg_user_id=555, status=status)
     mock_session.add_user(user)
-    fanout_bot.send_message.side_effect = Forbidden("Forbidden: bot was blocked by the user")
+    fanout_bot.do_api_request.side_effect = Forbidden("Forbidden: bot was blocked by the user")
 
     @db.with_session(write=True)
     async def handler(session: AsyncSession, context: SimpleNamespace):
@@ -471,7 +471,7 @@ async def test_write_mode_reconcile_dedups_repeated_inactive_user(
 ):
     user = create_user(id=1, tg_user_id=555)
     mock_session.add_user(user)
-    fanout_bot.send_message.side_effect = Forbidden("Forbidden: bot was blocked by the user")
+    fanout_bot.do_api_request.side_effect = Forbidden("Forbidden: bot was blocked by the user")
 
     @db.with_session(write=True)
     async def handler(session: AsyncSession, context: SimpleNamespace):
@@ -493,7 +493,7 @@ async def test_write_mode_reconcile_deletes_messages_reported_gone(
     meeting = create_meetup(id=10, title="Meeting", language="en")
     create_user(id=1, tg_user_id=100, owned_meetings=[meeting])
     msg = create_message(id=7, inline_message_id=None, chat_id=100, message_id=501, meetup_id=10)
-    fanout_bot.edit_message_text.side_effect = BadRequest("Message to edit not found")
+    fanout_bot.do_api_request.side_effect = BadRequest("Message to edit not found")
 
     @db.with_session(write=True)
     async def handler(session: AsyncSession, context: SimpleNamespace):
@@ -536,7 +536,7 @@ async def test_write_mode_connectivity_failure_stays_inside_the_drain(
     blocked = create_user(id=1, tg_user_id=555)
     healthy = create_user(id=2, tg_user_id=556)
     mock_session.add_user(blocked)
-    fanout_bot.send_message.side_effect = [
+    fanout_bot.do_api_request.side_effect = [
         Forbidden("Forbidden: bot was blocked by the user"),
         TimedOut(),
         mock.MagicMock(),
@@ -553,7 +553,7 @@ async def test_write_mode_connectivity_failure_stays_inside_the_drain(
     await handler(write_context)
     await fanout_metrics_client.flush()
 
-    assert fanout_bot.send_message.await_count == 3
+    assert fanout_bot.do_api_request.await_count == 3
     # ...and the fix-ups the drain collected landed in the reconcile transaction.
     assert blocked.status is UserStatus.LEFT
 

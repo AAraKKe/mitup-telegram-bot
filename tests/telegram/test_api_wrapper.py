@@ -2,6 +2,7 @@
 
 import logging
 import re
+import warnings
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -10,10 +11,9 @@ import pytest
 from structlog.contextvars import bound_contextvars
 from structlog.testing import capture_logs
 from telegram import (
+    Bot,
     ChatMember,
     ChatMemberRestricted,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
     Message,
     MessageEntity,
     Update,
@@ -21,14 +21,20 @@ from telegram import (
 from telegram.constants import ChatMemberStatus
 from telegram.error import BadRequest, Forbidden, NetworkError, TimedOut
 from telegram.ext import ExtBot
+from telegram.warnings import PTBUserWarning
 
 from mitup_bot.api_wrapper import (
+    ANSWER_INLINE_QUERY_ENDPOINT,
     CALLBACK_QUERY_TEXT_LIMIT,
+    EDIT_MESSAGE_TEXT_ENDPOINT,
     QUEUED_CALL_ATTEMPTS,
+    SEND_RICH_MESSAGE_ENDPOINT,
     ApiOutbox,
     BotAdapter,
+    KeyedSend,
     MeetingMessageEdit,
     MeetingRefresh,
+    OutboxStrategy,
     QueuedApiCall,
     TelegramApi,
     build_api,
@@ -36,24 +42,40 @@ from mitup_bot.api_wrapper import (
     chat_member_is_banned,
     chat_member_is_present,
     handle_edit_errors,
+    meeting_job_key,
+    modelled_endpoint_advisory,
+    silence_modelled_endpoint_advisory,
 )
 from mitup_bot.card_refresh import RefreshQueue
 from mitup_bot.exceptions import (
     AnswerInlineQueryError,
     CallbackQueryTextTooLong,
     InactiveUserInteraction,
-    NoDocumentAvailable,
     NoMessageAvailable,
 )
-from mitup_bot.keyboards import ButtonConfig
-from mitup_bot.models import Meetup
+from mitup_bot.keyboards import ButtonConfig, Keyboard
+from mitup_bot.models import MeetingImage, Meetup
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.protocols import ContextOrBotAdapter
-from mitup_bot.utils.entities import MAX_MESSAGE_UTF16_LENGTH, FormattedText, utf16_len
-from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView, ViewDocument
-from tests.helpers import log_record, make_test_metrics_client
+from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import MAX_MESSAGE_UTF16_LENGTH, FormattedText
+from mitup_bot.utils.messages import MeetingDisplayMessages
+from mitup_bot.utils.rich_message import (
+    DOCUMENT_ATTACH_NAME,
+    DOCUMENT_MEDIA_ID,
+    MAX_RICH_TEXT_LENGTH,
+    RichContent,
+    RichDocument,
+    RichMessageTooLong,
+    RichPhoto,
+    photo_content,
+)
+from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
+from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.meeting import shared_card
+from tests.helpers import RichCall, log_record, make_test_metrics_client, only_rich_call, rich_call, rich_calls
 from tests.helpers.fixtures import create_joined_link, create_meetup, create_message, create_user
 from tests.helpers.monitoring import MetricAssertions
 
@@ -138,28 +160,28 @@ async def test_send_message_with_string_view(telegram_api: TelegramApi, bot: Asy
     update = MagicMock(spec=Update)
     update.effective_chat.id = 42
     sentinel = MagicMock(spec=Message)
-    bot.send_message.return_value = sentinel
+    bot.do_api_request.return_value = sentinel
 
     result = await telegram_api.send_message(update, "hello")
 
-    bot.send_message.assert_awaited_once_with(
-        chat_id=42, text="hello", entities=None, reply_markup=None, disable_web_page_preview=True
-    )
+    call = only_rich_call(bot)
+    assert call.endpoint == SEND_RICH_MESSAGE_ENDPOINT
+    assert call.api_kwargs == {"chat_id": 42, "rich_message": {"html": "hello", "skip_entity_detection": True}}
     assert result is sentinel
 
 
 async def test_send_message_with_mitup_view(telegram_api: TelegramApi, bot: AsyncMock):
     update = MagicMock(spec=Update)
     update.effective_chat.id = 99
-    view = MitupView(description="view text", keyboard=[])
+    view = MitupView(message=RichContent("view text"), menu=[])
     sentinel = MagicMock(spec=Message)
-    bot.send_message.return_value = sentinel
+    bot.do_api_request.return_value = sentinel
 
     result = await telegram_api.send_message(update, view)
 
-    bot.send_message.assert_awaited_once_with(
-        chat_id=99, text="view text", entities=None, reply_markup=view.markup, disable_web_page_preview=True
-    )
+    call = only_rich_call(bot)
+    assert call.chat_id == 99
+    assert call.html == "view text"
     assert result is sentinel
 
 
@@ -181,194 +203,49 @@ def assert_over_cap_warning(caplog: pytest.LogCaptureFixture, api_method: str):
     assert "xxxxxxxxxx" not in caplog.text
 
 
-async def test_send_message_ellipsizes_a_view_over_the_telegram_cap(
-    telegram_api: TelegramApi,
-    bot: AsyncMock,
-    caplog: pytest.LogCaptureFixture,
-):
-    """The last-resort guard: a surface that escaped its own budget still sends, cut to the cap,
-    and says so once."""
-    caplog.set_level(logging.WARNING)
+async def test_send_refuses_a_view_over_the_wire_ceiling(telegram_api: TelegramApi, bot: AsyncMock):
+    """Nothing is trimmed to fit: a client folds a long message behind "Show more", so length is a
+    wire limit and a payload past it is a defect to surface rather than content to cut."""
     update = MagicMock(spec=Update)
     update.effective_chat.id = 42
 
-    await telegram_api.send_message(update, MitupView(OVER_CAP_TEXT, keyboard=[]))
+    with pytest.raises(RichMessageTooLong):
+        await telegram_api.send_message(update, MitupView(RichContent("x" * (MAX_RICH_TEXT_LENGTH + 1))))
 
-    sent_text = bot.send_message.await_args.kwargs["text"]
-    assert utf16_len(sent_text) == MAX_MESSAGE_UTF16_LENGTH
-    assert sent_text.endswith("…")
-    assert_over_cap_warning(caplog, "send_message")
+    bot.do_api_request.assert_not_awaited()
 
 
-async def test_edit_message_ellipsizes_a_view_over_the_telegram_cap(
-    telegram_api: TelegramApi,
-    bot: AsyncMock,
-    caplog: pytest.LogCaptureFixture,
-):
-    caplog.set_level(logging.WARNING)
+async def test_edit_refuses_a_view_over_the_wire_ceiling(telegram_api: TelegramApi, bot: AsyncMock):
     update = MagicMock(spec=Update)
     update.effective_message.chat.id = 123
     update.effective_message.id = 456
 
-    await telegram_api.edit_message(update, MitupView(OVER_CAP_TEXT, keyboard=[]))
+    with pytest.raises(RichMessageTooLong):
+        await telegram_api.edit_message(update, MitupView(RichContent("x" * (MAX_RICH_TEXT_LENGTH + 1))))
 
-    assert utf16_len(bot.edit_message_text.await_args.kwargs["text"]) == MAX_MESSAGE_UTF16_LENGTH
-    assert_over_cap_warning(caplog, "edit_message")
+    bot.do_api_request.assert_not_awaited()
 
 
-async def test_over_cap_ellipsis_keeps_the_entities_inside_the_text(
-    telegram_api: TelegramApi,
-    bot: AsyncMock,
-    caplog: pytest.LogCaptureFixture,
-):
-    """Telegram rejects the whole call when an entity reaches past the end of the text, so the cut
-    has to take the entities with it."""
-    caplog.set_level(logging.WARNING)
+async def test_a_view_at_the_ceiling_sends_unchanged(telegram_api: TelegramApi, bot: AsyncMock):
     update = MagicMock(spec=Update)
     update.effective_chat.id = 42
-    spanning = MessageEntity(type=MessageEntity.BOLD, offset=0, length=utf16_len(OVER_CAP_TEXT))
+    at_the_ceiling = "x" * MAX_RICH_TEXT_LENGTH
 
-    await telegram_api.send_message(update, MitupView(FormattedText(OVER_CAP_TEXT, [spanning]), keyboard=[]))
+    await telegram_api.send_message(update, MitupView(RichContent(at_the_ceiling)))
 
-    sent_entities = bot.send_message.await_args.kwargs["entities"]
-    assert sent_entities == [MessageEntity(type=MessageEntity.BOLD, offset=0, length=MAX_MESSAGE_UTF16_LENGTH - 1)]
+    assert only_rich_call(bot).html == at_the_ceiling
 
 
-async def test_a_view_within_the_cap_sends_unchanged_and_logs_nothing(
-    telegram_api: TelegramApi,
-    bot: AsyncMock,
-    caplog: pytest.LogCaptureFixture,
-):
-    caplog.set_level(logging.WARNING)
+async def test_button_markup_does_not_count_towards_the_ceiling(telegram_api: TelegramApi, bot: AsyncMock):
+    """The cap is on the text a reader sees, so a keyboard costing thousands of characters of
+    markup cannot push a short body over it."""
     update = MagicMock(spec=Update)
     update.effective_chat.id = 42
-    at_the_cap = "x" * MAX_MESSAGE_UTF16_LENGTH
+    rows = [[ButtonConfig(text=f"b{index}", callback_data="join")] for index in range(400)]
 
-    await telegram_api.send_message(update, MitupView(at_the_cap, keyboard=[]))
+    await telegram_api.send_message(update, MitupView(RichContent("short body"), rows))
 
-    assert bot.send_message.await_args.kwargs["text"] == at_the_cap
-    assert OVER_CAP_EVENT not in caplog.text
-
-
-# ---------------------------------------------------------------------------
-# send_document
-# ---------------------------------------------------------------------------
-
-
-async def test_send_document_sends_bytes_with_filename(telegram_api: TelegramApi, bot: AsyncMock):
-    update = MagicMock(spec=Update)
-    update.effective_chat.id = 42
-    sentinel = MagicMock(spec=Message)
-    bot.send_document.return_value = sentinel
-    view = MitupView("a caption", keyboard=[], document=ViewDocument(content=b"{}", filename="export.json"))
-
-    result = await telegram_api.send_document(update, view)
-
-    bot.send_document.assert_awaited_once_with(
-        chat_id=42,
-        document=b"{}",
-        filename="export.json",
-        caption="a caption",
-        caption_entities=None,
-        reply_markup=None,
-    )
-    assert result is sentinel
-
-
-async def test_send_document_with_formatted_caption(telegram_api: TelegramApi, bot: AsyncMock):
-    update = MagicMock(spec=Update)
-    update.effective_chat.id = 42
-    caption_entity = MessageEntity(type=MessageEntity.BOLD, offset=0, length=4)
-    caption = FormattedText("bold caption", entities=[caption_entity])
-    view = MitupView(caption, keyboard=[], document=ViewDocument(content=b"{}", filename="export.json"))
-
-    await telegram_api.send_document(update, view)
-
-    bot.send_document.assert_awaited_once_with(
-        chat_id=42,
-        document=b"{}",
-        filename="export.json",
-        caption="bold caption",
-        caption_entities=[caption_entity],
-        reply_markup=None,
-    )
-
-
-async def test_send_document_with_keyboard(telegram_api: TelegramApi, bot: AsyncMock):
-    update = MagicMock(spec=Update)
-    update.effective_chat.id = 42
-    keyboard = [[ButtonConfig(text="Privacy", callback_data="send;privacy")]]
-    view = MitupView("a caption", keyboard=keyboard, document=ViewDocument(content=b"{}", filename="export.json"))
-
-    await telegram_api.send_document(update, view)
-
-    bot.send_document.assert_awaited_once_with(
-        chat_id=42,
-        document=b"{}",
-        filename="export.json",
-        caption="a caption",
-        caption_entities=None,
-        reply_markup=MitupView.keyboard_to_markup(keyboard),
-    )
-
-
-async def test_send_document_raises_when_the_view_carries_no_document(telegram_api: TelegramApi, bot: AsyncMock):
-    update = MagicMock(spec=Update)
-    update.effective_chat.id = 42
-
-    with pytest.raises(NoDocumentAvailable):
-        await telegram_api.send_document(update, MitupView("a caption", keyboard=[]))
-
-    bot.send_document.assert_not_called()
-
-
-async def test_send_document_is_queued_under_capture(telegram_api: TelegramApi, bot: AsyncMock):
-    update = MagicMock(spec=Update)
-    update.effective_chat.id = 42
-    view = MitupView("a caption", keyboard=[], document=ViewDocument(content=b"{}", filename="export.json"))
-
-    outbox = telegram_api.begin_capture()
-    assert await telegram_api.send_document(update, view) is None
-    telegram_api.end_capture()
-
-    bot.send_document.assert_not_called()
-
-    await telegram_api.execute_queued(outbox)
-
-    bot.send_document.assert_awaited_once_with(
-        chat_id=42,
-        document=b"{}",
-        filename="export.json",
-        caption="a caption",
-        caption_entities=None,
-        reply_markup=None,
-    )
-
-
-async def test_send_document_keyboard_is_preserved_under_capture(telegram_api: TelegramApi, bot: AsyncMock):
-    # The markup is rendered at enqueue time and carried by the queued call as plain data,
-    # so the replay after commit sends the exact keyboard the handler attached.
-    update = MagicMock(spec=Update)
-    update.effective_chat.id = 42
-    keyboard = [[ButtonConfig(text="Privacy", callback_data="send;privacy")]]
-    view = MitupView("a caption", keyboard=keyboard, document=ViewDocument(content=b"{}", filename="export.json"))
-
-    outbox = telegram_api.begin_capture()
-    assert await telegram_api.send_document(update, view) is None
-    telegram_api.end_capture()
-
-    bot.send_document.assert_not_called()
-
-    await telegram_api.execute_queued(outbox)
-
-    bot.send_document.assert_awaited_once_with(
-        chat_id=42,
-        document=b"{}",
-        filename="export.json",
-        caption="a caption",
-        caption_entities=None,
-        reply_markup=MitupView.keyboard_to_markup(keyboard),
-    )
+    assert len(only_rich_call(bot).html) > MAX_RICH_TEXT_LENGTH
 
 
 # ---------------------------------------------------------------------------
@@ -414,36 +291,28 @@ async def test_handle_edit_errors_reraises_other_bad_request(adapter: BotAdapter
 
 async def test_send_message_to_user_with_mitup_view(telegram_api: TelegramApi, bot: AsyncMock):
     user = create_user(id=1, tg_user_id=456)
-    view = MitupView(description="Hello world", keyboard=[])
+    view = MitupView(message=RichContent("Hello world"), menu=[])
     sentinel = MagicMock(spec=Message)
-    bot.send_message.return_value = sentinel
+    bot.do_api_request.return_value = sentinel
 
     result = await telegram_api.send_message_to_user(user, view)
 
-    bot.send_message.assert_awaited_once_with(
-        chat_id=456,
-        text="Hello world",
-        entities=None,
-        reply_markup=view.markup,
-        disable_web_page_preview=True,
-    )
+    call = only_rich_call(bot)
+    assert call.endpoint == SEND_RICH_MESSAGE_ENDPOINT
+    assert call.chat_id == 456
+    assert call.html == "Hello world"
     assert result is sentinel
 
 
 async def test_send_message_to_user_with_plain_string(telegram_api: TelegramApi, bot: AsyncMock):
     user = create_user(id=1, tg_user_id=789)
     sentinel = MagicMock(spec=Message)
-    bot.send_message.return_value = sentinel
+    bot.do_api_request.return_value = sentinel
 
     result = await telegram_api.send_message_to_user(user, "plain text")
 
-    bot.send_message.assert_awaited_once_with(
-        chat_id=789,
-        text="plain text",
-        entities=None,
-        reply_markup=None,
-        disable_web_page_preview=True,
-    )
+    call = only_rich_call(bot)
+    assert call.api_kwargs == {"chat_id": 789, "rich_message": {"html": "plain text", "skip_entity_detection": True}}
     assert result is sentinel
 
 
@@ -459,7 +328,7 @@ async def test_send_message_to_user_raises_inactive_user(
     telegram_api: TelegramApi, bot: AsyncMock, side_effect: Exception, tg_user_id: int
 ):
     user = create_user(id=1, tg_user_id=tg_user_id)
-    bot.send_message.side_effect = side_effect
+    bot.do_api_request.side_effect = side_effect
 
     with pytest.raises(InactiveUserInteraction) as exc_info:
         await telegram_api.send_message_to_user(user, "test")
@@ -469,7 +338,7 @@ async def test_send_message_to_user_raises_inactive_user(
 
 async def test_send_message_to_user_other_bad_request_reraised(telegram_api: TelegramApi, bot: AsyncMock):
     user = create_user(id=1, tg_user_id=333)
-    bot.send_message.side_effect = BadRequest("Something else")
+    bot.do_api_request.side_effect = BadRequest("Something else")
 
     with pytest.raises(BadRequest, match="Something else"):
         await telegram_api.send_message_to_user(user, "test")
@@ -493,7 +362,7 @@ async def test_send_messages_to_users_on_success_called_for_each(telegram_api: T
     user2 = create_user(id=2, tg_user_id=200)
     on_success_1 = MagicMock()
     on_success_2 = MagicMock()
-    bot.send_message.return_value = MagicMock(spec=Message)
+    bot.do_api_request.return_value = MagicMock(spec=Message)
 
     await telegram_api.send_messages_to_users([user1, user2], ["msg1", "msg2"], on_success=[on_success_1, on_success_2])
 
@@ -507,7 +376,7 @@ async def test_send_messages_to_users_inactive_user_marked_inactive(
     """MEMBER user blocking the bot must transition to LEFT and have the departure recorded."""
     user1 = create_user(id=1, tg_user_id=100)
     user2 = create_user(id=2, tg_user_id=200)
-    bot.send_message.side_effect = [
+    bot.do_api_request.side_effect = [
         Forbidden("Forbidden: bot was blocked by the user"),
         MagicMock(spec=Message),
     ]
@@ -535,7 +404,7 @@ async def test_send_messages_to_users_joined_only_user_not_transitioned(
     through.
     """
     joined_only_user = create_user(id=1, tg_user_id=100, status=UserStatus.JOINED_ONLY)
-    bot.send_message.side_effect = Forbidden("Forbidden: bot was blocked by the user")
+    bot.do_api_request.side_effect = Forbidden("Forbidden: bot was blocked by the user")
 
     await telegram_api.send_messages_to_users([joined_only_user], ["msg1"])
     await api_metrics_client.flush()
@@ -547,7 +416,7 @@ async def test_send_messages_to_users_joined_only_user_not_transitioned(
 async def test_send_messages_to_users_general_error_calls_on_error(telegram_api: TelegramApi, bot: AsyncMock):
     user1 = create_user(id=1, tg_user_id=100)
     on_error_1 = MagicMock()
-    bot.send_message.side_effect = RuntimeError("network failure")
+    bot.do_api_request.side_effect = RuntimeError("network failure")
 
     await telegram_api.send_messages_to_users([user1], ["msg1"], on_error=[on_error_1])
 
@@ -561,7 +430,7 @@ async def test_send_messages_to_users_general_error_never_reports_success(telegr
     """A failed send must not run `on_success`, even when the caller passed no `on_error`."""
     user1 = create_user(id=1, tg_user_id=100)
     on_success_1 = MagicMock()
-    bot.send_message.side_effect = RuntimeError("network failure")
+    bot.do_api_request.side_effect = RuntimeError("network failure")
 
     await telegram_api.send_messages_to_users([user1], ["msg1"], on_success=[on_success_1])
 
@@ -573,7 +442,7 @@ async def test_send_messages_to_users_unreachable_user_calls_on_unreachable(tele
     user1 = create_user(id=1, tg_user_id=100)
     user2 = create_user(id=2, tg_user_id=200)
     callbacks = {name: [MagicMock(), MagicMock()] for name in ("on_success", "on_error", "on_unreachable")}
-    bot.send_message.side_effect = [Forbidden("Forbidden: bot was blocked by the user"), MagicMock(spec=Message)]
+    bot.do_api_request.side_effect = [Forbidden("Forbidden: bot was blocked by the user"), MagicMock(spec=Message)]
 
     await telegram_api.send_messages_to_users([user1, user2], ["msg1", "msg2"], **callbacks)
 
@@ -598,12 +467,12 @@ async def test_notify_users_promoted_filters_invited_users(telegram_api: Telegra
     inviter = create_user(id=4, tg_user_id=400)
     organic_link = create_joined_link(organic_user, meeting, id=1)
     invited_link = create_joined_link(invited_user, meeting, id=2, invited_by=inviter)
-    bot.send_message.return_value = MagicMock(spec=Message)
+    bot.do_api_request.return_value = MagicMock(spec=Message)
 
     await telegram_api.notify_users_promoted_from_waiting_list([organic_link, invited_link], meeting)
 
-    assert bot.send_message.await_count == 1
-    assert bot.send_message.call_args.kwargs["chat_id"] == 200
+    assert bot.do_api_request.await_count == 1
+    assert rich_call(bot).chat_id == 200
 
 
 # ---------------------------------------------------------------------------
@@ -611,8 +480,19 @@ async def test_notify_users_promoted_filters_invited_users(telegram_api: Telegra
 # ---------------------------------------------------------------------------
 
 
-def make_bot_chat_meeting() -> tuple[Meetup, MessageModel]:
-    meeting = create_meetup(id=10, title="Test Meeting", language="en")
+def assert_card_is_inert(call: RichCall):
+    """Assert the rendered card offers nothing to press.
+
+    A state card (deleted, finished) reports what happened to a meeting nobody can act on any
+    more, so neither the menu nor the body may carry a button: the body is checked too because a
+    meeting card renders its controls inside its content.
+    """
+    assert call.button_rows == []
+    assert "<tg-button" not in call.html
+
+
+def make_bot_chat_meeting(lang: str = "en") -> tuple[Meetup, MessageModel]:
+    meeting = create_meetup(id=10, title="Test Meeting", language=lang)
     owner = create_user(id=1, tg_user_id=100, owned_meetings=[meeting])
     msg = create_message(
         id=1,
@@ -643,11 +523,11 @@ async def test_update_single_meeting_message_bot_chat(telegram_api: TelegramApi,
 
     await telegram_api.update_single_meeting_message(msg, meeting)
 
-    bot.edit_message_text.assert_awaited_once()
-    call_kwargs = bot.edit_message_text.call_args.kwargs
-    assert call_kwargs["chat_id"] == msg.chat_id
-    assert call_kwargs["message_id"] == msg.message_id
-    assert call_kwargs["reply_markup"] is not None
+    bot.do_api_request.assert_awaited_once()
+    call = rich_call(bot)
+    assert call.chat_id == msg.chat_id
+    assert call.message_id == msg.message_id
+    assert call.button_rows
     # The rendered keyboard is persisted onto the row via MutableModel change tracking with
     # the caller's surrounding transaction.
     assert msg.buttons.keyboard
@@ -658,17 +538,21 @@ async def test_update_single_meeting_message_inline(telegram_api: TelegramApi, b
 
     await telegram_api.update_single_meeting_message(msg, meeting)
 
-    bot.edit_message_text.assert_awaited_once()
-    call_kwargs = bot.edit_message_text.call_args.kwargs
-    assert call_kwargs["inline_message_id"] == "inline_123"
-    assert call_kwargs["reply_markup"] is not None
+    bot.do_api_request.assert_awaited_once()
+    call = rich_call(bot)
+    assert call.inline_message_id == "inline_123"
+    # An inline-addressed card carries its buttons as a classic keyboard so chosen_inline_result
+    # keeps delivering inline_message_id (see classic_markup); the body holds no button rows.
+    assert not call.button_rows
+    assert call.reply_markup is not None
+    assert call.reply_markup["inline_keyboard"]
 
 
 @pytest.mark.parametrize(
-    "was_deleted, has_finished, expected_text_fragment",
+    "was_deleted, has_finished, expected_state_line",
     [
-        (True, False, "deleted"),
-        (False, True, "finished"),
+        (True, False, MeetingDisplayMessages.DELETED_BANNER),
+        (False, True, MeetingDisplayMessages.FINISHED_STATUS),
     ],
     ids=["was_deleted", "has_finished"],
 )
@@ -677,38 +561,55 @@ async def test_update_single_meeting_message_state_flags(
     bot: AsyncMock,
     was_deleted: bool,
     has_finished: bool,
-    expected_text_fragment: str,
+    expected_state_line: MeetingDisplayMessages,
+    lang: str,
 ):
-    meeting, msg = make_bot_chat_meeting()
+    meeting, msg = make_bot_chat_meeting(lang=lang)
 
     await telegram_api.update_single_meeting_message(msg, meeting, was_deleted=was_deleted, has_finished=has_finished)
 
-    call_kwargs = bot.edit_message_text.call_args.kwargs
-    assert call_kwargs["reply_markup"] is None
-    assert expected_text_fragment in call_kwargs["text"].lower()
+    call = rich_call(bot)
+    assert_card_is_inert(call)
+    assert expected_state_line.rich(lang=lang).html in call.body_html
+
+
+async def test_a_finished_card_is_the_meeting_card_itself_with_nothing_over_it(
+    telegram_api: TelegramApi, bot: AsyncMock, lang: str
+):
+    """The finish is reported by the status line inside the card, so no banner stands between the
+    reader and the title of the meeting they came for."""
+    meeting, msg = make_bot_chat_meeting(lang=lang)
+
+    await telegram_api.update_single_meeting_message(msg, meeting, has_finished=True)
+
+    assert rich_call(bot).body_html == meeting_views.shared_body(meeting, finished=True).html
 
 
 async def test_update_single_meeting_message_inline_vs_bot_chat_different_views(
     telegram_api: TelegramApi, bot: AsyncMock
 ):
+    """The owner's own card is the editor, every chip on it; the shared one closes on the link back
+    into the bot and offers nothing to edit."""
     meeting_bot, msg_bot = make_bot_chat_meeting()
     meeting_inline, msg_inline = make_inline_meeting()
 
     await telegram_api.update_single_meeting_message(msg_bot, meeting_bot)
-    bot_chat_text = bot.edit_message_text.call_args.kwargs["text"]
+    bot_chat_html = rich_call(bot).html
 
     bot.reset_mock()
 
     await telegram_api.update_single_meeting_message(msg_inline, meeting_inline)
-    inline_text = bot.edit_message_text.call_args.kwargs["text"]
+    inline_html = rich_call(bot).html
 
-    assert isinstance(bot_chat_text, str)
-    assert isinstance(inline_text, str)
+    assert str(cb.EDIT_MEETING_TITLE.with_id(meeting_bot.db_id)) in bot_chat_html
+    assert str(cb.EDIT_MEETING_TITLE.with_id(meeting_inline.db_id)) not in inline_html
+    assert f"?start={shared_card.SHARED_CHAT_SOURCE}" in inline_html
+    assert "?start=" not in bot_chat_html
 
 
 async def test_update_single_meeting_message_not_modified_is_swallowed(telegram_api: TelegramApi, bot: AsyncMock):
     meeting, msg = make_bot_chat_meeting()
-    bot.edit_message_text.side_effect = BadRequest("Message is not modified: ...")
+    bot.do_api_request.side_effect = BadRequest("Message is not modified: ...")
 
     # Verifies the wiring: update_single_meeting_message routes errors through handle_edit_errors
     await telegram_api.update_single_meeting_message(msg, meeting)
@@ -718,7 +619,7 @@ async def test_update_single_meeting_message_not_found_is_swallowed_in_immediate
     telegram_api: TelegramApi, bot: AsyncMock
 ):
     meeting, msg = make_bot_chat_meeting()
-    bot.edit_message_text.side_effect = BadRequest("Message to edit not found")
+    bot.do_api_request.side_effect = BadRequest("Message to edit not found")
 
     # No DB cleanup happens here: the dead row is recorded and deleted only by the write
     # lifecycle's reconcile (see test_execute_queued_records_dead_message_for_reconcile).
@@ -733,7 +634,7 @@ async def test_update_single_meeting_message_forbidden_is_swallowed_in_immediate
     telegram_api: TelegramApi, bot: AsyncMock, error_message: str
 ):
     meeting, msg = make_bot_chat_meeting()
-    bot.edit_message_text.side_effect = Forbidden(error_message)
+    bot.do_api_request.side_effect = Forbidden(error_message)
 
     # An unreachable chat gets the same dead-message treatment as a deleted message.
     await telegram_api.update_single_meeting_message(msg, meeting)
@@ -758,7 +659,7 @@ async def test_update_meeting_messages_current_updated_first_then_others(telegra
         current_message=current_msg,
     )
 
-    assert bot.edit_message_text.await_count == 2
+    assert bot.do_api_request.await_count == 2
 
 
 async def test_update_meeting_messages_skip_current(telegram_api: TelegramApi, bot: AsyncMock):
@@ -776,7 +677,7 @@ async def test_update_meeting_messages_skip_current(telegram_api: TelegramApi, b
         skip_current=True,
     )
 
-    assert bot.edit_message_text.await_count == 1
+    assert bot.do_api_request.await_count == 1
 
 
 async def test_update_meeting_messages_no_current_message(telegram_api: TelegramApi, bot: AsyncMock):
@@ -794,14 +695,14 @@ async def test_update_meeting_messages_no_current_message(telegram_api: Telegram
         meeting=meeting,
     )
 
-    assert bot.edit_message_text.await_count == 2
+    assert bot.do_api_request.await_count == 2
 
 
 @pytest.mark.parametrize(
-    "was_deleted, has_finished, expected_text_fragment",
+    "was_deleted, has_finished, expected_state_line",
     [
-        (True, False, "deleted"),
-        (False, True, "finished"),
+        (True, False, MeetingDisplayMessages.DELETED_BANNER),
+        (False, True, MeetingDisplayMessages.FINISHED_STATUS),
     ],
     ids=["was_deleted", "has_finished"],
 )
@@ -810,9 +711,10 @@ async def test_update_meeting_messages_state_flag_propagated(
     bot: AsyncMock,
     was_deleted: bool,
     has_finished: bool,
-    expected_text_fragment: str,
+    expected_state_line: MeetingDisplayMessages,
+    lang: str,
 ):
-    meeting = create_meetup(id=10, title="Meeting", language="en")
+    meeting = create_meetup(id=10, title="Meeting", language=lang)
     create_user(id=1, tg_user_id=100, owned_meetings=[meeting])
     msg = create_message(id=1, inline_message_id=None, chat_id=100, message_id=501, meetup_id=10)
     meeting.messages = [msg]
@@ -824,9 +726,9 @@ async def test_update_meeting_messages_state_flag_propagated(
         has_finished=has_finished,
     )
 
-    call_kwargs = bot.edit_message_text.call_args.kwargs
-    assert call_kwargs["reply_markup"] is None
-    assert expected_text_fragment in call_kwargs["text"].lower()
+    call = rich_call(bot)
+    assert_card_is_inert(call)
+    assert expected_state_line.rich(lang=lang).html in call.body_html
 
 
 # ---------------------------------------------------------------------------
@@ -850,19 +752,17 @@ async def test_edit_message_with_effective_message(telegram_api: TelegramApi, bo
     update.effective_message.chat.id = 123
     update.effective_message.id = 456
     sentinel = MagicMock(spec=Message)
-    bot.edit_message_text.return_value = sentinel
+    bot.do_api_request.return_value = sentinel
 
     result = await telegram_api.edit_message(update, "hello")
 
-    bot.edit_message_text.assert_awaited_once_with(
-        text="hello",
-        entities=None,
-        chat_id=123,
-        message_id=456,
-        inline_message_id=None,
-        reply_markup=None,
-        disable_web_page_preview=True,
-    )
+    call = only_rich_call(bot)
+    assert call.endpoint == EDIT_MESSAGE_TEXT_ENDPOINT
+    assert call.api_kwargs == {
+        "chat_id": 123,
+        "message_id": 456,
+        "rich_message": {"html": "hello", "skip_entity_detection": True},
+    }
     assert result is sentinel
 
 
@@ -871,19 +771,15 @@ async def test_edit_message_with_inline_message_id(telegram_api: TelegramApi, bo
     update.effective_message = None
     update.callback_query.inline_message_id = "inline_999"
     sentinel = MagicMock()
-    bot.edit_message_text.return_value = sentinel
+    bot.do_api_request.return_value = sentinel
 
     result = await telegram_api.edit_message(update, "hello inline")
 
-    bot.edit_message_text.assert_awaited_once_with(
-        text="hello inline",
-        entities=None,
-        chat_id=None,
-        message_id=None,
-        inline_message_id="inline_999",
-        reply_markup=None,
-        disable_web_page_preview=True,
-    )
+    call = only_rich_call(bot)
+    assert call.api_kwargs == {
+        "inline_message_id": "inline_999",
+        "rich_message": {"html": "hello inline", "skip_entity_detection": True},
+    }
     assert result is sentinel
 
 
@@ -891,14 +787,14 @@ async def test_edit_message_with_mitup_view(telegram_api: TelegramApi, bot: Asyn
     update = MagicMock(spec=Update)
     update.effective_message.chat.id = 123
     update.effective_message.id = 456
-    view = MitupView(description="view text", keyboard=[])
-    bot.edit_message_text.return_value = MagicMock(spec=Message)
+    view = MitupView(message=RichContent("view text"), menu=[])
+    bot.do_api_request.return_value = MagicMock(spec=Message)
 
     await telegram_api.edit_message(update, view)
 
-    call_kwargs = bot.edit_message_text.call_args.kwargs
-    assert call_kwargs["text"] == "view text"
-    assert call_kwargs["reply_markup"] == view.markup
+    call = rich_call(bot)
+    assert call.body_html == "view text"
+    assert call.button_rows == []
 
 
 async def test_edit_message_raises_no_message_available(telegram_api: TelegramApi):
@@ -911,83 +807,97 @@ async def test_edit_message_raises_no_message_available(telegram_api: TelegramAp
 
 
 # ---------------------------------------------------------------------------
-# clear_reply_markup
-# ---------------------------------------------------------------------------
-
-
-async def test_clear_reply_markup_with_effective_message(telegram_api: TelegramApi, bot: AsyncMock):
-    update = MagicMock(spec=Update)
-    update.effective_message.chat.id = 77
-    update.effective_message.id = 88
-
-    await telegram_api.clear_reply_markup(update)
-
-    bot.edit_message_reply_markup.assert_awaited_once_with(
-        chat_id=77,
-        message_id=88,
-        inline_message_id=None,
-        reply_markup=None,
-    )
-
-
-async def test_clear_reply_markup_with_inline_message_id(telegram_api: TelegramApi, bot: AsyncMock):
-    update = MagicMock(spec=Update)
-    update.effective_message = None
-    update.callback_query.inline_message_id = "inline_42"
-
-    await telegram_api.clear_reply_markup(update)
-
-    bot.edit_message_reply_markup.assert_awaited_once_with(
-        chat_id=None,
-        message_id=None,
-        inline_message_id="inline_42",
-        reply_markup=None,
-    )
-
-
-async def test_clear_reply_markup_suppresses_message_not_modified(telegram_api: TelegramApi, bot: AsyncMock):
-    update = MagicMock(spec=Update)
-    update.effective_message.chat.id = 1
-    update.effective_message.id = 2
-    # "Message is not modified" is silently ignored by handle_edit_errors
-    bot.edit_message_reply_markup.side_effect = BadRequest(
-        "Message is not modified: specified new message content and reply markup are exactly the same"
-    )
-
-    # Must not raise
-    await telegram_api.clear_reply_markup(update)
-
-
-async def test_clear_reply_markup_raises_no_message_available(telegram_api: TelegramApi):
-    update = MagicMock(spec=Update)
-    update.effective_message = None
-    update.callback_query = None
-
-    with pytest.raises(NoMessageAvailable):
-        await telegram_api.clear_reply_markup(update)
-
-
-# ---------------------------------------------------------------------------
 # answer_inline_query
 # ---------------------------------------------------------------------------
 
 
+def make_inline_view(keyboard: Keyboard | None = None) -> MitupInlineView:
+    return MitupInlineView(
+        message=RichContent("desc"), title="Title", inline_description="short", id="1", menu=keyboard or []
+    )
+
+
 async def test_answer_inline_query_with_button(telegram_api: TelegramApi, bot: AsyncMock):
     update = MagicMock(spec=Update)
-    bot.answer_inline_query.return_value = True
-    view = MitupInlineView(description="desc", title="Title", inline_description="short", id="1", keyboard=[])
+    bot.do_api_request.return_value = True
     button = InlineResultsButton(text="Go", start_parameter="start")
 
-    await telegram_api.answer_inline_query(update, [view], button=button)
+    await telegram_api.answer_inline_query(update, [make_inline_view()], button=button)
 
-    call_kwargs = bot.answer_inline_query.call_args.kwargs
-    assert call_kwargs["button"] is not None
-    assert call_kwargs["cache_time"] == 60
+    call = only_rich_call(bot)
+    assert call.endpoint == ANSWER_INLINE_QUERY_ENDPOINT
+    api_kwargs = call.api_kwargs
+    assert api_kwargs["button"] == {"text": "Go", "start_parameter": "start"}
+    assert api_kwargs["cache_time"] == 60
+
+
+async def test_answer_inline_query_without_a_button_names_none(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    bot.do_api_request.return_value = True
+
+    await telegram_api.answer_inline_query(update, [make_inline_view()], cache_time=0)
+
+    api_kwargs = only_rich_call(bot).api_kwargs
+    assert "button" not in api_kwargs
+    assert api_kwargs["cache_time"] == 0
+
+
+async def test_an_inline_result_carries_a_classic_keyboard_beside_its_rich_content(
+    telegram_api: TelegramApi, bot: AsyncMock
+):
+    """The picked result sends a rich body with its buttons as a classic keyboard on the result:
+    chosen_inline_result only delivers inline_message_id for a classic keyboard (see
+    classic_markup), and without that id the shared card can never be claimed."""
+    update = MagicMock(spec=Update)
+    bot.do_api_request.return_value = True
+    view = make_inline_view(keyboard=[[ButtonConfig(text="Join", callback_data="join")]])
+
+    await telegram_api.answer_inline_query(update, [view])
+
+    api_kwargs = only_rich_call(bot).api_kwargs
+    assert api_kwargs["results"] == [
+        {
+            "type": "article",
+            "id": "1",
+            "title": "Title",
+            "description": "short",
+            "input_message_content": {
+                "rich_message": {
+                    "html": "desc",
+                    "skip_entity_detection": True,
+                }
+            },
+            "reply_markup": {"inline_keyboard": [[{"text": "Join", "callback_data": "join"}]]},
+        }
+    ]
+
+
+async def test_the_query_id_addresses_the_answer(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.inline_query.id = "query-7"
+    bot.do_api_request.return_value = True
+
+    await telegram_api.answer_inline_query(update, [make_inline_view()])
+
+    api_kwargs = only_rich_call(bot).api_kwargs
+    assert api_kwargs["inline_query_id"] == "query-7"
+
+
+async def test_a_shared_card_edits_into_the_same_content_it_was_sent_as(telegram_api: TelegramApi, bot: AsyncMock):
+    """The result a user picks and the later edits of the card it became are rendered by one view
+    factory through one producer, so a shared card never changes shape once it is edited."""
+    meeting, card = make_inline_meeting()
+    shared = meeting_views.inline_view(meeting, chat_instance=card.chat_instance)
+
+    await telegram_api.update_single_meeting_message(card, meeting)
+
+    edited_html = only_rich_call(bot).html
+    assert edited_html == shared.inline_result()["input_message_content"]["rich_message"]["html"]
 
 
 async def test_answer_inline_query_raises_on_api_failure(telegram_api: TelegramApi, bot: AsyncMock):
     update = MagicMock(spec=Update)
-    bot.answer_inline_query.return_value = False
+    bot.do_api_request.return_value = False
 
     with pytest.raises(AnswerInlineQueryError):
         await telegram_api.answer_inline_query(update, [])
@@ -1030,8 +940,6 @@ async def test_answer_callback_query_raises_when_formatted_text_has_entities(
 ):
     from telegram import MessageEntity
 
-    from mitup_bot.utils.entities import FormattedText
-
     update = MagicMock(spec=Update)
     # FormattedText with at least one entity — should trigger the ValueError guard
     ft = FormattedText("hello", [MessageEntity(type="bold", offset=0, length=5)])
@@ -1048,7 +956,7 @@ async def test_answer_callback_query_raises_when_formatted_text_has_entities(
 async def test_capture_defers_calls_and_drains_in_enqueue_order(telegram_api: TelegramApi, bot: AsyncMock):
     user1 = create_user(id=1, tg_user_id=100)
     user2 = create_user(id=2, tg_user_id=200)
-    bot.send_message.return_value = MagicMock(spec=Message)
+    bot.do_api_request.return_value = MagicMock(spec=Message)
 
     outbox = telegram_api.begin_capture()
     assert await telegram_api.send_message_to_user(user1, "first") is None
@@ -1056,12 +964,12 @@ async def test_capture_defers_calls_and_drains_in_enqueue_order(telegram_api: Te
     telegram_api.end_capture()
 
     # Nothing reached the bot while the queue was being built (i.e. inside the transaction).
-    bot.send_message.assert_not_called()
+    bot.do_api_request.assert_not_called()
 
     await telegram_api.execute_queued(outbox)
 
-    assert [call.kwargs["chat_id"] for call in bot.send_message.call_args_list] == [100, 200]
-    assert [call.kwargs["text"] for call in bot.send_message.call_args_list] == ["first", "second"]
+    assert [call.chat_id for call in rich_calls(bot)] == [100, 200]
+    assert [call.html for call in rich_calls(bot)] == ["first", "second"]
 
 
 def test_nested_begin_capture_raises(telegram_api: TelegramApi):
@@ -1073,18 +981,18 @@ def test_nested_begin_capture_raises(telegram_api: TelegramApi):
 
 async def test_immediate_bypasses_capture_and_restores_it(telegram_api: TelegramApi, bot: AsyncMock):
     user = create_user(id=1, tg_user_id=100)
-    bot.send_message.return_value = MagicMock(spec=Message)
+    bot.do_api_request.return_value = MagicMock(spec=Message)
 
     outbox = telegram_api.begin_capture()
     await telegram_api.immediate.send_message_to_user(user, "in-transaction")
 
     # The lifted call executed right away and did not land on the queue...
-    bot.send_message.assert_awaited_once()
+    bot.do_api_request.assert_awaited_once()
     assert outbox.calls == []
 
     # ...and capture mode is restored afterwards: the next call enqueues again.
     await telegram_api.send_message_to_user(user, "queued")
-    bot.send_message.assert_awaited_once()
+    bot.do_api_request.assert_awaited_once()
     assert len(outbox.calls) == 1
 
 
@@ -1102,13 +1010,13 @@ async def test_update_meeting_messages_current_first_order_survives_capture(tele
     outbox = telegram_api.begin_capture()
     await telegram_api.update_meeting_messages(meeting=meeting, current_message=current_msg)
     telegram_api.end_capture()
-    bot.edit_message_text.assert_not_called()
+    bot.do_api_request.assert_not_called()
 
     await telegram_api.execute_queued(outbox)
 
-    first, second = bot.edit_message_text.call_args_list
-    assert first.kwargs["message_id"] == 501  # the current message is still edited first
-    assert second.kwargs["inline_message_id"] == "inline_other"
+    first, second = rich_calls(bot)
+    assert first.message_id == 501  # the current message is still edited first
+    assert second.inline_message_id == "inline_other"
 
 
 async def test_capture_snapshots_rendered_payload_at_enqueue(telegram_api: TelegramApi, bot: AsyncMock):
@@ -1123,9 +1031,9 @@ async def test_capture_snapshots_rendered_payload_at_enqueue(telegram_api: Teleg
 
     await telegram_api.execute_queued(outbox)
 
-    text = bot.edit_message_text.call_args.kwargs["text"]
-    assert "Test Meeting" in text
-    assert "Renamed after enqueue" not in text
+    html = rich_call(bot).html
+    assert "Test Meeting" in html
+    assert "Renamed after enqueue" not in html
 
 
 async def test_enqueue_validates_edit_target_inside_transaction(telegram_api: TelegramApi):
@@ -1421,7 +1329,6 @@ async def test_enqueued_calls_declare_whether_a_repeat_can_double_post(telegram_
     await telegram_api.send_message(update, "sent")
     await telegram_api.send_message_to_user(create_user(id=1, tg_user_id=100), "dm")
     await telegram_api.edit_message(update, "edited")
-    await telegram_api.clear_reply_markup(update)
     await telegram_api.answer_callback_query(update, "ack", show_alert=False)
     await telegram_api.update_single_meeting_message(msg, meeting)
     telegram_api.end_capture()
@@ -1430,7 +1337,6 @@ async def test_enqueued_calls_declare_whether_a_repeat_can_double_post(telegram_
         "send_message": False,
         "send_message_to_user": False,
         "edit_message": True,
-        "clear_reply_markup": True,
         "answer_callback_query": True,
         "update_meeting_message": True,
     }
@@ -1455,7 +1361,7 @@ async def test_execute_queued_unreachable_user_recorded_for_reconcile(
     await telegram_api.send_messages_to_users([user1, user2], ["msg1", "msg2"])
     telegram_api.end_capture()
 
-    bot.send_message.side_effect = [side_effect, MagicMock(spec=Message)]
+    bot.do_api_request.side_effect = [side_effect, MagicMock(spec=Message)]
     await telegram_api.execute_queued(outbox)
     await api_metrics_client.flush()
 
@@ -1464,7 +1370,7 @@ async def test_execute_queued_unreachable_user_recorded_for_reconcile(
     assert outbox.inactive_tg_user_ids == [100]
     assert user1.status is UserStatus.MEMBER
     # ...and an unreachable user is expected churn, not a fault; the drain continued.
-    assert bot.send_message.await_count == 2
+    assert bot.do_api_request.await_count == 2
     api_metrics.assert_not_emitted(name=MetricKey.FAULT)
 
 
@@ -1477,7 +1383,7 @@ async def test_execute_queued_records_dead_message_for_reconcile(
     await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
     telegram_api.end_capture()
 
-    bot.edit_message_text.side_effect = BadRequest("Message to edit not found")
+    bot.do_api_request.side_effect = BadRequest("Message to edit not found")
     with capture_logs() as logs:
         await telegram_api.execute_queued(outbox)
     await api_metrics_client.flush()
@@ -1497,7 +1403,7 @@ async def test_execute_queued_records_dead_message_on_forbidden(
     await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
     telegram_api.end_capture()
 
-    bot.edit_message_text.side_effect = Forbidden("Forbidden: user is deactivated")
+    bot.do_api_request.side_effect = Forbidden("Forbidden: user is deactivated")
     with capture_logs() as logs:
         await telegram_api.execute_queued(outbox)
     await api_metrics_client.flush()
@@ -1519,7 +1425,7 @@ async def test_execute_queued_message_without_db_id_gets_no_reconcile_entry(tele
     await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
     telegram_api.end_capture()
 
-    bot.edit_message_text.side_effect = BadRequest("Message to edit not found")
+    bot.do_api_request.side_effect = BadRequest("Message to edit not found")
     await telegram_api.execute_queued(outbox)
 
     assert outbox.dead_message_ids == []
@@ -1530,19 +1436,22 @@ async def test_execute_queued_message_without_db_id_gets_no_reconcile_entry(tele
 # ---------------------------------------------------------------------------
 
 
+JOIN_ROW: Keyboard = [[ButtonConfig(text="Join", callback_data="join")]]
+
+
 def make_edit(
-    text: str = "Card body",
-    entities: list[MessageEntity] | None = None,
-    reply_markup: InlineKeyboardMarkup | None = None,
+    content: RichContent | None = None,
+    keyboard: Keyboard | None = None,
+    photos: tuple[RichPhoto, ...] = (),
 ) -> MeetingMessageEdit:
     return MeetingMessageEdit(
         message_db_id=1,
         chat_id=100,
         message_id=555,
         inline_message_id=None,
-        text=text,
-        entities=entities,
-        reply_markup=reply_markup,
+        content=content if content is not None else RichContent("Card body"),
+        keyboard=keyboard,
+        photos=photos,
     )
 
 
@@ -1552,32 +1461,6 @@ def apply_confirmed_digests(outbox: ApiOutbox, *messages: MessageModel):
     for message in messages:
         if message.id in outbox.confirmed_render_digests:
             message.render_digest = outbox.confirmed_render_digests[message.id]
-
-
-def test_digest_is_stable_across_equal_payloads():
-    markup = InlineKeyboardMarkup([[InlineKeyboardButton("Join", callback_data="join")]])
-    entities = [MessageEntity(type=MessageEntity.BOLD, offset=0, length=4)]
-
-    assert (
-        make_edit(entities=entities, reply_markup=markup).digest
-        == make_edit(
-            entities=list(entities),
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Join", callback_data="join")]]),
-        ).digest
-    )
-
-
-@pytest.mark.parametrize(
-    "changed",
-    [
-        make_edit(text="Different body"),
-        make_edit(entities=[MessageEntity(type=MessageEntity.BOLD, offset=0, length=4)]),
-        make_edit(reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Leave", callback_data="leave")]])),
-    ],
-    ids=["text", "entities", "reply_markup"],
-)
-def test_digest_changes_with_every_part_of_the_payload(changed: MeetingMessageEdit):
-    assert changed.digest != make_edit().digest
 
 
 async def test_execute_queued_records_the_confirmed_digest_for_reconcile(telegram_api: TelegramApi, bot: AsyncMock):
@@ -1597,7 +1480,7 @@ async def test_execute_queued_records_the_digest_when_telegram_answers_not_modif
     telegram_api: TelegramApi, bot: AsyncMock
 ):
     meeting, msg = make_bot_chat_meeting()
-    bot.edit_message_text.side_effect = BadRequest("Message is not modified: nothing changed")
+    bot.do_api_request.side_effect = BadRequest("Message is not modified: nothing changed")
 
     outbox = telegram_api.begin_capture()
     await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
@@ -1617,7 +1500,7 @@ async def test_execute_queued_records_no_digest_when_the_edit_fails(
     telegram_api: TelegramApi, bot: AsyncMock, no_retry_backoff: AsyncMock, failure: Exception
 ):
     meeting, msg = make_bot_chat_meeting()
-    bot.edit_message_text.side_effect = failure
+    bot.do_api_request.side_effect = failure
 
     outbox = telegram_api.begin_capture()
     await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
@@ -1629,7 +1512,7 @@ async def test_execute_queued_records_no_digest_when_the_edit_fails(
 
 async def test_execute_queued_records_no_digest_for_a_dead_message(telegram_api: TelegramApi, bot: AsyncMock):
     meeting, msg = make_bot_chat_meeting()
-    bot.edit_message_text.side_effect = BadRequest("Message to edit not found")
+    bot.do_api_request.side_effect = BadRequest("Message to edit not found")
 
     outbox = telegram_api.begin_capture()
     await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
@@ -1661,7 +1544,7 @@ async def test_capture_skips_the_card_whose_confirmed_digest_still_matches(teleg
     telegram_api.end_capture()
     await telegram_api.execute_queued(first)
     apply_confirmed_digests(first, msg)
-    bot.edit_message_text.reset_mock()
+    bot.do_api_request.reset_mock()
 
     # A card whose edit is queued is narrated by the call itself, never by a skip line.
     assert not [entry for entry in first_logs if entry["event"] == "Meeting card edit skipped"]
@@ -1674,7 +1557,7 @@ async def test_capture_skips_the_card_whose_confirmed_digest_still_matches(teleg
 
     # Nothing about the card changed, so the refresh costs no Telegram round trip at all.
     assert second.calls == []
-    bot.edit_message_text.assert_not_called()
+    bot.do_api_request.assert_not_called()
 
     # The skipped card no longer appears as a Telegram API call line, so the skip line is the
     # only record of the decision.
@@ -1705,7 +1588,7 @@ async def test_failed_edit_leaves_the_card_to_be_repaired_by_the_next_refresh(
     telegram_api: TelegramApi, bot: AsyncMock, no_retry_backoff: AsyncMock
 ):
     meeting, msg = make_bot_chat_meeting()
-    bot.edit_message_text.side_effect = BadRequest("Bad Request: something else")
+    bot.do_api_request.side_effect = BadRequest("Bad Request: something else")
 
     failing = telegram_api.begin_capture()
     await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
@@ -1716,13 +1599,13 @@ async def test_failed_edit_leaves_the_card_to_be_repaired_by_the_next_refresh(
     # The stored digest still describes what is on Telegram, so the unchanged card is edited
     # again rather than left stale until something else happens to it.
     assert msg.render_digest is None
-    bot.edit_message_text.side_effect = None
+    bot.do_api_request.side_effect = None
     repair = telegram_api.begin_capture()
     await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg)
     telegram_api.end_capture()
     await telegram_api.execute_queued(repair)
 
-    bot.edit_message_text.assert_awaited()
+    bot.do_api_request.assert_awaited()
     assert list(repair.confirmed_render_digests) == [1]
 
 
@@ -1734,12 +1617,12 @@ async def test_immediate_mode_edits_a_card_whose_digest_matches(telegram_api: Te
     telegram_api.end_capture()
     await telegram_api.execute_queued(outbox)
     apply_confirmed_digests(outbox, msg)
-    bot.edit_message_text.reset_mock()
+    bot.do_api_request.reset_mock()
 
     # Outside the outbox there is no drain to confirm a delivery, so no digest is consulted.
     await telegram_api.update_single_meeting_message(msg, meeting)
 
-    bot.edit_message_text.assert_awaited_once()
+    bot.do_api_request.assert_awaited_once()
 
 
 async def test_capture_of_a_card_series_reaches_telegram_only_for_the_ones_that_drifted(
@@ -1759,7 +1642,7 @@ async def test_capture_of_a_card_series_reaches_telegram_only_for_the_ones_that_
     telegram_api.end_capture()
     await telegram_api.execute_queued(settled)
     apply_confirmed_digests(settled, up_to_date)
-    bot.edit_message_text.reset_mock()
+    bot.do_api_request.reset_mock()
 
     attach = telegram_api.begin_capture()
     for card in (up_to_date, never_confirmed):
@@ -1767,7 +1650,7 @@ async def test_capture_of_a_card_series_reaches_telegram_only_for_the_ones_that_
     telegram_api.end_capture()
     await telegram_api.execute_queued(attach)
 
-    edited = [call.kwargs["inline_message_id"] for call in bot.edit_message_text.call_args_list]
+    edited = [call.inline_message_id for call in rich_calls(bot)]
     assert edited == ["never_confirmed"]
 
 
@@ -1819,10 +1702,10 @@ async def test_the_fanout_defers_every_card_but_the_current_one(
     with bound_contextvars(update_id=ORIGIN_UPDATE_ID):
         outbox = await run_fanout(telegram_api, meeting, current_message=current)
 
-    bot.edit_message_text.assert_awaited_once()
-    assert bot.edit_message_text.call_args.kwargs["message_id"] == 501
+    bot.do_api_request.assert_awaited_once()
+    assert rich_call(bot).message_id == 501
     assert len(outbox.calls) == 1
-    assert deferring_queue.pending[10] == MeetingRefresh(
+    assert deferring_queue.pending[meeting_job_key(10)] == MeetingRefresh(
         meeting_id=10, skip_message_db_id=1, origin_update_id=ORIGIN_UPDATE_ID
     )
 
@@ -1836,9 +1719,9 @@ async def test_a_fanout_with_no_current_card_defers_all_of_them(
 
     outbox = await run_fanout(telegram_api, meeting)
 
-    bot.edit_message_text.assert_not_called()
+    bot.do_api_request.assert_not_called()
     assert outbox.calls == []
-    assert deferring_queue.pending[10] == MeetingRefresh(meeting_id=10, skip_message_db_id=None)
+    assert deferring_queue.pending[meeting_job_key(10)] == MeetingRefresh(meeting_id=10, skip_message_db_id=None)
 
 
 @pytest.mark.parametrize(
@@ -1855,7 +1738,7 @@ async def test_a_terminal_fanout_draws_every_card_itself(
     outbox = await run_fanout(telegram_api, meeting, current_message=current, **{state_flag: True})
 
     assert len(outbox.calls) == 2
-    assert bot.edit_message_text.await_count == 2
+    assert bot.do_api_request.await_count == 2
     assert deferring_queue.pending == {}
 
 
@@ -1869,7 +1752,7 @@ async def test_the_fanout_draws_every_card_where_the_queue_takes_no_deferrals(
     outbox = await run_fanout(telegram_api, meeting, current_message=current)
 
     assert len(outbox.calls) == 2
-    assert bot.edit_message_text.await_count == 2
+    assert bot.do_api_request.await_count == 2
     assert deferring_queue.pending == {}
 
 
@@ -1882,7 +1765,7 @@ async def test_the_fanout_draws_every_card_where_no_queue_is_attached(telegram_a
     outbox = await run_fanout(telegram_api, meeting, current_message=current)
 
     assert len(outbox.calls) == 2
-    assert bot.edit_message_text.await_count == 2
+    assert bot.do_api_request.await_count == 2
 
 
 # --- Scoping a fan-out to the cards the caller's change can reach ---
@@ -1907,7 +1790,7 @@ async def test_a_scoped_fanout_defers_one_job_naming_the_cards_it_covers(
 
     await run_fanout(telegram_api, meeting, current_message=current, only_message_db_ids={shared.id})
 
-    assert deferring_queue.pending[10] == MeetingRefresh(
+    assert deferring_queue.pending[meeting_job_key(10)] == MeetingRefresh(
         meeting_id=10, skip_message_db_id=1, message_db_ids=frozenset({shared.id})
     )
 
@@ -1920,7 +1803,9 @@ async def test_an_unscoped_fanout_defers_a_job_covering_every_card(
 
     await run_fanout(telegram_api, meeting, current_message=current)
 
-    assert deferring_queue.pending[10].message_db_ids is None
+    deferred = deferring_queue.pending[meeting_job_key(10)]
+    assert isinstance(deferred, MeetingRefresh)
+    assert deferred.message_db_ids is None
 
 
 async def test_a_scope_matching_no_card_queues_no_job_at_all(
@@ -1932,7 +1817,7 @@ async def test_a_scope_matching_no_card_queues_no_job_at_all(
 
     outbox = await run_fanout(telegram_api, meeting, current_message=current, only_message_db_ids=set())
 
-    bot.edit_message_text.assert_awaited_once()
+    bot.do_api_request.assert_awaited_once()
     assert outbox.meeting_refreshes == []
     assert deferring_queue.pending == {}
 
@@ -1947,8 +1832,8 @@ async def test_a_scoped_fanout_draws_only_its_cards_where_the_queue_takes_no_def
 
     await run_fanout(telegram_api, meeting, current_message=current, only_message_db_ids={shared.id})
 
-    assert bot.edit_message_text.await_count == 2
-    assert bot.edit_message_text.call_args.kwargs["inline_message_id"] == shared.inline_message_id
+    assert bot.do_api_request.await_count == 2
+    assert rich_calls(bot)[-1].inline_message_id == shared.inline_message_id
 
 
 @pytest.mark.parametrize("state_flag", ["was_deleted", "has_finished"])
@@ -1976,7 +1861,7 @@ async def test_an_immediate_fanout_never_defers(
 
     await telegram_api.update_meeting_messages(meeting=meeting, current_message=current)
 
-    assert bot.edit_message_text.await_count == 2
+    assert bot.do_api_request.await_count == 2
     assert deferring_queue.pending == {}
 
 
@@ -1991,13 +1876,13 @@ async def test_a_refresh_only_outbox_still_reaches_the_queue(
     apply_confirmed_digests(confirming, current)
     # That pass queued a refresh of its own; the assertions below are about the second one.
     deferring_queue.pending.clear()
-    bot.edit_message_text.reset_mock()
+    bot.do_api_request.reset_mock()
 
     outbox = await run_fanout(telegram_api, meeting, current_message=current)
 
     assert outbox.calls == []
-    bot.edit_message_text.assert_not_called()
-    assert deferring_queue.pending[10] == MeetingRefresh(meeting_id=10, skip_message_db_id=1)
+    bot.do_api_request.assert_not_called()
+    assert deferring_queue.pending[meeting_job_key(10)] == MeetingRefresh(meeting_id=10, skip_message_db_id=1)
 
 
 async def test_a_refused_submit_loses_the_fanout_without_failing_the_invocation(
@@ -2273,8 +2158,8 @@ async def test_is_chat_banned_degrades_to_false_on_error(telegram_api: TelegramA
 async def test_send_message_failure_logs_the_attempted_payload(telegram_api: TelegramApi, bot: AsyncMock):
     update = MagicMock(spec=Update)
     update.effective_chat.id = 42
-    view = MitupView(description="hello there", keyboard=[[ButtonConfig(text="Go", callback_data="cb")]])
-    bot.send_message.side_effect = BadRequest("Chat not found")
+    view = MitupView(message=RichContent("hello there"), menu=[[ButtonConfig(text="Go", callback_data="cb")]])
+    bot.do_api_request.side_effect = BadRequest("Chat not found")
 
     with capture_logs() as logs:
         with pytest.raises(BadRequest):
@@ -2286,12 +2171,11 @@ async def test_send_message_failure_logs_the_attempted_payload(telegram_api: Tel
     payload = failure_logs[0]["payload"]
     assert payload["chat_id"] == 42
     assert payload["text"] == "hello there"
-    assert view.markup is not None
-    assert payload["markup"] == view.markup.to_dict()
+    assert payload["markup"] == [[{"text": "Go", "callback_data": "cb"}]]
 
 
 async def test_blocked_user_send_is_not_logged_as_telegram_call_failure(telegram_api: TelegramApi, bot: AsyncMock):
-    bot.send_message.side_effect = Forbidden("blocked")
+    bot.do_api_request.side_effect = Forbidden("blocked")
     user = create_user(1)
 
     with capture_logs() as logs:
@@ -2303,7 +2187,7 @@ async def test_blocked_user_send_is_not_logged_as_telegram_call_failure(telegram
 
 @pytest.mark.parametrize(
     "log_card_text, card_fields",
-    [(True, {"text", "markup"}), (False, {"text_len", "entity_count"})],
+    [(True, {"text", "markup"}), (False, {"text_len"})],
     ids=["handler_api", "background_api"],
 )
 async def test_a_meeting_card_payload_carries_its_text_only_where_it_is_wanted(
@@ -2349,3 +2233,452 @@ async def test_execute_queued_failure_logs_the_attempted_payload(telegram_api: T
     failure_logs = [entry for entry in logs if entry["event"] == "Queued Telegram call failed after commit"]
     assert len(failure_logs) == 1
     assert failure_logs[0]["payload"] == attempted
+
+
+# ---------------------------------------------------------------------------
+# The rich-message payload
+# ---------------------------------------------------------------------------
+
+BOLD_ENTITY = MessageEntity(type=MessageEntity.BOLD, offset=3, length=4)
+CUSTOM_EMOJI_ENTITY = MessageEntity(type=MessageEntity.CUSTOM_EMOJI, offset=0, length=2, custom_emoji_id="123456")
+# The digest of `make_edit()`. Every `render_digest` stored in the database is one of these, so a
+# change to the recipe would silently re-edit every card in existence: it has to fail here instead.
+PLAIN_CARD_DIGEST = "5b30eff1fdef3de5414e2544d97278b2e987bd736d990dd02c82cf090a8c6e14"
+
+
+def chat_update(chat_id: int) -> MagicMock:
+    update = MagicMock(spec=Update)
+    update.effective_chat.id = chat_id
+    return update
+
+
+def formatted_view() -> MitupView:
+    return MitupView(
+        RichContent.from_markup('<tg-emoji emoji-id="123456">😀</tg-emoji> <b>bold</b>'),
+        [[ButtonConfig(text="Join", callback_data="join")]],
+    )
+
+
+# --- Sending ---
+
+
+async def test_a_send_carries_the_whole_body_as_html(telegram_api: TelegramApi, bot: AsyncMock):
+    await telegram_api.send_message(chat_update(42), formatted_view())
+
+    call = only_rich_call(bot)
+    assert call.endpoint == SEND_RICH_MESSAGE_ENDPOINT
+    # An exact comparison is the assertion: `text` and `rich_message` are mutually exclusive on the
+    # wire, and a rich message has no link-preview parameter to pass.
+    assert call.api_kwargs == {
+        "chat_id": 42,
+        "rich_message": {
+            "html": (
+                '<tg-emoji emoji-id="123456">😀</tg-emoji> <b>bold</b>'
+                '<hr/><tg-button-row><tg-button type="callback_data" data="join">Join</tg-button></tg-button-row>'
+            ),
+            "skip_entity_detection": True,
+        },
+    }
+    assert bot.do_api_request.call_args.kwargs["return_type"] is Message
+
+
+async def test_a_send_without_a_keyboard_closes_the_content_with_no_rows(telegram_api: TelegramApi, bot: AsyncMock):
+    await telegram_api.send_message(chat_update(42), "plain")
+
+    call = only_rich_call(bot)
+    assert call.html == "plain"
+    assert call.button_rows == []
+
+
+async def test_a_send_to_a_user_addresses_their_private_chat(telegram_api: TelegramApi, bot: AsyncMock):
+    user = create_user(id=1, tg_user_id=777)
+
+    await telegram_api.send_message_to_user(user, "hi")
+
+    call = only_rich_call(bot)
+    assert call.endpoint == SEND_RICH_MESSAGE_ENDPOINT
+    assert call.chat_id == 777
+
+
+async def test_a_user_who_blocked_the_bot_is_reported_unreachable(telegram_api: TelegramApi, bot: AsyncMock):
+    bot.do_api_request.side_effect = Forbidden("bot was blocked by the user")
+
+    with pytest.raises(InactiveUserInteraction):
+        await telegram_api.send_message_to_user(create_user(id=1, tg_user_id=777), "hi")
+
+
+# --- The file a message carries ---
+
+DOCUMENT_BLOCK = f'<tg-document src="tg://document?id={DOCUMENT_MEDIA_ID}"></tg-document>'
+
+
+def export_view() -> MitupView:
+    return MitupView(
+        RichContent("Your data"),
+        [[ButtonConfig(text="Privacy", callback_data="send;privacy")]],
+        document=RichDocument(content=b"{}", filename="export.json"),
+    )
+
+
+async def test_a_send_carrying_a_file_attaches_it_to_the_rich_message(telegram_api: TelegramApi, bot: AsyncMock):
+    await telegram_api.send_message(chat_update(42), export_view())
+
+    call = only_rich_call(bot)
+    assert call.endpoint == SEND_RICH_MESSAGE_ENDPOINT
+    # The block sits under the text captioning it and above the rows closing the message.
+    assert call.body_html == f"Your data{DOCUMENT_BLOCK}"
+    assert call.button_rows
+    assert call.media == [
+        {"id": DOCUMENT_MEDIA_ID, "media": {"type": "document", "media": f"attach://{DOCUMENT_ATTACH_NAME}"}}
+    ]
+    upload = call.uploads[DOCUMENT_ATTACH_NAME]
+    assert (upload.filename, upload.input_file_content) == ("export.json", b"{}")
+
+
+async def test_a_send_carrying_no_file_names_no_media(telegram_api: TelegramApi, bot: AsyncMock):
+    await telegram_api.send_message(chat_update(42), "plain")
+
+    call = only_rich_call(bot)
+    assert call.media == []
+    assert call.uploads == {}
+
+
+async def test_the_file_is_uploaded_again_on_the_custom_emoji_retry(telegram_api: TelegramApi, bot: AsyncMock):
+    """Every attempt builds its own upload: the file a refused request already read cannot be
+    handed to the one replacing it."""
+    bot.do_api_request.side_effect = [BadRequest("Custom emoji entities are not allowed"), None]
+    view = MitupView(
+        RichContent.from_markup('<tg-emoji emoji-id="123456">😀</tg-emoji>'),
+        document=RichDocument(content=b"{}", filename="export.json"),
+    )
+
+    await telegram_api.send_message(chat_update(42), view)
+
+    assert bot.do_api_request.await_count == 2
+    assert rich_call(bot, 1).uploads[DOCUMENT_ATTACH_NAME].input_file_content == b"{}"
+
+
+async def test_a_queued_send_carries_its_file_to_the_drain(telegram_api: TelegramApi, bot: AsyncMock):
+    outbox = telegram_api.begin_capture()
+    assert await telegram_api.send_message(chat_update(42), export_view()) is None
+    telegram_api.end_capture()
+    bot.do_api_request.assert_not_called()
+
+    await telegram_api.execute_queued(outbox)
+
+    call = only_rich_call(bot)
+    assert call.body_html == f"Your data{DOCUMENT_BLOCK}"
+    assert call.uploads[DOCUMENT_ATTACH_NAME].input_file_content == b"{}"
+
+
+async def test_an_edit_carrying_a_file_uploads_it_beside_the_rich_message(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.effective_message.chat.id = 123
+    update.effective_message.id = 456
+    bot.do_api_request.return_value = MagicMock(spec=Message)
+
+    await telegram_api.edit_message(update, export_view())
+
+    call = only_rich_call(bot)
+    assert call.endpoint == EDIT_MESSAGE_TEXT_ENDPOINT
+    assert call.body_html == f"Your data{DOCUMENT_BLOCK}"
+    assert call.media == [
+        {"id": DOCUMENT_MEDIA_ID, "media": {"type": "document", "media": f"attach://{DOCUMENT_ATTACH_NAME}"}}
+    ]
+    upload = call.uploads[DOCUMENT_ATTACH_NAME]
+    assert (upload.filename, upload.input_file_content) == ("export.json", b"{}")
+
+
+async def test_a_failed_send_reports_the_file_it_tried_to_deliver(telegram_api: TelegramApi, bot: AsyncMock):
+    bot.do_api_request.side_effect = BadRequest("Chat not found")
+
+    with capture_logs() as logs:
+        with pytest.raises(BadRequest):
+            await telegram_api.send_message(chat_update(42), export_view())
+
+    payload = next(entry for entry in logs if entry["event"] == "Telegram call failed")["payload"]
+    assert payload["document_filename"] == "export.json"
+    assert payload["document_bytes"] == 2
+
+
+# --- Editing ---
+
+
+async def test_a_card_edit_sends_the_rendered_meeting_as_html(telegram_api: TelegramApi, bot: AsyncMock):
+    meeting, card = make_bot_chat_meeting()
+
+    await telegram_api.update_single_meeting_message(card, meeting)
+
+    call = only_rich_call(bot)
+    assert call.endpoint == EDIT_MESSAGE_TEXT_ENDPOINT
+    assert call.chat_id == card.chat_id
+    assert call.message_id == card.message_id
+    assert "Test Meeting" in call.body_html
+    assert call.button_rows
+
+
+async def test_a_card_edit_of_an_inline_card_names_no_chat(telegram_api: TelegramApi, bot: AsyncMock):
+    """A stored inline card keeps a chat id alongside its inline message id, and the two address
+    different messages: only the inline one may reach a raw edit."""
+    meeting, card = make_inline_meeting()
+
+    await telegram_api.update_single_meeting_message(card, meeting)
+
+    call = only_rich_call(bot)
+    assert call.inline_message_id == "inline_123"
+    assert "chat_id" not in call.api_kwargs
+    assert "message_id" not in call.api_kwargs
+
+
+async def test_an_edit_still_swallows_an_unchanged_message(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.effective_message.chat.id = 123
+    update.effective_message.id = 456
+    bot.do_api_request.side_effect = BadRequest("Message is not modified: nothing changed")
+
+    assert await telegram_api.edit_message(update, "hello") is False
+
+
+# --- The custom-emoji retry ---
+
+
+async def test_a_send_retries_with_html_rebuilt_from_the_stripped_body(telegram_api: TelegramApi, bot: AsyncMock):
+    """The retry must re-serialize the stripped body rather than resend the html Telegram just
+    rejected, which is the whole point of stripping the entity."""
+    bot.do_api_request.side_effect = [BadRequest("Custom emoji entities are not allowed"), None]
+
+    await telegram_api.send_message(chat_update(42), formatted_view())
+
+    assert bot.do_api_request.await_count == 2
+    assert rich_call(bot, 0).body_html == '<tg-emoji emoji-id="123456">😀</tg-emoji> <b>bold</b>'
+    assert rich_call(bot, 1).body_html == "😀 <b>bold</b>"
+    # The labels are plain text, so nothing about the rows changes between the attempts.
+    assert rich_call(bot, 1).button_rows == rich_call(bot, 0).button_rows
+
+
+async def test_an_edit_retries_with_html_rebuilt_from_the_stripped_body(telegram_api: TelegramApi, bot: AsyncMock):
+    update = MagicMock(spec=Update)
+    update.effective_message.chat.id = 123
+    update.effective_message.id = 456
+    bot.do_api_request.side_effect = [BadRequest("can't parse custom emoji entity"), None]
+
+    await telegram_api.edit_message(update, formatted_view())
+
+    assert bot.do_api_request.await_count == 2
+    assert rich_call(bot, 1).body_html == "😀 <b>bold</b>"
+
+
+async def test_a_send_rejected_for_another_reason_is_not_retried(telegram_api: TelegramApi, bot: AsyncMock):
+    bot.do_api_request.side_effect = BadRequest("Chat not found")
+
+    with pytest.raises(BadRequest):
+        await telegram_api.send_message(chat_update(42), formatted_view())
+
+    assert bot.do_api_request.await_count == 1
+
+
+# --- The render digest ---
+
+
+def test_the_digest_is_pinned_to_the_payload_it_hashes():
+    assert make_edit().digest == PLAIN_CARD_DIGEST
+
+
+def test_the_digest_is_stable_across_equal_payloads():
+    [MessageEntity(type=MessageEntity.BOLD, offset=0, length=4)]
+
+    assert (
+        make_edit(keyboard=JOIN_ROW).digest
+        == make_edit(keyboard=[[ButtonConfig(text="Join", callback_data="join")]]).digest
+    )
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        make_edit(RichContent("Different body"), keyboard=JOIN_ROW),
+        make_edit(RichContent.from_markup("<b>Card</b> body"), keyboard=JOIN_ROW),
+        make_edit(),
+        make_edit(keyboard=[[ButtonConfig(text="Leave", callback_data="join")]]),
+        make_edit(keyboard=[[ButtonConfig(text="Join", callback_data="leave")]]),
+        make_edit(keyboard=[JOIN_ROW[0], JOIN_ROW[0]]),
+    ],
+    ids=["text", "entities", "no_keyboard", "button_label", "button_callback", "row_count"],
+)
+def test_the_digest_changes_with_every_part_of_the_payload(changed: MeetingMessageEdit):
+    """The buttons are inside the html the digest hashes, so a relabelled or re-pointed button is
+    a content change like any other and the card is re-edited for it."""
+    assert changed.digest != make_edit(keyboard=JOIN_ROW).digest
+
+
+# --- The photos a card shows ---
+
+BANNER = RichPhoto(media_id="AQADHRJrGzSd4FB-", file_id="AgACAgQAAxkBAAIB")
+
+
+def banner_edit(photo: RichPhoto = BANNER) -> MeetingMessageEdit:
+    return make_edit(RichContent("Card body").prepend(photo_content(photo.media_id)), photos=(photo,))
+
+
+def test_a_card_names_its_photos_in_the_media_list():
+    assert banner_edit().rich_message().to_api_dict()["media"] == [
+        {"id": "AQADHRJrGzSd4FB-", "media": {"type": "photo", "media": "AgACAgQAAxkBAAIB"}}
+    ]
+
+
+async def test_a_meeting_card_carries_the_meeting_photos(telegram_api: TelegramApi, bot: AsyncMock):
+    meeting, msg = make_bot_chat_meeting()
+    meeting.images = [MeetingImage(meetup_id=meeting.id, position=0, file_id="AgACAgQAAxkBAAIB", file_unique_id="AQAD")]
+
+    await telegram_api.update_single_meeting_message(msg, meeting)
+
+    assert rich_call(bot).media == [{"id": "AQAD", "media": {"type": "photo", "media": "AgACAgQAAxkBAAIB"}}]
+
+
+async def test_the_meeting_photos_travel_in_the_order_they_are_held(telegram_api: TelegramApi, bot: AsyncMock):
+    meeting, msg = make_bot_chat_meeting()
+    meeting.images = [
+        MeetingImage(meetup_id=meeting.id, position=0, file_id="first_file", file_unique_id="AQADfirst"),
+        MeetingImage(meetup_id=meeting.id, position=1, file_id="second_file", file_unique_id="AQADsecond"),
+    ]
+
+    await telegram_api.update_single_meeting_message(msg, meeting)
+
+    assert [entry["id"] for entry in rich_call(bot).media] == ["AQADfirst", "AQADsecond"]
+
+
+def test_the_digest_changes_when_a_shown_photo_changes():
+    replaced = RichPhoto(media_id="AQADdifferent", file_id=BANNER.file_id)
+
+    assert banner_edit(replaced).digest != banner_edit().digest
+
+
+def test_the_digest_is_unchanged_when_only_the_file_behind_a_photo_changes():
+    """The digest hashes the html, which names a photo by its media id, and that id is stable across
+    uploads. A re-uploaded file of the same picture is the same card and needs no edit."""
+    reuploaded = RichPhoto(media_id=BANNER.media_id, file_id="AgACAgQAAxkBAAIZ")
+
+    assert banner_edit(reuploaded).digest == banner_edit().digest
+
+
+# --- PTB's advice on an endpoint it models ---
+
+
+@pytest.mark.parametrize("endpoint", [EDIT_MESSAGE_TEXT_ENDPOINT, ANSWER_INLINE_QUERY_ENDPOINT])
+async def test_the_advisory_is_what_ptb_actually_raises(endpoint: str, monkeypatch: pytest.MonkeyPatch):
+    """The filters match the advisory text, so a PTB release that rewords it would silently stop
+    suppressing anything. Drive the real `do_api_request` and compare what it raises."""
+    monkeypatch.setattr(Bot, "_post", AsyncMock(return_value=True))
+    bot = Bot("123456:abcdefghijklmnopqrstuvwxyzABCDEFGHI")
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        await bot.do_api_request(endpoint, api_kwargs={"chat_id": 1})
+
+    assert [str(warning.message) for warning in caught] == [modelled_endpoint_advisory(endpoint)]
+
+
+async def test_the_rich_send_endpoint_draws_no_advisory(monkeypatch: pytest.MonkeyPatch):
+    """PTB models no `send_rich_message`, so that endpoint needs no filter and must not get one."""
+    monkeypatch.setattr(Bot, "_post", AsyncMock(return_value=True))
+    bot = Bot("123456:abcdefghijklmnopqrstuvwxyzABCDEFGHI")
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        await bot.do_api_request(SEND_RICH_MESSAGE_ENDPOINT, api_kwargs={"chat_id": 1})
+
+    assert caught == []
+
+
+@pytest.mark.parametrize("endpoint", [EDIT_MESSAGE_TEXT_ENDPOINT, ANSWER_INLINE_QUERY_ENDPOINT])
+def test_silencing_the_advisories_leaves_every_other_warning_audible(endpoint: str):
+    """The filters live for the life of the process, so each is matched on its one advisory rather
+    than on the category they share."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        silence_modelled_endpoint_advisory()
+        warnings.warn(modelled_endpoint_advisory(endpoint), PTBUserWarning, stacklevel=1)
+        warnings.warn("something else entirely", PTBUserWarning, stacklevel=1)
+
+    assert [str(warning.message) for warning in caught] == ["something else entirely"]
+
+
+# ---------------------------------------------------------------------------
+# Keyed sends and held fan-outs
+# ---------------------------------------------------------------------------
+
+ALBUM_STRATEGY = OutboxStrategy(("album", "media-group-1"), hold_seconds=1.5)
+
+
+async def test_a_send_with_a_strategy_reaches_the_worker_instead_of_the_chat(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue
+):
+    """The worker sends the message once no more submits arrive under its key."""
+    outbox = telegram_api.begin_capture()
+    with bound_contextvars(update_id=ORIGIN_UPDATE_ID):
+        assert await telegram_api.send_message(chat_update(42), "hello", strategy=ALBUM_STRATEGY) is None
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(outbox)
+
+    bot.do_api_request.assert_not_called()
+    queued = deferring_queue.pending[ALBUM_STRATEGY.key]
+    assert isinstance(queued, KeyedSend)
+    assert (queued.chat_id, queued.hold_seconds, queued.origin_update_id) == (42, 1.5, ORIGIN_UPDATE_ID)
+    assert queued.payload.html == "hello"
+
+
+async def test_a_send_without_a_strategy_goes_out_on_the_drain(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue
+):
+    outbox = telegram_api.begin_capture()
+    assert await telegram_api.send_message(chat_update(42), "hello") is None
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(outbox)
+
+    assert rich_call(bot).chat_id == 42
+    assert deferring_queue.pending == {}
+
+
+async def test_a_strategy_with_no_worker_to_hand_it_to_sends_the_message(telegram_api: TelegramApi, bot: AsyncMock):
+    """A CLI job and a recurrent event run without a queue, so the message is sent directly."""
+    await telegram_api.send_message(chat_update(42), "hello", strategy=ALBUM_STRATEGY)
+
+    assert rich_call(bot).chat_id == 42
+
+
+async def test_a_rendered_payload_is_sent_again_without_its_custom_emoji(telegram_api: TelegramApi, bot: AsyncMock):
+    """The worker has only the rendered payload, not the view, so the retry strips the custom emoji
+    from the payload's html."""
+    bot.do_api_request.side_effect = [BadRequest("Custom emoji entities are not allowed"), None]
+
+    await telegram_api.send_rich_payload(42, formatted_view().rich_message())
+
+    assert bot.do_api_request.await_count == 2
+    assert "tg-emoji" not in rich_call(bot, 1).html
+    assert "😀" in rich_call(bot, 1).html
+
+
+async def test_a_fanout_strategy_holds_the_job_it_defers(
+    telegram_api: TelegramApi, bot: AsyncMock, deferring_queue: RefreshQueue
+):
+    meeting, current, _ = make_shared_meeting()
+
+    await run_fanout(
+        telegram_api,
+        meeting,
+        current_message=current,
+        strategy=OutboxStrategy(meeting_job_key(10), hold_seconds=1.5),
+    )
+
+    assert deferring_queue.pending[meeting_job_key(10)].hold_seconds == 1.5
+
+
+async def test_a_fanout_strategy_naming_another_meeting_is_refused(
+    telegram_api: TelegramApi, deferring_queue: RefreshQueue
+):
+    """A fan-out job is keyed by the meeting it draws, so a strategy keyed to another meeting is a
+    caller bug."""
+    meeting, current, _ = make_shared_meeting()
+
+    with pytest.raises(AssertionError):
+        await run_fanout(telegram_api, meeting, current_message=current, strategy=OutboxStrategy(meeting_job_key(11)))

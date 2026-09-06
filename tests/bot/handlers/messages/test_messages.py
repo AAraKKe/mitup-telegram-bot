@@ -7,8 +7,9 @@ from mitup_bot.custom_context import ContextId, MitupContext
 from mitup_bot.handlers.meeting.edit.edit_meeting_description import edit_description_meeting_message_handler
 from mitup_bot.handlers.meeting.edit.edit_meeting_title import edit_title_meeting_message_handler
 from mitup_bot.handlers.messages import filter_messages_without_text, rich_message_handler
-from mitup_bot.models import User
+from mitup_bot.models import MeetingCounts, User
 from mitup_bot.monitoring import Feature, MetricKey
+from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import CommonMessages, MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import RenderContext, factory
@@ -24,7 +25,9 @@ async def test_filter_messages_without_text_handler_with_correct_view(
 
     result = await filter_messages_without_text(update, context)
 
-    context.api.assert_send_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    context.api.assert_send_message_called(
+        update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang), counts=MeetingCounts(0, 0, 0))
+    )
     assert result == -1
 
 
@@ -50,10 +53,7 @@ async def test_edit_title_message_handler_update_the_title_and_send_correct_view
 
     assert meeting.title == update.effective_message.text
 
-    view = meeting_views.edit_view(meeting).with_context(
-        MeetingEditContentMessages.TITLE_SUCCESS.get(title=update.effective_message.text)
-    )
-    context.api.assert_send_message_called(update, view)
+    context.api.assert_send_message_called(update, meeting_views.owner_view(meeting))
 
 
 @pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)
@@ -78,10 +78,7 @@ async def test_edit_description_message_handler_update_the_description_and_send_
 
     assert meeting.description == update.effective_message.text
 
-    view = meeting_views.edit_view(meeting).with_context(
-        MeetingEditContentMessages.DESCRIPTION_SUCCESS.get(description=update.effective_message.text)
-    )
-    context.api.assert_send_message_called(update, view)
+    context.api.assert_send_message_called(update, meeting_views.owner_view(meeting))
 
 
 async def test_filter_messages_without_text_shows_main_menu_when_no_on_exit_is_set(
@@ -114,9 +111,9 @@ async def test_rich_message_handler_replies_with_main_menu_and_emits_metric(
     result = await rich_message_handler(update, context)
 
     # Idle path: the not-supported notice rides on top of the main menu so the user is never stranded.
-    expected = factory.main_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(
-        CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=user_with_settings.lang)
-    )
+    expected = factory.main_menu_view(
+        RenderContext(lang=user_with_settings.lang), counts=MeetingCounts(0, 0, 0)
+    ).with_context(CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.rich(lang=user_with_settings.lang))
     context.api.assert_send_message_called(update, expected)
     assert result is None
     assert context.user_data.registry == {}
@@ -131,17 +128,20 @@ async def test_filter_messages_without_text_shows_on_exit_prompt_when_active_con
     assert context.user_data is not None
 
     cancel_callback = cb.EDIT_MEETING_CANCEL.with_id(1)
-    on_exit_message = MeetingEditContentMessages.TITLE_ON_EXIT.get(lang=user_with_settings.lang)
+    # The notice answers in the language it was stored with, the meeting's own on an edit flow.
+    notice_lang = next(code for code in SUPPORTED_LANGUAGES if code != user_with_settings.lang)
     context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, 1)
-    context.store_on_exit(ContextId.EDIT_MEETING_TITLE, on_exit_message, cancel_callback)
+    context.store_on_exit(
+        ContextId.EDIT_MEETING_TITLE, MeetingEditContentMessages.TITLE_ON_EXIT, cancel_callback, lang=notice_lang
+    )
 
     result = await filter_messages_without_text(update, context)
 
     context.api.assert_send_message_called(
         update,
         factory.conversation_interrupted_view(
-            RenderContext(lang=user_with_settings.lang),
-            message=on_exit_message,
+            RenderContext(lang=notice_lang),
+            notice=MeetingEditContentMessages.TITLE_ON_EXIT,
             cancel_callback=cancel_callback,
         ),
     )

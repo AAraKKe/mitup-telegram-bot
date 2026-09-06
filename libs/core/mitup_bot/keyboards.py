@@ -6,11 +6,15 @@ is stored. They stay pure data — this module must not import views, models, or
 rendering to Telegram markup lives in the view layer.
 """
 
-from typing import Any, Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, field_validator, model_validator
 
 from mitup_bot.callback_data import CallbackData
+
+# The accent a rendered button may carry. The names are Telegram's rich-button styles; the
+# schema stores them as plain strings so the wire format stays free of telegram imports.
+ButtonStyle = Literal["primary", "success", "danger", "link"]
 
 
 class ButtonConfig(BaseModel):
@@ -21,6 +25,10 @@ class ButtonConfig(BaseModel):
     # An https:// or tg:// deep link. Used by buttons that open an external page (e.g. the Patreon
     # OAuth consent screen), which produce no callback query and so carry no callback_data.
     url: str | None = None
+    # None renders with Telegram's default button look.
+    style: ButtonStyle | None = None
+    # An inert button: drawn like the others but answering no tap, so it names no action.
+    disabled: bool = False
 
     @field_validator("callback_data")
     @classmethod
@@ -28,18 +36,6 @@ class ButtonConfig(BaseModel):
         str_value = str(value)
         if len(str_value.encode("utf-8")) > 64:
             raise ValueError(f"The callback_data {str_value!r} is bigger than the 64B allowed by Telegram")
-        return value
-
-    @field_validator("text", mode="before")
-    @classmethod
-    def validate_text(cls, value: Any) -> Any:
-        # Accept FormattedText-shaped values duck-typed so this module never imports the
-        # entity rendering layer (which pulls in telegram): button labels are stored as
-        # plain strings, so an entity-free wrapper flattens to its text.
-        if hasattr(value, "text") and hasattr(value, "entities"):
-            if value.entities:
-                raise ValueError("ButtonConfig text should not contain entities")
-            return value.text
         return value
 
     @model_validator(mode="after")
@@ -53,6 +49,13 @@ class ButtonConfig(BaseModel):
                 self.switch_inline_query_current_chat,
             ]
         )
+        if self.disabled:
+            if action_count:
+                raise ValueError(
+                    "A disabled button answers no tap, so callback_data, switch_inline_query, "
+                    "switch_inline_query_current_chat and url must all be unset"
+                )
+            return self
         if action_count != 1:
             raise ValueError(
                 "Exactly one of callback_data, switch_inline_query, switch_inline_query_current_chat, "

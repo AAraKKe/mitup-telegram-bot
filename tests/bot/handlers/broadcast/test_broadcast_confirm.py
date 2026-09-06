@@ -43,7 +43,7 @@ async def test_confirm_queues_the_draft(
     assert broadcast.status is BroadcastStatus.QUEUED
     context.api.assert_edit_message_called(
         update,
-        BroadcastOperatorMessages.QUEUED_CONFIRMATION.get(
+        BroadcastOperatorMessages.QUEUED_CONFIRMATION.rich(
             lang=user_with_settings.lang, name=BROADCAST_NAME, broadcast_id=BROADCAST_ID
         ),
     )
@@ -86,7 +86,7 @@ async def test_confirm_reports_draft_not_found(
 
     assert state == ConversationHandler.END
     context.api.assert_edit_message_called(
-        update, BroadcastOperatorMessages.DRAFT_NOT_FOUND.get(lang=user_with_settings.lang)
+        update, BroadcastOperatorMessages.DRAFT_NOT_FOUND.rich(lang=user_with_settings.lang)
     )
     mock_session.assert_not_deleted()
 
@@ -112,7 +112,7 @@ async def test_cancel_deletes_the_draft(
     context.api.assert_edit_message_called(
         update,
         factory.admin_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(
-            BroadcastOperatorMessages.CANCELLED_CONFIRMATION.get(lang=user_with_settings.lang)
+            BroadcastOperatorMessages.CANCELLED_CONFIRMATION.rich(lang=user_with_settings.lang)
         ),
     )
 
@@ -136,6 +136,6 @@ async def test_cancel_confirms_even_when_draft_already_gone(
     context.api.assert_edit_message_called(
         update,
         factory.admin_menu_view(RenderContext(lang=user_with_settings.lang)).with_context(
-            BroadcastOperatorMessages.CANCELLED_CONFIRMATION.get(lang=user_with_settings.lang)
+            BroadcastOperatorMessages.CANCELLED_CONFIRMATION.rich(lang=user_with_settings.lang)
         ),
     )

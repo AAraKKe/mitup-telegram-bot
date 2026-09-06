@@ -31,11 +31,8 @@ class StubBot(ExtBot, AsyncMock):
 
     # We need to override the methods we use in the api wrapper to be async mocks
     # IMPORTANT: If you add a method here, you MUST also add it to __init__ below!
-    send_message: AsyncMock
-    edit_message_text: AsyncMock
-    answer_inline_query: AsyncMock
+    do_api_request: AsyncMock
     answer_callback_query: AsyncMock
-    edit_message_reply_markup: AsyncMock
 
     def __init__(self, *args, **kwargs):
         # We do not want to initialize the ExtBot as it requires a token
@@ -44,8 +41,5 @@ class StubBot(ExtBot, AsyncMock):
         # Override every method of the bot that we use and ignore type checking because
         # we are overriding them with a mock.
         # This ensures that we have a fresh mock for every test.
-        self.send_message = AsyncMock()
-        self.edit_message_text = AsyncMock()
-        self.answer_inline_query = AsyncMock()
+        self.do_api_request = AsyncMock()
         self.answer_callback_query = AsyncMock()
-        self.edit_message_reply_markup = AsyncMock()

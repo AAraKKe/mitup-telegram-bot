@@ -116,7 +116,7 @@ async def test_deletion_requested_users_purged_with_farewell(
 
     assert "DELETE FROM users WHERE users.id IN (30)" in mock_session.queries_executed
 
-    farewell = MitupView(description=PrivacyMessages.DELETION_COMPLETE.get(lang=lang), keyboard=[])
+    farewell = MitupView(message=PrivacyMessages.DELETION_COMPLETE.rich(lang=lang), menu=[])
     api.assert_send_message_to_user_called(user=marked, view=farewell)
 
     assert purged_count(caplog) == 1
@@ -142,7 +142,7 @@ async def test_left_and_marked_users_purged_together(
     assert "DELETE FROM users WHERE users.id IN (10, 30)" in mock_session.queries_executed
 
     # Only the marked user gets a farewell
-    farewell = MitupView(description=PrivacyMessages.DELETION_COMPLETE.get(lang=marked.lang), keyboard=[])
+    farewell = MitupView(message=PrivacyMessages.DELETION_COMPLETE.rich(lang=marked.lang), menu=[])
     api.assert_send_message_to_user_called(user=marked, view=farewell)
 
     assert purged_count(caplog) == 1

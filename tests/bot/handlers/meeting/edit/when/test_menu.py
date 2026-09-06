@@ -6,7 +6,7 @@ from telegram import Update
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.models import Settings, User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import MeetingEditWhenMessages
+from mitup_bot.utils.messages import CommonMessages, MeetingEditWhenMessages
 from mitup_bot.views import RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
@@ -37,7 +37,7 @@ def owner_with_meeting(
 
 
 # ---------------------------------------------------------------------------
-# WHEN_ENTRY_CALLBACK — renders when_view
+# WHEN_ENTRY_CALLBACK: stale submenu button, routed to the editor
 # ---------------------------------------------------------------------------
 
 
@@ -55,7 +55,7 @@ def owner_with_meeting(
     ],
     ids=["with_both_times", "with_start_only", "without_times"],
 )
-async def test_when_entry_renders_when_view(
+async def test_when_entry_routes_to_the_editor(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
@@ -68,7 +68,10 @@ async def test_when_entry_renders_when_view(
 
     context, _ = await call_handler(EditMeetingHandlerId.WHEN_ENTRY_CALLBACK, handler_context=handler_context)
 
-    context.api.assert_edit_message_called(update, meeting_views.when_view(meeting))
+    context.api.assert_edit_message_called(
+        update,
+        meeting_views.owner_view(meeting).with_context(CommonMessages.EDITING_REVAMP_BANNER.rich(lang=user.lang)),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +102,7 @@ async def test_clear_times_shows_confirmation(
         update,
         factory.confirmation_view(
             RenderContext(lang=user_with_settings.lang),
-            message=MeetingEditWhenMessages.CLEAR_CONFIRMATION.get(lang=user_with_settings.lang),
+            message=MeetingEditWhenMessages.REMOVE_TIMES_CONFIRMATION.rich(lang=user_with_settings.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING_TIMES.with_id(1),
             decline_callback_data=cb.DECLINE_DELETE_MEETING_TIMES.with_id(1),
         ),
@@ -107,7 +110,7 @@ async def test_clear_times_shows_confirmation(
 
 
 # ---------------------------------------------------------------------------
-# CONFIRM_CLEAR_TIMES_CALLBACK — clears all 3 fields, shows when_view
+# CONFIRM_CLEAR_TIMES_CALLBACK: clears both times, keeps the lock setting, shows the editor
 # ---------------------------------------------------------------------------
 
 
@@ -133,14 +136,10 @@ async def test_confirm_clear_times(
 
     assert meeting.datetime is None
     assert meeting.end_datetime is None
-    assert meeting.lock_on_start is False
+    # The lock is a standing setting: it survives the wipe, dormant until a new start time.
+    assert meeting.lock_on_start is True
 
-    context.api.assert_edit_message_called(
-        update,
-        meeting_views.when_view(meeting).with_context(
-            MeetingEditWhenMessages.CLEAR_SUCCESS.get(lang=user_with_settings.lang)
-        ),
-    )
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(meeting))
     context.api.assert_update_meeting_messages_called(
         meeting=meeting,
         current_message=meeting.message_from_update(update),
@@ -149,7 +148,7 @@ async def test_confirm_clear_times(
 
 
 # ---------------------------------------------------------------------------
-# DECLINE_CLEAR_TIMES_CALLBACK — no mutation, shows when_view
+# DECLINE_CLEAR_TIMES_CALLBACK: no mutation, shows the editor
 # ---------------------------------------------------------------------------
 
 
@@ -180,48 +179,5 @@ async def test_decline_clear_times(
     mock_session.assert_not_added()
     mock_session.assert_not_flushed()
 
-    context.api.assert_edit_message_called(
-        update,
-        meeting_views.when_view(meeting).with_context(
-            MeetingEditWhenMessages.CLEAR_DECLINED.get(lang=user_with_settings.lang)
-        ),
-    )
+    context.api.assert_edit_message_called(update, meeting_views.owner_view(meeting))
     context.api.assert_update_meeting_messages_not_called()
-
-
-# ---------------------------------------------------------------------------
-# LOCK_ON_START_CALLBACK — toggle lock_on_start with a start time set
-# (both a start+end window and a start-only, open-ended window)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "update",
-    [UpdateRequest(callback_query=cb.SET_MEETING_LOCK_ON_START.with_id(1))],
-    indirect=True,
-)
-@pytest.mark.parametrize("end_datetime", [END_DATETIME, None], ids=["with_end", "start_only"])
-@pytest.mark.parametrize("initial_lock", [True, False], ids=["lock_true", "lock_false"])
-async def test_lock_on_start_toggle(
-    mock_session: MockDbSession,
-    update: Update,
-    handler_context: HandlerContext,
-    end_datetime: dt.datetime | None,
-    initial_lock: bool,
-):
-    user, meeting = owner_with_meeting(
-        meeting_id=1, meeting_datetime=START_DATETIME, end_datetime=end_datetime, lock_on_start=initial_lock
-    )
-    mock_session.add_object(user, query_field="tg_user_id")
-    mock_session.add_object(meeting)
-
-    context, _ = await call_handler(EditMeetingHandlerId.LOCK_ON_START_CALLBACK, handler_context=handler_context)
-
-    assert meeting.lock_on_start == (not initial_lock)  # flipped
-
-    context.api.assert_edit_message_called(update, meeting_views.when_view(meeting))
-    context.api.assert_update_meeting_messages_called(
-        meeting=meeting,
-        current_message=meeting.message_from_update(update),  # None -- no message registered
-        skip_current=True,
-    )

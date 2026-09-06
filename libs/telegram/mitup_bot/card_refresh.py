@@ -1,11 +1,17 @@
-"""In-process background queue for meeting-card refreshes.
+"""In-process background queue for the Telegram work a committed change leaves behind.
 
-A job is per meeting, not per card: whatever the worker eventually runs re-reads the meeting and
-re-renders every card still tracked for it, so several changes to one meeting collapse into a
-single refresh. Jobs are keyed on the meeting id and taken one at a time, and a job's key leaves
-`pending` before it reads the database — a change committed after that read therefore enqueues a
-fresh job instead of merging into the one already running, which is what makes the queue converge
-on the meeting's latest state rather than stopping at whatever some earlier job saw.
+Every job has a key. A submit whose key is already waiting merges into that job instead of adding
+a new one. Two kinds of job share the queue: a meeting refresh re-renders every card the meeting
+still tracks, and a keyed send posts one rendered message, where a later submit under the same key
+replaces the message to post. A job may carry a hold: the worker does not take it until that many
+seconds have passed with no new submit under its key. This turns a burst of updates that Telegram
+delivers as separate messages into a single piece of work.
+
+A refresh is per meeting, not per card: the job re-reads the meeting when it runs and re-renders
+every card still tracked for it, so several changes to one meeting collapse into a single refresh.
+Jobs are taken one at a time, and a job's key leaves `pending` before the job reads the database.
+A change committed after that read therefore queues a new job instead of merging into the running
+one, so the queue always ends on the meeting's latest state.
 
 The worker is two tasks over that one queue: a drain loop that takes jobs and runs them, and a
 reporter that publishes the queue's accounting every `REPORT_INTERVAL_SECONDS`. They are separate
@@ -34,7 +40,15 @@ import structlog
 from telegram.ext import ExtBot
 
 from mitup_bot import db
-from mitup_bot.api_wrapper import BotAdapter, MeetingRefresh, TelegramApiWrapper, build_api
+from mitup_bot.api_wrapper import (
+    BackgroundJob,
+    BotAdapter,
+    JobKey,
+    KeyedSend,
+    MeetingRefresh,
+    TelegramApiWrapper,
+    build_api,
+)
 from mitup_bot.config import AppConfig
 from mitup_bot.models import Meetup
 from mitup_bot.models import Message as MessageModel
@@ -67,9 +81,10 @@ CONNECTION_CONTEXT = "BackgroundJobs"
 
 
 class JobOutcome(StrEnum):
-    """What one execution of a refresh job achieved."""
+    """What one execution of a background job achieved."""
 
     REFRESHED = auto()
+    SENT = auto()
     SKIPPED = auto()
     FAILED = auto()
 
@@ -81,7 +96,7 @@ class SkipReason(StrEnum):
 
 
 class ScheduleOutcome(StrEnum):
-    """Whether a submitted refresh became a job of its own or merged into one already waiting."""
+    """Whether a submitted job became one of its own or merged into one already waiting."""
 
     QUEUED = auto()
     COALESCED = auto()
@@ -95,7 +110,7 @@ class JobState(StrEnum):
 
 
 class DropReason(StrEnum):
-    """Why a submitted refresh was refused outright."""
+    """Why a submitted job was refused outright."""
 
     QUEUE_FULL = auto()
     SHUTTING_DOWN = auto()
@@ -121,13 +136,13 @@ class WorkerLimits:
 
 @dataclass(frozen=True)
 class RunningJob:
-    """A refresh the drain loop is executing, and the monotonic instant it began.
+    """A job the drain loop is executing, and the monotonic instant it began.
 
     The start is what an in-flight job's age is measured from, so a job holding the loop is
     reported while it still holds it rather than only once it ends one way or the other.
     """
 
-    job: MeetingRefresh
+    job: BackgroundJob
     started: float
 
 
@@ -135,7 +150,7 @@ class RunningJob:
 class OutstandingJob:
     """The longest-outstanding job at publication time, with the age reported for it."""
 
-    job: MeetingRefresh
+    job: BackgroundJob
     state: JobState
     age_ms: int
 
@@ -188,18 +203,37 @@ def merge_scopes(waiting: frozenset[int] | None, incoming: frozenset[int] | None
 
 
 def coalesce(waiting: MeetingRefresh, incoming: MeetingRefresh) -> MeetingRefresh:
-    """Merge *incoming* into the job already waiting for the same meeting.
+    """Merge *incoming* into the refresh already waiting for the same meeting.
 
-    Everything identifying the waiting job survives the merge — its origin update, its enqueue
-    time, its attempt — because that is the submit whose wait `queue_wait_ms` measures and whose
-    user has been looking at a stale card the longest. Only the skip narrows, the scope widens, and
-    the count grows.
+    The waiting job keeps its origin update, enqueue time and attempt: it is the oldest submit, and
+    its wait is what `queue_wait_ms` reports. The skip narrows, the scope widens, the coalesced
+    count grows, and the hold restarts with the latest submit's hold.
     """
     return replace(
         waiting,
         skip_message_db_id=merge_skip(waiting.skip_message_db_id, incoming.skip_message_db_id),
         message_db_ids=merge_scopes(waiting.message_db_ids, incoming.message_db_ids),
         coalesced=waiting.coalesced + 1,
+        hold_seconds=incoming.hold_seconds,
+        hold_since=incoming.hold_since,
+    )
+
+
+def merge_jobs(waiting: BackgroundJob, incoming: BackgroundJob) -> BackgroundJob:
+    """The one job that replaces two submits made under the same key.
+
+    Two refreshes of one meeting coalesce. Otherwise the incoming job wins and keeps only the
+    waiting job's origin update, enqueue time and attempt, so the reported wait is still the
+    oldest submit's.
+    """
+    if isinstance(waiting, MeetingRefresh) and isinstance(incoming, MeetingRefresh):
+        return coalesce(waiting, incoming)
+    return replace(
+        incoming,
+        origin_update_id=waiting.origin_update_id,
+        coalesced=waiting.coalesced + 1,
+        attempt=waiting.attempt,
+        enqueued_at=waiting.enqueued_at,
     )
 
 
@@ -223,15 +257,22 @@ def elapsed_ms(since: float) -> int:
     return age_ms(perf_counter(), since)
 
 
-def job_fields(job: MeetingRefresh, started: float) -> dict[str, Any]:
-    """The facts every line about one execution carries: which refresh ran, and its two latencies.
+def job_identity(job: BackgroundJob) -> dict[str, Any]:
+    """The log fields that identify a job: its kind, its key, and for a refresh the meeting id."""
+    named: dict[str, Any] = {"job_kind": job.kind, "job_key": ":".join(str(part) for part in job.key)}
+    if isinstance(job, MeetingRefresh):
+        named["meeting_id"] = job.meeting_id
+    return named
 
-    `queue_wait_ms` is how long the change sat unrendered before the worker reached it and
-    `duration_ms` how long drawing it took, so a slow card and a backed-up queue stay tellable
-    apart on a single line.
+
+def job_fields(job: BackgroundJob, started: float) -> dict[str, Any]:
+    """The facts every line about one execution carries: which job ran, and its two latencies.
+
+    `queue_wait_ms` is how long the job waited before the worker took it and `duration_ms` how
+    long running it took, so a slow job and a backed-up queue can be told apart on one line.
     """
     return {
-        "meeting_id": job.meeting_id,
+        **job_identity(job),
         "origin_update_id": job.origin_update_id,
         "coalesced": job.coalesced,
         "attempt": job.attempt,
@@ -241,7 +282,7 @@ def job_fields(job: MeetingRefresh, started: float) -> dict[str, Any]:
 
 
 class RefreshQueue:
-    """Coalescing queue of meeting-card refreshes, drained by a single worker.
+    """Coalescing queue of keyed background jobs, drained by a single worker.
 
     The api belongs to the queue alone: the worker re-enters `db.begin_write` on it and capture
     mode is per-instance, so an api shared with a handler would collide mid-invocation. Owning it
@@ -271,8 +312,8 @@ class RefreshQueue:
         self.job_timeout = job_timeout
         self.drain_deadline = drain_deadline
         self.accepts_fanout = accepts_fanout
-        self.pending: dict[int, MeetingRefresh] = {}
-        self.in_flight: dict[int, RunningJob] = {}
+        self.pending: dict[JobKey, BackgroundJob] = {}
+        self.in_flight: dict[JobKey, RunningJob] = {}
         self.counters = TickCounters()
         self.work_available = asyncio.Event()
         self.accepting = True
@@ -280,57 +321,70 @@ class RefreshQueue:
         # the reporter mints the next one as it publishes, so an id names a window, never a job.
         self.run_id = uuid4().hex
 
-    def submit(self, job: MeetingRefresh) -> bool:
-        """Queue a refresh, coalescing it onto any job already waiting for the same meeting.
-        Answers whether it was accepted; a queue at its cap or one already stopping drops it."""
+    def submit(self, job: BackgroundJob) -> bool:
+        """Queue *job*, merging it into any job already waiting under its key.
+        Returns False when the queue is full or stopping."""
         if not self.accepting:
-            # Nothing taken now could still be drawn: the worker is spending its last seconds on the
-            # jobs it already holds, so accepting this one would only lengthen what it abandons.
-            log.warning("Meeting card refresh dropped", meeting_id=job.meeting_id, reason=DropReason.SHUTTING_DOWN)
+            # A stopping worker only finishes the jobs it already holds, so a new one would never run.
+            log.warning("Background job dropped", **job_identity(job), reason=DropReason.SHUTTING_DOWN)
             return False
-        if job.meeting_id in self.in_flight:
+        if isinstance(job, MeetingRefresh) and job.key in self.in_flight:
             # The running job read the meeting before this change committed, so it may still put a
             # stale render over the card the submitter drew: nothing may be passed over.
             job = replace(job, skip_message_db_id=None)
-        waiting = self.pending.get(job.meeting_id)
+        waiting = self.pending.get(job.key)
         if waiting is not None:
-            job = coalesce(waiting, job)
+            job = merge_jobs(waiting, job)
         elif len(self.pending) >= self.max_pending:
-            log.warning("Meeting card refresh dropped", meeting_id=job.meeting_id, reason=DropReason.QUEUE_FULL)
+            log.warning("Background job dropped", **job_identity(job), reason=DropReason.QUEUE_FULL)
             return False
-        self.pending[job.meeting_id] = job
+        self.pending[job.key] = job
         self.counters.record_depth(len(self.pending))
         self.work_available.set()
         self.report_scheduled(job, merged=waiting is not None)
         return True
 
-    def report_scheduled(self, job: MeetingRefresh, merged: bool):
-        """Record the accepted submit. The enqueuing update is ambient wherever a submit happens —
-        it comes from code running under one — so the line names the meeting and the queue only."""
+    def report_scheduled(self, job: BackgroundJob, merged: bool):
+        """Log the accepted submit. The update id is already bound in the log context, so the line
+        only names the job and the queue depth."""
         log.info(
             "Background jobs scheduled",
-            meeting_id=job.meeting_id,
+            **job_identity(job),
             outcome=ScheduleOutcome.COALESCED if merged else ScheduleOutcome.QUEUED,
             pending=len(self.pending),
         )
 
-    def take(self) -> RunningJob | None:
-        """Claim the longest-waiting job, or None when nothing is waiting.
+    def seconds_until_ready(self, job: BackgroundJob) -> float:
+        """Seconds left on *job*'s hold.
 
-        The key leaves `pending` here, before `execute` reads the meeting — see the module
-        docstring for why that ordering is the whole convergence argument.
+        A stopping queue accepts no submits, so nothing can merge into the job any more and its
+        hold ends at once instead of eating into the shutdown deadline.
         """
-        job = next(iter(self.pending.values()), None)
-        running = None
-        if job is not None:
-            del self.pending[job.meeting_id]
-            running = RunningJob(job, perf_counter())
-            self.in_flight[job.meeting_id] = running
+        if not self.accepting:
+            return 0.0
+        return max(0.0, job.hold_since + job.hold_seconds - perf_counter())
+
+    def next_ready_in(self) -> float | None:
+        """Seconds until the first job may be taken, or None when nothing is waiting."""
         if not self.pending:
-            self.work_available.clear()
+            return None
+        return min(self.seconds_until_ready(job) for job in self.pending.values())
+
+    def take(self) -> RunningJob | None:
+        """Claim the oldest job whose hold has run out, or None when there is none.
+
+        The key leaves `pending` here, before `execute` reads the meeting. The module docstring
+        explains why that order matters.
+        """
+        job = next((job for job in self.pending.values() if self.seconds_until_ready(job) == 0.0), None)
+        if job is None:
+            return None
+        del self.pending[job.key]
+        running = RunningJob(job, perf_counter())
+        self.in_flight[job.key] = running
         return running
 
-    def requeue(self, job: MeetingRefresh):
+    def requeue(self, job: BackgroundJob):
         """Put an interrupted job back among the waiting ones, counting the attempt against it.
 
         Its cards were left half drawn or not drawn at all, so the change stays outstanding —
@@ -338,16 +392,19 @@ class RefreshQueue:
         ones nobody will. A refresh submitted for this meeting meanwhile is left alone: it already
         covers every card this one would have drawn.
         """
-        self.pending.setdefault(job.meeting_id, replace(job, attempt=job.attempt + 1))
+        self.pending.setdefault(job.key, replace(job, attempt=job.attempt + 1))
         self.work_available.set()
 
-    async def execute(self, job: MeetingRefresh) -> JobOutcome:
-        """Re-render one meeting's cards in its own write-mode critical section.
+    async def execute(self, job: BackgroundJob) -> JobOutcome:
+        """Run one job: a keyed send posts its message, a meeting refresh re-renders the cards.
 
-        `begin_write` is what makes this inherit the rendering path whole — the custom-emoji
-        retry, the not-modified suppression, the dead-message classification and the reconcile
-        that drops the rows Telegram reported gone.
+        The refresh runs inside `begin_write`, which gives it the whole rendering path: the
+        custom-emoji retry, the not-modified suppression, the dead-message classification and the
+        reconcile that drops the rows Telegram reported gone.
         """
+        if isinstance(job, KeyedSend):
+            await self.api.send_rich_payload(job.chat_id, job.payload)
+            return JobOutcome.SENT
         async with db.begin_write(self.api) as session:
             meeting = await Meetup.by_id(session, job.meeting_id)
             if meeting is None:
@@ -364,12 +421,11 @@ class RefreshQueue:
     async def run_job(self, running: RunningJob) -> JobOutcome:
         """Execute one job under its own timeout and record how it ended, never raising.
 
-        A job that outruns `job_timeout` is cancelled and counted like any other failure: the loop
-        takes one job at a time, so a refresh that will never finish would otherwise hold every
-        other meeting's cards behind it for as long as the process lives. A card Telegram refused
-        is not counted here — the post-commit drain inside `execute` owns that failure and reports
-        it on `PostCommitApiFault`, and counting it again would make the failed count read as jobs
-        that never landed at all.
+        A job that outruns `job_timeout` is cancelled and counted as a failure like any other: the
+        loop runs one job at a time, so a job that never finishes would block every job behind it
+        for as long as the process lives. A card Telegram refused during a refresh is not counted
+        here: the post-commit drain inside the refresh already reports that failure on
+        `PostCommitApiFault`, and counting it again would inflate the failed count.
         """
         job, started = running.job, running.started
         try:
@@ -392,7 +448,7 @@ class RefreshQueue:
         return outcome
 
     async def run_next(self):
-        """Run one job to completion, holding its meeting in flight throughout.
+        """Run one job to completion, holding its key in flight throughout.
 
         A failure ends that job only: the drain loop behind it must outlive any one meeting's
         refresh. A cancellation ends the loop as well, and puts the job it interrupted back among
@@ -408,7 +464,7 @@ class RefreshQueue:
                 self.requeue(running.job)
                 raise
             finally:
-                del self.in_flight[running.job.meeting_id]
+                del self.in_flight[running.job.key]
                 self.metrics.emit(MetricKey.JOB_PROCESSING_TIME, elapsed_ms(running.started), MetricUnit.MILLISECONDS)
             # A cancelled job reached no outcome and reports none: the fault rate is a rate over the
             # samples that carry it, so a shutdown would otherwise read as a burst of faults.
@@ -472,7 +528,7 @@ class RefreshQueue:
         if oldest is not None:
             log.info(
                 "Background job still outstanding",
-                meeting_id=oldest.job.meeting_id,
+                **job_identity(oldest.job),
                 origin_update_id=oldest.job.origin_update_id,
                 state=oldest.state,
                 age_ms=oldest.age_ms,
@@ -500,6 +556,22 @@ class RefreshQueue:
             await asyncio.sleep(self.report_interval)
             await self.publish()
 
+    async def await_ready_job(self):
+        """Wait until some job's hold has run out.
+
+        A submit sets `work_available`, which cuts the sleep short so the new job's hold is taken
+        into account. The event is cleared before the delay is computed, so a submit landing in
+        between is either counted in the delay or wakes the next wait.
+        """
+        while True:
+            self.work_available.clear()
+            delay = self.next_ready_in()
+            if delay == 0.0:
+                return
+            with suppress(TimeoutError):
+                async with asyncio.timeout(delay):
+                    await self.work_available.wait()
+
     async def run_drain(self):
         """Take jobs and run them for as long as the worker lives, waiting while there are none.
 
@@ -508,7 +580,7 @@ class RefreshQueue:
         """
         with bound_metrics_client(self.metrics):
             while True:
-                await self.work_available.wait()
+                await self.await_ready_job()
                 await self.run_next()
 
     async def drain_pending(self):

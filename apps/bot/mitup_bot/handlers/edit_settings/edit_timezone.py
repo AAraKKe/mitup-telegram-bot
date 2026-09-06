@@ -45,11 +45,11 @@ async def retry_timezone_step(
     )
 
     view = MitupView(
-        description=RegistrationMessages.TIMEZONE_FAIL.get(lang=user.lang),
-        keyboard=[
+        message=RegistrationMessages.TIMEZONE_FAIL.rich(lang=user.lang),
+        menu=[
             [
                 ButtonConfig(
-                    text=ButtonMessages.CANCEL.get_text(lang=user.lang),
+                    text=ButtonMessages.CANCEL.text(lang=user.lang),
                     callback_data=cb.CANCEL_SETTINGS,
                 )
             ]
@@ -84,8 +84,8 @@ async def store_timezone(
         input_method=input_method.value,
     )
 
-    message = SettingsMessages.TIMEZONE_SUCCESS.get(lang=user.lang, timezone=user.settings.timezone)
-    view = factory.settings_view(guards.render_context(user, update, context), message=message)
+    message = SettingsMessages.TIMEZONE_SUCCESS.rich(lang=user.lang, timezone=user.settings.timezone)
+    view = factory.settings_view(guards.render_context(user, update, context), user).with_context(message)
 
     await context.api.send_message(update=update, view=view)
 
@@ -99,12 +99,10 @@ async def store_timezone(
 async def callback_query_timezone(session: AsyncSession, update: Update, context: TMitupContext):
     # Settings-only: reads `user.lang`/`user.settings`, never the meetups/joined_links collections.
     user = await guards.current_user(update, session)
-    message = SettingsMessages.TIMEZONE_PROMPT.get(lang=user.lang, timezone=user.settings.timezone)
+    message = SettingsMessages.TIMEZONE_PROMPT.rich(lang=user.lang, timezone=user.settings.timezone)
 
     context.store_on_exit(
-        ContextId.EDIT_SETTINGS_TIMEZONE,
-        SettingsMessages.TIMEZONE_ON_EXIT.get(lang=user.lang),
-        cb.CANCEL_SETTINGS,
+        ContextId.EDIT_SETTINGS_TIMEZONE, SettingsMessages.TIMEZONE_ON_EXIT, cb.CANCEL_SETTINGS, lang=user.lang
     )
     log.info("Conversation on-exit registered", user_id=user.db_id, context_id=ContextId.EDIT_SETTINGS_TIMEZONE.value)
 
@@ -169,7 +167,7 @@ async def settings_timezone_rich_message_handler(
         reason="rich_message_unsupported",
     )
     ctx = guards.render_context(user, update, context)
-    message = SettingsMessages.TIMEZONE_PROMPT.get(lang=user.lang, timezone=user.settings.timezone)
+    message = SettingsMessages.TIMEZONE_PROMPT.rich(lang=user.lang, timezone=user.settings.timezone)
     view = views.factory.change_settings_element_view(ctx, message=message)
     await reply_rich_message_not_supported(ctx, update, context, view)
     return ConversationSettingsState.TIMEZONE

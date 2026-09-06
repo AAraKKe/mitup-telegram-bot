@@ -7,11 +7,11 @@ from structlog.testing import capture_logs
 
 from mitup_bot.events import notify_meetings
 from mitup_bot.events.service import EventType
-from mitup_bot.models import JoinedUsers
+from mitup_bot.models import JoinedUsers, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricsClient
-from mitup_bot.utils.messages import NotificationMessages
-from mitup_bot.views import MitupView
+from mitup_bot.views import meeting as meeting_views
+from mitup_bot.views.datetime_format import relative_time_content
 from tests.helpers import MockApi, MockDbSession, create_joined_link, create_meetup, create_settings, create_user
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
@@ -29,6 +29,11 @@ def metrics_client() -> MetricsClient:
 @pytest.fixture
 def metrics(metrics_client: MetricsClient) -> MetricAssertions:
     return MetricAssertions(metrics_client)
+
+
+def meeting_owner(lang: str) -> User:
+    """The host every scheduled meeting has, whose settings the card reads its timezone from."""
+    return create_user(id=99, tg_user_id=99, settings=create_settings(id=99, language=lang))
 
 
 def register_due_links(mock_session: MockDbSession, *links: JoinedUsers, still_due: bool = True):
@@ -100,16 +105,31 @@ async def test_meeting_start(mock_session: MockDbSession, metrics_client: Metric
     assert link_1.notification_sent
     assert link_2.notification_sent
 
-    view1 = MitupView(
-        description=NotificationMessages.STARTING_SOON.get(lang=joined_1.lang, meeting_title=meeting.title),
-        keyboard=[],
+    now = dt.datetime.now(dt.UTC)
+    api.assert_send_message_to_user_called(
+        user=joined_1, view=meeting_views.starting_soon_view(link_1, now=now), times=2
     )
-    view2 = MitupView(
-        description=NotificationMessages.STARTING_SOON.get(lang=joined_2.lang, meeting_title=meeting.title),
-        keyboard=[],
+    api.assert_send_message_to_user_called(
+        user=joined_2, view=meeting_views.starting_soon_view(link_2, now=now), times=2
     )
-    api.assert_send_message_to_user_called(user=joined_1, view=view1, times=2)
-    api.assert_send_message_to_user_called(user=joined_2, view=view2, times=2)
+
+
+async def test_the_reminder_counts_down_from_the_clock_it_is_sent_at(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi, lang: str
+):
+    """The card carries how far the start is, which only the job can know: the view is handed the
+    moment it is being sent at rather than reading a clock of its own."""
+    starts_at = dt.datetime.now(dt.UTC) + dt.timedelta(minutes=25)
+    meeting = create_meetup(id=7, title="Test meetup", datetime=starts_at, owner=meeting_owner(lang))
+    joined = create_user(id=1, tg_user_id=1, settings=create_settings(id=1, language=lang))
+    link = create_joined_link(user=joined, meetup=meeting, id=1)
+
+    register_due_links(mock_session, link)
+    await notify_meetings.run(api, metrics_client)
+    await metrics_client.flush()
+
+    countdown = relative_time_content(starts_at, now=dt.datetime.now(dt.UTC), lang=lang)
+    assert countdown.text in api.call_args("send_message_to_user").kwargs["view"].message.text
 
 
 async def test_link_no_longer_due_is_skipped(
@@ -200,7 +220,7 @@ async def test_the_sweep_names_the_participant_at_every_step(
     """Nomination, send and the closing summary all carry the joined link, its meeting and the
     person whose reminder it is, so the commonest support question this job produces — "this user
     says they never got their reminder" — is answerable by filtering on the user."""
-    meeting = create_meetup(id=7, title="Test meetup", datetime=dt.datetime.now(dt.UTC))
+    meeting = create_meetup(id=7, title="Test meetup", datetime=dt.datetime.now(dt.UTC), owner=meeting_owner(lang))
     settings = create_settings(id=1, language=lang)
     settings.notification_time = 15
     joined = create_user(id=1, tg_user_id=555, settings=settings)
@@ -232,7 +252,7 @@ async def test_the_sweep_names_the_participant_at_every_step(
 
 def make_stale_link(lang: str) -> JoinedUsers:
     """A link that satisfied every nomination condition, ready for one of them to be flipped."""
-    meeting = create_meetup(id=7, title="Test meetup", datetime=dt.datetime.now(dt.UTC))
+    meeting = create_meetup(id=7, title="Test meetup", datetime=dt.datetime.now(dt.UTC), owner=meeting_owner(lang))
     joined = create_user(id=1, tg_user_id=555, settings=create_settings(id=1, language=lang))
     return create_joined_link(user=joined, meetup=meeting, id=812)
 

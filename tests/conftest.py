@@ -1,5 +1,6 @@
 import datetime as dt
 import os
+import warnings
 from collections.abc import Generator, Mapping
 from typing import cast
 from unittest import mock
@@ -11,13 +12,18 @@ from pydantic import SecretStr
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
 from telegram.ext import Application, ConversationHandler
 
-from mitup_bot import api_guards, card_refresh, db, reconcile
+from mitup_bot import api_guards, bot_links, card_refresh, db, reconcile
 from mitup_bot.bot_cli import cli as bot_cli
 from mitup_bot.config import DbConfig, MetricsConfig, MetricsEnv
 from mitup_bot.handlers import HandlersRegistry
-from mitup_bot.models import Meetup, MeetupLocation, Settings
+from mitup_bot.models import MeetingCounts, Meetup, MeetupLocation, Settings
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.models import User as UserModel
+from mitup_bot.models.users import (
+    active_meetings_count_statement,
+    joined_meetings_count_statement,
+    past_meetings_count_statement,
+)
 from mitup_bot.monitoring import MetricsClient
 from mitup_bot.monitoring.backend import configure_emf_backend
 from mitup_bot.translations import SUPPORTED_LANGUAGES
@@ -34,7 +40,7 @@ from tests.helpers.fixtures import UpdateRequest, create_meetup, create_message,
 from tests.helpers.handler_context import HandlerContext
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 from tests.helpers.stub_db import MockDbSession
-from tests.helpers.types import ClaimSharedCard, StubMitupContext
+from tests.helpers.types import ClaimSharedCard, SeedMeetingCounts, StubMitupContext
 from tests.helpers.types import CliRunner as TypeRunner
 
 
@@ -207,6 +213,31 @@ def process_refresh_queue() -> Generator[None]:
     card_refresh.__queue = None
 
 
+@pytest.fixture(autouse=True)
+def process_bot_username() -> Generator[None]:
+    """Keep a startup's configured bot username from crossing test boundaries.
+
+    Any test that runs a real startup adopts whatever username its config carries, and every card
+    with a growth footer on it renders a link built from that name for the rest of the worker's
+    session. Restoring on both sides keeps those cards independent of the order tests run in.
+    """
+    bot_links.configure(None)
+    yield
+    bot_links.configure(None)
+
+
+@pytest.fixture(autouse=True)
+def process_warning_filters() -> Generator[None]:
+    """Keep a startup's warning filters from crossing test boundaries.
+
+    Any test that runs a real startup installs the process filter hiding PTB's modelled-endpoint
+    advisory, which would otherwise stay in force for the rest of the worker's session and hide
+    the advisory from the test that exists to assert it is raised.
+    """
+    with warnings.catch_warnings():
+        yield
+
+
 @pytest.fixture
 def mock_session(db_config: DbConfig) -> Generator[MockDbSession]:
     """
@@ -248,6 +279,18 @@ def claim_shared_card(mock_session: MockDbSession) -> ClaimSharedCard:
         return message
 
     return claim
+
+
+@pytest.fixture
+def seed_meeting_counts(mock_session: MockDbSession) -> SeedMeetingCounts:
+    """Register the three queries `User.meeting_counts` issues, so it answers with *counts*."""
+
+    def seed(user: UserModel, counts: MeetingCounts):
+        mock_session.add_objects_with_statement(active_meetings_count_statement(user), (counts.active,))
+        mock_session.add_objects_with_statement(joined_meetings_count_statement(user), (counts.joined,))
+        mock_session.add_objects_with_statement(past_meetings_count_statement(user), (counts.past,))
+
+    return seed
 
 
 @pytest.fixture(scope="session")

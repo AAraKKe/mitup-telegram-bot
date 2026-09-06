@@ -1,6 +1,6 @@
 import pytest
 from structlog.testing import capture_logs
-from telegram import Update
+from telegram import Chat, Update
 
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.acquisition import SHARED_CARD_SOURCE
@@ -8,14 +8,16 @@ from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import JoinedUsers, User, utils
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import Feature, MetricKey, MetricUnit
+from mitup_bot.monitoring import Feature, MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils.messages import MeetingDisplayMessages, MeetingJoinMessages, PrivacyMessages
 from mitup_bot.views import MitupView
 from mitup_bot.views import factory as views_factory
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
     MockDbSession,
+    StubMitupApp,
     UpdateRequest,
     assert_locked_meetup_select,
     call_handler,
@@ -24,6 +26,13 @@ from tests.helpers import (
     create_user,
     integrity_error,
 )
+from tests.helpers.constants import (
+    DEFAULT_CHAT_ID,
+    DEFAULT_INLINE_MESSAGE_ID,
+    DEFAULT_MESSAGE_ID,
+    DEFAULT_TG_USER_PARAMS,
+)
+from tests.helpers.fixtures import create_member, create_update, telegram_user_from_user
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.types import ClaimSharedCard
 
@@ -49,7 +58,8 @@ async def test_existing_user_joins_own_meeting(
     # The user should have joined the meeting
     assert len(meeting.joined_links) == 1
     assert meeting.joined_links[0].user == user_with_settings
-    assert len(meeting.messages) == 1
+    # The user tapped Join in the private chat with the bot, so no message is stored for the meeting
+    assert meeting.messages == []
     # Single flush: the savepoint flush inside racy_flush; everything else lands at commit.
     mock_session.assert_flushed()
 
@@ -59,15 +69,16 @@ async def test_existing_user_joins_own_meeting(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.JOIN_SUCCESS.get_text(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.JOIN_SUCCESS.text(lang=user_with_settings.lang),
         show_alert=False,
     )
 
-    # All messages have been updated
-    context.api.assert_update_meeting_messages_called(
-        meeting=meeting,
-        current_message=meeting.message_from_update(handler_context.update),
+    # The handler redraws the tapped message itself, so the update of the stored meeting messages skips it
+    context.api.assert_edit_message_called(
+        update=handler_context.update,
+        view=meeting_views.view_for(meeting, user_with_settings),
     )
+    context.api.assert_update_meeting_messages_called(meeting=meeting, current_message=None, skip_current=True)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
@@ -89,8 +100,8 @@ async def test_user_already_join_does_not_join(
     context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
     assert len(meeting.joined_links) == 1
-    # The mssage has been registered
-    assert len(meeting.messages) == 1
+    # A message in the private chat with the bot is never stored for the meeting
+    assert meeting.messages == []
     # No explicit flush: nothing racy was inserted and the rest lands at commit.
     mock_session.assert_not_flushed()
 
@@ -100,7 +111,7 @@ async def test_user_already_join_does_not_join(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get_text(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.JOIN_ALREADY_JOINED.text(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -113,8 +124,8 @@ async def test_concurrent_duplicate_join_is_idempotent_noop(
     metrics: MetricAssertions,
 ):
     """A join that slips past the Python fast path but collides with the (user_id, meetup_id) unique
-    constraint is reported as "already joined" — no fault, no double feature metric, and the surrounding
-    work (the Message row) still persists via the shared flush."""
+    constraint is reported as "already joined": no fault, no double feature metric, and the message the
+    user tapped is still redrawn."""
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
     meeting = user_with_settings.meetups[0]
@@ -127,9 +138,8 @@ async def test_concurrent_duplicate_join_is_idempotent_noop(
 
     context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=handler_context)
 
-    # The Message row created before the operation is still there — the savepoint rolled back only the
-    # duplicate insert, leaving the outer transaction consistent; the row lands at commit.
-    assert len(meeting.messages) == 1
+    # The user tapped Join in the private chat with the bot, so no message is stored for the meeting
+    assert meeting.messages == []
     # Only racy_flush's savepoint flush ran (and raised the clash).
     mock_session.assert_flushed()
 
@@ -141,15 +151,12 @@ async def test_concurrent_duplicate_join_is_idempotent_noop(
     # The user is told they are already joined.
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.JOIN_ALREADY_JOINED.get_text(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.JOIN_ALREADY_JOINED.text(lang=user_with_settings.lang),
         show_alert=False,
     )
 
-    # The surrounding message-update work still runs.
-    context.api.assert_update_meeting_messages_called(
-        meeting=meeting,
-        current_message=meeting.message_from_update(handler_context.update),
-    )
+    # The stored meeting messages are still updated
+    context.api.assert_update_meeting_messages_called(meeting=meeting, current_message=None, skip_current=True)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
@@ -171,20 +178,19 @@ async def test_join_loads_meeting_with_row_lock(
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.JOIN.with_id(1))], indirect=True)
-async def test_join_with_existing_message_does_not_create_new_one(
+async def test_join_redraws_an_already_stored_bot_chat_message_only_once(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
     metrics: MetricAssertions,
 ):
-    """When message_from_update finds an existing message, no new Message is created (branch 168->173)."""
+    """The handler redraws the message itself, stores no second copy of it, and the update of the
+    stored meeting messages skips it."""
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
     meeting = user_with_settings.meetups[0]
 
     # Pre-populate a message that matches the update's effective_message.message_id (default 123)
-    from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID
-
     existing_message = create_message(
         meetup_id=meeting.db_id,
         message_id=DEFAULT_MESSAGE_ID,
@@ -203,6 +209,45 @@ async def test_join_with_existing_message_does_not_create_new_one(
     mock_session.assert_flushed()
 
     metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.JOIN_MEETING)})
+
+    context.api.assert_edit_message_called(
+        update=handler_context.update,
+        view=meeting_views.view_for(meeting, user_with_settings),
+    )
+    context.api.assert_update_meeting_messages_called(
+        meeting=meeting,
+        current_message=existing_message,
+        skip_current=True,
+    )
+
+
+async def test_join_from_a_group_card_stores_it_as_a_meeting_message(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    app: StubMitupApp,
+    metrics_client: MetricsClient,
+):
+    """A card in a group is redrawn by the update of the stored meeting messages, not by the handler."""
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+    meeting = user_with_settings.meetups[0]
+    group_update = create_update(
+        UpdateRequest(callback_query=cb.JOIN.with_id(1)), tg_chat=Chat(id=DEFAULT_CHAT_ID, type=Chat.GROUP)
+    )
+    group_context = HandlerContext(update=group_update, app=app, metrics_client=metrics_client)
+
+    context, _ = await call_handler(MeetingHandlerId.JOIN, handler_context=group_context)
+
+    assert len(meeting.messages) == 1
+    assert meeting.messages[0].chat_id == DEFAULT_CHAT_ID
+    assert meeting.messages[0].message_id == DEFAULT_MESSAGE_ID
+
+    context.api.assert_edit_message_not_called()
+    context.api.assert_update_meeting_messages_called(
+        meeting=meeting,
+        current_message=meeting.messages[0],
+        skip_current=False,
+    )
 
 
 # from_bot_chat=False: the joining user neither owns nor has joined this private meeting, so the
@@ -238,7 +283,7 @@ async def test_user_cannot_join_if_the_meeting_is_full(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.JOIN_FULL.get_text(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.JOIN_FULL.text(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -265,8 +310,8 @@ async def test_user_join_for_non_existing_meeting(
     context.api.assert_edit_message_called(
         update=handler_context.update,
         view=MitupView(
-            description=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
-            keyboard=views_factory.main_menu_back_rows(user_with_settings.lang),
+            message=MeetingDisplayMessages.DELETED_BANNER.rich(lang=user_with_settings.lang),
+            menu=views_factory.main_menu_back_rows(user_with_settings.lang),
         ),
     )
 
@@ -297,7 +342,7 @@ async def test_non_existent_user_joins_meeting(
     # Message has been updated
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.JOIN_UNREGISTERED.get_text(user=user.inline_name),
+        text=MeetingJoinMessages.JOIN_UNREGISTERED.text(user=user.inline_name),
         show_alert=True,
     )
 
@@ -343,7 +388,7 @@ async def test_pending_deletion_user_cannot_join(
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=PrivacyMessages.PENDING_DELETION_ALERT.get_text(lang=user_with_settings.lang),
+        text=PrivacyMessages.PENDING_DELETION_ALERT.text(lang=user_with_settings.lang),
         show_alert=True,
     )
     context.api.assert_update_meeting_messages_not_called()
@@ -371,7 +416,7 @@ async def test_pending_deletion_user_cannot_leave(
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=PrivacyMessages.PENDING_DELETION_ALERT.get_text(lang=user_with_settings.lang),
+        text=PrivacyMessages.PENDING_DELETION_ALERT.text(lang=user_with_settings.lang),
         show_alert=True,
     )
     context.api.assert_update_meeting_messages_not_called()
@@ -406,15 +451,44 @@ async def test_user_leaves_meeting(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.LEAVE_SUCCESS.get_text(lang=user_with_settings.lang),
+        text=MeetingJoinMessages.LEAVE_SUCCESS.text(lang=user_with_settings.lang),
         show_alert=False,
     )
 
-    # All messages have been updated
-    context.api.assert_update_meeting_messages_called(
-        meeting=meeting,
-        current_message=meeting.message_from_update(handler_context.update),
+    # The owner keeps the meeting card after leaving; the handler redraws it itself, so the update
+    # of the stored meeting messages skips it
+    assert meeting.messages == []
+    context.api.assert_edit_message_called(
+        update=handler_context.update,
+        view=meeting_views.view_for(meeting, user_with_settings),
     )
+    context.api.assert_update_meeting_messages_called(meeting=meeting, current_message=None, skip_current=True)
+
+
+async def test_a_participant_leaving_from_the_bot_chat_gets_the_leave_confirmation_screen(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    app: StubMitupApp,
+    metrics_client: MetricsClient,
+):
+    """A participant who taps Leave in the private chat with the bot is shown the confirmation
+    screen instead of the card, whose Join button a private meeting would refuse them."""
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+    meeting = user_with_settings.meetups[0]
+    participant = create_member(id=2, tg_user_id=DEFAULT_TG_USER_PARAMS["id"] + 1)
+    mock_session.add_object(participant, query_field="tg_user_id")
+    JoinedUsers(meetup=meeting, user=participant, meetup_id=meeting.id, user_id=participant.id)
+    update = create_update(
+        UpdateRequest(callback_query=cb.LEAVE.with_id(1)), tg_user=telegram_user_from_user(participant)
+    )
+    handler_context = HandlerContext(update=update, app=app, metrics_client=metrics_client)
+
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
+
+    assert not meeting.has_participant(participant.db_id)
+    assert meeting.messages == []
+    context.api.assert_edit_message_called(update=update, view=meeting_views.left_view(meeting, participant.lang))
 
 
 # from_bot_chat=False: an unregistered user has no bot chat holding this meeting, so the card can
@@ -443,7 +517,7 @@ async def test_non_existing_user_leaves_meeting(
     # Message has been updated
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=MeetingJoinMessages.LEAVE_UNREGISTERED.get_text(user=user.inline_name),
+        text=MeetingJoinMessages.LEAVE_UNREGISTERED.text(user=user.inline_name),
         show_alert=True,
     )
 
@@ -470,39 +544,42 @@ async def test_user_leave_for_non_existing_meeting(
     context.api.assert_edit_message_called(
         update=handler_context.update,
         view=MitupView(
-            description=MeetingDisplayMessages.DELETED_BANNER.get(lang=user_with_settings.lang),
-            keyboard=views_factory.main_menu_back_rows(user_with_settings.lang),
+            message=MeetingDisplayMessages.DELETED_BANNER.rich(lang=user_with_settings.lang),
+            menu=views_factory.main_menu_back_rows(user_with_settings.lang),
         ),
     )
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.LEAVE.with_id(1))], indirect=True)
-async def test_leave_creates_new_message_when_no_existing_message_found(
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.LEAVE.with_id(1), from_bot_chat=False)], indirect=True
+)
+async def test_leave_from_a_shared_card_stores_it_as_a_meeting_message(
     user_with_settings: User,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
 ):
-    """When message_from_update returns None during a leave operation (branch 168→170),
-    a new Message is created and appended to the meeting's messages list."""
+    """A shared card is stored for the meeting the first time somebody taps a button on it."""
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
     meeting = user_with_settings.meetups[0]
     # Join the user so they can leave
     JoinedUsers(meetup=meeting, user=user_with_settings, meetup_id=meeting.id, user_id=user_with_settings.id)
 
-    # Confirm no messages exist before the handler runs
     assert len(meeting.messages) == 0
 
     context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 
-    # A new message was created (branch 168→170 in handle_join_leave_operation)
     assert len(meeting.messages) == 1
+    assert meeting.messages[0].inline_message_id == DEFAULT_INLINE_MESSAGE_ID
     # No explicit flush on the leave path: the removal lands at commit.
     mock_session.assert_not_flushed()
 
+    # The update of the stored meeting messages redraws the card; the handler does not edit it
+    context.api.assert_edit_message_not_called()
     context.api.assert_update_meeting_messages_called(
         meeting=meeting,
         current_message=meeting.messages[0],
+        skip_current=False,
     )
 
 
@@ -532,8 +609,8 @@ async def test_action_on_inactive_meeting_shows_finished_message(
     context.api.assert_edit_message_called(
         update=handler_context.update,
         view=MitupView(
-            description=MeetingDisplayMessages.FINISHED_BANNER.get(lang=inactive_meeting.lang),
-            keyboard=views_factory.main_menu_back_rows(inactive_meeting.lang),
+            message=MeetingDisplayMessages.FINISHED_BANNER.rich(lang=inactive_meeting.lang),
+            menu=views_factory.main_menu_back_rows(inactive_meeting.lang),
         ),
     )
 

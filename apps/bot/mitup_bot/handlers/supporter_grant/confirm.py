@@ -9,8 +9,8 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import FormattedText
 from mitup_bot.utils.messages import GrantOperatorMessages
+from mitup_bot.utils.rich_message import RichContent
 
 from .enums import ConversationGrantState, GrantHandlerId
 from .utils import apply_grant, load_target, picked_level
@@ -43,16 +43,16 @@ async def callback_query_pick_grant_level(
             TARGET_UNUSABLE_EVENT, stage="level", outcome="aborted", reason="target_not_member", target_user_id=valid.id
         )
         await show_admin_menu(
-            update, context, operator, GrantOperatorMessages.CANCELLED_CONFIRMATION.get(lang=operator.lang)
+            update, context, operator, GrantOperatorMessages.CANCELLED_CONFIRMATION.rich(lang=operator.lang)
         )
         return ConversationHandler.END
 
     view = views.factory.confirmation_view(
         guards.render_context(operator, update, context),
-        message=GrantOperatorMessages.CONFIRM_PROMPT.get(
+        message=GrantOperatorMessages.CONFIRM_PROMPT.rich(
             lang=operator.lang,
             name=target.display_name,
-            level=GrantOperatorMessages.level_label(level).get(lang=operator.lang),
+            level=GrantOperatorMessages.level_label(level).rich(lang=operator.lang),
         ),
         confirm_callback_data=cb.CONFIRM_GRANT.with_level(valid.id, valid.level),
         decline_callback_data=cb.CANCEL_GRANT,
@@ -91,7 +91,7 @@ async def callback_query_confirm_grant(session: AsyncSession, update: Update, co
             target_user_id=valid.id,
         )
         await show_admin_menu(
-            update, context, operator, GrantOperatorMessages.CANCELLED_CONFIRMATION.get(lang=operator.lang)
+            update, context, operator, GrantOperatorMessages.CANCELLED_CONFIRMATION.rich(lang=operator.lang)
         )
         return ConversationHandler.END
 
@@ -100,10 +100,10 @@ async def callback_query_confirm_grant(session: AsyncSession, update: Update, co
         update,
         context,
         operator,
-        GrantOperatorMessages.APPLIED_CONFIRMATION.get(
+        GrantOperatorMessages.APPLIED_CONFIRMATION.rich(
             lang=operator.lang,
             name=target.display_name,
-            level=GrantOperatorMessages.level_label(level).get(lang=operator.lang),
+            level=GrantOperatorMessages.level_label(level).rich(lang=operator.lang),
         ),
     )
     # The authorisation trail of a manual tier change: who granted what to whom, from where to
@@ -132,13 +132,13 @@ async def callback_query_cancel_grant(session: AsyncSession, update: Update, con
     # collections.
     operator = await guards.current_user(update, session)
     await show_admin_menu(
-        update, context, operator, GrantOperatorMessages.CANCELLED_CONFIRMATION.get(lang=operator.lang)
+        update, context, operator, GrantOperatorMessages.CANCELLED_CONFIRMATION.rich(lang=operator.lang)
     )
     log.info("Supporter grant flow cancelled", user_id=operator.db_id, stage="cancel", outcome="abandoned")
     return ConversationHandler.END
 
 
-async def show_admin_menu(update: Update, context: TMitupContext, operator: User, message: FormattedText):
+async def show_admin_menu(update: Update, context: TMitupContext, operator: User, message: RichContent):
     """Return to the admin menu with the flow's outcome prepended, so the operator both reads how
     the flow ended and keeps the admin-menu keyboard."""
     await context.api.edit_message(

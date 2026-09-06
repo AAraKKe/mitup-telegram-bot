@@ -7,6 +7,7 @@ from mitup_bot.callback_data import CallbackData
 from mitup_bot.handlers.stale_cancel import StaleCancelHandlerId
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import CommonMessages
+from mitup_bot.views import MitupView
 from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler
 from tests.helpers.api import MockApi
 
@@ -40,7 +41,7 @@ async def test_stale_cancel_answers_callback_with_show_alert(
 
     context, _ = await call_handler(StaleCancelHandlerId.STALE_CANCEL_CALLBACK, handler_context=handler_context)
 
-    expected_text = CommonMessages.STALE_CANCEL_ALERT.get_text(lang=user_with_settings.lang)
+    expected_text = CommonMessages.STALE_CANCEL_ALERT.text(lang=user_with_settings.lang)
     # show_alert=True so the user sees a popup, not just a toast
     context.api.assert_answer_callback_query_called(update, text=expected_text, show_alert=True)
 
@@ -50,18 +51,20 @@ async def test_stale_cancel_answers_callback_with_show_alert(
     [UpdateRequest(callback_query=cb.CANCEL_CREATE_MEETING.with_id(1))],
     indirect=True,
 )
-async def test_stale_cancel_removes_inline_keyboard(
+async def test_stale_cancel_replaces_the_screen_with_a_button_less_one(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings,
     handler_context: HandlerContext,
 ):
-    """clear_reply_markup is called to remove the inline keyboard after a stale cancel."""
+    """The stale buttons go away by being edited out: the screen is replaced by a view carrying no
+    keyboard, so the message that comes back names no buttons at all."""
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, _ = await call_handler(StaleCancelHandlerId.STALE_CANCEL_CALLBACK, handler_context=handler_context)
 
-    context.api.assert_method_just_called("clear_reply_markup")
+    expected = MitupView(message=CommonMessages.STALE_CANCEL_ALERT.rich(lang=user_with_settings.lang), menu=[])
+    context.api.assert_edit_message_called(update, expected)
 
 
 @pytest.mark.parametrize(
@@ -80,7 +83,7 @@ async def test_stale_cancel_matches_any_cancel_action_callback(
 
     context, _ = await call_handler(StaleCancelHandlerId.STALE_CANCEL_CALLBACK, handler_context=handler_context)
 
-    expected_text = CommonMessages.STALE_CANCEL_ALERT.get_text(lang=user_with_settings.lang)
+    expected_text = CommonMessages.STALE_CANCEL_ALERT.text(lang=user_with_settings.lang)
     context.api.assert_answer_callback_query_called(update, text=expected_text, show_alert=True)
 
 
@@ -89,23 +92,23 @@ async def test_stale_cancel_matches_any_cancel_action_callback(
     [UpdateRequest(callback_query=cb.CANCEL_CREATE_MEETING.with_id(1))],
     indirect=True,
 )
-async def test_stale_cancel_answer_callback_query_called_even_when_clear_markup_raises(
+async def test_stale_cancel_answer_callback_query_called_even_when_the_edit_raises(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings,
     handler_context: HandlerContext,
 ):
-    """answer_callback_query runs before clear_reply_markup, so its alert is sent even when markup removal fails."""
+    """answer_callback_query runs before the edit, so its alert is sent even when the edit fails."""
     mock_session.add_object(user_with_settings, "tg_user_id")
 
-    raising_clear = mock.AsyncMock(side_effect=Exception("boom"))
-    with mock.patch.object(MockApi, "clear_reply_markup", raising_clear):
+    raising_edit = mock.AsyncMock(side_effect=Exception("boom"))
+    with mock.patch.object(MockApi, "edit_message", raising_edit):
         context, _ = await call_handler(StaleCancelHandlerId.STALE_CANCEL_CALLBACK, handler_context=handler_context)
 
-    # The alert must have been sent before clear_reply_markup was attempted. The raised failure then
-    # reaches the global error handler, whose best-effort fault notification acknowledges the query a
-    # second time with an empty answer — hence two awaits, of which the alert is one.
-    expected_text = CommonMessages.STALE_CANCEL_ALERT.get_text(lang=user_with_settings.lang)
+    # The alert must have been sent before the edit was attempted. The raised failure then reaches
+    # the global error handler, whose best-effort fault notification acknowledges the query a
+    # second time with an empty answer, hence two awaits, of which the alert is one.
+    expected_text = CommonMessages.STALE_CANCEL_ALERT.text(lang=user_with_settings.lang)
     context.api.assert_answer_callback_query_called(update, text=expected_text, show_alert=True, times=2)
 
 
@@ -123,11 +126,11 @@ async def test_stale_cancel_fires_for_all_cancel_callbacks(
     user_with_settings,
     handler_context: HandlerContext,
 ):
-    """Every cancel-intent callback triggers the alert and removes the inline keyboard."""
+    """Every cancel-intent callback triggers the alert and edits the stale buttons away."""
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     context, _ = await call_handler(StaleCancelHandlerId.STALE_CANCEL_CALLBACK, handler_context=handler_context)
 
-    expected_text = CommonMessages.STALE_CANCEL_ALERT.get_text(lang=user_with_settings.lang)
+    expected_text = CommonMessages.STALE_CANCEL_ALERT.text(lang=user_with_settings.lang)
     context.api.assert_answer_callback_query_called(update, text=expected_text, show_alert=True)
-    context.api.assert_method_just_called("clear_reply_markup")
+    context.api.assert_method_just_called("edit_message")

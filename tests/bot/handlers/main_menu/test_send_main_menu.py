@@ -2,20 +2,29 @@ from telegram import Update
 
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.main_menu.send_main_menu import callback_query_send_main_menu
-from mitup_bot.models import User
+from mitup_bot.models import MeetingCounts, User
 from mitup_bot.views import RenderContext, factory
 from tests.helpers import StubMitupContext
 from tests.helpers.stub_db import MockDbSession
+from tests.helpers.types import SeedMeetingCounts
 
 
 async def test_send_main_menu_sends_a_new_message(
-    update: Update, context: StubMitupContext, user_with_settings: User, mock_session: MockDbSession
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    seed_meeting_counts: SeedMeetingCounts,
 ):
+    counts = MeetingCounts(active=1, joined=4, past=0)
     mock_session.add_object(user_with_settings, "tg_user_id")
+    seed_meeting_counts(user_with_settings, counts)
 
     await callback_query_send_main_menu(update, context)
 
-    context.api.assert_send_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    context.api.assert_send_message_called(
+        update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang), counts=counts)
+    )
 
 
 async def test_send_main_menu_does_not_edit_the_tapped_message(

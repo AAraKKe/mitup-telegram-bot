@@ -1,62 +1,21 @@
-import pytest
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, MessageEntity
+from telegram import MessageEntity
 
 import mitup_bot.utils.callbacks as cb
 from mitup_bot.keyboards import ButtonConfig
-from mitup_bot.utils.entities import MAX_MESSAGE_UTF16_LENGTH, FormattedText, utf16_len
-from mitup_bot.views import MitupView, ViewDocument
-from mitup_bot.views.mitup_view import (
-    CONTEXT_SEPARATOR,
-    MitupInlineView,
-    PaginatedMitupView,
-    PaginatedViewPosition,
-)
-
-
-def test_mitup_view_markup():
-    expected_keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton("button1", callback_data="show;meeting:12"),
-                InlineKeyboardButton("button2", callback_data="show;meeting:13"),
-            ],
-            [
-                InlineKeyboardButton("button3", callback_data="show;meeting:14"),
-                InlineKeyboardButton("button4", callback_data="show;meeting:15"),
-            ],
-            [
-                InlineKeyboardButton("sharebutton", switch_inline_query="meeting:12"),
-            ],
-        ]
-    )
-
-    view = MitupView(
-        "Some message",
-        keyboard=[
-            [
-                ButtonConfig(text="button1", callback_data=cb.SHOW_MEETING.with_id(12)),
-                ButtonConfig(text="button2", callback_data=cb.SHOW_MEETING.with_id(13)),
-            ],
-            [
-                ButtonConfig(text="button3", callback_data=cb.SHOW_MEETING.with_id(14)),
-                ButtonConfig(text="button4", callback_data=cb.SHOW_MEETING.with_id(15)),
-            ],
-            [ButtonConfig(text="sharebutton", switch_inline_query="meeting:12")],
-        ],
-    )
-
-    assert expected_keyboard == view.markup
+from mitup_bot.utils.rich_message import RichContent, RichDocument, RichPhoto, collage_content, photo_content
+from mitup_bot.views import MitupView
+from mitup_bot.views.mitup_view import MitupInlineView, PaginatedMitupView
 
 
 def test_mitup_view_eq_returns_not_implemented_for_non_view():
-    view = MitupView("hello", keyboard=[])
+    view = MitupView(RichContent("hello"), menu=[])
     result = view.__eq__("not a view")
     # __eq__ must signal the comparison cannot be made, not return False
     assert result is NotImplemented
 
 
 def test_mitup_view_repr_contains_description():
-    view = MitupView("hello world", keyboard=[])
+    view = MitupView(RichContent("hello world"), menu=[])
     r = repr(view)
     # repr must identify the class and include the description text
     assert "MitupView" in r
@@ -64,26 +23,32 @@ def test_mitup_view_repr_contains_description():
 
 
 def test_mitup_view_eq_compares_the_document():
-    document = ViewDocument(content=b"{}", filename="export.json")
+    document = RichDocument(content=b"{}", filename="export.json")
 
-    assert MitupView("hello", keyboard=[], document=document) == MitupView("hello", keyboard=[], document=document)
-    assert MitupView("hello", keyboard=[], document=document) != MitupView("hello", keyboard=[])
+    assert MitupView(RichContent("hello"), menu=[], document=document) == MitupView(
+        RichContent("hello"), menu=[], document=document
+    )
+    assert MitupView(RichContent("hello"), menu=[], document=document) != MitupView(RichContent("hello"), menu=[])
 
 
 def test_mitup_view_repr_contains_the_document():
-    view = MitupView("hello", keyboard=[], document=ViewDocument(content=b"{}", filename="export.json"))
+    view = MitupView(
+        RichContent("hello"),
+        menu=[],
+        document=RichDocument(content=b"{}", filename="export.json"),
+    )
     assert "export.json" in repr(view)
 
 
 def test_mitup_inline_view_eq_returns_not_implemented_for_non_inline_view():
     inline_view = MitupInlineView(
-        description="desc",
-        keyboard=[],
+        message=RichContent("desc"),
+        menu=[],
         title="title",
         inline_description="short",
         id="abc",
     )
-    plain_view = MitupView("desc", keyboard=[])
+    plain_view = MitupView(RichContent("desc"), menu=[])
     result = inline_view.__eq__(plain_view)
     # Comparing MitupInlineView to a plain MitupView must return NotImplemented
     assert result is NotImplemented
@@ -94,89 +59,224 @@ def test_mitup_inline_view_eq_returns_not_implemented_for_non_inline_view():
 # ---------------------------------------------------------------------------
 
 
-def test_with_context_under_the_cap_prepends_the_context_unchanged():
-    """Regression pin: a context that fits is prepended exactly as before, entities and all."""
-    description = FormattedText("Meeting card", [MessageEntity(type=MessageEntity.BOLD, offset=0, length=7)])
-    context = FormattedText("Description updated", [MessageEntity(type=MessageEntity.ITALIC, offset=0, length=11)])
+def test_with_context_prepends_the_context_above_what_it_comments_on():
+    view = MitupView(RichContent.from_markup("<b>Meeting</b> card"), menu=[]).with_context(
+        RichContent.from_markup("<i>Description updated</i>")
+    )
 
-    view = MitupView(description, keyboard=[]).with_context(context)
+    assert view.message.html == "<i>Description updated</i><hr/><b>Meeting</b> card"
 
-    assert view.description == FormattedText(
-        "Description updated\n\nMeeting card",
-        [
-            MessageEntity(type=MessageEntity.ITALIC, offset=0, length=11),
-            MessageEntity(type=MessageEntity.BOLD, offset=21, length=7),
-        ],
+
+def test_with_context_escapes_a_bare_string():
+    view = MitupView(RichContent("card"), menu=[]).with_context("a < b")
+
+    assert view.message.html == "a &lt; b<hr/>card"
+
+
+def test_with_context_never_trims_the_context_to_fit():
+    """Length is a wire limit checked on the finished payload, not a reading problem solved by
+    cutting: a client folds a long message behind "Show more"."""
+    echo = "C" * 5000
+
+    view = MitupView(RichContent("card"), menu=[]).with_context(RichContent(echo))
+
+    assert view.message.html.startswith(echo)
+    assert view.message.html.endswith("card")
+
+
+def test_with_context_keeps_a_long_body_whole():
+    body = "D" * 5000
+
+    view = MitupView(RichContent(body), menu=[]).with_context("note")
+
+    assert view.message.text == "note\n" + body
+
+
+def test_paginated_view_single_page_appends_no_navigation_row():
+    # With exactly page_size (4) buttons there is a single page, so the keyboard is the grid alone.
+    buttons = [ButtonConfig(text=str(i), callback_data=cb.SHOW_MEETING.with_id(i)) for i in range(1, 5)]
+    view = PaginatedMitupView(
+        message=RichContent("test"),
+        buttons=buttons,
+        page_number=1,
+        row_size=2,
+        column_size=2,
+    )
+    assert len(view.menu) == 2  # two rows of 2 buttons, no navigation row
+
+
+# ---------------------------------------------------------------------------
+# The rich message a view is sent as
+# ---------------------------------------------------------------------------
+
+CUSTOM_EMOJI = MessageEntity(type=MessageEntity.CUSTOM_EMOJI, offset=0, length=2, custom_emoji_id="123456")
+BOLD = MessageEntity(type=MessageEntity.BOLD, offset=3, length=4)
+
+
+def test_rich_message_serializes_the_description_into_html():
+    view = MitupView(RichContent.from_markup("<b>" + "hi there"[:2] + "</b>" + "hi there"[2:]), [])
+
+    assert view.rich_message().to_api_dict() == {"html": "<b>hi</b> there", "skip_entity_detection": True}
+
+
+def test_rich_message_closes_the_content_with_the_keyboard():
+    """A rich message carries its buttons inside its content, so the payload the view renders is
+    the whole message and nothing travels beside it."""
+    view = MitupView(RichContent("press it"), [[ButtonConfig(text="Go", callback_data=cb.SHOW_MEETING.with_id(1))]])
+
+    assert view.rich_message().html == (
+        'press it<hr/><tg-button-row><tg-button type="callback_data" data="show;meeting:1">Go</tg-button>'
+        "</tg-button-row>"
     )
 
 
-def test_with_context_ellipsizes_the_context_to_the_room_the_description_leaves():
-    """The card is the content and the context is a transient echo of it, so the echo is what is
-    cut — and the entities on both sides stay inside the text Telegram is handed."""
-    card = FormattedText(
-        "D" * (MAX_MESSAGE_UTF16_LENGTH - 104) + "TAIL",
-        [MessageEntity(type=MessageEntity.BOLD, offset=0, length=4)],
+def test_rich_message_puts_the_carried_file_between_the_body_and_the_buttons():
+    view = MitupView(
+        RichContent("your data"),
+        [[ButtonConfig(text="Go", callback_data=cb.SHOW_MEETING.with_id(1))]],
+        document=RichDocument(content=b"{}", filename="export.json"),
     )
-    echo = FormattedText("C" * 500, [MessageEntity(type=MessageEntity.ITALIC, offset=0, length=500)])
 
-    view = MitupView(card, keyboard=[]).with_context(echo)
+    payload = view.rich_message()
 
-    room = 98  # the cap, less the card, less the two-newline separator
-    assert utf16_len(view.description.text) == MAX_MESSAGE_UTF16_LENGTH
-    assert view.description.text.startswith("C" * (room - 1) + "…" + CONTEXT_SEPARATOR)
-    # The card survives whole: its tail is the part a cut in the wrong direction would eat.
-    assert view.description.text.endswith("TAIL")
-    assert view.description.entities == [
-        MessageEntity(type=MessageEntity.ITALIC, offset=0, length=room - 1),
-        MessageEntity(type=MessageEntity.BOLD, offset=room + utf16_len(CONTEXT_SEPARATOR), length=4),
+    assert payload.html == (
+        'your data<tg-document src="tg://document?id=document"></tg-document>'
+        '<hr/><tg-button-row><tg-button type="callback_data" data="show;meeting:1">Go</tg-button></tg-button-row>'
+    )
+    # The payload keeps the file itself, which is what the send uploads beside the content.
+    assert payload.document == view.document
+
+
+BANNER = RichPhoto(media_id="AQADHRJrGzSd4FB-", file_id="AgACAgQAAxkBAAIB")
+
+
+def banner_view() -> MitupView:
+    return MitupView(
+        RichContent("the meeting").prepend(collage_content([photo_content(BANNER.media_id)])),
+        [],
+        photos=[BANNER],
+    )
+
+
+def test_mitup_view_eq_compares_the_photos():
+    assert banner_view() == banner_view()
+    assert banner_view() != MitupView(banner_view().message, [], photos=[RichPhoto(media_id="X", file_id="Y")])
+
+
+def test_mitup_view_repr_contains_the_photos():
+    assert "AQADHRJrGzSd4FB-" in repr(banner_view())
+
+
+def test_rich_message_names_the_photos_the_body_shows():
+    payload = banner_view().rich_message()
+
+    assert payload.html.startswith('<tg-collage><img src="tg://photo?id=AQADHRJrGzSd4FB-"/></tg-collage>')
+    assert payload.to_api_dict()["media"] == [
+        {"id": "AQADHRJrGzSd4FB-", "media": {"type": "photo", "media": "AgACAgQAAxkBAAIB"}}
     ]
 
 
-@pytest.mark.parametrize(
-    "card_length",
-    [MAX_MESSAGE_UTF16_LENGTH, MAX_MESSAGE_UTF16_LENGTH - utf16_len(CONTEXT_SEPARATOR)],
-    ids=["description_at_the_cap", "description_leaving_only_the_separator"],
-)
-def test_with_context_drops_the_context_when_the_description_leaves_no_room(card_length: int):
-    """With no room the context collapses to nothing — the separator alone would still overflow."""
-    card = FormattedText("D" * card_length)
-
-    view = MitupView(card, keyboard=[]).with_context("Description updated")
-
-    assert view.description == card
-
-
-def test_paginated_view_unique_position_navigation_row_is_empty():
-    # With exactly page_size (4) buttons total_pages == 1, position is UNIQUE
-    buttons = [ButtonConfig(text=str(i), callback_data=cb.SHOW_MEETING.with_id(i)) for i in range(1, 5)]
-    view = PaginatedMitupView(
-        description="test",
-        buttons=buttons,
-        page_number=1,
-        row_size=2,
-        column_size=2,
+def test_an_inline_result_carries_the_photos_it_shows():
+    """A picked inline result sends the card as a new message, so the media list has to travel
+    inside the input message content."""
+    view = MitupInlineView(
+        message=RichContent("the meeting").prepend(collage_content([photo_content(BANNER.media_id)])),
+        menu=[],
+        photos=[BANNER],
+        title="Title",
+        inline_description="Description",
+        id="1",
     )
-    assert view.position is PaginatedViewPosition.UNIQUE
-    # The UNIQUE branch in __match_navigation_button returns [] so no navigation row is appended
-    # The keyboard only contains the button rows (1 row of 2 + 1 row of 2 = 2 rows total)
-    assert len(view.keyboard) == 2  # two rows of 2 buttons, no navigation row
+
+    result = view.inline_result()
+
+    assert result["input_message_content"]["rich_message"]["media"] == [
+        {"id": "AQADHRJrGzSd4FB-", "media": {"type": "photo", "media": "AgACAgQAAxkBAAIB"}}
+    ]
 
 
-def test_paginated_view_match_navigation_button_returns_empty_list_for_unique_position():
-    """The UNIQUE case in __match_navigation_button (lines 262-263) returns [].
-
-    __get_paginated_view skips calling __match_navigation_button when position is UNIQUE,
-    so the only way to cover this branch is to invoke the method directly via name mangling."""
-    buttons = [ButtonConfig(text=str(i), callback_data=cb.SHOW_MEETING.with_id(i)) for i in range(1, 5)]
-    view = PaginatedMitupView(
-        description="test",
-        buttons=buttons,
-        page_number=1,
-        row_size=2,
-        column_size=2,
+def test_rich_message_renders_one_row_per_keyboard_row_in_order():
+    view = MitupView(
+        RichContent("pick"),
+        [
+            [ButtonConfig(text="A", callback_data=cb.SHOW_MEETING.with_id(1))],
+            [
+                ButtonConfig(text="B", callback_data=cb.SHOW_MEETING.with_id(2)),
+                ButtonConfig(text="C", url="https://mitup.social"),
+            ],
+        ],
     )
-    assert view.position is PaginatedViewPosition.UNIQUE
 
-    # Call the private method directly — returns [] for UNIQUE (line 262-263)
-    result = view._PaginatedMitupView__match_navigation_button(cb.SHOW_MEETING)  # type: ignore[attr-defined]  # ty: ignore[unresolved-attribute]  # https://github.com/astral-sh/ty/issues/645
-    assert result == []  # UNIQUE case returns an empty list, not navigation buttons
+    assert view.rich_message().html == (
+        "pick<hr/>"
+        '<tg-button-row><tg-button type="callback_data" data="show;meeting:1">A</tg-button></tg-button-row>'
+        '<tg-button-row><tg-button type="callback_data" data="show;meeting:2">B</tg-button>'
+        '<tg-button type="url" url="https://mitup.social">C</tg-button></tg-button-row>'
+    )
+
+
+def test_rich_message_escapes_a_button_label_that_would_read_as_markup():
+    view = MitupView(RichContent("body"), [[ButtonConfig(text="5 < 6", callback_data=cb.SHOW_MEETING.with_id(1))]])
+
+    assert "5 &lt; 6" in view.rich_message().html
+
+
+def test_rich_message_escapes_text_that_would_otherwise_read_as_markup():
+    view = MitupView(RichContent("5 < 6 & rising"), [])
+
+    assert view.rich_message().html == "5 &lt; 6 &amp; rising"
+
+
+def test_rich_message_without_custom_emoji_falls_back_to_the_glyph():
+    view = MitupView(RichContent.from_markup('<tg-emoji emoji-id="123456">🎉</tg-emoji> <b>bold</b>'), [])
+
+    assert view.rich_message(without_custom_emoji=True).html == "🎉 <b>bold</b>"
+
+
+def test_rich_message_keeps_the_custom_emoji_by_default():
+    view = MitupView(RichContent.from_markup('<tg-emoji emoji-id="123456">🎉</tg-emoji> <b>bold</b>'), [])
+
+    assert view.rich_message().html == '<tg-emoji emoji-id="123456">🎉</tg-emoji> <b>bold</b>'
+
+
+def test_rich_message_without_custom_emoji_keeps_the_buttons():
+    view = MitupView(
+        RichContent.from_markup('<tg-emoji emoji-id="123456">🎉</tg-emoji> <b>bold</b>'),
+        [[ButtonConfig(text="Go", callback_data=cb.SHOW_MEETING.with_id(1))]],
+    )
+
+    assert view.rich_message(without_custom_emoji=True).html == (
+        '🎉 <b>bold</b><hr/><tg-button-row><tg-button type="callback_data" data="show;meeting:1">Go</tg-button>'
+        "</tg-button-row>"
+    )
+
+
+def test_carries_custom_emoji_answers_whether_the_retry_has_anything_to_strip():
+    assert (
+        MitupView(
+            RichContent.from_markup('<tg-emoji emoji-id="123456">🎉</tg-emoji> <b>bold</b>'), []
+        ).carries_custom_emoji
+        is True
+    )
+    assert MitupView(RichContent.from_markup("🎉 <b>bold</b>"), []).carries_custom_emoji is False
+    assert MitupView(RichContent("plain"), []).carries_custom_emoji is False
+
+
+def test_a_builder_added_context_is_part_of_the_rendered_message():
+    """The builders mutate the description in place, so a payload produced after one has to carry
+    what it added."""
+    view = MitupView(RichContent("the body"), []).with_context(RichContent.from_markup("<b>done</b>"))
+
+    assert view.rich_message().html == "<b>done</b><hr/>the body"
+
+
+def test_an_inline_view_renders_the_same_way():
+    view = MitupInlineView(
+        message=RichContent.from_markup("<b>" + "hi there"[:2] + "</b>" + "hi there"[2:]),
+        menu=[],
+        title="Title",
+        inline_description="Description",
+        id="1",
+    )
+
+    assert view.rich_message().html == "<b>hi</b> there"

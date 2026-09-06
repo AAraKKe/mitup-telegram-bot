@@ -67,7 +67,7 @@ async def test_delete_meeting_shows_confirmation(
         update,
         factory.confirmation_view(
             lang=user_with_settings.lang,
-            message=MeetingMessages.DELETE_MEETING.get(lang=user_with_settings.lang),
+            message=MeetingMessages.DELETE_MEETING.rich(lang=user_with_settings.lang),
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING.with_id(1),
             decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(1),
         ),

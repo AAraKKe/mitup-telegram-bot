@@ -1,10 +1,11 @@
 import json
 import re
+import warnings
 from asyncio import gather, sleep
-from collections.abc import Callable, Coroutine, Sequence
+from collections.abc import Callable, Coroutine, Hashable, Sequence
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
-from enum import Enum, auto
+from dataclasses import dataclass, field, replace
+from enum import Enum, StrEnum, auto
 from functools import partial
 from hashlib import sha256
 from time import perf_counter
@@ -17,26 +18,23 @@ from telegram import (
     Chat,
     ChatMember,
     ChatMemberRestricted,
-    InlineKeyboardMarkup,
     InlineQuery,
-    InlineQueryResultArticle,
     InlineQueryResultsButton,
-    InputTextMessageContent,
     Message,
-    MessageEntity,
     Update,
 )
 from telegram.constants import ChatMemberStatus
-from telegram.error import BadRequest, Forbidden, NetworkError
+from telegram.error import BadRequest, Forbidden, NetworkError, TelegramError
 from telegram.ext import ExtBot
+from telegram.warnings import PTBUserWarning
 
 from mitup_bot.exceptions import (
     AnswerInlineQueryError,
     CallbackQueryTextTooLong,
     InactiveUserInteraction,
-    NoDocumentAvailable,
     NoMessageAvailable,
 )
+from mitup_bot.keyboards import Keyboard
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MessageModel
 from mitup_bot.models.joined_users import JoinedUsers
@@ -46,10 +44,19 @@ from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils import MeetingDisplayMessages, MeetingJoinMessages
-from mitup_bot.utils.entities import MAX_MESSAGE_UTF16_LENGTH, FormattedText, ellipsize, utf16_len
+from mitup_bot.utils.entities import FormattedText
+from mitup_bot.utils.rich_message import (
+    RichContent,
+    RichMessagePayload,
+    RichPhoto,
+    as_rich_content,
+    carries_custom_emoji_markup,
+    without_custom_emoji_content,
+    without_custom_emoji_markup,
+)
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from mitup_bot.views import meeting as meeting_views
-from mitup_bot.views.meeting_text import rich_title
+from mitup_bot.views.meeting_text import title_content
 
 MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
     re.compile(r"Message_id_invalid"),
@@ -78,6 +85,10 @@ DRAIN_NETWORK_FAILURE_LIMIT = 3
 # transport error in NetworkError (or TimedOut) and keeps the original as __cause__, which is the
 # only place the distinction survives.
 CONNECT_FAILURE_CAUSES = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
+
+# How an edit addresses its message: (chat_id, message_id, inline_message_id). A card in a chat
+# fills the first pair, one in an inline result the last field.
+type EditTarget = tuple[int | None, int | None, str | None]
 
 
 if TYPE_CHECKING:
@@ -120,6 +131,51 @@ def get_update_guards() -> UpdateGuards:
     return __update_guards
 
 
+# --- The outbound transport ---
+# Message bodies travel as rich messages, whose formatting is html inside the request body. PTB
+# models neither the `send_rich_message` method nor the `rich_message` parameter of an edit, so
+# both go out as raw requests.
+SEND_RICH_MESSAGE_ENDPOINT = "send_rich_message"
+SEND_RICH_MESSAGE_DRAFT_ENDPOINT = "send_rich_message_draft"
+EDIT_MESSAGE_TEXT_ENDPOINT = "edit_message_text"
+ANSWER_INLINE_QUERY_ENDPOINT = "answer_inline_query"
+
+# The endpoints PTB models that this module reaches raw anyway, because the rich form of each
+# carries a parameter PTB's signature has no place for. `send_rich_message` is not among them:
+# PTB models no such method, so it draws no advice.
+MODELLED_ENDPOINTS = (EDIT_MESSAGE_TEXT_ENDPOINT, ANSWER_INLINE_QUERY_ENDPOINT)
+
+
+def modelled_endpoint_advisory(endpoint: str) -> str:
+    """The exact advisory PTB raises when `do_api_request` is handed an endpoint it also models
+    (`Bot._warn` in telegram._bot)."""
+    return f"Please use 'Bot.{endpoint}' instead of 'Bot.do_api_request(\"{endpoint}\", ...)'"
+
+
+def silence_modelled_endpoint_advisory():
+    """Install the process filters hiding PTB's advice to call its own method for each endpoint
+    this module reaches raw.
+
+    Matched on the exact advisory text rather than on `PTBUserWarning` as a whole, because the
+    filters live for the life of the process: every other warning of that category still has to
+    reach whoever is listening. Nothing but this module reaches those endpoints through
+    `do_api_request`, so the filters hide only calls it makes.
+    """
+    for endpoint in MODELLED_ENDPOINTS:
+        warnings.filterwarnings(
+            "ignore", message=re.escape(modelled_endpoint_advisory(endpoint)), category=PTBUserWarning
+        )
+
+
+def edit_target_api_kwargs(target: EditTarget) -> dict[str, Any]:
+    """The identifiers a raw edit addresses its message with: the inline message id when the card
+    lives in an inline result, otherwise the chat and message pair."""
+    chat_id, message_id, inline_message_id = target
+    if inline_message_id is not None:
+        return {"inline_message_id": inline_message_id}
+    return {"chat_id": chat_id, "message_id": message_id}
+
+
 @dataclass
 class QueuedApiCall:
     """A Telegram call captured during a write-mode handler, to be executed after commit.
@@ -142,6 +198,34 @@ class QueuedApiCall:
     idempotent: bool = False
 
 
+# Submits with equal keys merge into one background job.
+type JobKey = tuple[Hashable, ...]
+
+
+@dataclass(frozen=True)
+class OutboxStrategy:
+    """Key and hold for a job handed to the background worker.
+
+    Submits with the same *key* merge into one job. The worker runs that job once *hold_seconds*
+    have passed with no new submit under the key.
+    """
+
+    key: JobKey
+    hold_seconds: float = 0.0
+
+
+class JobKind(StrEnum):
+    """The kind of background job, logged as `job_kind`."""
+
+    MEETING_REFRESH = auto()
+    KEYED_SEND = auto()
+
+
+def meeting_job_key(meeting_id: int) -> JobKey:
+    """The key every refresh of one meeting shares."""
+    return ("meeting", meeting_id)
+
+
 @dataclass(frozen=True)
 class MeetingRefresh:
     """One meeting's cards to re-render in the background, optionally leaving a single card alone.
@@ -160,11 +244,48 @@ class MeetingRefresh:
     skip_message_db_id: int | None = None
     message_db_ids: frozenset[int] | None = None
     origin_update_id: int | None = None
+    hold_seconds: float = 0.0
     coalesced: int = 0
     attempt: int = 1
     # Monotonic, so the wait it measures survives a clock adjustment. Out of the equality because
     # two refreshes naming the same cards are the same job whenever either of them was made.
     enqueued_at: float = field(default_factory=perf_counter, compare=False)
+    # When the hold started counting. Every submit merged into this job resets it to now.
+    hold_since: float = field(default_factory=perf_counter, compare=False)
+
+    @property
+    def kind(self) -> JobKind:
+        return JobKind.MEETING_REFRESH
+
+    @property
+    def key(self) -> JobKey:
+        return meeting_job_key(self.meeting_id)
+
+
+@dataclass(frozen=True)
+class KeyedSend:
+    """One rendered message for the background worker to send.
+
+    A later submit under the same key replaces the payload, so a burst of updates leaves one
+    message in the chat: the last rendered one, which already reflects every earlier change.
+    """
+
+    key: JobKey
+    chat_id: int
+    payload: RichMessagePayload
+    origin_update_id: int | None = None
+    hold_seconds: float = 0.0
+    coalesced: int = 0
+    attempt: int = 1
+    enqueued_at: float = field(default_factory=perf_counter, compare=False)
+    hold_since: float = field(default_factory=perf_counter, compare=False)
+
+    @property
+    def kind(self) -> JobKind:
+        return JobKind.KEYED_SEND
+
+
+type BackgroundJob = MeetingRefresh | KeyedSend
 
 
 @dataclass
@@ -248,33 +369,43 @@ class MeetingMessageEdit:
     chat_id: int | None
     message_id: int | None
     inline_message_id: str | None
-    text: str
-    entities: Sequence[MessageEntity] | None
-    reply_markup: InlineKeyboardMarkup | None
+    content: RichContent
+    keyboard: Keyboard | None
+    photos: tuple[RichPhoto, ...] = ()
+
+    @property
+    def carries_custom_emoji(self) -> bool:
+        """Whether the card holds custom emoji, which Telegram refuses from a bot whose owner has
+        no Premium."""
+        return carries_custom_emoji_markup(self.content.html)
+
+    def rich_message(self, *, without_custom_emoji: bool = False) -> RichMessagePayload:
+        """Render the card into the rich message it is sent as, the same way a view renders.
+
+        An inline-addressed card carries its buttons as a classic keyboard (see `classic_markup`),
+        so the payload splits the same way the edit that delivers it does.
+        """
+        body = without_custom_emoji_content(self.content) if without_custom_emoji else self.content
+        return RichMessagePayload.from_content(
+            body, self.keyboard, photos=self.photos, inline_addressed=self.inline_message_id is not None
+        )
 
     @property
     def digest(self) -> str:
         """Fingerprint of everything this edit sends, compared against the digest stored on the
         `Message` row so an edit that would change nothing is never sent.
 
-        It describes what was rendered rather than what Telegram ends up displaying:
-        `retry_without_custom_emoji` can drop entities on the way out, leaving the card showing
-        fallback glyphs under the digest of the version that still had them. That is benign — the
-        next differing render edits again and converges. `default=str` keeps an exotic nested value
-        in a Telegram object from raising here, where a wrong fingerprint costs one edit but a
-        raise would abort the caller's whole render.
+        The fingerprint hashes exactly what goes on the wire, read through `rich_message` as the
+        edit itself is: the html, and for an inline-addressed card the classic keyboard riding
+        beside it (a keyboard-only change must still edit). It describes what was rendered rather
+        than what Telegram ends up displaying, since a custom-emoji retry sends the stripped body,
+        leaving the card showing fallback glyphs under the digest of the version that still had
+        them. That is benign: the next differing render edits again and converges. A body with no
+        html representation raises here, and it could not have been sent either way.
         """
-        payload = json.dumps(
-            [
-                self.text,
-                [entity.to_dict() for entity in self.entities or ()],
-                self.reply_markup.to_dict() if self.reply_markup is not None else None,
-            ],
-            sort_keys=True,
-            separators=(",", ":"),
-            default=str,
-        )
-        return sha256(payload.encode()).hexdigest()
+        payload = self.rich_message()
+        markup = "" if payload.reply_markup is None else json.dumps(payload.reply_markup, sort_keys=True)
+        return sha256((payload.html + markup).encode()).hexdigest()
 
 
 class BotAdapter:
@@ -341,39 +472,51 @@ async def handle_edit_errors(adapter: ContextOrBotAdapter):
 
 
 async def retry_without_custom_emoji[T](
-    send: Callable[[Sequence[MessageEntity] | None], Coroutine[Any, Any, T]],
-    entities: Sequence[MessageEntity] | None,
+    send: Callable[[bool], Coroutine[Any, Any, T]],
+    carries_custom_emoji: bool,
 ) -> T:
-    """Run *send* with *entities*; when Telegram rejects the custom emoji in them, retry once
-    with only the custom_emoji entities stripped so the message still goes out with fallback
-    glyphs and its remaining formatting."""
+    """Run *send*; when Telegram rejects the custom emoji the message carries, run it once more
+    without them so it still goes out with fallback glyphs and its remaining formatting.
+
+    *send* takes the flag to render with and nothing else: dropping the emoji is a rendering
+    decision, so it belongs to whatever produces the payload rather than to this retry.
+    """
     try:
-        return await send(entities)
+        return await send(False)
     except BadRequest as error:
-        stripped = [entity for entity in entities or [] if entity.type != MessageEntity.CUSTOM_EMOJI]
-        if len(stripped) == len(entities or []) or not CUSTOM_EMOJI_REJECTION_PATTERN.search(error.message):
+        if not carries_custom_emoji or not CUSTOM_EMOJI_REJECTION_PATTERN.search(error.message):
             raise
         log.warning("Custom emoji rejected by Telegram, retrying without them", error=error.message)
-        return await send(stripped or None)
+        return await send(True)
 
 
 def view_log_payload(view: MitupView) -> dict[str, Any]:
-    """Loggable snapshot of a rendered view — the full text plus the serialized markup.
+    """Loggable snapshot of a rendered view: the full text, its button rows, and the file it
+    carries, named by size rather than content.
 
     Attached only to failure logs: happy-path log and metric lines stay lean, but when a send
     fails the log must show everything the call tried to deliver (log retention owns the PII
     lifecycle).
     """
-    return {
-        "text": view.description.text,
-        "markup": view.markup.to_dict() if view.markup is not None else None,
-    }
+    payload = {"text": view.message.text, "markup": keyboard_log_payload(view.menu)}
+    if view.document is None:
+        return payload
+    return payload | {"document_filename": view.document.filename, "document_bytes": len(view.document.content)}
 
 
-def edit_target_log_payload(target: tuple[int | None, int | None, str | None]) -> dict[str, Any]:
+def edit_target_log_payload(target: EditTarget) -> dict[str, Any]:
     """Loggable identifiers of an edit target (chat, message, inline message)."""
     chat_id, message_id, inline_message_id = target
     return {"chat_id": chat_id, "message_id": message_id, "inline_message_id": inline_message_id}
+
+
+def keyboard_log_payload(keyboard: Keyboard | None) -> list[list[dict[str, Any]]]:
+    """Loggable form of a keyboard: its button rows as plain data.
+
+    A button names only the fields it sets, so the row reads as what was built rather than as the
+    whole schema repeated once per button.
+    """
+    return [[button.model_dump(mode="json", exclude_defaults=True) for button in row] for row in keyboard or []]
 
 
 def meeting_edit_log_payload(edit: MeetingMessageEdit) -> dict[str, Any]:
@@ -382,8 +525,8 @@ def meeting_edit_log_payload(edit: MeetingMessageEdit) -> dict[str, Any]:
         "chat_id": edit.chat_id,
         "message_id": edit.message_id,
         "inline_message_id": edit.inline_message_id,
-        "text": edit.text,
-        "markup": edit.reply_markup.to_dict() if edit.reply_markup is not None else None,
+        "text": edit.content.text,
+        "markup": keyboard_log_payload(edit.keyboard),
     }
 
 
@@ -398,37 +541,18 @@ def meeting_edit_log_facts(edit: MeetingMessageEdit) -> dict[str, Any]:
         "chat_id": edit.chat_id,
         "message_id": edit.message_id,
         "inline_message_id": edit.inline_message_id,
-        "text_len": len(edit.text),
-        "entity_count": len(edit.entities or []),
+        "text_len": edit.content.text_length,
     }
 
 
-def cap_outbound_text(text: FormattedText, api_method: str) -> FormattedText:
-    """Return *text* within Telegram's message-text cap, saying so when it had to be cut.
+def resolve_view(view: MitupView | RichContent | str, api_method: str) -> MitupView:
+    """Normalize a send/edit argument into a view.
 
-    Every surface that renders a message is expected to arrive here already fitted — a meeting card
-    to its budget, a context line to the room its description leaves. A cut here therefore means one
-    of them let an unbounded value through, and Telegram would have rejected the whole call: the
-    warning is the only signal that a surface escaped its own budget. The text itself never reaches
-    the log line.
+    Telegram caps a rich message on the text it renders, which is checked on the finished payload
+    on its way out rather than here: the cap belongs to what is actually sent, buttons included.
     """
-    overflow = utf16_len(text.text) - MAX_MESSAGE_UTF16_LENGTH
-    if overflow <= 0:
-        return text
-    log.warning("Message text over the Telegram cap, ellipsized", api_method=api_method, overflow=overflow)
-    return ellipsize(text, MAX_MESSAGE_UTF16_LENGTH)
-
-
-def resolve_view(view: MitupView | FormattedText | str, api_method: str) -> MitupView:
-    """Normalize a send/edit argument into a view whose text Telegram will accept.
-
-    Every method taking a `MitupView | FormattedText | str` passes through here, which makes it the
-    one place the outbound cap is enforced for them. An over-long view is capped in place, so the
-    failure logs and the persisted buttons describe what actually went out.
-    """
-    resolved = view if isinstance(view, MitupView) else MitupView(view, keyboard=[])
-    resolved.description = cap_outbound_text(resolved.description, api_method)
-    return resolved
+    _ = api_method
+    return view if isinstance(view, MitupView) else MitupView(as_rich_content(view))
 
 
 def chat_member_is_present(member: ChatMember) -> bool:
@@ -462,7 +586,7 @@ def membership_refusal(error: Forbidden | BadRequest) -> str:
     return "forbidden" if isinstance(error, Forbidden) else "bad_request"
 
 
-def edit_target(update: Update) -> tuple[int | None, int | None, str | None]:
+def edit_target(update: Update) -> EditTarget:
     """Extract (chat_id, message_id, inline_message_id) for an edit from the update."""
     if update.effective_message:
         return update.effective_message.chat.id, update.effective_message.id, None
@@ -499,20 +623,23 @@ class TelegramApiWrapper(Protocol):
     def begin_capture(self) -> ApiOutbox: ...
     def end_capture(self): ...
     async def execute_queued(self, outbox: ApiOutbox): ...
-    async def send_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | None: ...
-    async def send_document(self, update: Update, view: MitupView) -> Message | None: ...
-    async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None: ...
+    async def send_message(
+        self, update: Update, view: MitupView | RichContent | str, *, strategy: OutboxStrategy | None = None
+    ) -> Message | None: ...
+    async def send_rich_payload(self, chat_id: int, message: RichMessagePayload) -> Message | None: ...
+    async def send_draft(self, update: Update, view: MitupView | RichContent | str, *, draft_id: int): ...
+    async def send_message_to_user(self, user: User, view: MitupView | RichContent | str) -> Message | None: ...
     async def send_messages_to_users(
         self,
         users: Sequence[User],
-        views: Sequence[MitupView | FormattedText | str],
+        views: Sequence[MitupView | RichContent | str],
         on_success: Sequence[Callable[[User], None]] | None = None,
         on_error: Sequence[Callable[[User, Exception], None]] | None = None,
         on_unreachable: Sequence[Callable[[User], None]] | None = None,
     ): ...
-    async def edit_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | bool: ...
+    async def edit_message(self, update: Update, view: MitupView | RichContent | str) -> Message | bool: ...
     async def edit_message_for_user(
-        self, user: User, message_id: int, view: MitupView | FormattedText | str
+        self, user: User, message_id: int, view: MitupView | RichContent | str
     ) -> Message | bool: ...
     async def answer_inline_query(
         self,
@@ -538,13 +665,13 @@ class TelegramApiWrapper(Protocol):
         was_deleted: bool = False,
         has_finished: bool = False,
         only_message_db_ids: frozenset[int] | None = None,
+        strategy: OutboxStrategy | None = None,
     ): ...
     async def notify_users_promoted_from_waiting_list(
         self,
         joined_users: Sequence[JoinedUsers],
         meeting: Meetup,
     ): ...
-    async def clear_reply_markup(self, update: Update): ...
     # Immediate admin operations on a supergroup — never routed through the outbox. Each answers
     # whether Telegram applied the change, so a caller never records a membership move that a
     # swallowed Forbidden/BadRequest prevented.
@@ -778,69 +905,86 @@ class TelegramApi:
 
     # -- Public api -------------------------------------------------------------------------
 
-    async def send_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | None:
+    async def send_message(
+        self, update: Update, view: MitupView | RichContent | str, *, strategy: OutboxStrategy | None = None
+    ) -> Message | None:
+        """Send *view* to the chat *update* came from.
+
+        With a *strategy*, the rendered message is handed to the background worker under the
+        strategy's key instead of being sent here, so a burst of updates leaves one message in
+        the chat. Without a background queue the message is sent as usual.
+        """
         chat_id = get_update_guards().chat(update).id
         resolved = resolve_view(view, "send_message")
-        return await self._call_or_enqueue(
-            "send_message",
-            partial(self._send_chat_message_now, chat_id, resolved),
-            None,
-            {"chat_id": chat_id} | view_log_payload(resolved),
-        )
-
-    async def _send_chat_message_now(self, chat_id: int, view: MitupView) -> Message | None:
-        return await retry_without_custom_emoji(
-            lambda entities: self.adapter.bot.send_message(
+        payload = {"chat_id": chat_id} | view_log_payload(resolved)
+        if strategy is not None and self._outbox is not None and self.refresh_queue is not None:
+            send = KeyedSend(
+                key=strategy.key,
                 chat_id=chat_id,
-                text=view.description.text,
-                entities=entities,
-                reply_markup=view.markup,
-                disable_web_page_preview=True,
-            ),
-            view.description.entities or None,
-        )
+                payload=resolved.rich_message(),
+                origin_update_id=ambient_update_id(),
+                hold_seconds=strategy.hold_seconds,
+            )
+            self._enqueue("submit_keyed_send", partial(self.submit_keyed_send, send), payload)
+            return None
+        return await self._call_or_enqueue("send_message", partial(self._send_now, chat_id, resolved), None, payload)
 
-    async def send_document(self, update: Update, view: MitupView) -> Message | None:
-        """Send the view's document to the chat from the update, with the view's description
-        as the caption and its keyboard as the reply markup."""
+    async def send_draft(self, update: Update, view: MitupView | RichContent | str, *, draft_id: int):
+        """Show *view* right away as a draft in the chat *update* came from.
+
+        A draft is a preview Telegram removes on its own when the bot sends its next message, so it
+        is sent at once rather than after commit, and a failure is only logged: the real answer
+        follows either way.
+        """
         chat_id = get_update_guards().chat(update).id
-        if view.document is None:
-            raise NoDocumentAvailable("Cannot send document, the view carries no document")
-        # Rendered at enqueue time so the queued call carries only plain data under capture.
-        return await self._call_or_enqueue(
-            "send_document",
-            partial(
-                self._send_document_now,
-                chat_id,
-                view.document.content,
-                view.document.filename,
-                view.description,
-                view.markup,
+        payload = resolve_view(view, "send_draft").rich_message()
+        try:
+            await self.adapter.bot.do_api_request(
+                SEND_RICH_MESSAGE_DRAFT_ENDPOINT,
+                api_kwargs={"chat_id": chat_id, "draft_id": draft_id, "rich_message": payload.to_api_dict()},
+            )
+        except TelegramError:
+            log.warning("Draft message not shown", chat_id=chat_id, draft_id=draft_id, exc_info=True)
+
+    async def submit_keyed_send(self, send: KeyedSend):
+        """Submit *send* to the background worker. Runs from the outbox, after the transaction that
+        rendered the message has committed."""
+        assert self.refresh_queue is not None, "send_message only enqueues this when a queue exists"
+        self.refresh_queue.submit(send)
+
+    async def _send_now(self, chat_id: int, view: MitupView) -> Message | None:
+        """Send *view* to *chat_id*, re-rendering it without its custom emoji if Telegram rejects
+        them. The view renders itself per attempt, so the retry sends the stripped body rather than
+        the one that was refused."""
+        return await retry_without_custom_emoji(
+            lambda without_custom_emoji: self._send_rich_message_now(
+                chat_id, view.rich_message(without_custom_emoji=without_custom_emoji)
             ),
-            None,
-            {"chat_id": chat_id, "filename": view.document.filename, "caption": view.description.text},
+            view.carries_custom_emoji,
         )
 
-    async def _send_document_now(
-        self,
-        chat_id: int,
-        document: bytes,
-        filename: str,
-        caption: FormattedText | str | None,
-        reply_markup: InlineKeyboardMarkup | None,
-    ) -> Message | None:
-        caption_text = caption.text if isinstance(caption, FormattedText) else caption
-        caption_entities = (caption.entities or None) if isinstance(caption, FormattedText) else None
-        return await self.adapter.bot.send_document(
-            chat_id=chat_id,
-            document=document,
-            filename=filename,
-            caption=caption_text,
-            caption_entities=caption_entities,
-            reply_markup=reply_markup,
+    async def _send_rich_message_now(self, chat_id: int, message: RichMessagePayload) -> Message | None:
+        """Post *message* to *chat_id*, uploading the file it carries beside it. There is no
+        link-preview parameter: what a rich message previews is governed by its own content."""
+        message.check_length()
+        return await self.adapter.bot.do_api_request(
+            SEND_RICH_MESSAGE_ENDPOINT,
+            api_kwargs={"chat_id": chat_id, "rich_message": message.to_api_dict()} | message.upload_kwargs(),
+            return_type=Message,
         )
 
-    async def send_message_to_user(self, user: User, view: MitupView | FormattedText | str) -> Message | None:
+    async def send_rich_payload(self, chat_id: int, message: RichMessagePayload) -> Message | None:
+        """Send an already rendered *message* to *chat_id*. If Telegram rejects its custom emoji,
+        send it again with the custom emoji replaced by plain emoji."""
+        return await retry_without_custom_emoji(
+            lambda without_custom_emoji: self._send_rich_message_now(
+                chat_id,
+                replace(message, html=without_custom_emoji_markup(message.html)) if without_custom_emoji else message,
+            ),
+            carries_custom_emoji_markup(message.html),
+        )
+
+    async def send_message_to_user(self, user: User, view: MitupView | RichContent | str) -> Message | None:
         resolved = resolve_view(view, "send_message_to_user")
         return await self._call_or_enqueue(
             "send_message_to_user",
@@ -851,16 +995,7 @@ class TelegramApi:
 
     async def _send_user_message_now(self, tg_user_id: int, view: MitupView) -> Message | None:
         try:
-            return await retry_without_custom_emoji(
-                lambda entities: self.adapter.bot.send_message(
-                    chat_id=tg_user_id,
-                    text=view.description.text,
-                    entities=entities,
-                    reply_markup=view.markup,
-                    disable_web_page_preview=True,
-                ),
-                view.description.entities or None,
-            )
+            return await self._send_now(tg_user_id, view)
         except Forbidden as e:
             log.warning("User has blocked the bot", tg_user_id=tg_user_id)
             raise InactiveUserInteraction(tg_user_id, private=True) from e
@@ -873,7 +1008,7 @@ class TelegramApi:
     async def send_messages_to_users(
         self,
         users: Sequence[User],
-        views: Sequence[MitupView | FormattedText | str],
+        views: Sequence[MitupView | RichContent | str],
         on_success: Sequence[Callable[[User], None]] | None = None,
         on_error: Sequence[Callable[[User, Exception], None]] | None = None,
         on_unreachable: Sequence[Callable[[User], None]] | None = None,
@@ -914,7 +1049,7 @@ class TelegramApi:
     def _enqueue_user_messages(
         self,
         users: Sequence[User],
-        views: Sequence[MitupView | FormattedText | str],
+        views: Sequence[MitupView | RichContent | str],
         *,
         has_callbacks: bool,
     ):
@@ -940,7 +1075,7 @@ class TelegramApi:
     ):
         users = [link.user for link in joined_users if link.invited_by is None]
         views_to_send = [
-            MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(lang=user.lang, meeting_title=rich_title(meeting))
+            MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.rich(lang=user.lang, meeting_title=title_content(meeting))
             for user in users
         ]
         await self.send_messages_to_users(
@@ -948,7 +1083,7 @@ class TelegramApi:
             views=views_to_send,
         )
 
-    async def edit_message(self, update: Update, view: MitupView | FormattedText | str) -> Message | bool:
+    async def edit_message(self, update: Update, view: MitupView | RichContent | str) -> Message | bool:
         resolved = resolve_view(view, "edit_message")
         target = edit_target(update)
         return await self._call_or_enqueue(
@@ -959,27 +1094,36 @@ class TelegramApi:
             idempotent=True,
         )
 
-    async def _edit_message_now(
-        self, target: tuple[int | None, int | None, str | None], view: MitupView
-    ) -> Message | bool:
-        chat_id, message_id, inline_message_id = target
+    async def _edit_rich_text_now(self, target: EditTarget, message: RichMessagePayload) -> Message | bool:
+        """Telegram accepts a direct file upload on a chat-message edit and rejects one on an
+        inline-message edit."""
+        message.check_length()
+        return await self.adapter.bot.do_api_request(
+            EDIT_MESSAGE_TEXT_ENDPOINT,
+            api_kwargs=edit_target_api_kwargs(target)
+            | {"rich_message": message.to_api_dict()}
+            | message.markup_kwargs()
+            | message.upload_kwargs(),
+            return_type=Message,
+        )
+
+    async def _edit_message_now(self, target: EditTarget, view: MitupView) -> Message | bool:
+        # An inline-addressed message keeps its buttons as a classic keyboard (see
+        # `classic_markup`), and an edit that folded them into the content instead would strip
+        # that keyboard off the card.
+        inline_addressed = target[2] is not None
         async with handle_edit_errors(adapter=self.adapter):
             return await retry_without_custom_emoji(
-                lambda entities: self.adapter.bot.edit_message_text(
-                    text=view.description.text,
-                    entities=entities,
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    inline_message_id=inline_message_id,
-                    reply_markup=view.markup,
-                    disable_web_page_preview=True,
+                lambda without_custom_emoji: self._edit_rich_text_now(
+                    target,
+                    view.rich_message(without_custom_emoji=without_custom_emoji, inline_addressed=inline_addressed),
                 ),
-                view.description.entities or None,
+                view.carries_custom_emoji,
             )
         return False
 
     async def edit_message_for_user(
-        self, user: User, message_id: int, view: MitupView | FormattedText | str
+        self, user: User, message_id: int, view: MitupView | RichContent | str
     ) -> Message | bool:
         """Edit a message in a user's private chat by explicit ``message_id``, without an ``Update``.
 
@@ -989,7 +1133,7 @@ class TelegramApi:
         message). Routes through the same ``_edit_message_now`` suppression as update-based edits.
         """
         resolved = resolve_view(view, "edit_message_for_user")
-        target: tuple[int | None, int | None, str | None] = (user.tg_user_id, message_id, None)
+        target: EditTarget = (user.tg_user_id, message_id, None)
         return await self._call_or_enqueue(
             "edit_message_for_user",
             partial(self._edit_message_now, target, resolved),
@@ -997,26 +1141,6 @@ class TelegramApi:
             edit_target_log_payload(target) | view_log_payload(resolved),
             idempotent=True,
         )
-
-    async def clear_reply_markup(self, update: Update):
-        target = edit_target(update)
-        await self._call_or_enqueue(
-            "clear_reply_markup",
-            partial(self._clear_reply_markup_now, target),
-            None,
-            edit_target_log_payload(target),
-            idempotent=True,
-        )
-
-    async def _clear_reply_markup_now(self, target: tuple[int | None, int | None, str | None]):
-        chat_id, message_id, inline_message_id = target
-        async with handle_edit_errors(adapter=self.adapter):
-            await self.adapter.bot.edit_message_reply_markup(
-                chat_id=chat_id,
-                message_id=message_id,
-                inline_message_id=inline_message_id,
-                reply_markup=None,
-            )
 
     async def answer_inline_query(
         self,
@@ -1026,25 +1150,16 @@ class TelegramApi:
         cache_time: int = 60,
     ):
         query = get_update_guards().valid_inline_query(update)
-        inline_results = [
-            InlineQueryResultArticle(
-                id=view.id,
-                title=view.title,
-                description=view.inline_description,
-                input_message_content=InputTextMessageContent(
-                    message_text=view.description.text,
-                    entities=view.description.entities or None,
-                ),
-                reply_markup=view.markup,
-            )
-            for view in results
-        ]
-        tg_button = (
-            InlineQueryResultsButton(text=button.text, start_parameter=button.start_parameter) if button else None
+        # Rendered at enqueue time so the queued call carries only plain data under capture.
+        inline_results = [view.inline_result() for view in results]
+        results_button = (
+            InlineQueryResultsButton(text=button.text, start_parameter=button.start_parameter).to_dict()
+            if button
+            else None
         )
         await self._call_or_enqueue(
             "answer_inline_query",
-            partial(self._answer_inline_query_now, query.id, query.query, inline_results, tg_button, cache_time),
+            partial(self._answer_inline_query_now, query.id, query.query, inline_results, results_button, cache_time),
             None,
             {"query_id": query.id, "query": query.query, "result_count": len(inline_results)},
             idempotent=True,
@@ -1054,13 +1169,23 @@ class TelegramApi:
         self,
         query_id: str,
         query_text: str,
-        inline_results: list[InlineQueryResultArticle],
-        tg_button: InlineQueryResultsButton | None,
+        inline_results: list[dict[str, Any]],
+        results_button: dict[str, Any] | None,
         cache_time: int,
     ):
-        if await self.adapter.bot.answer_inline_query(
-            query_id, results=inline_results, button=tg_button, cache_time=cache_time
-        ):
+        """Answer the query with results whose picked message is a rich one.
+
+        The results go out raw because PTB's `InlineQueryResult` types model no rich content; each
+        one already carries its whole message, buttons included, so none attaches a `reply_markup`.
+        """
+        api_kwargs: dict[str, Any] = {
+            "inline_query_id": query_id,
+            "results": inline_results,
+            "cache_time": cache_time,
+        }
+        if results_button is not None:
+            api_kwargs["button"] = results_button
+        if await self.adapter.bot.do_api_request(ANSWER_INLINE_QUERY_ENDPOINT, api_kwargs=api_kwargs):
             return
         raise AnswerInlineQueryError(query_text)
 
@@ -1093,13 +1218,13 @@ class TelegramApi:
     ) -> MeetingMessageEdit:
         """Render one stored meeting message into a plain edit payload.
 
-        `has_finished` clears buttons; uses the enriched summary when `end_datetime` is set.
+        A meeting that was deleted or has finished renders with no buttons at all.
         """
 
         view = (
             meeting_views.inline_view(meeting, chat_instance=message.chat_instance)
             if message.inline_message_id or message.chat_id != meeting.owner.tg_user_id
-            else meeting_views.main_view(meeting)
+            else meeting_views.owner_view(meeting)
         )
 
         # Update the stored buttons to match the current view to ensure they are persisted.
@@ -1108,58 +1233,42 @@ class TelegramApi:
         # messages cascade, so no explicit session.add is needed.
         # TODO: We might want to remove the persistency on this message. Not sure what was the
         # reason to have it to begin with
-        message.buttons.keyboard = view.keyboard
+        message.buttons.keyboard = view.menu
 
-        # Determine the text, entities and markup based on meeting state
+        # Determine the text, entities and buttons based on meeting state
         if was_deleted:
-            body = MeetingDisplayMessages.DELETED_BANNER.get(lang=meeting.lang)
-            reply_markup = None
+            body = MeetingDisplayMessages.DELETED_BANNER.rich(lang=meeting.lang)
+            keyboard = None
         elif has_finished:
-            finished_message = (
-                MeetingDisplayMessages.FINISHED_SUMMARY_BANNER.get(
-                    lang=meeting.lang,
-                    start_datetime=f"{meeting.datetime:%Y-%m-%d %H:%M}" if meeting.datetime else "?",
-                    end_datetime=f"{meeting.end_datetime:%Y-%m-%d %H:%M}" if meeting.end_datetime else "?",
-                    attendee_count=meeting.n_participants,
-                )
-                if meeting.end_datetime is not None
-                else MeetingDisplayMessages.FINISHED_BANNER.get(lang=meeting.lang)
-            )
-            body = view.with_context(finished_message).description
-            reply_markup = None
+            # The owner's card is built out of controls, so a finished meeting renders from the
+            # shared body instead.
+            body = meeting_views.shared_body(meeting, finished=True)
+            keyboard = None
         else:
-            body = view.description
-            reply_markup = view.markup
+            body = view.message
+            keyboard = view.menu
 
-        # This path renders its own text instead of taking a view argument, so it is outside
-        # `resolve_view` and carries the outbound cap itself.
-        body = cap_outbound_text(body, "update_meeting_message")
         return MeetingMessageEdit(
             message_db_id=message.id,
             chat_id=message.chat_id,
             message_id=message.message_id,
             inline_message_id=message.inline_message_id,
-            text=body.text,
-            entities=body.entities or None,
-            reply_markup=reply_markup,
+            content=body,
+            keyboard=keyboard,
+            photos=meeting_views.meeting_photos(meeting),
         )
 
     async def _edit_meeting_message_now(self, edit: MeetingMessageEdit) -> bool:
         """Execute a rendered meeting-message edit. Returns True when Telegram reports the
         message unreachable (deleted by the user, or its chat gone), leaving the DB cleanup
         to the caller."""
+        target: EditTarget = (edit.chat_id, edit.message_id, edit.inline_message_id)
         try:
             await retry_without_custom_emoji(
-                lambda entities: self.adapter.bot.edit_message_text(
-                    text=edit.text,
-                    entities=entities,
-                    chat_id=edit.chat_id,
-                    message_id=edit.message_id,
-                    inline_message_id=edit.inline_message_id,
-                    reply_markup=edit.reply_markup,
-                    disable_web_page_preview=True,
+                lambda without_custom_emoji: self._edit_rich_text_now(
+                    target, edit.rich_message(without_custom_emoji=without_custom_emoji)
                 ),
-                edit.entities,
+                edit.carries_custom_emoji,
             )
         except BadRequest as e:
             # Sometimes the message does not need to be updated but we don't know that in
@@ -1251,6 +1360,7 @@ class TelegramApi:
         meeting: Meetup,
         current_message: MessageModel | None,
         message_db_ids: frozenset[int] | None = None,
+        strategy: OutboxStrategy | None = None,
     ) -> bool:
         """Record a refresh of *meeting* on the outbox instead of drawing the rest of its cards
         here, answering whether it was recorded.
@@ -1258,7 +1368,8 @@ class TelegramApi:
         Recording is all that happens inside the transaction; `execute_queued` submits the refresh
         to the queue once that transaction has committed, because the job re-reads the meeting.
         Only a capture-mode fan-out can defer, since the outbox is what carries it across that
-        boundary. *message_db_ids* is the scope the job inherits, None meaning every card.
+        boundary. *message_db_ids* is the set of cards the job covers, None meaning every card.
+        *strategy* gives the hold the job waits before drawing them.
         """
         queue = self.refresh_queue
         if self._outbox is None or queue is None or not queue.accepts_fanout or meeting.id is None:
@@ -1269,6 +1380,7 @@ class TelegramApi:
                 skip_message_db_id=current_message.id if current_message is not None else None,
                 message_db_ids=message_db_ids,
                 origin_update_id=ambient_update_id(),
+                hold_seconds=0.0 if strategy is None else strategy.hold_seconds,
             )
         )
         return True
@@ -1282,6 +1394,7 @@ class TelegramApi:
         was_deleted: bool = False,
         has_finished: bool = False,
         only_message_db_ids: frozenset[int] | None = None,
+        strategy: OutboxStrategy | None = None,
     ):
         """
         Updates all tracked messages for a meeting, `current_message` first for immediate
@@ -1296,9 +1409,15 @@ class TelegramApi:
         so the invocation ends once the card the user is looking at is drawn. A deletion or a
         finish is the exception and always draws every card here: both render rows that die in the
         same transaction, so a job reading the meeting afterwards would find nothing to draw.
+
+        *strategy* gives the hold the deferred job waits, so a burst of changes to one meeting
+        draws its cards once.
         """
         terminal = was_deleted or has_finished
         assert not (terminal and only_message_db_ids is not None), "A deletion or a finish draws every card"
+        assert strategy is None or strategy.key == meeting_job_key(meeting.db_id), (
+            "A fan-out strategy must be keyed by the meeting being drawn"
+        )
         # First lets update the current message for a better user experience
         if current_message and not skip_current:
             await self.update_single_meeting_message(
@@ -1314,7 +1433,7 @@ class TelegramApi:
         ]
         if not editable:
             return
-        if not terminal and self.defer_meeting_refresh(meeting, current_message, only_message_db_ids):
+        if not terminal and self.defer_meeting_refresh(meeting, current_message, only_message_db_ids, strategy):
             return
         for message in editable:
             await self.update_single_meeting_message(

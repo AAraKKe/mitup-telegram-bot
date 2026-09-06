@@ -105,7 +105,7 @@ class FlagProbeBot:
         self.meetup_id = meetup_id
         self.flag_seen_during_drain: bool | None = None
 
-    async def send_message(self, **kwargs: object):
+    async def do_api_request(self, endpoint: str, **kwargs: object):
         # A fresh transaction only sees committed state: True here proves the job's
         # transaction was over before the queued send executed.
         async with db.begin() as contender:
@@ -117,7 +117,7 @@ class FlagProbeBot:
 class BlockedBot:
     """Every DM raises Forbidden, as when the participant has blocked the bot."""
 
-    async def send_message(self, **kwargs: object):
+    async def do_api_request(self, endpoint: str, **kwargs: object):
         raise Forbidden("Forbidden: bot was blocked by the user")
 
 
@@ -128,7 +128,7 @@ class LockProbeBot:
         self.meetup_id = meetup_id
         self.active_seen_under_lock: bool | None = None
 
-    async def edit_message_text(self, **kwargs: object):
+    async def do_api_request(self, endpoint: str, **kwargs: object):
         # Takes the same FOR UPDATE lock the critical section held. This blocks (and times
         # the test out) if the job's transaction were still open around the fan-out.
         async with db.begin() as contender:
@@ -206,7 +206,7 @@ class ErasureProbeBot:
         self.tg_user_id = tg_user_id
         self.row_present_during_drain: bool | None = None
 
-    async def send_message(self, **kwargs: object):
+    async def do_api_request(self, endpoint: str, **kwargs: object):
         # A fresh transaction only sees committed state: an absent row here proves the purge
         # committed before the farewell executed — the deletion is never announced early.
         async with db.begin() as contender:

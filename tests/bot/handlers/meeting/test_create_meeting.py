@@ -11,19 +11,20 @@ from telegram.ext import Application, ConversationHandler
 from mitup_bot import limits, supporter
 from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
+from mitup_bot.datetimes import DateFormat
 from mitup_bot.handlers.meeting.create_meeting import ValidTitleFilter, callback_query_create_meeting
 from mitup_bot.handlers.meeting.enums import ConversationMeetingState, MeetingHandlerId
 from mitup_bot.handlers.meeting.utils import main_menu_back_button
-from mitup_bot.models import Meetup, User
+from mitup_bot.models import MeetingCounts, Meetup, User
 from mitup_bot.monitoring import MetricsClient
 from mitup_bot.utils import CommonMessages, MeetingCreationMessages, MeetingEditContentMessages, SupporterMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import build_datetime_link
+from mitup_bot.utils.rich_message import datetime_link_content
 from mitup_bot.views import RenderContext
 from mitup_bot.views import factory as views_factory
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.collaborate import supporter_upsell_view
-from mitup_bot.views.meeting_text import rich_title
+from mitup_bot.views.meeting_text import title_content
 from tests.helpers import (
     ConversationStep,
     ConversationTester,
@@ -81,8 +82,8 @@ async def test_meeting_creation_successful(
     assert new_meeting.datetime is None  # plain-text title carries no date entity
 
     title_step = result.get_step(1)
-    message = MeetingCreationMessages.SUCCESS.get(title=new_meeting.title, lang=user_with_settings.lang)
-    view = meeting_views.edit_view(new_meeting).with_context(message)
+    message = MeetingCreationMessages.CREATED.rich(title=new_meeting.title, lang=user_with_settings.lang)
+    view = meeting_views.owner_view(new_meeting).with_context(message)
     title_step.context.api.assert_send_message_called(title_step.context.get_update(), view)
 
 
@@ -106,8 +107,8 @@ async def test_rich_message_keeps_create_meeting_in_title_then_title_creates(
     # The rich step re-prompts the creation view with the not-supported notice on top and creates nothing.
     rich_step = result.get_step(1)
     expected_rich_view = views_factory.create_meeting_view(
-        RenderContext(lang=user_with_settings.lang), datetime_link=build_datetime_link()
-    ).with_context(CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=user_with_settings.lang))
+        RenderContext(lang=user_with_settings.lang), datetime_link=datetime_link_content()
+    ).with_context(CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.rich(lang=user_with_settings.lang))
     rich_step.context.api.assert_send_message_called(rich_step.context.get_update(), expected_rich_view)
 
     # The subsequent plain-text title creates the meeting.
@@ -135,7 +136,7 @@ async def test_meeting_creation_cancelled(
     cancel_step = result.get_step(1)
     cancel_step.context.api.assert_edit_message_called(
         cancel_step.context.get_update(),
-        views_factory.main_menu_view(RenderContext(lang=user_with_settings.lang)),
+        views_factory.main_menu_view(RenderContext(lang=user_with_settings.lang), counts=MeetingCounts(0, 0, 0)),
         times=1,
     )
 
@@ -153,7 +154,8 @@ async def test_callback_query_create_meeting_stores_on_exit(
     assert context.user_data is not None
     on_exit = context.user_data.registry[ContextId.CREATE_MEETING].on_exit
     assert on_exit is not None
-    assert on_exit.message == MeetingCreationMessages.ON_EXIT.get(lang=user_with_settings.lang)
+    assert on_exit.notice is MeetingCreationMessages.ON_EXIT
+    assert on_exit.lang == user_with_settings.lang
     assert on_exit.cancel_callback == cb.CANCEL_CREATE_MEETING
 
 
@@ -310,8 +312,8 @@ async def test_meeting_creation_with_formatting_entities_stores_tagged_title(
     assert new_meeting.title == f'<b>Raid</b> night <tg-emoji emoji-id="{custom_emoji_id}">😀</tg-emoji>'
     assert new_meeting.plain_title == "Raid night 😀"
 
-    message = MeetingCreationMessages.SUCCESS.get(title=rich_title(new_meeting), lang=user_with_settings.lang)
-    view = meeting_views.edit_view(new_meeting).with_context(message)
+    message = MeetingCreationMessages.CREATED.rich(title=title_content(new_meeting), lang=user_with_settings.lang)
+    view = meeting_views.owner_view(new_meeting).with_context(message)
     context.api.assert_send_message_called(title_update, view)
 
 
@@ -372,7 +374,7 @@ async def test_invalid_title_fires_fallback_handler(
     # Handler returns TITLE to signal the conversation should remain in TITLE state
     assert state == ConversationMeetingState.TITLE
     # Error view sent to the user
-    error_msg = MeetingCreationMessages.INVALID_TITLE_ENTITY.get(lang=user_with_settings.lang)
+    error_msg = MeetingCreationMessages.INVALID_TITLE_ENTITY.rich(lang=user_with_settings.lang)
     error_view = views_factory.create_meeting_view(RenderContext(lang=user_with_settings.lang), message=error_msg)
     context.api.assert_send_message_called(bad_update, error_view)
 
@@ -499,7 +501,7 @@ async def test_create_meeting_entry_blocked_at_cap_shows_upsell(
     context.api.assert_edit_message_called(
         update,
         supporter_upsell_view(
-            SupporterMessages.ACTIVE_MEETINGS_CAP.get(lang=user_with_settings.lang, cap=2),
+            SupporterMessages.ACTIVE_MEETINGS_CAP.rich(lang=user_with_settings.lang, cap=2),
             user_with_settings.lang,
         ).with_context_menu([[main_menu_back_button(user_with_settings.lang)]]),
     )
@@ -526,7 +528,7 @@ async def test_create_meeting_entry_blocked_at_patron_cap_shows_patron_notice(
     context.api.assert_edit_message_called(
         update,
         supporter_upsell_view(
-            SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON.get(lang=user_with_settings.lang, cap=2),
+            SupporterMessages.ACTIVE_MEETINGS_CAP_PATRON.rich(lang=user_with_settings.lang, cap=2),
             user_with_settings.lang,
         ).with_context_menu([[main_menu_back_button(user_with_settings.lang)]]),
     )
@@ -552,7 +554,7 @@ async def test_create_meeting_title_blocked_at_cap_sends_message(
     context.api.assert_send_message_called(
         title_update,
         supporter_upsell_view(
-            SupporterMessages.ACTIVE_MEETINGS_CAP.get(lang=user_with_settings.lang, cap=2),
+            SupporterMessages.ACTIVE_MEETINGS_CAP.rich(lang=user_with_settings.lang, cap=2),
             user_with_settings.lang,
         ).with_context_menu([[main_menu_back_button(user_with_settings.lang)]]),
     )
@@ -585,7 +587,7 @@ async def test_create_meeting_title_date_beyond_horizon_stays_in_title(
     context.api.assert_send_message_called(
         title_update,
         supporter_upsell_view(
-            SupporterMessages.SCHEDULING_HORIZON_TITLE.get_text(lang=user_with_settings.lang, days=31),
+            SupporterMessages.SCHEDULING_HORIZON_TITLE.rich(lang=user_with_settings.lang, days=31),
             user_with_settings.lang,
         ),
     )
@@ -649,7 +651,7 @@ async def test_over_cap_title_creates_nothing_and_keeps_the_user_in_the_title_st
     assert mock_session.objects_added == []
     assert state == ConversationMeetingState.TITLE
 
-    error_msg = MeetingEditContentMessages.TITLE_TOO_LONG.get(
+    error_msg = MeetingEditContentMessages.TITLE_TOO_LONG.rich(
         lang=user_with_settings.lang, length=len(OVER_CAP_TITLE), limit=limits.TITLE_MAX_CHARS
     )
     # Both numbers reach the reader: a message still carrying `${length}` would leave them guessing.
@@ -688,3 +690,36 @@ async def test_title_at_the_cap_creates_the_meeting(
     assert len(mock_session.objects_added) == 1
     new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
     assert new_meeting.title == at_cap
+
+
+async def test_a_new_meeting_starts_with_the_owners_defaults(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    conversation: ConversationTester,
+):
+    """Every default the settings screen holds is stamped onto the meeting at creation, so a later
+    change to the defaults leaves the meetings already made alone."""
+    settings = user_with_settings.settings
+    settings.default_waiting_list = True
+    settings.default_public = True
+    settings.default_allow_invitation = True
+    settings.default_incognito = True
+    settings.default_lock_on_start = True
+    settings.default_show_timezone = False
+    settings.default_clock_24h = False
+    settings.default_date_format = DateFormat.FULL
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    steps = [
+        ConversationStep.callback(cb.CREATE_MEETING, expected_state=ConversationMeetingState.TITLE),
+        ConversationStep.message("My test meeting"),
+    ]
+    await conversation.run(handler_id=MeetingHandlerId.CREATE_MEETING_CONVERSATION, steps=steps)
+
+    new_meeting: Meetup = cast(Meetup, mock_session.objects_added[0])
+    assert new_meeting.waiting_list is True
+    assert new_meeting.public is True
+    assert new_meeting.allow_invitation is True
+    assert new_meeting.incognito is True
+    assert new_meeting.lock_on_start is True
+    assert new_meeting.time_format == settings.default_time_format

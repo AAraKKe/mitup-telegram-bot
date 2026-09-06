@@ -17,7 +17,8 @@ from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring.metric_keys import Feature, MetricKey
 from mitup_bot.utils import MeetingCreationMessages, MeetingEditContentMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import build_datetime_link, capture_tagged_text
+from mitup_bot.utils.entities import capture_tagged_text
+from mitup_bot.utils.rich_message import RichContent, datetime_link_content
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views import meeting_text
 from mitup_bot.views.collaborate import supporter_upsell_view
@@ -57,7 +58,7 @@ async def reject_long_title(
         input_length=length,
         limit=limits.TITLE_MAX_CHARS,
     )
-    error_msg = MeetingEditContentMessages.TITLE_TOO_LONG.get(
+    error_msg = MeetingEditContentMessages.TITLE_TOO_LONG.rich(
         lang=user.lang, length=length, limit=limits.TITLE_MAX_CHARS
     )
     view = views.factory.create_meeting_view(guards.render_context(user, update, context), message=error_msg)
@@ -81,13 +82,11 @@ async def callback_query_create_meeting(
         return ConversationHandler.END
 
     view = views.factory.create_meeting_view(
-        guards.render_context(user, update, context), datetime_link=build_datetime_link()
+        guards.render_context(user, update, context), datetime_link=datetime_link_content()
     )
 
     context.store_on_exit(
-        ContextId.CREATE_MEETING,
-        MeetingCreationMessages.ON_EXIT.get(lang=user.lang),
-        cb.CANCEL_CREATE_MEETING,
+        ContextId.CREATE_MEETING, MeetingCreationMessages.ON_EXIT, cb.CANCEL_CREATE_MEETING, lang=user.lang
     )
 
     await context.api.edit_message(update=update, view=view)
@@ -134,7 +133,9 @@ async def create_meeting_message_handler(
                     step="title",
                     reason="title_datetime_beyond_horizon",
                 )
-                await context.api.send_message(update=update, view=supporter_upsell_view(rejection, user.lang))
+                await context.api.send_message(
+                    update=update, view=supporter_upsell_view(RichContent(rejection), user.lang)
+                )
                 return ConversationMeetingState.TITLE
             meeting_datetime = unix_time
 
@@ -147,12 +148,15 @@ async def create_meeting_message_handler(
         allow_invitation=user.settings.default_allow_invitation,
         incognito=user.settings.default_incognito,
         lock_on_start=user.settings.default_lock_on_start,
+        show_timezone=user.settings.default_show_timezone,
+        clock_24h=user.settings.default_clock_24h,
+        date_format=user.settings.default_date_format,
     )
     session.add(meetup)
     await session.flush()
-    # A freshly flushed instance has never loaded its joined_links collection, and the async
-    # engine cannot lazy-load it when the view renders below — load it explicitly.
-    await session.refresh(meetup, ["joined_links"])
+    # A freshly flushed instance has loaded neither collection the owner card reads, and the
+    # async engine cannot lazy-load them when the view renders below.
+    await session.refresh(meetup, ["joined_links", "images"])
 
     # The origin line every later meeting line hangs off, and the only record of which owner
     # defaults the new meeting was stamped with — the settings screen shows today's values, not the
@@ -169,10 +173,13 @@ async def create_meeting_message_handler(
         allow_invitation=meetup.allow_invitation,
         incognito=meetup.incognito,
         lock_on_start=meetup.lock_on_start,
+        show_timezone=meetup.show_timezone,
+        clock_24h=meetup.clock_24h,
+        date_format=meetup.date_format.value,
     )
 
-    success_message = MeetingCreationMessages.SUCCESS.get(title=meeting_text.rich_title(meetup), lang=user.lang)
-    view = meeting_views.edit_view(meetup).with_context(success_message)
+    success_message = MeetingCreationMessages.CREATED.rich(title=meeting_text.title_content(meetup), lang=user.lang)
+    view = meeting_views.owner_view(meetup).with_context(success_message)
     await context.api.send_message(update=update, view=view)
     context.put_feature_metric(Feature.CREATE_MEETING)
     return ConversationHandler.END
@@ -189,7 +196,7 @@ async def create_meeting_invalid_title_message_handler(
 ) -> ConversationMeetingState:
     user = await guards.current_user(update, session)
     log.info("Meeting creation step rejected", user_id=user.db_id, step="title", reason="invalid_title_entities")
-    error_msg = MeetingCreationMessages.INVALID_TITLE_ENTITY.get(lang=user.lang)
+    error_msg = MeetingCreationMessages.INVALID_TITLE_ENTITY.rich(lang=user.lang)
     view = views.factory.create_meeting_view(guards.render_context(user, update, context), message=error_msg)
     await context.api.send_message(update=update, view=view)
     return ConversationMeetingState.TITLE
@@ -207,7 +214,7 @@ async def create_meeting_rich_message_handler(
     user = await guards.current_user(update, session)
     log.info("Meeting creation step rejected", user_id=user.db_id, step="title", reason="rich_message_unsupported")
     ctx = guards.render_context(user, update, context)
-    view = views.factory.create_meeting_view(ctx, datetime_link=build_datetime_link())
+    view = views.factory.create_meeting_view(ctx, datetime_link=datetime_link_content())
     await reply_rich_message_not_supported(ctx, update, context, view)
     return ConversationMeetingState.TITLE
 

@@ -1,6 +1,7 @@
 from enum import StrEnum, auto
 
 import structlog
+from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 from telegram.ext import ConversationHandler
 
@@ -54,7 +55,12 @@ def log_screen_shown(user: User, screen: Screen, delivery: ScreenDelivery):
 
 
 async def recover_from_lost_context(
-    update: Update, context: TMitupContext, user: User, exc: ContextPropertyNotSetError, context_id: ContextId
+    session: AsyncSession,
+    update: Update,
+    context: TMitupContext,
+    user: User,
+    exc: ContextPropertyNotSetError,
+    context_id: ContextId,
 ) -> int:
     """Close the flow whose stored state is gone and leave the user on the main menu.
 
@@ -77,7 +83,8 @@ async def recover_from_lost_context(
         update=update,
         view=factory.main_menu_view(
             guards.render_context(user, update, context),
-            message=CommonMessages.CONTEXT_LOST.get(lang=user.lang),
+            message=CommonMessages.CONTEXT_LOST.rich(lang=user.lang),
+            counts=await user.meeting_counts(session),
         ),
     )
     return ConversationHandler.END
@@ -92,6 +99,6 @@ async def reply_rich_message_not_supported(
     keeps their buttons and reads the step as still open. The rich-message feature metric is
     recorded here so every per-step rich handler emits it exactly once.
     """
-    view.with_context(CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.get(lang=ctx.lang))
+    view.with_context(CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.rich(lang=ctx.lang))
     await context.api.send_message(update=update, view=view)
     context.put_feature_metric(Feature.RICH_MESSAGE)

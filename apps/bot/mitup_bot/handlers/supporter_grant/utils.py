@@ -64,7 +64,7 @@ def target_prompt_view(lang: str) -> MitupView:
     """The identifier prompt shown on the admin-menu message, with a Cancel button so the operator
     is never stranded on a keyboard-less message."""
     return MitupView(
-        GrantOperatorMessages.TARGET_PROMPT.get(lang=lang),
+        GrantOperatorMessages.TARGET_PROMPT.rich(lang=lang),
         [[cancel_button(lang)]],
     )
 
@@ -76,12 +76,12 @@ def target_summary_view(lang: str, target: User, *, linked: bool) -> MitupView:
     per-operator draft state and a stale button re-resolves everything server-side.
     """
     return MitupView(
-        GrantOperatorMessages.TARGET_SUMMARY.get(
+        GrantOperatorMessages.TARGET_SUMMARY.rich(
             lang=lang,
             name=target.display_name,
             tg_user_id=target.tg_user_id,
-            current_level=GrantOperatorMessages.level_label(target.supporter_level).get(lang=lang),
-            granted_level=GrantOperatorMessages.level_label(target.granted_supporter_level).get(lang=lang),
+            current_level=GrantOperatorMessages.level_label(target.supporter_level).rich(lang=lang),
+            granted_level=GrantOperatorMessages.level_label(target.granted_supporter_level).rich(lang=lang),
             patreon_linked=Emojis.boolean(linked),
         ),
         [
@@ -99,13 +99,13 @@ def level_button(lang: str, target: User, level: SupporterLevel) -> ButtonConfig
         else GrantOperatorMessages.level_label(level)
     )
     return ButtonConfig(
-        text=label.get_text(lang=lang),
+        text=label.text(lang=lang),
         callback_data=cb.SET_GRANT_LEVEL.with_level(target.db_id, supporter.rank(level)),
     )
 
 
 def cancel_button(lang: str) -> ButtonConfig:
-    return ButtonConfig(text=GrantOperatorMessages.BUTTON_CANCEL.get_text(lang=lang), callback_data=cb.CANCEL_GRANT)
+    return ButtonConfig(text=GrantOperatorMessages.BUTTON_CANCEL.text(lang=lang), callback_data=cb.CANCEL_GRANT)
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,7 +157,7 @@ async def notify_target(api: TelegramApiWrapper, target: User, previous_level: S
         message = SupporterNotificationMessages.downgraded_to(new_level)
     else:
         message = SupporterNotificationMessages.GRANT_REMOVED
-    await api.send_message_to_user(target, grant_notification_view(message.get(lang=target.lang), target.lang))
+    await api.send_message_to_user(target, grant_notification_view(message.rich(lang=target.lang), target.lang))
 
 
 async def reconcile_hosts_group(api: TelegramApiWrapper, target: User, previous_level: SupporterLevel):

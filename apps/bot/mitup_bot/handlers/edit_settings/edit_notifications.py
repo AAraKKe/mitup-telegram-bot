@@ -8,57 +8,14 @@ from telegram.ext import ConversationHandler, filters
 from mitup_bot import guards, views
 from mitup_bot.db import with_session
 from mitup_bot.handlers import HandlersRegistry, PositiveNumberFilter
-from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.entities import FormattedText
-from mitup_bot.utils.messages import ButtonMessages, CommonMessages, SettingsMessages
-from mitup_bot.views import MitupView
+from mitup_bot.utils.messages import CommonMessages, SettingsMessages
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId, SettingName
 from .utils import SETTING_CHANGED_EVENT, SETTINGS_MENU_SOURCE
 
 log = structlog.get_logger(__name__)
-
-
-def notification_status(user: User) -> FormattedText:
-    if user.settings.notification:
-        return SettingsMessages.ENABLED.get(lang=user.lang)
-    return SettingsMessages.DISABLED.get(lang=user.lang)
-
-
-def edit_notification_view(user: User) -> MitupView:
-    message = SettingsMessages.NOTIFICATIONS_DESCRIPTION.get(
-        lang=user.lang,
-        notifications_status=notification_status(user),
-        notifications_time=user.settings.notification_time,
-    )
-    action = (ButtonMessages.DISABLE if user.settings.notification else ButtonMessages.ENABLE).get_text(lang=user.lang)
-    set_time_action = ButtonMessages.NOTIFICATIONS_TIME.get_text(lang=user.lang)
-
-    return MitupView(
-        description=message,
-        keyboard=[
-            [
-                ButtonConfig(text=action, callback_data=cb.TOGGLE_NOTIFICATIONS),
-                ButtonConfig(text=set_time_action, callback_data=cb.SET_NOTIFICATION_TIME),
-            ],
-        ],
-    ).with_back_button(ButtonMessages.SETTINGS, lang=user.lang, callback_data=cb.SETTINGS)
-
-
-@HandlersRegistry.register_callback_query(
-    EditSettingsHandlerId.NOTIFICATIONS_CALLBACK,
-    callback_data=cb.EDIT_NOTIFICATIONS,
-)
-@with_session
-async def callback_query_notifications(session: AsyncSession, update: Update, context: TMitupContext):
-    # Settings-only: `edit_notification_view` reads `user.lang`/`user.settings` and never the
-    # meetups/joined_links collections, so skip loading them.
-    user = await guards.current_user(update, session)
-
-    await context.api.edit_message(update=update, view=edit_notification_view(user))
 
 
 @HandlersRegistry.register_callback_query(
@@ -82,7 +39,9 @@ async def callback_query_toggle_notifications(session: AsyncSession, update: Upd
         source=SETTINGS_MENU_SOURCE,
     )
 
-    await context.api.edit_message(update=update, view=edit_notification_view(user))
+    view = views.factory.settings_view(guards.render_context(user, update, context), user)
+
+    await context.api.edit_message(update=update, view=view)
 
 
 @HandlersRegistry.register_callback_query(
@@ -91,7 +50,7 @@ async def callback_query_toggle_notifications(session: AsyncSession, update: Upd
 @with_session
 async def callback_query_set_notification_time(session: AsyncSession, update: Update, context: TMitupContext):
     user = await guards.current_user(update, session)
-    message = SettingsMessages.NOTIFICATIONS_TIME_PROMPT.get(lang=user.lang)
+    message = SettingsMessages.NOTIFICATIONS_TIME_PROMPT.rich(lang=user.lang)
 
     log.info(
         "Settings step shown",
@@ -100,9 +59,7 @@ async def callback_query_set_notification_time(session: AsyncSession, update: Up
         current_value=user.settings.notification_time,
     )
 
-    view = views.factory.change_settings_element_view(
-        guards.render_context(user, update, context), message=message, callback_data=cb.EDIT_NOTIFICATIONS
-    )
+    view = views.factory.change_settings_element_view(guards.render_context(user, update, context), message=message)
 
     await context.api.edit_message(update=update, view=view)
 
@@ -134,10 +91,10 @@ async def settings_notification_time_text_message_handler(
         source=SETTINGS_MENU_SOURCE,
     )
 
-    message = SettingsMessages.NOTIFICATIONS_TIME_SUCCESS.get(
+    message = SettingsMessages.NOTIFICATIONS_TIME_SUCCESS.rich(
         lang=user.lang, notifications_time=user.settings.notification_time
     )
-    view = edit_notification_view(user).with_context(message)
+    view = views.factory.settings_view(guards.render_context(user, update, context), user).with_context(message)
 
     await context.api.send_message(update=update, view=view)
 
@@ -158,11 +115,9 @@ async def settings_notification_time_invalid_input_handler(
         setting=SettingName.NOTIFICATION_TIME.value,
         reason="not_a_positive_integer",
     )
-    message = CommonMessages.POSITIVE_INTEGER_INVALID.get(lang=user.lang)
+    message = CommonMessages.POSITIVE_INTEGER_INVALID.rich(lang=user.lang)
 
-    view = views.factory.change_settings_element_view(
-        guards.render_context(user, update, context), message=message, callback_data=cb.EDIT_NOTIFICATIONS
-    )
+    view = views.factory.change_settings_element_view(guards.render_context(user, update, context), message=message)
 
     await context.api.send_message(update=update, view=view)
 

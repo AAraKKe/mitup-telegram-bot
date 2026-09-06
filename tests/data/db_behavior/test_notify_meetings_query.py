@@ -4,7 +4,8 @@
 participant filters (status, notification toggle, lead-time window) were evaluated against
 the meeting owner. Whether each participant is selected on their OWN settings is decided by
 real SQL over real rows — a mock session can't evaluate the join/WHERE predicates, so these
-cases live here. Throwaway data uses the 998_7xx range (single-session, never committed).
+cases live here. Throwaway data uses the 998_7xx range (single-session, never committed); the
+rendering test at the bottom is the one exception and says why.
 """
 
 import datetime as dt
@@ -14,9 +15,11 @@ import pytest
 from sqlmodel import col
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from mitup_bot import db
 from mitup_bot.events.notify_meetings import USERS_TO_NOTIFY_STATEMENT
-from mitup_bot.models import JoinedUsers, Meetup, Settings, User
+from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation, Settings, User
 from mitup_bot.models.users import UserStatus
+from mitup_bot.views import meeting as meeting_views
 
 pytestmark = pytest.mark.db_test
 
@@ -132,3 +135,36 @@ async def test_waiting_list_and_left_participants_are_excluded(db_session: Async
     await db_session.flush()
 
     assert await due_user_ids(db_session, meetup) == {member.id}
+
+
+# The rendering test below commits its rows (the 997_9xx range) and reads them back in a fresh
+# session: a same-session read is served from the identity map, which resolves a many-to-one with
+# no SQL and would mask a relationship the eager-load cascade never brought along.
+RENDERING_OWNER_TG_USER_ID = 997_900
+RENDERING_PARTICIPANT_TG_USER_ID = 997_901
+
+
+async def test_the_notification_cards_render_from_what_the_statement_loads(db_session: AsyncSession):
+    """Both start cards write the schedule in the timezone and language the meeting's owner is
+    configured with. Whether the selectin cascade reaches the owner from a JoinedUsers root is
+    decided by real loading, so an attribute it leaves out raises here and not in the runner."""
+    async with db.begin() as session:
+        owner = make_member(RENDERING_OWNER_TG_USER_ID)
+        owner.settings.timezone = "Europe/Madrid"
+        participant = make_member(RENDERING_PARTICIPANT_TG_USER_ID)
+        meetup = make_meetup(owner, starts_in_minutes=10)
+        meetup.location = MeetupLocation(name="The usual bar", coordinates=(2.34, 48.85))
+        session.add_all([owner, participant, meetup])
+        await session.flush()
+        session.add(JoinedUsers(user=participant, meetup=meetup))
+        meetup_id = meetup.db_id
+
+    async with db.begin() as fresh:
+        statement = USERS_TO_NOTIFY_STATEMENT.where(col(JoinedUsers.meetup_id) == meetup_id)
+        link = (await fresh.exec(statement)).one()
+
+        now = dt.datetime.now(dt.UTC)
+        for view in (meeting_views.starting_soon_view(link, now=now), meeting_views.started_view(link, now=now)):
+            assert "The usual bar" in view.message.text
+            assert '<tg-map lat="48.85"' in view.message.html
+            assert "<tg-time" in view.message.html

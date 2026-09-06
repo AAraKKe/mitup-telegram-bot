@@ -30,11 +30,11 @@ def build_recipient_views(bodies: dict[str, str]) -> dict[str, MitupView]:
     """Render each language's recipient view once, keyed by language, for the whole run.
 
     The delivered view depends only on `(body, language)`, so a broadcast to thousands of
-    recipients would otherwise re-parse the HTML and re-run the gettext lookup once per recipient.
+    recipients would otherwise re-run the keyboard's gettext lookup once per recipient.
     Precomputing here collapses that to one build per language. Uses the shared
     `broadcast_recipient_view` so delivery stays identical to the operator preview.
     """
-    return {language: broadcast_recipient_view(body_html, language) for language, body_html in bodies.items()}
+    return {language: broadcast_recipient_view(body, language) for language, body in bodies.items()}
 
 
 async def deliver_batch(

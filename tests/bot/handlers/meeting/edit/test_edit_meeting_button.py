@@ -3,6 +3,7 @@ import re
 import pytest
 from telegram import Update
 
+from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData, MeetingNotOwnedError
 from mitup_bot.handlers.meeting.edit.entry import callback_query_edit_meeting
 from mitup_bot.models import Settings, User
@@ -69,8 +70,32 @@ async def test_edit_meeting_works_as_expected(
     mock_session.add_object(user_with_settings, "tg_user_id")
     mock_session.add_object(user_with_settings.meetups[0])
 
-    view = meeting_views.edit_view(user_with_settings.meetups[0])
+    view = meeting_views.owner_view(user_with_settings.meetups[0])
 
     await callback_query_edit_meeting(update, context)
 
     context.api.assert_edit_message_called(update, view)
+
+
+@pytest.mark.parametrize("update", ([UpdateRequest(callback_query=True)]), indirect=True)
+async def test_edit_meeting_closes_whatever_edit_flow_led_here(
+    mock_session: MockDbSession,
+    update: Update,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    """The owner card replaces whichever edit screen led here, so the owner's next message is not
+    read as that screen's answer."""
+    match = re.match(cb.EDIT_MEETING.pattern, "edit;meeting:1")
+    assert match is not None
+
+    context.matches = [match]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+    context.store_meeting_id(ContextId.EDIT_MEETING_IMAGES, 1)
+    context.store_meeting_id(ContextId.EDIT_MEETING_TITLE, 1)
+
+    await callback_query_edit_meeting(update, context)
+
+    assert not context.has_meeting_id(ContextId.EDIT_MEETING_IMAGES)
+    assert not context.has_meeting_id(ContextId.EDIT_MEETING_TITLE)

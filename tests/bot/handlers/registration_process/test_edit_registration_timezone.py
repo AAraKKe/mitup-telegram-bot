@@ -12,11 +12,11 @@ from mitup_bot.handlers.registration_process.edit_registration_timezone import (
     registration_timezone_text_message_handler,
 )
 from mitup_bot.handlers.registration_process.enums import ConversationRegistrationProcessState
-from mitup_bot.models import User
+from mitup_bot.models import MeetingCounts, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.timezone_api import TimezoneLookupFailure
 from mitup_bot.utils import RegistrationMessages
-from mitup_bot.utils.entities import Link, render
+from mitup_bot.utils.rich_message import RichContent
 from mitup_bot.views import RenderContext, factory
 from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import StubMitupContext, UpdateRequest, claimed_state, create_user, log_record
@@ -26,11 +26,11 @@ from tests.helpers.stub_db import MockDbSession
 def expected_registration_complete_view(timezone: str, lang: str) -> MitupView:
     """Expected completion view built independently of the handler helper: the welcome as the
     main-menu message with an inline user-guide link pointing at the production docs site."""
-    user_guide_link = render(
-        t"{Link(RegistrationMessages.USER_GUIDE_LABEL.get_text(lang=lang), 'https://mitup.social/user-guide/')}"
+    user_guide_link = RichContent.link(
+        RegistrationMessages.USER_GUIDE_LABEL.text(lang=lang), "https://mitup.social/user-guide/"
     )
-    message = RegistrationMessages.REGISTRATION_COMPLETE.get(timezone=timezone, user_guide=user_guide_link, lang=lang)
-    return factory.main_menu_view(RenderContext(lang=lang), message=message)
+    message = RegistrationMessages.REGISTRATION_COMPLETE.rich(timezone=timezone, user_guide=user_guide_link, lang=lang)
+    return factory.main_menu_view(RenderContext(lang=lang), message=message, counts=MeetingCounts(0, 0, 0))
 
 
 @pytest.fixture
@@ -82,7 +82,7 @@ async def test_registration_timezone_invalid_input_handler_sends_invalid_input_m
 
     context.api.assert_send_message_called(
         update,
-        RegistrationMessages.TIMEZONE_INVALID_INPUT.get(lang=user_with_settings.lang),
+        RegistrationMessages.TIMEZONE_INVALID_INPUT.rich(lang=user_with_settings.lang),
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
 
@@ -122,7 +122,7 @@ async def test_registration_timezone_text_message_handler_stays_in_timezone_stat
 
     context.api.assert_send_message_called(
         update,
-        RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
+        RegistrationMessages.TIMEZONE_FAIL.rich(lang=user_with_settings.lang),
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
 
@@ -153,7 +153,7 @@ async def test_registration_timezone_text_handler_reprompts_when_google_geocodes
 
     context.api.assert_send_message_called(
         update,
-        RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
+        RegistrationMessages.TIMEZONE_FAIL.rich(lang=user_with_settings.lang),
     )
     geocode_client.geocode.assert_called_once_with("Hii")
     timezone_client.timezone.assert_not_called()
@@ -179,7 +179,7 @@ async def test_registration_timezone_location_handler_reprompts_when_google_maps
 
     context.api.assert_send_message_called(
         update,
-        RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
+        RegistrationMessages.TIMEZONE_FAIL.rich(lang=user_with_settings.lang),
     )
     timezone_client.timezone.assert_called_once_with((34.0522, -118.2437))
     assert user_with_settings.settings.timezone == original_timezone
@@ -223,7 +223,7 @@ async def test_registration_timezone_location_message_handler_stays_in_timezone_
 
     context.api.assert_send_message_called(
         update,
-        RegistrationMessages.TIMEZONE_FAIL.get(lang=user_with_settings.lang),
+        RegistrationMessages.TIMEZONE_FAIL.rich(lang=user_with_settings.lang),
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
 
@@ -394,7 +394,7 @@ async def test_brand_new_spanish_client_gets_prompt_in_seeded_language(
 
     context.api.assert_send_message_called(
         update,
-        RegistrationMessages.TIMEZONE_PROMPT.get(first_name="Test User", lang="es_ES"),
+        RegistrationMessages.TIMEZONE_PROMPT.rich(first_name="Test User", lang="es_ES"),
     )
 
 

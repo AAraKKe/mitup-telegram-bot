@@ -17,20 +17,10 @@ from .utils import SETTING_CHANGED_EVENT, SETTINGS_MENU_SOURCE
 log = structlog.get_logger(__name__)
 
 
-@HandlersRegistry.register_callback_query(EditSettingsHandlerId.LANGUAGE_CALLBACK, callback_data=cb.EDIT_LANGUAGE)
-@with_session
-async def callback_query_timezone(session: AsyncSession, update: Update, context: TMitupContext):
-    # Settings-only: reads `user.lang`/`user.settings`, never the meetups/joined_links collections.
-    user = await guards.current_user(update, session)
-
-    view = views.factory.settings_set_language_view(guards.render_context(user, update, context))
-
-    await context.api.edit_message(update=update, view=view)
-
-
 @HandlersRegistry.register_callback_query(EditSettingsHandlerId.SET_LANGUAGE_CALLBACK, callback_data=cb.SET_LANGUAGE)
 @with_session
-async def callback_query_set_timezone(session: AsyncSession, update: Update, context: TMitupContext):
+async def callback_query_set_language(session: AsyncSession, update: Update, context: TMitupContext):
+    # Settings-only: reads `user.lang`/`user.settings`, never the meetups/joined_links collections.
     user = await guards.current_user(update, session)
 
     language_id = guards.valid_callback_data(
@@ -62,8 +52,8 @@ async def callback_query_set_timezone(session: AsyncSession, update: Update, con
         source=SETTINGS_MENU_SOURCE,
     )
 
-    view = views.factory.settings_set_language_view(
-        guards.render_context(user, update, context).with_lang(new_language)
-    ).with_context(SettingsMessages.LANGUAGE_SUCCESS.get(lang=new_language))
+    view = views.factory.settings_view(
+        guards.render_context(user, update, context).with_lang(new_language), user
+    ).with_context(SettingsMessages.LANGUAGE_SUCCESS.rich(lang=new_language))
 
     await context.api.edit_message(update=update, view=view)

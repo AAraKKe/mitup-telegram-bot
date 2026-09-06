@@ -67,7 +67,7 @@ async def test_user_joins_waiting_list_with_full_meeting(
     # The user has been notified
     context.api.assert_answer_callback_query_called(
         update=handler_context.update,
-        text=response.get_text(lang=user_with_settings.lang),
+        text=response.text(lang=user_with_settings.lang),
         show_alert=False,
     )
 
@@ -75,6 +75,7 @@ async def test_user_joins_waiting_list_with_full_meeting(
     context.api.assert_update_meeting_messages_called(
         meeting=full_meeting,
         current_message=full_meeting.message_from_update(handler_context.update),
+        skip_current=False,
     )
 
 
@@ -117,7 +118,7 @@ async def test_user_leaves_and_waiting_list_promotes(
     # The user who was promoted has been notified
     context.api.assert_send_message_to_user_called(
         user=second_user,
-        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(
+        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.rich(
             lang=second_user.lang, meeting_title=full_meeting.title
         ),
     )
@@ -184,7 +185,7 @@ async def test_user_leaves_and_first_waiting_list_user_promoted(
     # The user who was promoted has been notified
     context.api.assert_send_message_to_user_called(
         user=second_waiting_user,
-        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(
+        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.rich(
             lang=first_waiting_user.lang, meeting_title=full_meeting.title
         ),
     )
@@ -237,14 +238,14 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
     # The users who were promoted have been notified
     context.api.assert_send_message_to_user_called(
         user=first_waiting_user,
-        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(
+        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.rich(
             lang=first_waiting_user.lang, meeting_title=full_meeting.title
         ),
         times=2,
     )
     context.api.assert_send_message_to_user_called(
         user=second_waiting_user,
-        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.get(
+        view=MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.rich(
             lang=second_waiting_user.lang, meeting_title=full_meeting.title
         ),
         times=2,

@@ -24,22 +24,20 @@ class MessagesId(HandlerId):
 @HandlersRegistry.register_message(MessagesId.MESSAGE_WITHOUT_TEXT, ~filters.TEXT | filters.COMMAND, bindable=False)
 @with_session
 async def filter_messages_without_text(session: AsyncSession, update: Update, context: TMitupContext):
-    # Reads only `user.lang` for the interrupted/main-menu views; never traverses the
-    # meetups/joined_links collections.
+    # Neither view traverses the meetups/joined_links collections: the menu sizes its list chips
+    # with counting queries instead.
     user = await guards.current_user(update, session)
     ctx = guards.render_context(user, update, context)
 
     if on_exit := context.get_active_on_exit():
         view = factory.conversation_interrupted_view(
-            ctx,
-            message=on_exit.message,
-            cancel_callback=on_exit.cancel_callback,
+            ctx.with_lang(on_exit.lang), notice=on_exit.notice, cancel_callback=on_exit.cancel_callback
         )
         await context.api.send_message(update=update, view=view)
         return None
 
     context.clean_all_user_data(reason="conversation_abandoned")
-    view = factory.main_menu_view(ctx)
+    view = factory.main_menu_view(ctx, counts=await user.meeting_counts(session))
     await context.api.send_message(update=update, view=view)
     return ConversationHandler.END
 
@@ -54,5 +52,7 @@ async def rich_message_handler(session: AsyncSession, update: Update, context: T
     user = await guards.current_user(update, session)
     ctx = guards.render_context(user, update, context)
     context.clean_all_user_data(reason="idle_rich_message")
-    await reply_rich_message_not_supported(ctx, update, context, factory.main_menu_view(ctx))
+    await reply_rich_message_not_supported(
+        ctx, update, context, factory.main_menu_view(ctx, counts=await user.meeting_counts(session))
+    )
     return None

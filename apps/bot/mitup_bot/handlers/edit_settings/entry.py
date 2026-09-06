@@ -21,7 +21,7 @@ async def callback_query_settings(session: AsyncSession, update: Update, context
     # Settings-only screen: every handler in this package reads `user.lang`/`user.settings` and
     # never the meetups/joined_links collections, so skip loading them.
     user = await guards.current_user(update, session)
-    view = views.factory.settings_view(guards.render_context(user, update, context))
+    view = views.factory.settings_view(guards.render_context(user, update, context), user)
 
     log_screen_shown(user, Screen.SETTINGS, ScreenDelivery.EDIT)
     await context.api.edit_message(update=update, view=view)
@@ -33,7 +33,7 @@ async def callback_query_settings(session: AsyncSession, update: Update, context
 @with_session
 async def callback_query_cancel_settings(session: AsyncSession, update: Update, context: TMitupContext):
     user = await guards.current_user(update, session)
-    view = views.factory.settings_view(guards.render_context(user, update, context))
+    view = views.factory.settings_view(guards.render_context(user, update, context), user)
 
     log.info("Settings conversation cancelled", user_id=user.db_id, reason="user_cancelled")
     await context.api.edit_message(update=update, view=view)

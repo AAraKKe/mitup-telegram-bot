@@ -1,12 +1,13 @@
 import datetime as dt
 from typing import TYPE_CHECKING
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
 
 import structlog
-from sqlalchemy import BigInteger, CheckConstraint, Column, DateTime, FetchedValue
+from sqlalchemy import BigInteger, CheckConstraint, Column, DateTime, Enum, FetchedValue
 from sqlmodel import Field, Relationship, SQLModel
 from sqlmodel.main import SQLModelConfig
 
+from mitup_bot.datetimes import UTC_TIMEZONE, DateFormat, TimeFormat, parse_timezone
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.translations import TranslationEngine
 
@@ -49,6 +50,21 @@ class Settings(BaseModel, SQLModel, table=True):
     default_allow_invitation: bool = False
     default_incognito: bool = False
     default_lock_on_start: bool = False
+    default_show_timezone: bool = False
+    default_clock_24h: bool = True
+    default_date_format: DateFormat = Field(
+        default=DateFormat.DEFAULT,
+        sa_column=Column(
+            Enum(
+                DateFormat,
+                native_enum=False,
+                length=16,
+                values_callable=lambda enum: [member.value for member in enum],
+            ),
+            nullable=False,
+            server_default=DateFormat.DEFAULT.value,
+        ),
+    )
 
     # Deliberately lazy: no code path traverses `settings.user` (settings are always reached
     # through the user), so it never triggers a load under the async engine.
@@ -61,11 +77,19 @@ class Settings(BaseModel, SQLModel, table=True):
         return hash(self) == hash(other) if isinstance(other, Settings) else NotImplemented
 
     @property
+    def default_time_format(self) -> TimeFormat:
+        return TimeFormat(
+            show_timezone=self.default_show_timezone,
+            clock_24h=self.default_clock_24h,
+            date_format=self.default_date_format,
+        )
+
+    @property
     def tz(self) -> ZoneInfo:
-        try:
-            return ZoneInfo(self.timezone)
-        except ZoneInfoNotFoundError:
-            # While we implement proper timezone handling, users can set random timezones.
-            # We should log this and use UTC instead.
+        zone = parse_timezone(self.timezone)
+        if zone is None:
+            # Nothing validates the stored id against the zone database on the way in, so a row can
+            # name a zone this system does not carry.
             log.warning("Invalid timezone, falling back to UTC", timezone=self.timezone, user_id=self.user_id)
-            return ZoneInfo("UTC")
+            return UTC_TIMEZONE
+        return zone

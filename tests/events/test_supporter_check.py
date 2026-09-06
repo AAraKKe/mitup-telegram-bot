@@ -326,7 +326,7 @@ async def test_due_lapsed_first_time_starts_grace(mock_session: MockDbSession, a
     assert subscription.support_expiration > dt.datetime.now(dt.UTC)
     assert user.supporter_level is SupporterLevel.HOST_2
     api.assert_send_message_to_user_called(
-        user=user, view=SupporterNotificationMessages.GRACE_STARTED.get(lang=user.lang)
+        user=user, view=SupporterNotificationMessages.GRACE_STARTED.rich(lang=user.lang)
     )
 
 
@@ -345,7 +345,7 @@ async def test_due_lapsed_after_grace_revokes_to_none(mock_session: MockDbSessio
     # re-notifying on every following run.
     assert subscription.support_expiration is None
     api.assert_send_message_to_user_called(
-        user=user, view=SupporterNotificationMessages.SUPPORT_LOST.get(lang=user.lang)
+        user=user, view=SupporterNotificationMessages.SUPPORT_LOST.rich(lang=user.lang)
     )
 
 
@@ -365,7 +365,7 @@ async def test_due_lapsed_with_lower_grant_floor_drops_to_the_floor(mock_session
     assert user.supporter_level is SupporterLevel.HOST_1
     assert subscription.support_expiration is None
     api.assert_send_message_to_user_called(
-        user=user, view=SupporterNotificationMessages.downgraded_to(SupporterLevel.HOST_1).get(lang=user.lang)
+        user=user, view=SupporterNotificationMessages.downgraded_to(SupporterLevel.HOST_1).rich(lang=user.lang)
     )
 
 
@@ -513,7 +513,7 @@ async def test_sync_promotes_none_user_to_entitled_tier(
     assert subscription.support_expiration > dt.datetime.now(dt.UTC)
     # A none->patron promotion must announce the Patron tier specifically.
     api.assert_send_message_to_user_called(
-        user=user, view=SupporterNotificationMessages.PATRON_UNLOCKED.get(lang=user.lang)
+        user=user, view=SupporterNotificationMessages.PATRON_UNLOCKED.rich(lang=user.lang)
     )
 
 
@@ -530,7 +530,7 @@ async def test_sync_promotes_patron_to_organizer_and_notifies(
     assert user.supporter_level is SupporterLevel.HOST_3
     # A patron->organizer promotion must announce the Organizer tier specifically.
     api.assert_send_message_to_user_called(
-        user=user, view=SupporterNotificationMessages.ORGANIZER_UNLOCKED.get(lang=user.lang)
+        user=user, view=SupporterNotificationMessages.ORGANIZER_UNLOCKED.rich(lang=user.lang)
     )
 
 
@@ -546,7 +546,7 @@ async def test_sync_downgrades_between_tiers_notifies(mock_session: MockDbSessio
     assert outcome is supporter_check.LevelSyncOutcome.DOWNGRADED
     assert user.supporter_level is SupporterLevel.HOST_2
     api.assert_send_message_to_user_called(
-        user=user, view=SupporterNotificationMessages.PATRON_TIER_SET.get(lang=user.lang)
+        user=user, view=SupporterNotificationMessages.PATRON_TIER_SET.rich(lang=user.lang)
     )
 
 
@@ -567,7 +567,7 @@ async def test_sync_downgrade_clamps_to_the_grant_floor(
     assert outcome is supporter_check.LevelSyncOutcome.DOWNGRADED
     assert user.supporter_level is SupporterLevel.HOST_2
     api.assert_send_message_to_user_called(
-        user=user, view=SupporterNotificationMessages.PATRON_TIER_SET.get(lang=user.lang)
+        user=user, view=SupporterNotificationMessages.PATRON_TIER_SET.rich(lang=user.lang)
     )
 
 

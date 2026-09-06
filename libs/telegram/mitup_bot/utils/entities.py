@@ -138,20 +138,6 @@ def shift_entity(entity: MessageEntity, offset: int) -> MessageEntity:
     )
 
 
-def strip_entity_from_text(text: str, entity: MessageEntity) -> str:
-    """Return *text* with the UTF-16 span covered by *entity* removed.
-
-    Whitespace adjacent to the removed span is trimmed so that a single space
-    between the left and right parts is preserved rather than a double space.
-    """
-    encoded = text.encode("utf-16-le")
-    start = entity.offset * 2
-    end = (entity.offset + entity.length) * 2
-    left = encoded[:start].decode("utf-16-le").rstrip()
-    right = encoded[end:].decode("utf-16-le").lstrip()
-    return f"{left} {right}" if left and right else left + right
-
-
 # --- UTF-16 helper ---
 
 
@@ -323,15 +309,10 @@ def render(template: Template) -> FormattedText:
     return FormattedText(plain, entities)
 
 
+# The label and target of the inline link to Telegram's date & time formatting help, which
+# `datetime_link_content` builds into the content a message substitutes.
 TELEGRAM_DATETIME_LINK_URL = "https://telegram.org/blog/member-tags-disable-sharing-and-more#time-and-date-formatting"
-# Kept out of the t-string below: a quoted literal (with its apostrophe) inside a same-quoted
-# interpolation is valid Python but derails regex-based highlighters for the rest of the file.
 TELEGRAM_DATETIME_LINK_TEXT = "Telegram's date & time formatting"
-
-
-def build_datetime_link() -> FormattedText:
-    """Build the `FormattedText` for Telegram's date & time formatting help link."""
-    return render(t"{Link(TELEGRAM_DATETIME_LINK_TEXT, TELEGRAM_DATETIME_LINK_URL)}")
 
 
 # --- parse_format_tags() ---
