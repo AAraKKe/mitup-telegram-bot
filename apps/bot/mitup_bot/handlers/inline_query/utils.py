@@ -3,10 +3,19 @@ from typing import cast
 
 from mitup_bot.datetimes import as_utc
 from mitup_bot.keyboards import ButtonConfig
-from mitup_bot.models import Meetup
-from mitup_bot.utils import ButtonMessages
+from mitup_bot.models import Meetup, User
+from mitup_bot.translations import TranslationEngine
+from mitup_bot.utils import ButtonMessages, InlineQueryMessages
+from mitup_bot.views import InlineResultsButton
 
 from .enums import SEARCH_QUERY_PREFIX
+
+
+def inline_results_button(user: User | None) -> InlineResultsButton:
+    """The button Telegram shows above an inline results panel, labelled for whoever is looking."""
+    label = InlineQueryMessages.CREATE_MEETING_BUTTON if user else InlineQueryMessages.EXPLORE_BUTTON
+    lang = user.lang if user else TranslationEngine.FALLBACK_LANG
+    return InlineResultsButton(text=label.text(lang=lang), start_parameter="inline")
 
 
 def search_chat_meetings_button(*, lang: str, chat_instance: str) -> ButtonConfig:

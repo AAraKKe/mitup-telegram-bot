@@ -4,6 +4,12 @@ from telegram import Update
 
 from mitup_bot import guards
 from mitup_bot.db import with_session
+from mitup_bot.exceptions import (
+    MeetingAccessError,
+    MeetingGoneError,
+    MeetingInactiveOwnerError,
+    MeetingNotOwnedError,
+)
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
@@ -13,13 +19,19 @@ from mitup_bot.monitoring import Feature
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import ButtonMessages, InlineQueryMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import InlineResultsButton, MitupInlineView
+from mitup_bot.views import MitupInlineView
 from mitup_bot.views import meeting as meeting_views
 
-from .enums import InlineQueryId
-from .utils import sort_meetings
+from .enums import InlineQueryId, ShareRejectionReason
+from .utils import inline_results_button, sort_meetings
 
 log = structlog.get_logger(__name__)
+
+SHARE_REJECTION_REASONS: dict[type[MeetingAccessError], ShareRejectionReason] = {
+    MeetingGoneError: ShareRejectionReason.MEETING_NOT_FOUND,
+    MeetingNotOwnedError: ShareRejectionReason.MEETING_NOT_SHAREABLE,
+    MeetingInactiveOwnerError: ShareRejectionReason.MEETING_FINISHED,
+}
 
 
 def default_results_reason(user: User | None, *, suppressed: bool) -> str:
@@ -53,12 +65,6 @@ async def inline_view(session: AsyncSession, update: Update, context: TMitupCont
         suppressed = True
     lang = user.lang if user else TranslationEngine.FALLBACK_LANG
 
-    button_text = InlineQueryMessages.CREATE_MEETING_BUTTON if user else InlineQueryMessages.EXPLORE_BUTTON
-    button = InlineResultsButton(
-        text=button_text.text(lang=lang),
-        start_parameter="inline",
-    )
-
     results: list[MitupInlineView] = [
         MitupInlineView(
             message=InlineQueryMessages.CHAT_MEETINGS_MESSAGE.rich(lang=lang),
@@ -89,7 +95,30 @@ async def inline_view(session: AsyncSession, update: Update, context: TMitupCont
         results=len(results),
         reason=default_results_reason(user, suppressed=suppressed),
     )
-    await context.api.answer_inline_query(update=update, results=results, button=button, cache_time=0)
+    await context.api.answer_inline_query(
+        update=update, results=results, button=inline_results_button(user), cache_time=0
+    )
+
+
+async def answer_share_rejection(
+    update: Update,
+    context: TMitupContext,
+    user: User | None,
+    reason: ShareRejectionReason,
+    meeting_id: int | None = None,
+):
+    """Answer a share query that resolves no card, and record which rejection it was.
+
+    All four rejections get the same empty panel under the same button, so nothing on the wire
+    separates an id nobody has from one somebody else keeps private.
+    """
+    log.info(
+        "Meeting share rejected",
+        user_id=user.db_id if user else None,
+        meeting_id=meeting_id,
+        reason=reason.value,
+    )
+    await context.api.answer_inline_query(update=update, results=[], button=inline_results_button(user), cache_time=0)
 
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.SHARE_MEETING, pattern=r"\d+")
@@ -99,8 +128,8 @@ async def share_meeting(session: AsyncSession, update: Update, context: TMitupCo
 
     This handler can be triggered by any Telegram user, whether or not they have a mitup profile:
     a public meeting resolves for anyone, a non-public one only for its owner, and everything else
-    is answered with the unavailable placeholder. The shared card renders in the meeting's own
-    language, so the sharer's language only drives that card.
+    is answered with the empty panel. The shared card renders in the meeting's own language, so the
+    sharer's language only drives that card.
     """
     # load_collections=False: nothing here traverses the sharer's own meetings — ownership is decided
     # on the meeting's owner leaf.
@@ -115,19 +144,22 @@ async def share_meeting(session: AsyncSession, update: Update, context: TMitupCo
         log.info("Inline results suppressed", user_id=user.db_id, reason="deletion_requested")
         user = None
 
-    meeting_id = await guards.shareable_meeting_id(update, context)
+    meeting_id = guards.shareable_meeting_id(update)
     if meeting_id is None:
-        # The guard already answered with empty results; the other three rejection causes are
-        # raised by `guards.meeting` below and recorded on the fault path.
-        log.warning("Meeting share rejected", user_id=user.db_id if user else None, reason="non_numeric_inline_query")
+        await answer_share_rejection(update, context, user, ShareRejectionReason.NON_NUMERIC_INLINE_QUERY)
         return
 
-    # A meeting the caller may not put on a card — gone, finished, or somebody else's and not
-    # public — is rejected by the guard, and the error handler answers the query with the
-    # unavailable card that every one of those cases shows.
-    meeting = await guards.meeting(
-        session, user, meeting_id, "share meeting", context, access=guards.MeetingAccess.OWNER_OR_PUBLIC
-    )
+    # Telegram sends a query on every keystroke, so a backspace routinely addresses somebody else's
+    # meeting: that is a normal interaction, not a rejection worth the error handler's screen.
+    try:
+        meeting = await guards.meeting(
+            session, user, meeting_id, "share meeting", context, access=guards.MeetingAccess.OWNER_OR_PUBLIC
+        )
+    except MeetingAccessError as rejection:
+        await answer_share_rejection(
+            update, context, user, SHARE_REJECTION_REASONS[type(rejection)], meeting_id=meeting_id
+        )
+        return
 
     log.info(
         "Meeting shared",

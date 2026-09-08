@@ -39,7 +39,6 @@ __all__ = (
     "started_view",
     "starting_soon_view",
     "time_format_view",
-    "unavailable_inline_view",
     "view_for",
 )
 
@@ -50,11 +49,4 @@ from .list_card import list_heading, meeting_list_section
 from .notifications import started_view, starting_soon_view
 from .owner_card import owner_body, owner_view
 from .settings_card import behavior_view, settings_view, time_format_view
-from .shared_card import (
-    build_inline_keyboard,
-    external_view,
-    inline_view,
-    left_view,
-    shared_body,
-    unavailable_inline_view,
-)
+from .shared_card import build_inline_keyboard, external_view, inline_view, left_view, shared_body

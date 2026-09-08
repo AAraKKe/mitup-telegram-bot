@@ -37,6 +37,7 @@ from mitup_bot.guards import (
     is_admin,
     message,
     render_context,
+    shareable_meeting_id,
     user_language,
     user_registered,
     valid_callback_data,
@@ -1034,6 +1035,30 @@ def test_valid_inline_query_raises_when_no_inline_query(update: Update):
     # An update with inline_query="" produces Update(inline_query=None) per create_update logic
     with pytest.raises(InlineQueryNotSetError):
         valid_inline_query(update)
+
+
+@pytest.mark.parametrize(
+    "update, expected_id",
+    [
+        (UpdateRequest(inline_query="123"), 123),
+        (UpdateRequest(inline_query="555 "), 555),
+        (UpdateRequest(inline_query="123abc"), None),
+        (UpdateRequest(inline_query="12 34"), None),
+        (UpdateRequest(inline_query="123①"), None),
+    ],
+    indirect=["update"],
+    ids=["plain_id", "trailing_space", "trailing_junk", "inner_space", "non_decimal_digit"],
+)
+def test_shareable_meeting_id_parses_the_query_without_answering_it(
+    update: Update, context: StubMitupContext, expected_id: int | None
+):
+    """The guard only parses: the share handler owns the single answer every rejection gets.
+
+    PTB matches the share pattern with re.match, so a query with leading digits reaches the handler
+    naming no meeting, and `isdigit` would let "①" through to an `int()` that rejects it.
+    """
+    assert shareable_meeting_id(update) == expected_id
+    context.api.assert_method_just_called("answer_inline_query", times=0)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=False)], indirect=True)

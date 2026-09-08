@@ -11,7 +11,6 @@ from mitup_bot.models import Meetup, MeetupLocation
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import (
     ButtonMessages,
-    InlineQueryMessages,
     MeetingAttachMessages,
     MeetingCardSectionMessages,
     MeetingDisplayMessages,
@@ -729,18 +728,6 @@ def test_inline_view_of_a_meeting_under_way_still_opens_on_its_own_title(lang: s
 
     assert view.message.html.startswith("<h2>")
     assert MeetingDisplayMessages.IN_PROGRESS_STATUS.rich(lang=meeting.lang).text in view.message.text
-
-
-def test_unavailable_inline_view_answers_the_picker_with_a_bare_placeholder(lang: str):
-    """Telegram needs every inline query answered, so a meeting that is gone still gets a result:
-    one that offers nothing to tap."""
-    view = meeting_views.unavailable_inline_view(lang)
-
-    assert view.id == "meeting_unavailable"
-    assert view.title == InlineQueryMessages.MEETING_UNAVAILABLE_TITLE.text(lang=lang)
-    assert view.inline_description == InlineQueryMessages.MEETING_UNAVAILABLE_DESCRIPTION.text(lang=lang)
-    assert view.message.text == InlineQueryMessages.MEETING_UNAVAILABLE_MESSAGE.rich(lang=lang).text
-    assert view.menu == []
 
 
 # --- Fitting the card to its budget ---

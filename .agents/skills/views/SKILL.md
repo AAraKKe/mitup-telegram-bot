@@ -168,7 +168,7 @@ Screens rendered *from* a domain model (the meeting card, its settings and inlin
 | `controls.py` | The chips and button rows every meeting screen builds from (`meeting_chip`, `join_leave_row`, `maps_row`, `main_menu_back_button`) |
 | `owner_card.py` | `owner_view` and the section builders of its body |
 | `attendees.py` | The participants section of the owner card, and the attendance questions it asks |
-| `shared_card.py` | `external_view`, `inline_view`, `unavailable_inline_view`, `build_inline_keyboard` |
+| `shared_card.py` | `external_view`, `inline_view`, `build_inline_keyboard` |
 | `settings_card.py` | `settings_view` |
 | `audience.py` | `view_for` and `keyboard_for_update`, which pick a screen for whoever is looking |
 

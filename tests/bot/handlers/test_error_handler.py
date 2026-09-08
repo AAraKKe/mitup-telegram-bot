@@ -48,7 +48,6 @@ from mitup_bot.utils.messages import (
 )
 from mitup_bot.utils.rich_message import RichContent
 from mitup_bot.views import MitupView, RenderContext, factory
-from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     MockDbSession,
     StubMitupApp,
@@ -706,22 +705,6 @@ async def test_meeting_rejection_replies_to_message_updates(
     context.api.assert_edit_message_not_called()
 
 
-@pytest.mark.parametrize("error, expected_view", REJECTION_PARAMS)
-async def test_meeting_rejection_answers_inline_queries_with_the_unavailable_card(
-    app: StubMitupApp, mock_session: MockDbSession, error: MeetingAccessError, expected_view: MitupView
-):
-    """An inline query can only carry results, so every rejection becomes the unavailable card."""
-    context = build_inline_context(app)
-
-    await error_handler.handler(context, error, Env.PROD)
-
-    context.api.assert_answer_inline_query_called(
-        context.telegram_update, results=[meeting_views.unavailable_inline_view("en")], cache_time=0
-    )
-    context.api.assert_send_message_not_called()
-    context.api.assert_edit_message_not_called()
-
-
 async def test_meeting_rejection_renders_in_the_language_the_error_carries(
     app: StubMitupApp, mock_session: MockDbSession
 ):
@@ -914,21 +897,6 @@ async def test_flow_context_renders_in_the_language_the_rejection_carries(
     delivered: MitupView = context.api.call_args("edit_message").kwargs["view"]
     assert delivered.message.text.endswith(INVITE_FLOW_CONTEXT.text(lang="es"))
     assert delivered.menu == factory.deleted_meeting_view(RenderContext(lang="es")).menu
-
-
-async def test_flow_context_is_not_added_to_the_unavailable_inline_card(app: StubMitupApp, mock_session: MockDbSession):
-    """An inline query carries results, not a screen: it is answered with the card and nothing else."""
-    context = build_inline_context(app)
-    error = MeetingGoneError(
-        meeting_id=7, action="invite users to a meeting", user_db_id=1, lang="en", flow_context=INVITE_FLOW_CONTEXT
-    )
-
-    await error_handler.handler(context, error, Env.PROD)
-
-    context.api.assert_answer_inline_query_called(
-        context.telegram_update, results=[meeting_views.unavailable_inline_view("en")], cache_time=0
-    )
-    context.api.assert_edit_message_not_called()
 
 
 async def test_meeting_inactive_owner_is_a_plain_screen(

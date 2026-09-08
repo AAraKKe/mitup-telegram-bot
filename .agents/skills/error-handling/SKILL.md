@@ -196,7 +196,8 @@ For the bot-chat rejections the reply shape comes from the update, not from the 
 |---|---|
 | callback query | `edit_message` — the screen the button sits on is replaced |
 | message | `send_message` — there is no message of ours to replace |
-| inline query | `answer_inline_query` with `meeting.unavailable_inline_view` |
+
+An inline query never reaches here: the share handler catches its own `MeetingAccessError` and answers the query itself with an empty results panel.
 
 The `SharedMeetingError` subclasses come from a tap on a meeting card that may sit in any chat, so they answer on the card whatever the update looks like, in `deliver_shared_meeting_answer()`:
 

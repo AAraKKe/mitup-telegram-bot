@@ -146,19 +146,18 @@ def valid_inline_query(update: Update) -> InlineQuery:
     return update.inline_query
 
 
-async def shareable_meeting_id(update: Update, context: TMitupContext) -> int | None:
-    """Return the meeting id from an inline share query, or `None` after answering with no results.
+def shareable_meeting_id(update: Update) -> int | None:
+    """Return the meeting id an inline share query names, or `None` when it names none.
 
     PTB matches the inline pattern with `re.match` (not `fullmatch`), so a query such as "123abc"
-    reaches the share handler even though it is not a valid meeting id. Answering with empty results
-    here avoids letting `int()` raise and leaving the inline query silently unanswered.
+    reaches the share handler even though it is not a valid meeting id. The caller answers the
+    query: this only keeps `int()` from raising on one.
 
     `isdecimal` (not `isdigit`) because `int()` rejects non-decimal digit characters such as "①",
     which `isdigit` accepts.
     """
     query = valid_inline_query(update).query.strip()
     if not query.isdecimal():
-        await context.api.answer_inline_query(update=update, results=[], cache_time=0)
         return None
     return int(query)
 

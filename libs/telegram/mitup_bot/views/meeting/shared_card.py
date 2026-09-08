@@ -9,7 +9,6 @@ from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.utils import (
     ButtonMessages,
     Emojis,
-    InlineQueryMessages,
     MeetingAttachMessages,
     MeetingCardSectionMessages,
     MeetingDisplayMessages,
@@ -290,19 +289,4 @@ def inline_view(meeting: Meetup, *, chat_instance: str | None = None) -> MitupIn
         id=str(meeting.db_id),
         title=meeting.plain_title,
         inline_description=inline_query_message(meeting),
-    )
-
-
-def unavailable_inline_view(lang: str) -> MitupInlineView:
-    """Inline placeholder shown when a shared meeting is cancelled or inaccessible.
-
-    Telegram requires every inline query to be answered; returning this result keeps the
-    picker from stalling silently when the meeting behind a stale share button is gone.
-    """
-    return MitupInlineView(
-        message=InlineQueryMessages.MEETING_UNAVAILABLE_MESSAGE.rich(lang=lang),
-        menu=[],
-        id="meeting_unavailable",
-        title=InlineQueryMessages.MEETING_UNAVAILABLE_TITLE.text(lang=lang),
-        inline_description=InlineQueryMessages.MEETING_UNAVAILABLE_DESCRIPTION.text(lang=lang),
     )

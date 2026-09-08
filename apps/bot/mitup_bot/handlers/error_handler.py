@@ -36,7 +36,6 @@ from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.translations import TranslationEngine, locale_for_language_code
 from mitup_bot.utils.messages import CommonMessages, MeetingDisplayMessages, PrivacyMessages
 from mitup_bot.views import MitupView, RenderContext, factory
-from mitup_bot.views import meeting as meeting_views
 
 console = Console()
 
@@ -360,18 +359,11 @@ async def deliver_meeting_access_screen(context: TMitupContext, update: Update, 
     """Send the rejection screen in the shape this update can carry.
 
     A shared surface answers on the card that was tapped, whatever the update looks like. Everywhere
-    else the shape follows the update: a callback query replaces the screen the button sits on, a
-    message update has no message of ours to replace so the rejection arrives as a fresh reply, and
-    an inline query can only carry results, so it is answered with the unavailable card.
+    else the shape follows the update: a callback query replaces the screen the button sits on, and a
+    message update has no message of ours to replace, so the rejection arrives as a fresh reply.
     """
     if isinstance(error, SharedMeetingError):
         await deliver_shared_meeting_answer(context, update, error)
-        return
-
-    if update.inline_query is not None:
-        await context.api.answer_inline_query(
-            update=update, results=[meeting_views.unavailable_inline_view(error.lang)], cache_time=0
-        )
         return
 
     view = meeting_access_view(error, RenderContext(lang=error.lang, is_admin=guards.is_admin(update, context)))

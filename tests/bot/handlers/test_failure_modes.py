@@ -24,7 +24,6 @@ from mitup_bot.handlers.broadcast.enums import BroadcastHandlerId
 from mitup_bot.handlers.collaborate.enums import CollaborateHandlerId
 from mitup_bot.handlers.command_enums import CommandsId
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId
-from mitup_bot.handlers.inline_query.enums import InlineQueryId
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.meeting.edit.enums import EditMeetingHandlerId
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
@@ -41,7 +40,6 @@ from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CommonMessages, PrivacyMessages
 from mitup_bot.views import MitupView, RenderContext, factory
-from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
@@ -1216,7 +1214,10 @@ CONTEXTS = [
     #     of the chat, so the sharer resolves optionally and an unregistered one is a valid case that
     #     reaches guards.meeting with no user. A user marked for deletion is collapsed to the same
     #     anonymous caller instead of raising, so neither USER_NOT_FOUND nor USER_PENDING_DELETION
-    #     applies. Both are covered in tests/bot/handlers/inline_query/test_share_meeting.py.
+    #     applies. It also catches its own meeting rejections and answers the query with an empty
+    #     results panel rather than letting the error handler build a screen, so no meeting error
+    #     mode applies either. All of it is covered in
+    #     tests/bot/handlers/inline_query/test_share_meeting.py.
     #   - MeetingHandlerId.ATTACH_TO_CHAT: the "Make it searchable" button renders on every card the
     #     meeting was shared into, so the caller resolves optionally and an unregistered one is a
     #     valid case that reaches guards.shared_meeting with no user. A user marked for deletion is
@@ -1566,15 +1567,6 @@ CONTEXTS = [
         update_request=UpdateRequest(callback_query=cb.EDIT_MEETING_DESCRIPTION.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="edit_meeting_description",
-    ),
-    # --- Inline query ---
-    # Registered-sharer coverage only: the unregistered sharer is a valid case here, not a fault
-    # (see the documented exclusions above).
-    Context(
-        handler_id=InlineQueryId.SHARE_MEETING,
-        update_request=UpdateRequest(inline_query=str(MEETING_ID_NOT_OWNED)),
-        error_modes={ErrorMode.MEETING_NOT_OWNED},
-        id="inline_share_meeting",
     ),
     # --- Edit meeting title and description content steps ---
     Context(
@@ -1974,20 +1966,12 @@ def handler_shows_reactivation_prompt_for_inactive_meeting() -> list[Context]:
     return [context for context in CONTEXTS if ErrorMode.MEETING_INACTIVE_OWNER in context.error_modes]
 
 
-def assert_rejection_screen(context: StubMitupContext, update: Update, view: MitupView, *, lang: str):
+def assert_rejection_screen(context: StubMitupContext, update: Update, view: MitupView):
     """Assert the rejection screen reached the user in the shape this update can carry.
 
     A callback query replaces the screen the button sits on; a message update has no message of
-    ours to replace, so the rejection arrives as a fresh reply. An inline query can only carry
-    results and answers every rejection with the same unavailable card, so `view` does not apply
-    there and `lang` is what picks the screen.
+    ours to replace, so the rejection arrives as a fresh reply.
     """
-    if update.inline_query is not None:
-        context.api.assert_answer_inline_query_called(
-            update, results=[meeting_views.unavailable_inline_view(lang)], cache_time=0
-        )
-        return
-
     if update.callback_query is not None:
         context.api.assert_edit_message_called(update, view)
         context.api.assert_send_message_not_called()
@@ -2047,7 +2031,6 @@ async def test_handler_rejects_meeting_not_owned(
         context,
         update,
         factory.main_menu_view(RenderContext(lang=user_with_settings.lang)),
-        lang=user_with_settings.lang,
     )
 
 
@@ -2097,7 +2080,6 @@ async def test_handler_rejects_meeting_that_is_gone(
             message=CommonMessages.DELETED_MEETING_ALERT.rich(lang=user_with_settings.lang),
             menu=keyboard,
         ),
-        lang=user_with_settings.lang,
     )
 
 
@@ -2313,7 +2295,6 @@ async def test_owner_sees_reactivation_prompt_for_inactive_meeting(
         factory.reactivation_prompt_view(
             RenderContext(lang=user_with_settings.lang), meeting_id=MEETING_ID_INACTIVE, back_rows=back_rows
         ),
-        lang=user_with_settings.lang,
     )
 
 
@@ -2354,5 +2335,4 @@ async def test_non_owner_sees_main_menu_for_inactive_meeting(
         context,
         update,
         factory.main_menu_view(RenderContext(lang=user_with_settings.lang)),
-        lang=user_with_settings.lang,
     )
