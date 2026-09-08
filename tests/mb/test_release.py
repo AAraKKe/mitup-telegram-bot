@@ -176,7 +176,7 @@ def test_release_creates_gitlab_release_titled_and_milestoned_with_the_tag(recor
 
 def test_release_notes_list_merge_requests_since_the_previous_tag(recorder: CommandRecorder):
     green_repo(recorder)
-    recorder.captured_outputs["log --format"] = "Ship the widget (!34)\n\nMerge (!12) into main\n"
+    recorder.captured_outputs["log --format"] = "Ship the widget (!34)\n\x00Merge (!12) into main\n\x00"
     recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
     recorder.captured_outputs["merge_requests/12"] = json.dumps({"iid": 12, "title": "Fix the gadget"})
 
@@ -190,7 +190,7 @@ def test_release_notes_list_merge_requests_since_the_previous_tag(recorder: Comm
 def test_release_notes_dedupe_references_and_drop_unfetchable_titles(recorder: CommandRecorder):
     green_repo(recorder)
     # !34 is referenced twice (deduplicated); !12 cannot be fetched, so it is dropped.
-    recorder.captured_outputs["log --format"] = "Ship it (!34)\n\nMerge (!12) into main\nFollow-up (!34)\n"
+    recorder.captured_outputs["log --format"] = "Ship it (!34)\n\x00Merge (!12) into main\n\x00Follow-up (!34)\n\x00"
     recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
     recorder.exit_codes["merge_requests/12"] = 1
 
@@ -198,6 +198,25 @@ def test_release_notes_dedupe_references_and_drop_unfetchable_titles(recorder: C
 
     call = release_create_call(recorder)
     assert release_notes_field(call) == "- [!34] Add the widget"
+
+
+def test_release_notes_count_one_merge_request_per_commit(recorder: CommandRecorder):
+    green_repo(recorder)
+    # A feature-branch squash embeds the messages of the commits it squashed, each with its own MR.
+    feature_squash = (
+        "Rebuild the bot on rich messages (!70)\n\nSee merge request group/project!70\n\n"
+        "Commits squashed (max 100):\n\n* Add the payload layer (!66)\n\nSee merge request group/project!66\n\n"
+        "* Rebuild the card (!68)\n\nSee merge request group/project!68\n"
+    )
+    recorder.captured_outputs["log --format"] = feature_squash + "\x00Fix the gadget (!12)\n\x00"
+    recorder.captured_outputs["merge_requests/70"] = json.dumps({"iid": 70, "title": "Rebuild the bot on rich"})
+    recorder.captured_outputs["merge_requests/12"] = json.dumps({"iid": 12, "title": "Fix the gadget"})
+
+    cli.invoke(app, ["release"])
+
+    call = release_create_call(recorder)
+    assert release_notes_field(call) == "- [!70] Rebuild the bot on rich\n- [!12] Fix the gadget"
+    assert ["glab", "api", "projects/:id/merge_requests/66"] not in recorder.commands
 
 
 def test_release_notes_are_empty_when_no_merge_requests_shipped(recorder: CommandRecorder):
@@ -254,7 +273,7 @@ def test_release_warns_but_still_publishes_when_the_tag_never_registers(recorder
 
 def test_release_milestones_shipped_mrs_and_leaves_manual_assignments(recorder: CommandRecorder):
     green_repo(recorder)
-    recorder.captured_outputs["log --format"] = "Ship the widget (!34)\n\nMerge (!12) into main\n"
+    recorder.captured_outputs["log --format"] = "Ship the widget (!34)\n\x00Merge (!12) into main\n\x00"
     recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
     recorder.captured_outputs["merge_requests/12"] = json.dumps(
         {"iid": 12, "title": "Fix the gadget", "milestone": {"title": "v9.9.9"}}
@@ -286,7 +305,7 @@ def test_release_sweep_warns_when_the_milestone_id_cannot_be_resolved(recorder: 
 
 def test_release_sweep_warns_but_continues_when_an_assignment_fails(recorder: CommandRecorder):
     green_repo(recorder)
-    recorder.captured_outputs["log --format"] = "Ship it (!34)\nFix it (!35)\n"
+    recorder.captured_outputs["log --format"] = "Ship it (!34)\n\x00Fix it (!35)\n\x00"
     recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
     recorder.captured_outputs["merge_requests/35"] = json.dumps({"iid": 35, "title": "Polish the widget"})
     recorder.captured_outputs["milestones?title=v1.3.0"] = json.dumps([{"title": "v1.3.0", "id": 77}])

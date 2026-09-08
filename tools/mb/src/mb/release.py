@@ -11,6 +11,7 @@ DEFAULT_BRANCH = "main"
 FIRST_VERSION = (0, 1, 0)
 VERSION_TAG_RE = re.compile(r"v(\d+)\.(\d+)\.(\d+)$")
 MERGE_REQUEST_REF_RE = re.compile(r"!(\d+)")
+COMMIT_SEPARATOR = "\x00"
 PIPELINES_URL = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/pipelines"
 PIPELINE_POLL_INTERVAL_SECONDS = 3
 PIPELINE_POLL_ATTEMPTS = 20
@@ -197,18 +198,18 @@ def wait_for_tag(version: str) -> bool:
 
 
 def merge_request_ids(previous_tag: str | None, sha: str) -> list[int]:
-    """MR IIDs referenced by the commits shipping in this release, newest first, without duplicates.
+    """MR IIDs of the commits shipping in this release, newest first, without duplicates.
 
-    Squash and merge commits carry their MR as a `!123` reference, so the range `previous_tag..sha`
-    (all of `sha`'s history when there is no previous tag) yields exactly what changed since the
-    last release.
+    A commit ships exactly one merge request, the one it was merged from, named by the first `!123`
+    reference in its message. A feature-branch squash embeds the messages of the commits it
+    squashed, each naming the MR that landed it on the feature branch, and those never count.
     """
     revision_range = f"{previous_tag}..{sha}" if previous_tag else sha
-    log = git_capture("log", "--format=%B", revision_range)
+    log = git_capture("log", "--format=%B%x00", revision_range)
     ids: list[int] = []
-    for match in MERGE_REQUEST_REF_RE.finditer(log):
-        iid = int(match[1])
-        if iid not in ids:
+    for message in log.split(COMMIT_SEPARATOR):
+        match = MERGE_REQUEST_REF_RE.search(message)
+        if match and (iid := int(match[1])) not in ids:
             ids.append(iid)
     return ids
 
