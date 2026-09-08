@@ -32,6 +32,7 @@ from mitup_bot.utils.rich_message import (
 )
 from mitup_bot.utils.rich_template import render_rich
 from mitup_bot.views import MitupView, RenderContext
+from mitup_bot.views.datetime_format import duration_minutes_content
 from mitup_bot.views.mitup_view import arrange_in_grid
 from mitup_bot.views.sections import chip_section, section_header
 
@@ -174,7 +175,9 @@ def timezone_settings_section(lang: str, timezone: str) -> RichContent:
 
 def notifications_settings_section(lang: str, enabled: bool, lead_minutes: int) -> RichContent:
     change = ButtonConfig(text=ButtonMessages.CHANGE.text(lang=lang), callback_data=cb.SET_NOTIFICATION_TIME)
-    lead = SettingsMessages.NOTIFICATION_LEAD.rich(lang=lang, minutes=lead_minutes, button_change=change)
+    lead = SettingsMessages.NOTIFICATION_LEAD.rich(
+        lang=lang, duration=duration_minutes_content(lead_minutes, lang=lang), button_change=change
+    )
     return settings_section(
         ButtonMessages.NOTIFICATIONS, lang, toggle_chip(cb.TOGGLE_NOTIFICATIONS, enabled, lang), lead
     )
@@ -182,7 +185,9 @@ def notifications_settings_section(lang: str, enabled: bool, lead_minutes: int) 
 
 def timeout_settings_section(lang: str, timeout_minutes: int) -> RichContent:
     change = ButtonConfig(text=ButtonMessages.CHANGE.text(lang=lang), callback_data=cb.EDIT_TIMEOUT)
-    value = SettingsMessages.TIMEOUT_VALUE.rich(lang=lang, minutes=timeout_minutes)
+    value = SettingsMessages.TIMEOUT_VALUE.rich(
+        lang=lang, duration=duration_minutes_content(timeout_minutes, lang=lang)
+    )
     return settings_section(ButtonMessages.TIMEOUT, lang, change, value)
 
 

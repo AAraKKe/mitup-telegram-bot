@@ -7,6 +7,7 @@ from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import CommonMessages, SettingsMessages
 from mitup_bot.views import MitupView, RenderContext, factory
+from mitup_bot.views.datetime_format import duration_minutes_content
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -77,7 +78,9 @@ async def test_settings_notification_time_text_message_handler(
     assert user_with_settings.settings.notification_time == 10
 
     expected_success_view = settings_card(user_with_settings).with_context(
-        SettingsMessages.NOTIFICATIONS_TIME_SUCCESS.rich(lang=user_with_settings.lang, notifications_time=10)
+        SettingsMessages.NOTIFICATIONS_TIME_SUCCESS.rich(
+            lang=user_with_settings.lang, duration=duration_minutes_content(10, lang=user_with_settings.lang)
+        )
     )
     context.api.assert_send_message_called(update, expected_success_view)
     assert result == ConversationHandler.END

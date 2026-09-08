@@ -18,6 +18,7 @@ from mitup_bot.utils.messages import (
 from mitup_bot.utils.rich_message import RichContent, RichDocument, RichTag, button_content, button_row_content
 from mitup_bot.utils.rich_template import render_rich_tags
 from mitup_bot.views import MitupView, RenderContext, factory
+from mitup_bot.views.datetime_format import duration_minutes_content
 
 STAGING_DOCS_URL = "https://staging.mitup.social"
 
@@ -274,8 +275,13 @@ def test_settings_card_states_the_notification_lead_and_the_timeout(user_with_se
     html = settings_card_html(user_with_settings, lang)
 
     change = ButtonConfig(text=ButtonMessages.CHANGE.text(lang=lang), callback_data=cb.SET_NOTIFICATION_TIME)
-    assert SettingsMessages.NOTIFICATION_LEAD.rich(lang=lang, minutes=15, button_change=change).html in html
-    assert SettingsMessages.TIMEOUT_VALUE.rich(lang=lang, minutes=240).html in html
+    lead = SettingsMessages.NOTIFICATION_LEAD.rich(
+        lang=lang, duration=duration_minutes_content(15, lang=lang), button_change=change
+    )
+    assert lead.html in html
+    assert (
+        SettingsMessages.TIMEOUT_VALUE.rich(lang=lang, duration=duration_minutes_content(240, lang=lang)).html in html
+    )
 
 
 @pytest.mark.parametrize(

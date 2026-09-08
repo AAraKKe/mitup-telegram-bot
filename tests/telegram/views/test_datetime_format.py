@@ -13,6 +13,7 @@ from mitup_bot.views.datetime_format import (
     TIME_ENTITY_FORMAT,
     datetime_content,
     datetime_range_content,
+    duration_minutes_content,
     locale_for,
     localized_datetime,
     month_name,
@@ -428,3 +429,31 @@ def test_relative_time_reads_a_stored_moment_and_a_stored_clock_as_utc():
 
 def test_relative_time_falls_back_to_english_for_a_language_babel_does_not_know():
     assert relative_time_content(NOW + dt.timedelta(minutes=25), now=NOW, lang="zz_ZZ").text == "in 25 minutes"
+
+
+# How each shipped language names a single minute and a run of them.
+MINUTE_COUNTS = {
+    "en": ("1 minute", "25 minutes"),
+    "es_ES": ("1 minuto", "25 minutos"),
+    "gl_ES": ("1 minuto", "25 minutos"),
+    "de_DE": ("1 Minute", "25 Minuten"),
+    "pt_BR": ("1 minuto", "25 minutos"),
+    "it_IT": ("1 minuto", "25 minuti"),
+}
+
+
+@pytest.mark.parametrize("language", MINUTE_COUNTS)
+def test_a_count_of_minutes_carries_the_unit_each_language_spells_for_it(language: str):
+    singular, plural = MINUTE_COUNTS[language]
+
+    assert duration_minutes_content(1, lang=language).text == singular
+    assert duration_minutes_content(25, lang=language).text == plural
+
+
+def test_every_shipped_language_has_an_expected_minute_count():
+    """A language added to the bot must be given its expected wording here, not left unchecked."""
+    assert sorted(MINUTE_COUNTS) == sorted(SUPPORTED_LANGUAGES)
+
+
+def test_a_count_of_minutes_falls_back_to_english_for_a_language_babel_does_not_know():
+    assert duration_minutes_content(1, lang="zz_ZZ").text == "1 minute"

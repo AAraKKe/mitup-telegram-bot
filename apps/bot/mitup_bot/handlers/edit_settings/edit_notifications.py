@@ -11,6 +11,7 @@ from mitup_bot.handlers import HandlersRegistry, PositiveNumberFilter
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import CommonMessages, SettingsMessages
+from mitup_bot.views.datetime_format import duration_minutes_content
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId, SettingName
 from .utils import SETTING_CHANGED_EVENT, SETTINGS_MENU_SOURCE
@@ -92,7 +93,7 @@ async def settings_notification_time_text_message_handler(
     )
 
     message = SettingsMessages.NOTIFICATIONS_TIME_SUCCESS.rich(
-        lang=user.lang, notifications_time=user.settings.notification_time
+        lang=user.lang, duration=duration_minutes_content(user.settings.notification_time, lang=user.lang)
     )
     view = views.factory.settings_view(guards.render_context(user, update, context), user).with_context(message)
 

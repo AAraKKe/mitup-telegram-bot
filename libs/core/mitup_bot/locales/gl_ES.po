@@ -402,13 +402,13 @@ msgid "SettingsMessages.TIMEOUT_INVALID"
 msgstr "Vaia! Isto non parece unha prórroga válida. Envía un número enteiro positivo de minutos, ata <b>${max_timeout}</b> (un día). Non se permiten decimais!"
 
 msgid "SettingsMessages.TIMEOUT_SUCCESS"
-msgstr "A prórroga estableceuse en: <b>${timeout} minutos</b>"
+msgstr "A prórroga estableceuse en: <b>${duration}</b>"
 
 msgid "SettingsMessages.NOTIFICATIONS_TIME_PROMPT"
 msgstr "Envía canto tempo antes de que comece unha quedada (en minutos) che gustaría recibir unha notificación ou toca Cancelar para volver."
 
 msgid "SettingsMessages.NOTIFICATIONS_TIME_SUCCESS"
-msgstr "Recibirás unha notificación <b>${notifications_time} minutos</b> antes de que comecen as quedadas ás que te uniches."
+msgstr "Recibirás unha notificación <b>${duration}</b> antes de que comecen as quedadas ás que te uniches."
 
 msgid "PrivacyMessages.INTRO"
 msgstr "Os teus datos son teus."
@@ -1113,10 +1113,10 @@ msgid "GrantOperatorMessages.BUTTON_CANCEL"
 msgstr "❌ Cancelar"
 
 msgid "SettingsMessages.TIMEOUT_VALUE"
-msgstr "Unha quedada sen hora de remate segue activa ${minutes} minutos despois de comezar."
+msgstr "Unha quedada sen hora de remate segue activa ${duration} despois de comezar."
 
 msgid "SettingsMessages.NOTIFICATION_LEAD"
-msgstr "${minutes} minutos antes de que comece unha quedada ${button_change}"
+msgstr "${duration} antes de que comece unha quedada ${button_change}"
 
 msgid "SettingsMessages.DEFAULT_OPTIONS_LINE"
 msgstr "Así comeza cada quedada que crees."

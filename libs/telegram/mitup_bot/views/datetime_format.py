@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from babel import Locale, UnknownLocaleError
 from babel.dates import format_date, format_skeleton, format_timedelta
+from babel.units import format_unit
 
 from mitup_bot.datetimes import DateFormat, TimeFormat, as_utc, in_timezone
 from mitup_bot.translations import TranslationEngine
@@ -177,6 +178,11 @@ def relative_time_content(moment: dt.datetime, *, now: dt.datetime, lang: str) -
     """
     gap = as_utc(moment) - as_utc(now)
     return RichContent(format_timedelta(gap, add_direction=True, granularity="minute", locale=locale_for(lang)))
+
+
+def duration_minutes_content(minutes: int, *, lang: str) -> RichContent:
+    """A count of minutes with its unit spelled the way *lang* spells it ("1 minute", "25 minutes")."""
+    return RichContent(format_unit(minutes, "duration-minute", length="long", locale=locale_for(lang)))
 
 
 def weekday_names(lang: str) -> list[str]:

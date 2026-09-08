@@ -12,6 +12,7 @@ from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import SettingsMessages
+from mitup_bot.views.datetime_format import duration_minutes_content
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId, SettingName
 from .utils import SETTING_CHANGED_EVENT, SETTINGS_MENU_SOURCE
@@ -81,7 +82,9 @@ async def settings_timeout_text_message_handler(session: AsyncSession, update: U
         source=SETTINGS_MENU_SOURCE,
     )
 
-    message = SettingsMessages.TIMEOUT_SUCCESS.rich(lang=user.lang, timeout=user.settings.timeout)
+    message = SettingsMessages.TIMEOUT_SUCCESS.rich(
+        lang=user.lang, duration=duration_minutes_content(user.settings.timeout, lang=user.lang)
+    )
     view = views.factory.settings_view(guards.render_context(user, update, context), user).with_context(message)
 
     await context.api.send_message(update=update, view=view)

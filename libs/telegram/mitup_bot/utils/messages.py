@@ -399,20 +399,20 @@ class SettingsMessages(MessageBase):
     TOGGLE_HINT = "Tap a setting's state to turn it on or off."
 
     # Timeout messages
-    TIMEOUT_VALUE = "A meeting without an end time stays active ${minutes} minutes after it starts."
+    TIMEOUT_VALUE = "A meeting without an end time stays active ${duration} after it starts."
     TIMEOUT_PROMPT = "Send the new timeout in minutes, up to <b>${max_timeout}</b> (one day), or tap Cancel to go back."
     TIMEOUT_INVALID = (
         "That doesn't look like a valid timeout. Send a positive whole number of minutes, "
         "up to <b>${max_timeout}</b> (one day). No decimals allowed!"
     )
-    TIMEOUT_SUCCESS = "Timeout set to: <b>${timeout} minutes</b>"
+    TIMEOUT_SUCCESS = "Timeout set to: <b>${duration}</b>"
 
     # Notification settings
-    NOTIFICATION_LEAD = "${minutes} minutes before a meeting starts ${button_change}"
+    NOTIFICATION_LEAD = "${duration} before a meeting starts ${button_change}"
     NOTIFICATIONS_TIME_PROMPT = (
         "Send how long before a meeting starts (in minutes) you would like to be notified or touch Cancel to go back."
     )
-    NOTIFICATIONS_TIME_SUCCESS = "Notification time set to <b>${notifications_time} minutes</b>."
+    NOTIFICATIONS_TIME_SUCCESS = "Notification time set to <b>${duration}</b>."
 
     # Card lines for the sections that only open another screen
     DEFAULT_OPTIONS_LINE = "What every meeting you create starts with."

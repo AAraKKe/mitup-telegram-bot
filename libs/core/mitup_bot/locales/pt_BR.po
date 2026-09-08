@@ -402,13 +402,13 @@ msgid "SettingsMessages.TIMEOUT_INVALID"
 msgstr "Isso não parece um tempo limite válido. Envie um número inteiro positivo de minutos, até <b>${max_timeout}</b> (um dia). Nada de decimais!"
 
 msgid "SettingsMessages.TIMEOUT_SUCCESS"
-msgstr "Tempo limite definido para: <b>${timeout} minutos</b>"
+msgstr "Tempo limite definido para: <b>${duration}</b>"
 
 msgid "SettingsMessages.NOTIFICATIONS_TIME_PROMPT"
 msgstr "Envie quantos minutos antes de um evento começar você quer receber a notificação, ou toque em Cancelar para voltar."
 
 msgid "SettingsMessages.NOTIFICATIONS_TIME_SUCCESS"
-msgstr "Antecedência da notificação definida para <b>${notifications_time} minutos</b>."
+msgstr "Antecedência da notificação definida para <b>${duration}</b>."
 
 msgid "PrivacyMessages.INTRO"
 msgstr "Seus dados pertencem a você."
@@ -1122,10 +1122,10 @@ msgid "GrantOperatorMessages.BUTTON_CANCEL"
 msgstr "❌ Cancelar"
 
 msgid "SettingsMessages.TIMEOUT_VALUE"
-msgstr "Um evento sem horário de término fica ativo por ${minutes} minutos depois de começar."
+msgstr "Um evento sem horário de término fica ativo por ${duration} depois de começar."
 
 msgid "SettingsMessages.NOTIFICATION_LEAD"
-msgstr "${minutes} minutos antes de um evento começar ${button_change}"
+msgstr "${duration} antes de um evento começar ${button_change}"
 
 msgid "SettingsMessages.DEFAULT_OPTIONS_LINE"
 msgstr "O ponto de partida de todo evento que você criar."

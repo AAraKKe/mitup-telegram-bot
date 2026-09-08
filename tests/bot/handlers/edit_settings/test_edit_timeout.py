@@ -9,6 +9,7 @@ from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import SettingsMessages
 from mitup_bot.views import RenderContext, factory
+from mitup_bot.views.datetime_format import duration_minutes_content
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -73,7 +74,9 @@ async def test_settings_timeout_text_message_handler(
     assert user_with_settings.settings.timeout == timeout
 
     expected_view = factory.settings_view(RenderContext(lang=user_with_settings.lang), user_with_settings).with_context(
-        SettingsMessages.TIMEOUT_SUCCESS.rich(lang=user_with_settings.lang, timeout=timeout)
+        SettingsMessages.TIMEOUT_SUCCESS.rich(
+            lang=user_with_settings.lang, duration=duration_minutes_content(timeout, lang=user_with_settings.lang)
+        )
     )
     context.api.assert_send_message_called(update, expected_view)
     assert result == ConversationHandler.END

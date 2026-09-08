@@ -402,13 +402,13 @@ msgid "SettingsMessages.TIMEOUT_INVALID"
 msgstr "Non sembra un timeout valido. Invia un numero intero positivo di minuti, fino a <b>${max_timeout}</b> (un giorno). Non sono consentiti decimali!"
 
 msgid "SettingsMessages.TIMEOUT_SUCCESS"
-msgstr "Timeout impostato a: <b>${timeout} minuti</b>"
+msgstr "Timeout impostato a: <b>${duration}</b>"
 
 msgid "SettingsMessages.NOTIFICATIONS_TIME_PROMPT"
 msgstr "Inviami con quanto anticipo (in minuti) vuoi ricevere la notifica prima dell'inizio di un incontro, oppure tocca Annulla per tornare indietro."
 
 msgid "SettingsMessages.NOTIFICATIONS_TIME_SUCCESS"
-msgstr "Ora di notifica impostata a <b>${notifications_time} minuti</b>."
+msgstr "Ora di notifica impostata a <b>${duration}</b>."
 
 msgid "PrivacyMessages.INTRO"
 msgstr "I tuoi dati sono tuoi."
@@ -1113,10 +1113,10 @@ msgid "GrantOperatorMessages.BUTTON_CANCEL"
 msgstr "❌ Annulla"
 
 msgid "SettingsMessages.TIMEOUT_VALUE"
-msgstr "Un incontro senza orario di fine resta attivo ${minutes} minuti dopo l'inizio."
+msgstr "Un incontro senza orario di fine resta attivo ${duration} dopo l'inizio."
 
 msgid "SettingsMessages.NOTIFICATION_LEAD"
-msgstr "${minutes} minuti prima dell'inizio di un incontro ${button_change}"
+msgstr "${duration} prima dell'inizio di un incontro ${button_change}"
 
 msgid "SettingsMessages.DEFAULT_OPTIONS_LINE"
 msgstr "Le opzioni con cui parte ogni incontro che crei."
