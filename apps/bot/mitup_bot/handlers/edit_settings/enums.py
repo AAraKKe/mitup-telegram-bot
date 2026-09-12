@@ -44,6 +44,9 @@ class EditSettingsHandlerId(HandlerId):
 
     # Edit notifications
     TOGGLE_NOTIFICATIONS = auto()
+    TOGGLE_START_REMINDER = auto()
+    TOGGLE_DELETION_WARNING = auto()
+    TOGGLE_DELETION_NOTICE = auto()
     SET_NOTIFICATION_TIME = auto()
     NOTIFICATION_TIME_MESSAGE_WITH_TEXT = auto()
     NOTIFICATION_TIME_INVALID_INPUT = auto()
@@ -59,8 +62,8 @@ class ConversationSettingsState(Enum):
 class SettingName(StrEnum):
     """The `setting` facet of the shared `User setting changed` event.
 
-    Every `DEFAULT_*` member doubles as the `Settings` attribute it writes, which is what lets the
-    default-meeting-option toggles share one call site.
+    Every member doubles as the `Settings` attribute it writes, which is what lets the boolean
+    toggles share one call site.
     """
 
     LANGUAGE = auto()
@@ -68,6 +71,8 @@ class SettingName(StrEnum):
     TIMEOUT = auto()
     NOTIFICATION = auto()
     NOTIFICATION_TIME = auto()
+    DELETION_WARNING = auto()
+    DELETION_NOTICE = auto()
     DEFAULT_WAITING_LIST = auto()
     DEFAULT_PUBLIC = auto()
     DEFAULT_ALLOW_INVITATION = auto()

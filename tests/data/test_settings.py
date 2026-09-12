@@ -43,6 +43,13 @@ def test_timeout_at_cap_is_accepted(settings: Settings):
     assert settings.timeout == LifecyclePolicy.get().max_timeout_minutes
 
 
+def test_a_new_settings_row_announces_both_stages_of_a_deletion():
+    settings = Settings()
+
+    assert settings.deletion_warning is True
+    assert settings.deletion_notice is True
+
+
 def test_a_new_settings_row_names_the_time_format_every_meeting_starts_with():
     assert Settings().default_time_format == TimeFormat(
         show_timezone=False, clock_24h=True, date_format=DateFormat.DEFAULT

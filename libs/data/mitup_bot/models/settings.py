@@ -44,6 +44,8 @@ class Settings(BaseModel, SQLModel, table=True):
     timezone: str = "UTC"
     notification: bool = True
     notification_time: int = 5
+    deletion_warning: bool = True
+    deletion_notice: bool = True
     timeout: int = Field(default=5, le=LifecyclePolicy.get().max_timeout_minutes, sa_type=BigInteger)
     default_waiting_list: bool = False
     default_public: bool = False
@@ -75,6 +77,10 @@ class Settings(BaseModel, SQLModel, table=True):
 
     def __eq__(self, other: object) -> bool:
         return hash(self) == hash(other) if isinstance(other, Settings) else NotImplemented
+
+    @property
+    def any_notification_enabled(self) -> bool:
+        return self.notification or self.deletion_warning or self.deletion_notice
 
     @property
     def default_time_format(self) -> TimeFormat:

@@ -407,12 +407,17 @@ class SettingsMessages(MessageBase):
     )
     TIMEOUT_SUCCESS = "Timeout set to: <b>${duration}</b>"
 
-    # Notification settings
-    NOTIFICATION_LEAD = "${duration} before a meeting starts ${button_change}"
+    # Notification settings. Each option is a label carrying its chips, explained on the line below.
+    REMINDER_LABEL = "Reminder"
+    NOTIFICATION_LEAD = "${duration} before a meeting starts"
     NOTIFICATIONS_TIME_PROMPT = (
         "Send how long before a meeting starts (in minutes) you would like to be notified or touch Cancel to go back."
     )
     NOTIFICATIONS_TIME_SUCCESS = "Notification time set to <b>${duration}</b>."
+    DELETION_WARNING_LABEL = "Deletion warning"
+    DELETION_WARNING_LINE = "${days} days before a meeting is permanently deleted"
+    DELETION_NOTICE_LABEL = "Deletion notice"
+    DELETION_NOTICE_LINE = "Once a meeting is deleted"
 
     # Card lines for the sections that only open another screen
     DEFAULT_OPTIONS_LINE = "What every meeting you create starts with."

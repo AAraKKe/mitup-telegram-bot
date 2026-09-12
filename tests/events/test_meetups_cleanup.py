@@ -662,3 +662,104 @@ async def test_purge_names_the_meetings_and_the_invitees_it_destroys(
 
     summary = next(entry for entry in logs if entry["event"] == "Meetup purge sweep complete")
     assert (summary["purged"], summary["invitee_users_purged"]) == (1, 1)
+
+
+async def test_an_owner_who_turned_the_warning_off_is_not_written_to_but_the_meeting_moves_on(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """Turning the warning off opts out of the message, never out of the deletion: the meeting is
+    recorded as warned exactly as an unreachable owner's is, so it reaches the deletion pool and is
+    not re-nominated every day."""
+    meeting = create_meetup(id=1, title="Quietly Expiring")
+    create_user(
+        id=1,
+        tg_user_id=10,
+        owned_meetings=[meeting],
+        settings=create_settings(id=1, deletion_warning=False),
+    )
+
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, (meeting,))
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
+
+    api.assert_method_just_called("send_message_to_user", times=0)
+    assert meeting.expiration_notification_sent is True
+    assert meeting.warned_time is not None
+
+    record = next(entry for entry in logs if entry["event"] == "Meetup deletion warning recorded")
+    assert record["delivery"] == meetups_cleanup.WarningDelivery.OPTED_OUT.value
+    assert record["meeting_id"] == 1
+
+
+async def test_the_warning_sweep_counts_the_owners_who_turned_it_off(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    silent = create_meetup(id=1, title="Opted Out")
+    create_user(id=1, tg_user_id=10, owned_meetings=[silent], settings=create_settings(id=1, deletion_warning=False))
+    warned = create_meetup(id=2, title="Still Warned")
+    owner = create_user(id=2, tg_user_id=20, owned_meetings=[warned], settings=create_settings(id=2))
+
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, (silent, warned))
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
+
+    api.assert_send_message_to_user_called(user=owner, view=meetups_cleanup.deletion_warning_view(warned))
+    api.assert_method_just_called("send_message_to_user", times=1)
+
+    sweep = next(entry for entry in logs if entry["event"] == "Deletion warning sweep complete")
+    assert (sweep["nominated"], sweep["delivered"], sweep["opted_out"], sweep["unreachable"]) == (2, 1, 1, 0)
+
+
+async def test_an_owner_who_turned_the_notice_off_is_not_written_to_but_the_meeting_is_deleted(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
+    """The notice is the only thing the toggle silences: the meeting is purged in the same run, and
+    the deletion is not counted as one its owner was never told about."""
+    meeting = create_meetup(id=1, title="Quietly Deleted")
+    create_user(
+        id=1,
+        tg_user_id=10,
+        owned_meetings=[meeting],
+        settings=create_settings(id=1, deletion_notice=False),
+    )
+
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, (meeting,))
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
+    await metrics_client.flush()
+
+    api.assert_method_just_called("send_message_to_user", times=0)
+    assert deleted_meetup_ids(mock_session) == {1}
+
+    purged = next(entry for entry in logs if entry["event"] == "Meetups purged")
+    assert (purged["count"], purged["opted_out"], purged["unnotified"]) == (1, 1, 0)
+
+    metrics.assert_emitted(
+        name=MetricKey.MEETUPS_DELETED_UNNOTIFIED,
+        value=0,
+        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+    )
+
+
+async def test_the_purge_writes_only_to_the_owners_who_still_want_the_notice(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    silent = create_meetup(id=1, title="Opted Out")
+    create_user(id=1, tg_user_id=10, owned_meetings=[silent], settings=create_settings(id=1, deletion_notice=False))
+    told = create_meetup(id=2, title="Still Notified")
+    owner = create_user(id=2, tg_user_id=20, owned_meetings=[told], settings=create_settings(id=2))
+
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, (silent, told))
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
+
+    api.assert_send_message_to_user_called(user=owner, view=meetups_cleanup.deletion_notice_view(told))
+    api.assert_method_just_called("send_message_to_user", times=1)
+    assert deleted_meetup_ids(mock_session) == {1, 2}
+
+    summary = next(entry for entry in logs if entry["event"] == "Meetup purge sweep complete")
+    assert (summary["nominated"], summary["delivered"], summary["opted_out"], summary["purged"]) == (2, 1, 1, 2)

@@ -214,7 +214,10 @@ SET_DEFAULT_CLOCK_24H = CallbackData(action="set", entity="def_clock")
 SET_DEFAULT_DATE_FORMAT = CallbackData(action="set", entity="def_datefmt")
 # Notifications
 TOGGLE_NOTIFICATIONS = CallbackData(action="toggle", entity="notif")
+TOGGLE_START_REMINDER = CallbackData(action="toggle", entity="reminder")
 SET_NOTIFICATION_TIME = CallbackData(action="set", entity="notif_time")
+TOGGLE_DELETION_WARNING = CallbackData(action="toggle", entity="del_warn")
+TOGGLE_DELETION_NOTICE = CallbackData(action="toggle", entity="del_notice")
 
 # ----------------------------------------
 # Broadcast callbacks (operator-only)

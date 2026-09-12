@@ -75,6 +75,8 @@ async def test_export_contains_the_users_own_record_and_settings(mock_session: M
     assert export["user"]["acquisition_source"] == "src_web"
     assert export["settings"]["language"] == exporter.settings.language
     assert export["settings"]["timezone"] == exporter.settings.timezone
+    assert export["settings"]["deletion_warning"] == exporter.settings.deletion_warning
+    assert export["settings"]["deletion_notice"] == exporter.settings.deletion_notice
 
 
 async def test_export_lists_owned_meetings_with_participants_as_display_names(mock_session: MockDbSession):

@@ -12,7 +12,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import SettingsMessages
 
 from .enums import EditSettingsHandlerId, SettingName
-from .utils import SETTING_CHANGED_EVENT, SETTINGS_MENU_SOURCE
+from .utils import SETTING_CHANGED_EVENT
 
 log = structlog.get_logger(__name__)
 
@@ -49,7 +49,6 @@ async def callback_query_set_language(session: AsyncSession, update: Update, con
         setting=SettingName.LANGUAGE.value,
         old_value=old_language,
         new_value=new_language,
-        source=SETTINGS_MENU_SOURCE,
     )
 
     view = views.factory.settings_view(

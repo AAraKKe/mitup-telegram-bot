@@ -24,23 +24,108 @@ def settings_card(user: User) -> MitupView:
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.TOGGLE_NOTIFICATIONS)], indirect=True)
 @pytest.mark.parametrize(
-    "notifications_enabled",
-    [True, False],
-    ids=["enabled", "disabled"],
+    "starting_state",
+    [(True, True, True), (True, False, False), (False, False, True), (False, True, True)],
+    ids=["all_on", "reminder_only", "notice_only", "deletion_only"],
 )
-async def test_callback_query_toggle_notifications(
+async def test_callback_query_toggle_notifications_turns_everything_off_while_any_is_on(
     mock_session: MockDbSession,
     user_with_settings: User,
     update: Update,
     handler_context: HandlerContext,
-    notifications_enabled: bool,
+    starting_state: tuple[bool, bool, bool],
 ):
-    user_with_settings.settings.notification = notifications_enabled
+    settings = user_with_settings.settings
+    settings.notification, settings.deletion_warning, settings.deletion_notice = starting_state
     mock_session.add_object(user_with_settings, query_field="tg_user_id")
 
     context, result = await call_handler(EditSettingsHandlerId.TOGGLE_NOTIFICATIONS, handler_context=handler_context)
 
-    assert user_with_settings.settings.notification is not notifications_enabled
+    assert (settings.notification, settings.deletion_warning, settings.deletion_notice) == (False, False, False)
+    mock_session.assert_flushed()
+
+    context.api.assert_edit_message_called(update, settings_card(user_with_settings))
+    assert result is None
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.TOGGLE_NOTIFICATIONS)], indirect=True)
+async def test_callback_query_toggle_notifications_turns_everything_on_when_all_are_off(
+    mock_session: MockDbSession, user_with_settings: User, update: Update, handler_context: HandlerContext
+):
+    settings = user_with_settings.settings
+    settings.notification = settings.deletion_warning = settings.deletion_notice = False
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    context, result = await call_handler(EditSettingsHandlerId.TOGGLE_NOTIFICATIONS, handler_context=handler_context)
+
+    assert (settings.notification, settings.deletion_warning, settings.deletion_notice) == (True, True, True)
+    mock_session.assert_flushed()
+
+    context.api.assert_edit_message_called(update, settings_card(user_with_settings))
+    assert result is None
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.TOGGLE_START_REMINDER)], indirect=True)
+@pytest.mark.parametrize("reminder_enabled", [True, False], ids=["enabled", "disabled"])
+async def test_callback_query_toggle_start_reminder(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    update: Update,
+    handler_context: HandlerContext,
+    reminder_enabled: bool,
+):
+    user_with_settings.settings.notification = reminder_enabled
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    context, result = await call_handler(EditSettingsHandlerId.TOGGLE_START_REMINDER, handler_context=handler_context)
+
+    assert user_with_settings.settings.notification is not reminder_enabled
+    assert user_with_settings.settings.deletion_warning is True
+    assert user_with_settings.settings.deletion_notice is True
+    mock_session.assert_flushed()
+
+    context.api.assert_edit_message_called(update, settings_card(user_with_settings))
+    assert result is None
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.TOGGLE_DELETION_WARNING)], indirect=True)
+@pytest.mark.parametrize("warning_enabled", [True, False], ids=["enabled", "disabled"])
+async def test_callback_query_toggle_deletion_warning(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    update: Update,
+    handler_context: HandlerContext,
+    warning_enabled: bool,
+):
+    user_with_settings.settings.deletion_warning = warning_enabled
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    context, result = await call_handler(EditSettingsHandlerId.TOGGLE_DELETION_WARNING, handler_context=handler_context)
+
+    assert user_with_settings.settings.deletion_warning is not warning_enabled
+    assert user_with_settings.settings.deletion_notice is True
+    mock_session.assert_flushed()
+
+    context.api.assert_edit_message_called(update, settings_card(user_with_settings))
+    assert result is None
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.TOGGLE_DELETION_NOTICE)], indirect=True)
+@pytest.mark.parametrize("notice_enabled", [True, False], ids=["enabled", "disabled"])
+async def test_callback_query_toggle_deletion_notice(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    update: Update,
+    handler_context: HandlerContext,
+    notice_enabled: bool,
+):
+    user_with_settings.settings.deletion_notice = notice_enabled
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+
+    context, result = await call_handler(EditSettingsHandlerId.TOGGLE_DELETION_NOTICE, handler_context=handler_context)
+
+    assert user_with_settings.settings.deletion_notice is not notice_enabled
+    assert user_with_settings.settings.deletion_warning is True
     mock_session.assert_flushed()
 
     context.api.assert_edit_message_called(update, settings_card(user_with_settings))

@@ -1125,7 +1125,7 @@ msgid "SettingsMessages.TIMEOUT_VALUE"
 msgstr "Um evento sem horário de término fica ativo por ${duration} depois de começar."
 
 msgid "SettingsMessages.NOTIFICATION_LEAD"
-msgstr "${duration} antes de um evento começar ${button_change}"
+msgstr "${duration} antes de um evento começar"
 
 msgid "SettingsMessages.DEFAULT_OPTIONS_LINE"
 msgstr "O ponto de partida de todo evento que você criar."
@@ -1204,3 +1204,18 @@ msgstr "Isso remove a imagem ${number} do cartão. Tem certeza?"
 
 msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
 msgstr "Isso remove todas as fotos do cartão. Tem certeza?"
+
+msgid "SettingsMessages.DELETION_WARNING_LINE"
+msgstr "${days} dias antes de um evento ser excluído permanentemente"
+
+msgid "SettingsMessages.DELETION_NOTICE_LINE"
+msgstr "Quando um evento é excluído"
+
+msgid "SettingsMessages.REMINDER_LABEL"
+msgstr "Lembrete"
+
+msgid "SettingsMessages.DELETION_WARNING_LABEL"
+msgstr "Aviso de exclusão"
+
+msgid "SettingsMessages.DELETION_NOTICE_LABEL"
+msgstr "Confirmação de exclusão"

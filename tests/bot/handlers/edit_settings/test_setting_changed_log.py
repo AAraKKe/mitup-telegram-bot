@@ -5,11 +5,7 @@ from telegram import Update
 
 from mitup_bot.datetimes import DateFormat
 from mitup_bot.handlers.edit_settings.enums import EditSettingsHandlerId, SettingName
-from mitup_bot.handlers.edit_settings.utils import (
-    DEFAULT_OPTIONS_SOURCE,
-    SETTING_CHANGED_EVENT,
-    SETTINGS_MENU_SOURCE,
-)
+from mitup_bot.handlers.edit_settings.utils import SETTING_CHANGED_EVENT
 from mitup_bot.models import User
 from mitup_bot.utils import callbacks as cb
 from tests.helpers import HandlerContext, MockDbSession, UpdateRequest, call_handler, log_record
@@ -34,7 +30,6 @@ async def test_timeout_change_is_recorded_as_a_setting_change(
     assert record.__dict__["setting"] == SettingName.TIMEOUT.value
     assert record.__dict__["old_value"] == old_timeout
     assert record.__dict__["new_value"] == 15
-    assert record.__dict__["source"] == SETTINGS_MENU_SOURCE
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.SET_DEFAULT_INCOGNITO)], indirect=True)
@@ -59,7 +54,6 @@ async def test_default_option_toggle_shares_the_setting_changed_event(
     assert record.__dict__["setting"] == SettingName.DEFAULT_INCOGNITO.value
     assert record.__dict__["old_value"] is False
     assert record.__dict__["new_value"] is True
-    assert record.__dict__["source"] == DEFAULT_OPTIONS_SOURCE
     assert user_with_settings.settings.default_incognito is True
 
 
@@ -83,4 +77,21 @@ async def test_the_default_date_format_writes_the_same_event_from_its_own_call_s
     assert record.__dict__["setting"] == SettingName.DEFAULT_DATE_FORMAT.value
     assert record.__dict__["old_value"] == DateFormat.DEFAULT.value
     assert record.__dict__["new_value"] == DateFormat.LONG.value
-    assert record.__dict__["source"] == DEFAULT_OPTIONS_SOURCE
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.TOGGLE_NOTIFICATIONS)], indirect=True)
+async def test_the_notifications_switch_records_only_the_settings_it_changes(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    update: Update,
+    handler_context: HandlerContext,
+    caplog: pytest.LogCaptureFixture,
+):
+    caplog.set_level(logging.INFO)
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    user_with_settings.settings.notification = False
+
+    await call_handler(EditSettingsHandlerId.TOGGLE_NOTIFICATIONS, handler_context=handler_context)
+
+    recorded = [record.__dict__["setting"] for record in caplog.records if record.message == SETTING_CHANGED_EVENT]
+    assert recorded == [SettingName.DELETION_WARNING.value, SettingName.DELETION_NOTICE.value]

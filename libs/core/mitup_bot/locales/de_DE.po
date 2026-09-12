@@ -1116,7 +1116,7 @@ msgid "SettingsMessages.TIMEOUT_VALUE"
 msgstr "Ein Treffen ohne Endzeit bleibt nach dem Start noch ${duration} aktiv."
 
 msgid "SettingsMessages.NOTIFICATION_LEAD"
-msgstr "${duration} vor Beginn eines Treffens ${button_change}"
+msgstr "${duration} vor Beginn eines Treffens"
 
 msgid "SettingsMessages.DEFAULT_OPTIONS_LINE"
 msgstr "Damit startet jedes Treffen, das du erstellst."
@@ -1204,3 +1204,18 @@ msgstr "Damit wird Bild ${number} von der Karte entfernt. Bist du sicher?"
 
 msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
 msgstr "Damit werden alle Fotos von der Karte entfernt. Bist du sicher?"
+
+msgid "SettingsMessages.DELETION_WARNING_LINE"
+msgstr "${days} Tage, bevor ein Treffen endgültig gelöscht wird"
+
+msgid "SettingsMessages.DELETION_NOTICE_LINE"
+msgstr "Sobald ein Treffen gelöscht wurde"
+
+msgid "SettingsMessages.REMINDER_LABEL"
+msgstr "Erinnerung"
+
+msgid "SettingsMessages.DELETION_WARNING_LABEL"
+msgstr "Löschwarnung"
+
+msgid "SettingsMessages.DELETION_NOTICE_LABEL"
+msgstr "Löschbestätigung"

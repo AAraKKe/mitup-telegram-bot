@@ -68,7 +68,7 @@ def toggle_section(
 ) -> RichContent:
     """One boolean setting: its name with the state chip beside it, and below them the paragraph
     saying what the setting does."""
-    return settings_section(name, lang, toggle_chip(callback_data, value, lang), explanation.rich(lang=lang))
+    return settings_section(name, lang, [toggle_chip(callback_data, value, lang)], explanation.rich(lang=lang))
 
 
 def date_format_section(

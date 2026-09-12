@@ -1116,7 +1116,7 @@ msgid "SettingsMessages.TIMEOUT_VALUE"
 msgstr "Un incontro senza orario di fine resta attivo ${duration} dopo l'inizio."
 
 msgid "SettingsMessages.NOTIFICATION_LEAD"
-msgstr "${duration} prima dell'inizio di un incontro ${button_change}"
+msgstr "${duration} prima dell'inizio di un incontro"
 
 msgid "SettingsMessages.DEFAULT_OPTIONS_LINE"
 msgstr "Le opzioni con cui parte ogni incontro che crei."
@@ -1204,3 +1204,18 @@ msgstr "Questo rimuove l'immagine ${number} dalla scheda. Confermi?"
 
 msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
 msgstr "Questo rimuove tutte le foto dalla scheda. Confermi?"
+
+msgid "SettingsMessages.DELETION_WARNING_LINE"
+msgstr "${days} giorni prima che un incontro venga eliminato definitivamente"
+
+msgid "SettingsMessages.DELETION_NOTICE_LINE"
+msgstr "Quando un incontro viene eliminato"
+
+msgid "SettingsMessages.REMINDER_LABEL"
+msgstr "Promemoria"
+
+msgid "SettingsMessages.DELETION_WARNING_LABEL"
+msgstr "Avviso di eliminazione"
+
+msgid "SettingsMessages.DELETION_NOTICE_LABEL"
+msgstr "Conferma di eliminazione"

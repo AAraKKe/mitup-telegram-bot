@@ -1116,7 +1116,7 @@ msgid "SettingsMessages.TIMEOUT_VALUE"
 msgstr "Unha quedada sen hora de remate segue activa ${duration} despois de comezar."
 
 msgid "SettingsMessages.NOTIFICATION_LEAD"
-msgstr "${duration} antes de que comece unha quedada ${button_change}"
+msgstr "${duration} antes de que comece unha quedada"
 
 msgid "SettingsMessages.DEFAULT_OPTIONS_LINE"
 msgstr "Así comeza cada quedada que crees."
@@ -1204,3 +1204,18 @@ msgstr "Isto quita a imaxe ${number} da tarxeta. Seguro que queres continuar?"
 
 msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
 msgstr "Isto quita todas as fotos da tarxeta. Seguro que queres continuar?"
+
+msgid "SettingsMessages.DELETION_WARNING_LINE"
+msgstr "${days} días antes de que unha quedada se elimine definitivamente"
+
+msgid "SettingsMessages.DELETION_NOTICE_LINE"
+msgstr "Cando se elimina unha quedada"
+
+msgid "SettingsMessages.REMINDER_LABEL"
+msgstr "Recordatorio"
+
+msgid "SettingsMessages.DELETION_WARNING_LABEL"
+msgstr "Aviso de eliminación"
+
+msgid "SettingsMessages.DELETION_NOTICE_LABEL"
+msgstr "Confirmación de eliminación"

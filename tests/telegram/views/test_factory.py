@@ -1,9 +1,14 @@
+import datetime as dt
+from dataclasses import replace
+
 import pytest
 
-from mitup_bot import docs_links
+from mitup_bot import docs_links, lifecycle
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.keyboards import ButtonConfig, ButtonStyle
+from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import MeetingCounts, User
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import (
@@ -208,8 +213,8 @@ def test_settings_card_heads_the_screen_with_its_title(user_with_settings: User,
     assert html.startswith(ButtonMessages.SETTINGS.rich(lang=lang).wrap(RichTag.H2).html)
 
 
-def test_settings_card_titles_every_section(user_with_settings: User, lang: str):
-    html = settings_card_html(user_with_settings, lang)
+def test_settings_card_opens_every_section_behind_a_rule(user_with_settings: User, lang: str):
+    blocks = settings_card_html(user_with_settings, lang).split("<hr/>")
 
     titles = [
         ButtonMessages.LANGUAGE,
@@ -219,8 +224,9 @@ def test_settings_card_titles_every_section(user_with_settings: User, lang: str)
         ButtonMessages.DEFAULT_OPTIONS,
         ButtonMessages.PRIVACY,
     ]
-    for title in titles:
-        assert title.rich(lang=lang).wrap(RichTag.BOLD).html in html
+    assert blocks[0] == ButtonMessages.SETTINGS.rich(lang=lang).wrap(RichTag.H2).html
+    for block, title in zip(blocks[1:], titles, strict=True):
+        assert block.startswith(title.rich(lang=lang).wrap(RichTag.BOLD).html)
 
 
 def test_settings_card_offers_every_language_with_the_current_one_accented(user_with_settings: User, lang: str):
@@ -251,34 +257,139 @@ def test_settings_card_names_utc_as_it_is_stored(user_with_settings: User, lang:
 
 
 @pytest.mark.parametrize(
-    "notifications_enabled, label, style",
+    "setting, option_label, callback_data",
+    [
+        ("notification", SettingsMessages.REMINDER_LABEL, cb.TOGGLE_START_REMINDER),
+        ("deletion_warning", SettingsMessages.DELETION_WARNING_LABEL, cb.TOGGLE_DELETION_WARNING),
+        ("deletion_notice", SettingsMessages.DELETION_NOTICE_LABEL, cb.TOGGLE_DELETION_NOTICE),
+    ],
+    ids=["reminder", "warning", "notice"],
+)
+@pytest.mark.parametrize(
+    "enabled, label, style",
     [(True, ButtonMessages.ENABLED, "success"), (False, ButtonMessages.DISABLED, "danger")],
     ids=["enabled", "disabled"],
 )
-def test_settings_card_carries_the_notification_toggle_in_its_current_state(
-    user_with_settings: User, lang: str, notifications_enabled: bool, label: ButtonMessages, style: ButtonStyle
+def test_settings_card_labels_every_notification_option_with_its_own_toggle(
+    user_with_settings: User,
+    lang: str,
+    setting: str,
+    option_label: SettingsMessages,
+    callback_data: CallbackData,
+    enabled: bool,
+    label: ButtonMessages,
+    style: ButtonStyle,
 ):
-    user_with_settings.settings.notification = notifications_enabled
+    setattr(user_with_settings.settings, setting, enabled)
 
     html = settings_card_html(user_with_settings, lang)
 
-    chip = factory.toggle_chip(cb.TOGGLE_NOTIFICATIONS, notifications_enabled, lang)
-    assert button_content(chip).html in html
+    chip = factory.toggle_chip(callback_data, enabled, lang)
+    assert factory.chip_line(option_label, lang, [chip]).html in html
     assert label.text(lang=lang) in html
     assert f'style="{style}"' in html
 
 
-def test_settings_card_states_the_notification_lead_and_the_timeout(user_with_settings: User, lang: str):
+@pytest.mark.parametrize(
+    "notification, deletion_warning, deletion_notice, header_enabled",
+    [
+        (True, True, True, True),
+        (True, False, False, True),
+        (False, True, False, True),
+        (False, False, True, True),
+        (False, False, False, False),
+    ],
+    ids=["all_on", "reminder_only", "warning_only", "notice_only", "all_off"],
+)
+def test_the_notifications_header_chip_stays_on_while_any_of_the_three_options_is_on(
+    user_with_settings: User,
+    lang: str,
+    notification: bool,
+    deletion_warning: bool,
+    deletion_notice: bool,
+    header_enabled: bool,
+):
+    user_with_settings.settings.notification = notification
+    user_with_settings.settings.deletion_warning = deletion_warning
+    user_with_settings.settings.deletion_notice = deletion_notice
+
+    html = settings_card_html(user_with_settings, lang)
+
+    header_chip = factory.toggle_chip(cb.TOGGLE_NOTIFICATIONS, header_enabled, lang)
+    assert button_content(header_chip).html in html
+    assert button_content(factory.toggle_chip(cb.TOGGLE_NOTIFICATIONS, not header_enabled, lang)).html not in html
+
+
+def test_the_deletion_toggles_do_not_follow_the_start_reminder(user_with_settings: User, lang: str):
+    """Each option's chip reads its own setting, so both deletion options survive a reminder turned off."""
+    user_with_settings.settings.notification = False
+
+    html = settings_card_html(user_with_settings, lang)
+
+    for callback_data in (cb.TOGGLE_DELETION_WARNING, cb.TOGGLE_DELETION_NOTICE):
+        assert button_content(factory.toggle_chip(callback_data, True, lang)).html in html
+
+
+def notification_options(user: User, lang: str) -> list[tuple[SettingsMessages, list[ButtonConfig], RichContent]]:
+    """Every notification option as the label line and the description the card writes below it."""
+    settings = user.settings
+    change = ButtonConfig(text=ButtonMessages.CHANGE.text(lang=lang), callback_data=cb.SET_NOTIFICATION_TIME)
+    days = LifecyclePolicy.interval_days(LifecyclePolicy.get(user.supporter_level).deletion_warning_lead)
+    return [
+        (
+            SettingsMessages.REMINDER_LABEL,
+            [factory.toggle_chip(cb.TOGGLE_START_REMINDER, settings.notification, lang), change],
+            SettingsMessages.NOTIFICATION_LEAD.rich(
+                lang=lang, duration=duration_minutes_content(settings.notification_time, lang=lang)
+            ),
+        ),
+        (
+            SettingsMessages.DELETION_WARNING_LABEL,
+            [factory.toggle_chip(cb.TOGGLE_DELETION_WARNING, settings.deletion_warning, lang)],
+            SettingsMessages.DELETION_WARNING_LINE.rich(lang=lang, days=days),
+        ),
+        (
+            SettingsMessages.DELETION_NOTICE_LABEL,
+            [factory.toggle_chip(cb.TOGGLE_DELETION_NOTICE, settings.deletion_notice, lang)],
+            SettingsMessages.DELETION_NOTICE_LINE.rich(lang=lang),
+        ),
+    ]
+
+
+def test_settings_card_writes_every_notification_option_over_its_description(user_with_settings: User, lang: str):
     user_with_settings.settings.notification_time = 15
+
+    html = settings_card_html(user_with_settings, lang)
+
+    for label, chips, description in notification_options(user_with_settings, lang):
+        assert f"{factory.chip_line(label, lang, chips).html}<br/>{description.html}" in html
+
+
+def test_settings_card_opens_every_notification_option_after_a_blank_line(user_with_settings: User, lang: str):
+    html = settings_card_html(user_with_settings, lang)
+
+    for label, _, _ in notification_options(user_with_settings, lang):
+        assert f"<br/><br/>{label.rich(lang=lang).wrap(RichTag.BOLD).html}" in html
+
+
+def test_settings_card_counts_the_deletion_warning_in_the_owners_own_lead(
+    user_with_settings: User, lang: str, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(
+        lifecycle, "PATRON_POLICY", replace(lifecycle.PATRON_POLICY, deletion_warning_lead=dt.timedelta(days=21))
+    )
+    user_with_settings.supporter_level = SupporterLevel.HOST_2
+
+    html = settings_card_html(user_with_settings, lang)
+
+    assert SettingsMessages.DELETION_WARNING_LINE.rich(lang=lang, days=21).html in html
+
+
+def test_settings_card_states_the_timeout(user_with_settings: User, lang: str):
     user_with_settings.settings.timeout = 240
 
     html = settings_card_html(user_with_settings, lang)
 
-    change = ButtonConfig(text=ButtonMessages.CHANGE.text(lang=lang), callback_data=cb.SET_NOTIFICATION_TIME)
-    lead = SettingsMessages.NOTIFICATION_LEAD.rich(
-        lang=lang, duration=duration_minutes_content(15, lang=lang), button_change=change
-    )
-    assert lead.html in html
     assert (
         SettingsMessages.TIMEOUT_VALUE.rich(lang=lang, duration=duration_minutes_content(240, lang=lang)).html in html
     )

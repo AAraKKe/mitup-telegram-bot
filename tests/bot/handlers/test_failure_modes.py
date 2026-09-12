@@ -1446,6 +1446,24 @@ CONTEXTS = [
         id="settings_toggle_notifications",
     ),
     Context(
+        handler_id=EditSettingsHandlerId.TOGGLE_START_REMINDER,
+        update_request=UpdateRequest(callback_query=cb.TOGGLE_START_REMINDER),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_toggle_start_reminder",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.TOGGLE_DELETION_WARNING,
+        update_request=UpdateRequest(callback_query=cb.TOGGLE_DELETION_WARNING),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_toggle_deletion_warning",
+    ),
+    Context(
+        handler_id=EditSettingsHandlerId.TOGGLE_DELETION_NOTICE,
+        update_request=UpdateRequest(callback_query=cb.TOGGLE_DELETION_NOTICE),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="settings_toggle_deletion_notice",
+    ),
+    Context(
         handler_id=EditSettingsHandlerId.SET_NOTIFICATION_TIME,
         update_request=UpdateRequest(callback_query=cb.SET_NOTIFICATION_TIME),
         error_modes={ErrorMode.USER_NOT_FOUND},

@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -10,28 +12,28 @@ log = structlog.get_logger(__name__)
 # One event name for every settings mutation in the package, with `setting` as the filterable
 # facet, so a single query returns a user's whole change history.
 SETTING_CHANGED_EVENT = "User setting changed"
-SETTINGS_MENU_SOURCE = "settings_menu"
-DEFAULT_OPTIONS_SOURCE = "default_meeting_options"
 
 
-async def toggle_default_meeting_option(session: AsyncSession, user: User, setting: SettingName) -> bool:
-    """Flip one default-meeting-option flag, returning its new value.
+async def set_settings(session: AsyncSession, user: User, settings: Sequence[SettingName], *, value: bool):
+    """Write one value across several boolean settings, recording only the ones that change."""
+    changed = [setting for setting in settings if getattr(user.settings, setting.value) != value]
 
-    Each flag is copied into every meeting the user creates afterwards, so the flip needs a change
-    history; routing all five through here keeps that to one call site.
-    """
-    old_value: bool = getattr(user.settings, setting.value)
-    new_value = not old_value
-
-    setattr(user.settings, setting.value, new_value)
+    for setting in changed:
+        setattr(user.settings, setting.value, value)
     await session.flush()
 
-    log.info(
-        SETTING_CHANGED_EVENT,
-        user_id=user.db_id,
-        setting=setting.value,
-        old_value=old_value,
-        new_value=new_value,
-        source=DEFAULT_OPTIONS_SOURCE,
-    )
+    for setting in changed:
+        log.info(
+            SETTING_CHANGED_EVENT,
+            user_id=user.db_id,
+            setting=setting.value,
+            old_value=not value,
+            new_value=value,
+        )
+
+
+async def toggle_setting(session: AsyncSession, user: User, setting: SettingName) -> bool:
+    """Flip one boolean setting, returning its new value."""
+    new_value = not getattr(user.settings, setting.value)
+    await set_settings(session, user, [setting], value=new_value)
     return new_value

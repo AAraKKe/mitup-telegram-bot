@@ -15,7 +15,7 @@ from mitup_bot.utils.messages import SettingsMessages
 from mitup_bot.views.datetime_format import duration_minutes_content
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId, SettingName
-from .utils import SETTING_CHANGED_EVENT, SETTINGS_MENU_SOURCE
+from .utils import SETTING_CHANGED_EVENT
 
 log = structlog.get_logger(__name__)
 
@@ -79,7 +79,6 @@ async def settings_timeout_text_message_handler(session: AsyncSession, update: U
         setting=SettingName.TIMEOUT.value,
         old_value=old_timeout,
         new_value=timeout,
-        source=SETTINGS_MENU_SOURCE,
     )
 
     message = SettingsMessages.TIMEOUT_SUCCESS.rich(

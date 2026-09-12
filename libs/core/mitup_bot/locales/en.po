@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-09-08 22:04\n"
+"PO-Revision-Date: 2026-09-12 18:34\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -434,14 +434,29 @@ msgstr "That doesn't look like a valid timeout. Send a positive whole number of 
 msgid "SettingsMessages.TIMEOUT_SUCCESS"
 msgstr "Timeout set to: <b>${duration}</b>"
 
+msgid "SettingsMessages.REMINDER_LABEL"
+msgstr "Reminder"
+
 msgid "SettingsMessages.NOTIFICATION_LEAD"
-msgstr "${duration} before a meeting starts ${button_change}"
+msgstr "${duration} before a meeting starts"
 
 msgid "SettingsMessages.NOTIFICATIONS_TIME_PROMPT"
 msgstr "Send how long before a meeting starts (in minutes) you would like to be notified or touch Cancel to go back."
 
 msgid "SettingsMessages.NOTIFICATIONS_TIME_SUCCESS"
 msgstr "Notification time set to <b>${duration}</b>."
+
+msgid "SettingsMessages.DELETION_WARNING_LABEL"
+msgstr "Deletion warning"
+
+msgid "SettingsMessages.DELETION_WARNING_LINE"
+msgstr "${days} days before a meeting is permanently deleted"
+
+msgid "SettingsMessages.DELETION_NOTICE_LABEL"
+msgstr "Deletion notice"
+
+msgid "SettingsMessages.DELETION_NOTICE_LINE"
+msgstr "Once a meeting is deleted"
 
 msgid "SettingsMessages.DEFAULT_OPTIONS_LINE"
 msgstr "What every meeting you create starts with."

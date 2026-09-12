@@ -21,7 +21,7 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import MitupView, factory
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId, SettingName
-from .utils import SETTING_CHANGED_EVENT, SETTINGS_MENU_SOURCE
+from .utils import SETTING_CHANGED_EVENT
 
 log = structlog.get_logger(__name__)
 
@@ -80,7 +80,6 @@ async def store_timezone(
         setting=SettingName.TIMEZONE.value,
         old_value=old_timezone,
         new_value=timezone,
-        source=SETTINGS_MENU_SOURCE,
         input_method=input_method.value,
     )
 

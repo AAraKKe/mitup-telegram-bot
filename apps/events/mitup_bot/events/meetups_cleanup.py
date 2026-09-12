@@ -15,7 +15,7 @@ from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.datetimes import as_utc
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.lifecycle import LifecyclePolicy
-from mitup_bot.models import Meetup, User
+from mitup_bot.models import Meetup, Settings, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
@@ -69,14 +69,15 @@ class ResidueReason(StrEnum):
 
 
 class WarningDelivery(StrEnum):
-    """Whether the owner of a warned meetup actually received the notice.
+    """How the warning owed to the owner of a warned meetup resolved.
 
-    Both dispositions record the warning, so this is the only thing that keeps them apart once the
+    Every disposition records the warning, so this is the only thing that keeps them apart once the
     stamp is written.
     """
 
     DELIVERED = "delivered"
     UNREACHABLE = "unreachable"
+    OPTED_OUT = "opted_out"
 
 
 @dataclass
@@ -86,6 +87,18 @@ class SendOutcome:
     delivered: list[Meetup] = field(default_factory=list)
     unreachable: list[Meetup] = field(default_factory=list)
     failed: list[Meetup] = field(default_factory=list)
+
+
+def partition_by_opt_in(
+    meetups: Sequence[Meetup], wants_notice: Callable[[Settings], bool]
+) -> tuple[list[Meetup], list[Meetup]]:
+    """The meetups whose owner still wants this notice, and those whose owner turned it off."""
+    wanted: list[Meetup] = []
+    opted_out: list[Meetup] = []
+    for meetup in meetups:
+        bucket = wanted if wants_notice(meetup.owner.settings) else opted_out
+        bucket.append(meetup)
+    return wanted, opted_out
 
 
 def bucket_meetup(_user: User, *, bucket: list[Meetup], meetup: Meetup):
@@ -242,9 +255,9 @@ def deletion_notice_view(meetup: Meetup) -> MitupView:
 def record_warning(meetup: Meetup, delivery: WarningDelivery):
     """The mutation record for `record_deletion_warning`.
 
-    That stamp is the precondition for the later permanent deletion and is written for a delivered
-    warning and an undeliverable one alike, so this line is the only place the two stay
-    distinguishable once the run is over.
+    That stamp is the precondition for the later permanent deletion and is written whichever way
+    the warning resolved, so this line is the only place the dispositions stay distinguishable once
+    the run is over.
     """
     log.info(
         "Meetup deletion warning recorded",
@@ -262,12 +275,14 @@ def record_warning(meetup: Meetup, delivery: WarningDelivery):
 async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
     """Warn every owner whose meeting is a week away from permanent deletion.
 
-    An owner who has blocked the bot can never receive the warning, so their meeting is marked
-    as warned anyway and moves on to the deletion pool instead of being re-warned on every run.
-    A send that raised leaves the meeting in the pool for the next run to retry.
+    An owner who has blocked the bot can never receive the warning, and one who turned the warning
+    off does not want it, so either way the meeting is marked as warned and moves on to the
+    deletion pool instead of being re-warned on every run. A send that raised leaves the meeting in
+    the pool for the next run to retry.
     """
     meetups = (await session.exec(MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT)).all()
-    outcome = await notify_owners(api, meetups, deletion_warning_view)
+    wanted, opted_out = partition_by_opt_in(meetups, lambda settings: settings.deletion_warning)
+    outcome = await notify_owners(api, wanted, deletion_warning_view)
 
     log_residues(
         outcome,
@@ -280,8 +295,10 @@ async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: Telegra
         record_warning(meetup, WarningDelivery.DELIVERED)
     for meetup in outcome.unreachable:
         record_warning(meetup, WarningDelivery.UNREACHABLE)
+    for meetup in opted_out:
+        record_warning(meetup, WarningDelivery.OPTED_OUT)
 
-    for meetup in outcome.delivered + outcome.unreachable:
+    for meetup in outcome.delivered + outcome.unreachable + opted_out:
         meetup.record_deletion_warning()
 
     log.info(
@@ -289,6 +306,7 @@ async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: Telegra
         nominated=len(meetups),
         delivered=len(outcome.delivered),
         unreachable=len(outcome.unreachable),
+        opted_out=len(opted_out),
         failed=len(outcome.failed),
         windows=loggable_windows(lambda policy: policy.deletion_warning_delay),
         reason="warning_window_elapsed",
@@ -309,12 +327,13 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
     `deletion_warning_lead` since its warning was recorded.
 
     Delivering the notice is not a precondition for the deletion: an owner who has blocked the
-    bot has opted out of the notice, and keeping their expired meetings alive to keep retrying
-    it would retain the data forever. Only a send that raised — a transient Telegram failure —
-    defers the deletion to the next run.
+    bot has opted out of the notice, one who turned it off said so outright, and keeping their
+    expired meetings alive to keep retrying it would retain the data forever. Only a send that
+    raised, a transient Telegram failure, defers the deletion to the next run.
     """
     meetups = (await session.exec(MEETUPS_TO_DELETE_STATEMENT)).all()
-    outcome = await notify_owners(api, meetups, deletion_notice_view)
+    wanted, opted_out = partition_by_opt_in(meetups, lambda settings: settings.deletion_notice)
+    outcome = await notify_owners(api, wanted, deletion_notice_view)
 
     log_residues(
         outcome,
@@ -323,7 +342,7 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
         failed_event="Meeting deletion deferred",
     )
 
-    deletable = outcome.delivered + outcome.unreachable
+    deletable = outcome.delivered + outcome.unreachable + opted_out
     meeting_ids = [cast(int, meetup.id) for meetup in deletable]
     # Invited users exist only in the context of the meeting they were invited to.
     outside_user_ids = [
@@ -339,6 +358,7 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
         supporter_levels=supporter_level_counts(meetup.owner.supporter_level for meetup in deletable),
         windows=loggable_windows(lambda policy: policy.inactive_retention),
         unnotified=len(outcome.unreachable),
+        opted_out=len(opted_out),
         reason="retention_elapsed",
     )
     log.info(
@@ -356,6 +376,7 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
         nominated=len(meetups),
         delivered=len(outcome.delivered),
         unreachable=len(outcome.unreachable),
+        opted_out=len(opted_out),
         failed=len(outcome.failed),
         purged=len(deletable),
         invitee_users_purged=len(outside_user_ids),

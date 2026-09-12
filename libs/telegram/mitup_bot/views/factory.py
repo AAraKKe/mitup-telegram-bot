@@ -5,7 +5,9 @@ from collections.abc import Sequence
 from mitup_bot import docs_links
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.keyboards import ButtonConfig, Keyboard
-from mitup_bot.models import MeetingCounts, User
+from mitup_bot.lifecycle import LifecyclePolicy
+from mitup_bot.models import MeetingCounts, Settings, User
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import (
     AdminMessages,
@@ -27,10 +29,10 @@ from mitup_bot.utils.rich_message import (
     RichDocument,
     RichPhoto,
     RichTag,
+    button_content,
     horizontal_rule_content,
     keyboard_content,
 )
-from mitup_bot.utils.rich_template import render_rich
 from mitup_bot.views import MitupView, RenderContext
 from mitup_bot.views.datetime_format import duration_minutes_content
 from mitup_bot.views.mitup_view import arrange_in_grid
@@ -156,9 +158,14 @@ def language_grid_content(lang: str, current: str, callback_data: CallbackData) 
     return keyboard_content(arrange_in_grid(buttons, min(len(SUPPORTED_LANGUAGES), LANGUAGE_GRID_COLUMNS)))
 
 
-def settings_section(title: ButtonMessages, lang: str, chip: ButtonConfig, body: RichContent) -> RichContent:
-    header = title.rich(lang=lang).wrap(RichTag.BOLD)
-    return render_rich(t"{header} {chip}").append("\n").append(body)
+def chip_line(label: MessageBase, lang: str, chips: Sequence[ButtonConfig]) -> RichContent:
+    """A bold label followed by the chips that act on what it names."""
+    title = label.rich(lang=lang).wrap(RichTag.BOLD)
+    return RichContent.join(" ", [title, *(button_content(chip) for chip in chips)])
+
+
+def settings_section(title: MessageBase, lang: str, chips: Sequence[ButtonConfig], body: RichContent) -> RichContent:
+    return chip_line(title, lang, chips).append("\n").append(body)
 
 
 def language_settings_section(lang: str) -> RichContent:
@@ -170,17 +177,42 @@ def timezone_settings_section(lang: str, timezone: str) -> RichContent:
     """The city of the stored zone id names the timezone: "Europe/Madrid" reads as "Madrid"."""
     city = timezone.rpartition("/")[2].replace("_", " ")
     change = ButtonConfig(text=ButtonMessages.CHANGE.text(lang=lang), callback_data=cb.EDIT_TIEMZONE)
-    return settings_section(ButtonMessages.TIMEZONE, lang, change, RichContent(city))
+    return settings_section(ButtonMessages.TIMEZONE, lang, [change], RichContent(city))
 
 
-def notifications_settings_section(lang: str, enabled: bool, lead_minutes: int) -> RichContent:
+def notifications_settings_section(lang: str, settings: Settings, level: SupporterLevel) -> RichContent:
+    """The header chip switches every option at once, and each option carries its own toggle above
+    the line saying when it arrives. The deletion warning names the lead *level* is warned on."""
     change = ButtonConfig(text=ButtonMessages.CHANGE.text(lang=lang), callback_data=cb.SET_NOTIFICATION_TIME)
-    lead = SettingsMessages.NOTIFICATION_LEAD.rich(
-        lang=lang, duration=duration_minutes_content(lead_minutes, lang=lang), button_change=change
+    warning_lead = LifecyclePolicy.interval_days(LifecyclePolicy.get(level).deletion_warning_lead)
+    header = chip_line(
+        ButtonMessages.NOTIFICATIONS,
+        lang,
+        [toggle_chip(cb.TOGGLE_NOTIFICATIONS, settings.any_notification_enabled, lang)],
     )
-    return settings_section(
-        ButtonMessages.NOTIFICATIONS, lang, toggle_chip(cb.TOGGLE_NOTIFICATIONS, enabled, lang), lead
-    )
+    options = [
+        settings_section(
+            SettingsMessages.REMINDER_LABEL,
+            lang,
+            [toggle_chip(cb.TOGGLE_START_REMINDER, settings.notification, lang), change],
+            SettingsMessages.NOTIFICATION_LEAD.rich(
+                lang=lang, duration=duration_minutes_content(settings.notification_time, lang=lang)
+            ),
+        ),
+        settings_section(
+            SettingsMessages.DELETION_WARNING_LABEL,
+            lang,
+            [toggle_chip(cb.TOGGLE_DELETION_WARNING, settings.deletion_warning, lang)],
+            SettingsMessages.DELETION_WARNING_LINE.rich(lang=lang, days=warning_lead),
+        ),
+        settings_section(
+            SettingsMessages.DELETION_NOTICE_LABEL,
+            lang,
+            [toggle_chip(cb.TOGGLE_DELETION_NOTICE, settings.deletion_notice, lang)],
+            SettingsMessages.DELETION_NOTICE_LINE.rich(lang=lang),
+        ),
+    ]
+    return RichContent.join("\n\n", [header, *options])
 
 
 def timeout_settings_section(lang: str, timeout_minutes: int) -> RichContent:
@@ -188,40 +220,33 @@ def timeout_settings_section(lang: str, timeout_minutes: int) -> RichContent:
     value = SettingsMessages.TIMEOUT_VALUE.rich(
         lang=lang, duration=duration_minutes_content(timeout_minutes, lang=lang)
     )
-    return settings_section(ButtonMessages.TIMEOUT, lang, change, value)
+    return settings_section(ButtonMessages.TIMEOUT, lang, [change], value)
 
 
 def settings_view(ctx: RenderContext, user: User) -> MitupView:
     lang = ctx.lang
     settings = user.settings
     heading = ButtonMessages.SETTINGS.rich(lang=lang).wrap(RichTag.H2)
-    account = RichContent.join(
-        "\n\n",
-        [
-            timezone_settings_section(lang, settings.timezone),
-            notifications_settings_section(lang, settings.notification, settings.notification_time),
-            timeout_settings_section(lang, settings.timeout),
-        ],
-    )
-    screens = RichContent.join(
-        "\n\n",
-        [
-            settings_section(
-                ButtonMessages.DEFAULT_OPTIONS,
-                lang,
-                ButtonConfig(text=ButtonMessages.OPEN.text(lang=lang), callback_data=cb.EDIT_DEFAULT_OPTIONS),
-                SettingsMessages.DEFAULT_OPTIONS_LINE.rich(lang=lang),
-            ),
-            settings_section(
-                ButtonMessages.PRIVACY,
-                lang,
-                ButtonConfig(text=ButtonMessages.OPEN.text(lang=lang), callback_data=cb.EDIT_PRIVACY),
-                SettingsMessages.PRIVACY_LINE.rich(lang=lang),
-            ),
-        ],
-    )
-    body = RichContent.join(horizontal_rule_content(), [heading, language_settings_section(lang), account, screens])
-    return MitupView(body, main_menu_back_rows(lang))
+    sections = [
+        heading,
+        language_settings_section(lang),
+        timezone_settings_section(lang, settings.timezone),
+        notifications_settings_section(lang, settings, user.supporter_level),
+        timeout_settings_section(lang, settings.timeout),
+        settings_section(
+            ButtonMessages.DEFAULT_OPTIONS,
+            lang,
+            [ButtonConfig(text=ButtonMessages.OPEN.text(lang=lang), callback_data=cb.EDIT_DEFAULT_OPTIONS)],
+            SettingsMessages.DEFAULT_OPTIONS_LINE.rich(lang=lang),
+        ),
+        settings_section(
+            ButtonMessages.PRIVACY,
+            lang,
+            [ButtonConfig(text=ButtonMessages.OPEN.text(lang=lang), callback_data=cb.EDIT_PRIVACY)],
+            SettingsMessages.PRIVACY_LINE.rich(lang=lang),
+        ),
+    ]
+    return MitupView(RichContent.join(horizontal_rule_content(), sections), main_menu_back_rows(lang))
 
 
 def help_view(ctx: RenderContext) -> MitupView:

@@ -14,9 +14,11 @@ from mitup_bot.utils.messages import CommonMessages, SettingsMessages
 from mitup_bot.views.datetime_format import duration_minutes_content
 
 from .enums import ConversationSettingsState, EditSettingsHandlerId, SettingName
-from .utils import SETTING_CHANGED_EVENT, SETTINGS_MENU_SOURCE
+from .utils import SETTING_CHANGED_EVENT, set_settings, toggle_setting
 
 log = structlog.get_logger(__name__)
+
+NOTIFICATION_SETTINGS = (SettingName.NOTIFICATION, SettingName.DELETION_WARNING, SettingName.DELETION_NOTICE)
 
 
 @HandlersRegistry.register_callback_query(
@@ -26,19 +28,49 @@ log = structlog.get_logger(__name__)
 @with_session
 async def callback_query_toggle_notifications(session: AsyncSession, update: Update, context: TMitupContext):
     user = await guards.current_user(update, session)
+    await set_settings(session, user, NOTIFICATION_SETTINGS, value=not user.settings.any_notification_enabled)
 
-    old_value = user.settings.notification
-    user.settings.notification = not old_value
-    await session.flush()
+    view = views.factory.settings_view(guards.render_context(user, update, context), user)
 
-    log.info(
-        SETTING_CHANGED_EVENT,
-        user_id=user.db_id,
-        setting=SettingName.NOTIFICATION.value,
-        old_value=old_value,
-        new_value=user.settings.notification,
-        source=SETTINGS_MENU_SOURCE,
-    )
+    await context.api.edit_message(update=update, view=view)
+
+
+@HandlersRegistry.register_callback_query(
+    EditSettingsHandlerId.TOGGLE_START_REMINDER,
+    callback_data=cb.TOGGLE_START_REMINDER,
+)
+@with_session
+async def callback_query_toggle_start_reminder(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
+    await toggle_setting(session, user, SettingName.NOTIFICATION)
+
+    view = views.factory.settings_view(guards.render_context(user, update, context), user)
+
+    await context.api.edit_message(update=update, view=view)
+
+
+@HandlersRegistry.register_callback_query(
+    EditSettingsHandlerId.TOGGLE_DELETION_WARNING,
+    callback_data=cb.TOGGLE_DELETION_WARNING,
+)
+@with_session
+async def callback_query_toggle_deletion_warning(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
+    await toggle_setting(session, user, SettingName.DELETION_WARNING)
+
+    view = views.factory.settings_view(guards.render_context(user, update, context), user)
+
+    await context.api.edit_message(update=update, view=view)
+
+
+@HandlersRegistry.register_callback_query(
+    EditSettingsHandlerId.TOGGLE_DELETION_NOTICE,
+    callback_data=cb.TOGGLE_DELETION_NOTICE,
+)
+@with_session
+async def callback_query_toggle_deletion_notice(session: AsyncSession, update: Update, context: TMitupContext):
+    user = await guards.current_user(update, session)
+    await toggle_setting(session, user, SettingName.DELETION_NOTICE)
 
     view = views.factory.settings_view(guards.render_context(user, update, context), user)
 
@@ -89,7 +121,6 @@ async def settings_notification_time_text_message_handler(
         setting=SettingName.NOTIFICATION_TIME.value,
         old_value=old_notification_time,
         new_value=notification_time,
-        source=SETTINGS_MENU_SOURCE,
     )
 
     message = SettingsMessages.NOTIFICATIONS_TIME_SUCCESS.rich(

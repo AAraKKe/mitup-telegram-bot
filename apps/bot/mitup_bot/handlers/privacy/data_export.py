@@ -94,6 +94,8 @@ def settings_section(settings: Settings) -> dict[str, Any]:
         "timezone": settings.timezone,
         "notification": settings.notification,
         "notification_time": settings.notification_time,
+        "deletion_warning": settings.deletion_warning,
+        "deletion_notice": settings.deletion_notice,
         "timeout": settings.timeout,
         "default_waiting_list": settings.default_waiting_list,
         "default_public": settings.default_public,

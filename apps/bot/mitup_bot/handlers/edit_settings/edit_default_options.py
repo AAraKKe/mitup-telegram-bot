@@ -17,7 +17,7 @@ from mitup_bot.views.meeting_settings import (
 
 from .entry import EditSettingsHandlerId
 from .enums import SettingName
-from .utils import DEFAULT_OPTIONS_SOURCE, SETTING_CHANGED_EVENT, toggle_default_meeting_option
+from .utils import SETTING_CHANGED_EVENT, toggle_setting
 
 log = structlog.get_logger(__name__)
 
@@ -69,7 +69,7 @@ async def callback_query_open_default_time_format(session: AsyncSession, update:
 @with_session
 async def callback_query_toggle_default_waiting_list(session: AsyncSession, update: Update, context: TMitupContext):
     user = await current_user(update, session)
-    await toggle_default_meeting_option(session, user, SettingName.DEFAULT_WAITING_LIST)
+    await toggle_setting(session, user, SettingName.DEFAULT_WAITING_LIST)
 
     await context.api.edit_message(
         update=update,
@@ -81,7 +81,7 @@ async def callback_query_toggle_default_waiting_list(session: AsyncSession, upda
 @with_session
 async def callback_query_toggle_default_public(session: AsyncSession, update: Update, context: TMitupContext):
     user = await current_user(update, session)
-    await toggle_default_meeting_option(session, user, SettingName.DEFAULT_PUBLIC)
+    await toggle_setting(session, user, SettingName.DEFAULT_PUBLIC)
 
     await context.api.edit_message(
         update=update,
@@ -95,7 +95,7 @@ async def callback_query_toggle_default_public(session: AsyncSession, update: Up
 @with_session
 async def callback_query_toggle_default_invitations(session: AsyncSession, update: Update, context: TMitupContext):
     user = await current_user(update, session)
-    await toggle_default_meeting_option(session, user, SettingName.DEFAULT_ALLOW_INVITATION)
+    await toggle_setting(session, user, SettingName.DEFAULT_ALLOW_INVITATION)
 
     await context.api.edit_message(
         update=update,
@@ -109,7 +109,7 @@ async def callback_query_toggle_default_invitations(session: AsyncSession, updat
 @with_session
 async def callback_query_toggle_default_incognito(session: AsyncSession, update: Update, context: TMitupContext):
     user = await current_user(update, session)
-    await toggle_default_meeting_option(session, user, SettingName.DEFAULT_INCOGNITO)
+    await toggle_setting(session, user, SettingName.DEFAULT_INCOGNITO)
 
     await context.api.edit_message(
         update=update,
@@ -123,7 +123,7 @@ async def callback_query_toggle_default_incognito(session: AsyncSession, update:
 @with_session
 async def callback_query_toggle_default_lock_on_start(session: AsyncSession, update: Update, context: TMitupContext):
     user = await current_user(update, session)
-    await toggle_default_meeting_option(session, user, SettingName.DEFAULT_LOCK_ON_START)
+    await toggle_setting(session, user, SettingName.DEFAULT_LOCK_ON_START)
 
     await context.api.edit_message(
         update=update,
@@ -137,7 +137,7 @@ async def callback_query_toggle_default_lock_on_start(session: AsyncSession, upd
 @with_session
 async def callback_query_toggle_default_show_timezone(session: AsyncSession, update: Update, context: TMitupContext):
     user = await current_user(update, session)
-    await toggle_default_meeting_option(session, user, SettingName.DEFAULT_SHOW_TIMEZONE)
+    await toggle_setting(session, user, SettingName.DEFAULT_SHOW_TIMEZONE)
 
     await context.api.edit_message(
         update=update,
@@ -151,7 +151,7 @@ async def callback_query_toggle_default_show_timezone(session: AsyncSession, upd
 @with_session
 async def callback_query_toggle_default_clock_24h(session: AsyncSession, update: Update, context: TMitupContext):
     user = await current_user(update, session)
-    await toggle_default_meeting_option(session, user, SettingName.DEFAULT_CLOCK_24H)
+    await toggle_setting(session, user, SettingName.DEFAULT_CLOCK_24H)
 
     await context.api.edit_message(
         update=update,
@@ -179,7 +179,6 @@ async def callback_query_set_default_date_format(session: AsyncSession, update: 
         setting=SettingName.DEFAULT_DATE_FORMAT.value,
         old_value=old_format.value,
         new_value=settings.default_date_format.value,
-        source=DEFAULT_OPTIONS_SOURCE,
     )
 
     await context.api.edit_message(
