@@ -17,13 +17,14 @@ from mitup_bot.bootstrap import load_config
 from mitup_bot.config import BotConfig, Config, Env
 from mitup_bot.events import (
     broadcast,
+    delete_meetings,
     generate_stats,
     inactive_meetings,
-    meetups_cleanup,
     notify_meetings,
     notify_meetings_started,
     supporter_check,
     user_cleanup,
+    warn_meeting_deletions,
 )
 from mitup_bot.logging_config import Component, configure_logging
 from mitup_bot.models import configure_token_encryption
@@ -47,7 +48,8 @@ DEFAULT_USER_CLEANUP_INTERVAL = 3600
 DEFAULT_GENERATE_STATS_INTERVAL = 21600  # 6 hours
 DEFAULT_NOTIFY_MEETINGS_START = 60
 DEFAULT_DEACTIVATE_MEETINGS_INTERVAL = 60
-DEFAULT_MEETUPS_CLEANUP_INTERVAL = 86400  # 24 hours
+DEFAULT_WARN_MEETING_DELETIONS_INTERVAL = 86400  # 24 hours
+DEFAULT_DELETE_MEETINGS_INTERVAL = 86400  # 24 hours
 DEFAULT_NOTIFY_MEETING_STARTED_INTERVAL = 60
 DEFAULT_SEND_BROADCASTS_INTERVAL = 60
 DEFAULT_SUPPORTER_CHECK_INTERVAL = 86400  # 24 hours
@@ -73,7 +75,8 @@ class EventType(Enum):
     NOTIFY_START_MEETING = "NotifyStartMeeting"
     NOTIFY_MEETING_STARTED = "NotifyMeetingStarted"
     DEACTIVATE_MEETINGS = "DeactivateMeetings"
-    MEETUPS_CLEANUP = "MeetupsCleanup"
+    WARN_MEETING_DELETIONS = "WarnMeetingDeletions"
+    DELETE_MEETINGS = "DeleteMeetings"
     SEND_BROADCASTS = "SendBroadcasts"
     SUPPORTER_CHECK = "SupporterCheck"
 
@@ -85,7 +88,8 @@ class IntervalsConfiguration:
     notify_meeting_started: int
     generate_stats: int
     deactivate_meetings: int
-    meetups_cleanup: int
+    warn_meeting_deletions: int
+    delete_meetings: int
     send_broadcasts: int
     supporter_check: int
 
@@ -101,8 +105,10 @@ class IntervalsConfiguration:
                 return self.generate_stats
             case EventType.DEACTIVATE_MEETINGS:
                 return self.deactivate_meetings
-            case EventType.MEETUPS_CLEANUP:
-                return self.meetups_cleanup
+            case EventType.WARN_MEETING_DELETIONS:
+                return self.warn_meeting_deletions
+            case EventType.DELETE_MEETINGS:
+                return self.delete_meetings
             case EventType.SEND_BROADCASTS:
                 return self.send_broadcasts
             case EventType.SUPPORTER_CHECK:
@@ -146,7 +152,9 @@ def build_broadcast_bot(config: BotConfig) -> ExtBot:
 
 
 # High-volume, not time-sensitive fan-outs, kept off the shared bot's rate budget.
-BROADCAST_LIMITED_EVENTS = frozenset({EventType.SEND_BROADCASTS, EventType.MEETUPS_CLEANUP})
+BROADCAST_LIMITED_EVENTS = frozenset(
+    {EventType.SEND_BROADCASTS, EventType.WARN_MEETING_DELETIONS, EventType.DELETE_MEETINGS}
+)
 
 
 def select_bot(event_type: EventType, bot: ExtBot, broadcast_bot: ExtBot) -> ExtBot:
@@ -169,8 +177,10 @@ async def dispatch_event(
             await generate_stats.run(api, client)
         case EventType.DEACTIVATE_MEETINGS:
             await inactive_meetings.run(api, client)
-        case EventType.MEETUPS_CLEANUP:
-            await meetups_cleanup.run(api, client)
+        case EventType.WARN_MEETING_DELETIONS:
+            await warn_meeting_deletions.run(api, client)
+        case EventType.DELETE_MEETINGS:
+            await delete_meetings.run(api, client)
         case EventType.SEND_BROADCASTS:
             await broadcast.run(api, client, admin_tg_ids)
         case EventType.SUPPORTER_CHECK:

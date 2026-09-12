@@ -56,7 +56,8 @@ INTERVAL_PARAMS = [
     (EventType.NOTIFY_MEETING_STARTED, "notify_meeting_started"),
     (EventType.GENERATE_STATS, "generate_stats"),
     (EventType.DEACTIVATE_MEETINGS, "deactivate_meetings"),
-    (EventType.MEETUPS_CLEANUP, "meetups_cleanup"),
+    (EventType.WARN_MEETING_DELETIONS, "warn_meeting_deletions"),
+    (EventType.DELETE_MEETINGS, "delete_meetings"),
     (EventType.SEND_BROADCASTS, "send_broadcasts"),
     (EventType.SUPPORTER_CHECK, "supporter_check"),
 ]
@@ -74,7 +75,8 @@ def test_intervals_configuration_get(event_type: EventType, field_name: str):
         notify_meeting_started=25,
         generate_stats=30,
         deactivate_meetings=40,
-        meetups_cleanup=50,
+        warn_meeting_deletions=50,
+        delete_meetings=55,
         send_broadcasts=60,
         supporter_check=60,
     )
@@ -131,8 +133,9 @@ def test_select_bot_uses_shared_bot_for_time_sensitive_events(event_type: EventT
     "event_type", [event for event in EventType if event in BROADCAST_LIMITED_EVENTS], ids=lambda e: e.name
 )
 def test_select_bot_uses_broadcast_bot_for_high_volume_events(event_type: EventType):
-    """The daily cleanup writes one digest to every owner it nominated, which is broadcast-shaped
-    traffic: it runs on the capped limiter so it cannot crowd out a meeting reminder."""
+    """The daily deletion sweeps write one digest to every owner they nominated, which is
+    broadcast-shaped traffic: they run on the capped limiter so they cannot crowd out a meeting
+    reminder."""
     bot, broadcast_bot = MagicMock(), MagicMock()
 
     assert select_bot(event_type, bot, broadcast_bot) is broadcast_bot
@@ -143,7 +146,8 @@ ASYNC_LAUNCH_PARAMS = [
     (EventType.NOTIFY_START_MEETING, "mitup_bot.events.service.notify_meetings"),
     (EventType.NOTIFY_MEETING_STARTED, "mitup_bot.events.service.notify_meetings_started"),
     (EventType.DEACTIVATE_MEETINGS, "mitup_bot.events.service.inactive_meetings"),
-    (EventType.MEETUPS_CLEANUP, "mitup_bot.events.service.meetups_cleanup"),
+    (EventType.WARN_MEETING_DELETIONS, "mitup_bot.events.service.warn_meeting_deletions"),
+    (EventType.DELETE_MEETINGS, "mitup_bot.events.service.delete_meetings"),
     (EventType.SUPPORTER_CHECK, "mitup_bot.events.service.supporter_check"),
 ]
 
@@ -347,7 +351,8 @@ async def test_run_all_tasks_logs_a_registration_line_per_event():
         notify_meeting_started=25,
         generate_stats=30,
         deactivate_meetings=40,
-        meetups_cleanup=50,
+        warn_meeting_deletions=50,
+        delete_meetings=55,
         send_broadcasts=60,
         supporter_check=70,
     )
@@ -360,7 +365,6 @@ async def test_run_all_tasks_logs_a_registration_line_per_event():
     assert set(registered) == {event_type.value for event_type in EventType}
     assert registered[EventType.USER_CLEANUP.value]["interval_seconds"] == 10
     assert registered[EventType.USER_CLEANUP.value]["bot"] == "shared"
-    # Only SEND_BROADCASTS runs on the separately rate-capped bot.
     assert registered[EventType.SEND_BROADCASTS.value]["bot"] == "broadcast"
 
 
@@ -377,7 +381,8 @@ async def test_run_all_tasks_logs_why_scheduling_stopped():
         notify_meeting_started=25,
         generate_stats=30,
         deactivate_meetings=40,
-        meetups_cleanup=50,
+        warn_meeting_deletions=50,
+        delete_meetings=55,
         send_broadcasts=60,
         supporter_check=70,
     )
@@ -399,7 +404,8 @@ def make_intervals() -> IntervalsConfiguration:
         notify_meeting_started=25,
         generate_stats=30,
         deactivate_meetings=40,
-        meetups_cleanup=50,
+        warn_meeting_deletions=50,
+        delete_meetings=55,
         send_broadcasts=60,
         supporter_check=70,
     )
@@ -777,7 +783,8 @@ async def test_run_all_tasks_creates_all_tasks():
         notify_meeting_started=25,
         generate_stats=30,
         deactivate_meetings=40,
-        meetups_cleanup=50,
+        warn_meeting_deletions=50,
+        delete_meetings=55,
         send_broadcasts=60,
         supporter_check=60,
     )
@@ -1024,8 +1031,10 @@ def test_cli_passes_custom_intervals():
                 "333",
                 "--deactivate-meetings-interval",
                 "444",
-                "--meetups-cleanup-interval",
+                "--warn-meeting-deletions-interval",
                 "555",
+                "--delete-meetings-interval",
+                "556",
                 "--send-broadcasts-interval",
                 "666",
                 "--supporter-check-interval",
@@ -1045,7 +1054,8 @@ def test_cli_passes_custom_intervals():
         assert intervals_arg.notify_start_meeting == 222
         assert intervals_arg.generate_stats == 333
         assert intervals_arg.deactivate_meetings == 444
-        assert intervals_arg.meetups_cleanup == 555
+        assert intervals_arg.warn_meeting_deletions == 555
+        assert intervals_arg.delete_meetings == 556
         assert intervals_arg.send_broadcasts == 666
         assert intervals_arg.supporter_check == 777
         assert start_time_arg == 1.5

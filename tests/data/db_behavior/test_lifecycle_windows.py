@@ -1,12 +1,12 @@
 """DB-integration tests for the per-owner lifecycle windows the events jobs query.
 
 Every window in `mitup_bot.lifecycle` reaches production as an interval comparison joined to the
-owner's `supporter_level`: the dateless deactivation window in `inactive_meetings`, and the
-deletion-warning and permanent-deletion windows in `meetups_cleanup`. Which rows each one selects is
-decided by real SQL over real rows — a mock session cannot evaluate the join or the interval
-arithmetic — so the cases live here. The day offsets are derived from the policy, so the tests follow
-a retuned duration instead of pinning a stale number (the values themselves are pinned in
-`tests/core/test_lifecycle.py`).
+owner's `supporter_level`: the dateless deactivation window in `inactive_meetings`, the
+deletion-warning window in `warn_meeting_deletions`, and the permanent-deletion windows in
+`delete_meetings`. Which rows each one selects is decided by real SQL over real rows, since a mock
+session cannot evaluate the join or the interval arithmetic, so the cases live here. The day
+offsets are derived from the policy, so the tests follow a retuned duration instead of pinning a
+stale number (the values themselves are pinned in `tests/core/test_lifecycle.py`).
 
 Throwaway data uses the 998_95x-998_97x range (single-session, never committed); the lower 998_9xx
 ids belong to `test_meeting_deactivation_cleanup.py`.
@@ -18,8 +18,9 @@ import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
+from mitup_bot.events.delete_meetings import MEETUPS_TO_DELETE_STATEMENT
 from mitup_bot.events.inactive_meetings import MEETINGS_TO_DEACTIVATE_STATEMENT
-from mitup_bot.events.meetups_cleanup import MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, MEETUPS_TO_DELETE_STATEMENT
+from mitup_bot.events.warn_meeting_deletions import MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Meetup
 from mitup_bot.models.users import UserStatus

@@ -2,7 +2,7 @@
 
 Meetings imported from the old Heroku/Rails bot arrive with `expiration_time` set to `None`
 regardless of their `active` state (see the Rails migration mapper). The cleanup
-queries in `apps/events/mitup_bot/events/meetups_cleanup.py` only ever consider rows where
+queries in `apps/events/mitup_bot/events/` only ever consider rows where
 `expiration_time IS NOT NULL`, so every imported meeting that was already inactive is invisible
 to both the deletion-warning and the permanent-deletion query and is retained forever.
 

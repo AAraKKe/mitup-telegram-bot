@@ -105,7 +105,8 @@ services:
       --user-cleanup-interval 10
       --generate-stats-interval 5
       --deactivate-meetings-interval 5
-      --meetups-cleanup-interval 5
+      --warn-meeting-deletions-interval 5
+      --delete-meetings-interval 5
       --send-broadcasts-interval 5
       --env dev"
     environment:

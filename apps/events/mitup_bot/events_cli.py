@@ -3,13 +3,14 @@ import click
 from mitup_bot.config import Env
 from mitup_bot.events.service import (
     DEFAULT_DEACTIVATE_MEETINGS_INTERVAL,
+    DEFAULT_DELETE_MEETINGS_INTERVAL,
     DEFAULT_GENERATE_STATS_INTERVAL,
-    DEFAULT_MEETUPS_CLEANUP_INTERVAL,
     DEFAULT_NOTIFY_MEETING_STARTED_INTERVAL,
     DEFAULT_NOTIFY_MEETINGS_START,
     DEFAULT_SEND_BROADCASTS_INTERVAL,
     DEFAULT_SUPPORTER_CHECK_INTERVAL,
     DEFAULT_USER_CLEANUP_INTERVAL,
+    DEFAULT_WARN_MEETING_DELETIONS_INTERVAL,
     IntervalsConfiguration,
     run_events,
 )
@@ -46,9 +47,15 @@ def cli():
     show_default=True,
 )
 @click.option(
-    "--meetups-cleanup-interval",
-    default=DEFAULT_MEETUPS_CLEANUP_INTERVAL,
-    help="Interval in seconds to cleanup meetups",
+    "--warn-meeting-deletions-interval",
+    default=DEFAULT_WARN_MEETING_DELETIONS_INTERVAL,
+    help="Interval in seconds to warn owners about meetings due for deletion",
+    show_default=True,
+)
+@click.option(
+    "--delete-meetings-interval",
+    default=DEFAULT_DELETE_MEETINGS_INTERVAL,
+    help="Interval in seconds to delete the meetings whose warning has run its course",
     show_default=True,
 )
 @click.option(
@@ -87,7 +94,8 @@ def recurrent_events(
     notify_meeting_interval: int,
     generate_stats_interval: int,
     deactivate_meetings_interval: int,
-    meetups_cleanup_interval: int,
+    warn_meeting_deletions_interval: int,
+    delete_meetings_interval: int,
     notify_meeting_started_interval: int,
     send_broadcasts_interval: int,
     supporter_check_interval: int,
@@ -101,7 +109,8 @@ def recurrent_events(
         notify_meeting_started=notify_meeting_started_interval,
         generate_stats=generate_stats_interval,
         deactivate_meetings=deactivate_meetings_interval,
-        meetups_cleanup=meetups_cleanup_interval,
+        warn_meeting_deletions=warn_meeting_deletions_interval,
+        delete_meetings=delete_meetings_interval,
         send_broadcasts=send_broadcasts_interval,
         supporter_check=supporter_check_interval,
     )
