@@ -155,6 +155,10 @@ class MetricKey(CamelCaseStrEnum):
     """Number of expiration warnings that failed to send this run; their meetings stay in the warning
     pool and are nominated again on the next run. The cleanup job never raises, so the run closes on
     Fault=0 and this series is the only alarmable trace of the undelivered warning."""
+    MEETINGS_AWAITING_DELETION = auto()
+    """Backlog gauge: warned meetings still waiting for their deletion, counted at the start of the
+    WarnMeetingDeletions run. Read by the mitup-infra deletion backlog widget, which derives the
+    not-yet-warned inactive meetings from it and the Stats meeting totals."""
     FEATURE_CANCELLED = auto()
     """A user cancelled a feature flow before completing it (emitted under the Feature dimension)"""
     FLOW_STARTED = auto()

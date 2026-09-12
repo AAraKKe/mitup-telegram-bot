@@ -4,7 +4,7 @@ from enum import StrEnum
 from functools import partial
 
 import structlog
-from sqlmodel import and_, col, false, null, select
+from sqlmodel import and_, col, false, func, null, select, true
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
@@ -42,6 +42,11 @@ MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT: SelectOfScalar[Meetup] = (
             owner_tier_window_elapsed(col(Meetup.expiration_time), lambda policy: policy.deletion_warning_delay),
         )
     )
+)
+
+# The backlog gauge counts every warned meeting still to be deleted, not only what is due today.
+MEETINGS_AWAITING_DELETION_COUNT_STATEMENT: SelectOfScalar[int] = (
+    select(func.count()).select_from(Meetup).where(Meetup.expiration_notification_sent == true())
 )
 
 
@@ -124,6 +129,17 @@ async def warn_owner_chunk(session: AsyncSession, api: TelegramApiWrapper, owner
     return outcome
 
 
+@db.with_session
+async def emit_backlog_gauge(session: AsyncSession, metrics: MetricsClient):
+    """Report how many warned meetings are still waiting for their deletion.
+
+    Counted before this run warns anything, so consecutive days measure the same point in the cycle.
+    """
+    awaiting_deletion = (await session.exec(MEETINGS_AWAITING_DELETION_COUNT_STATEMENT)).one()
+    metrics.emit(MetricKey.MEETINGS_AWAITING_DELETION, awaiting_deletion, MetricUnit.COUNT)
+    log.info("Deletion backlog measured", awaiting_deletion=awaiting_deletion)
+
+
 async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     """Warn every owner whose meetings are a week away from permanent deletion, one digest each.
 
@@ -132,6 +148,7 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     deletion pool instead of being re-warned on every run. A send that raised leaves every meeting
     of that owner's digest in the pool for the next run to retry.
     """
+    await emit_backlog_gauge(metrics)
     nomination = await nominate_owners(MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT)
     totals = await sweep_chunks(nomination, partial(warn_owner_chunk, api))
 

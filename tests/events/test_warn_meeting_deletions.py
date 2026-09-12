@@ -13,7 +13,7 @@ from mitup_bot.events.service import EventType
 from mitup_bot.exceptions import InactiveUserInteraction
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models.users import UserStatus
-from mitup_bot.monitoring import MetricKey, MetricsClient
+from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.views import meeting as meeting_views
 from tests.events.deletion_sweep_helpers import (
     fail_transaction,
@@ -37,7 +37,13 @@ from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 WARNING_DAYS = LifecyclePolicy.interval_days(LifecyclePolicy.get().deletion_warning_delay)
 
 STATEMENT = warn_meeting_deletions.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT
+AWAITING_DELETION_COUNT_STATEMENT = warn_meeting_deletions.MEETINGS_AWAITING_DELETION_COUNT_STATEMENT
 SWEEP_DIMENSIONS = {"EventType": EventType.WARN_MEETING_DELETIONS.value}
+
+
+def register_backlog_count(mock_session: MockDbSession, awaiting_deletion: int = 0):
+    """Answer the backlog count statement, which every path through `run` reads."""
+    mock_session.add_objects_with_statement(AWAITING_DELETION_COUNT_STATEMENT, (awaiting_deletion,))
 
 
 @pytest.fixture
@@ -50,6 +56,12 @@ def metrics(metrics_client: MetricsClient) -> MetricAssertions:
     return MetricAssertions(metrics_client)
 
 
+@pytest.fixture(autouse=True)
+def empty_backlog(mock_session: MockDbSession):
+    """An empty backlog, so the tests that are not about the gauges need no counts of their own."""
+    register_backlog_count(mock_session)
+
+
 async def test_no_meetings_to_warn(
     mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
 ):
@@ -60,6 +72,35 @@ async def test_no_meetings_to_warn(
     api.assert_method_just_called("send_message_to_user", times=0)
 
     metrics.assert_emitted(name=MetricKey.EXPIRATION_NOTIFICATIONS_FAILED, value=0, dimensions=SWEEP_DIMENSIONS)
+    # A gauge that goes missing on a quiet day is indistinguishable from a job that stopped running.
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_AWAITING_DELETION, value=0, unit=MetricUnit.COUNT, dimensions=SWEEP_DIMENSIONS
+    )
+
+
+async def test_the_run_gauges_what_each_phase_is_still_holding(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
+    """The gauge reports the count the backlog statement returns, once per run."""
+    # The registry refuses a second answer for a statement, so the empty backlog goes first.
+    mock_session.statements_registry.clear()
+    register_backlog_count(mock_session, 3)
+    register_nominated(mock_session, STATEMENT, ())
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await warn_meeting_deletions.run(api, metrics_client)
+    await metrics_client.flush()
+
+    metrics.assert_emitted(
+        name=MetricKey.MEETINGS_AWAITING_DELETION,
+        value=3,
+        unit=MetricUnit.COUNT,
+        dimensions=SWEEP_DIMENSIONS,
+        times=1,
+    )
+
+    measured = next(entry for entry in logs if entry["event"] == "Deletion backlog measured")
+    assert measured["awaiting_deletion"] == 3
 
 
 async def test_notify_meeting_about_to_be_deleted(
@@ -132,6 +173,7 @@ async def test_notify_unreachable_owner_meeting_is_not_warned_again(
     # expiration_notification_sent being false.
     still_unwarned = tuple(candidate for candidate in (meeting,) if not candidate.expiration_notification_sent)
     mock_session.statements_registry.clear()
+    register_backlog_count(mock_session)
     register_nominated(mock_session, STATEMENT, still_unwarned)
 
     await warn_meeting_deletions.run(api, metrics_client)
@@ -391,8 +433,9 @@ async def test_the_warning_summary_counts_owners_beside_meetings(
 async def test_the_warning_sweep_commits_one_transaction_per_chunk_of_owners(
     mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
 ):
-    """The sweep commits as it goes rather than once at the end: the nomination read, then one
-    transaction per chunk of owners. Every nominated owner is still written to exactly once."""
+    """The sweep commits as it goes rather than once at the end: the backlog read, the nomination
+    read, then one transaction per chunk of owners. Every nominated owner is still written to
+    exactly once."""
     meetings = over_one_chunk()
     chunks = register_nominated(mock_session, STATEMENT, meetings)
 
@@ -400,7 +443,7 @@ async def test_the_warning_sweep_commits_one_transaction_per_chunk_of_owners(
 
     assert len(chunks) == 3
     api.assert_method_just_called("send_message_to_user", times=len(meetings))
-    assert transaction_count(mock_session) == 1 + len(chunks)
+    assert transaction_count(mock_session) == 2 + len(chunks)
 
 
 async def test_a_failed_chunk_leaves_the_chunks_around_it_committed(
@@ -411,8 +454,8 @@ async def test_a_failed_chunk_leaves_the_chunks_around_it_committed(
     next daily run re-nominates."""
     meetings = over_one_chunk()
     chunks = register_nominated(mock_session, STATEMENT, meetings)
-    # The nomination read is the first transaction, so the second chunk is the third.
-    fail_transaction(mock_session, 3)
+    # The backlog read and the nomination read come first, so the second chunk is the fourth.
+    fail_transaction(mock_session, 4)
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         with pytest.raises(RuntimeError, match="cleanup chunks"):
@@ -436,7 +479,7 @@ async def test_a_chunk_whose_commit_is_lost_is_counted_as_neither_warned_nor_del
     deletion nobody was warned about."""
     meetings = over_one_chunk()
     chunks = register_nominated(mock_session, STATEMENT, meetings)
-    fail_transaction(mock_session, 3, on_commit=True)
+    fail_transaction(mock_session, 4, on_commit=True)
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         with pytest.raises(RuntimeError, match="cleanup chunks"):
