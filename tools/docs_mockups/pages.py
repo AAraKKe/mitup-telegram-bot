@@ -90,8 +90,15 @@ def fill_all():
         "user_settings",
         annotated(
             "user_settings",
-            [("Timezone</strong>", "Change chips", "right"), ("Default Options</strong>", "Defaults", "left")],
-            rename=[("<br/>UTC<br/>", "<br/>Europe/Madrid<br/>"), ("active 1 minutes", "active 5 minutes")],
+            [
+                ("Language</strong>", "Language", "left"),
+                ("Timezone</strong>", "Timezone", "right"),
+                ("Notifications</strong>", "Notifications", "left"),
+                ("Timeout</strong>", "Timeout", "right"),
+                ("Default Options</strong>", "Default options", "left"),
+                ("Privacy</strong>", "Privacy", "right"),
+            ],
+            rename=[("<br/>UTC<", "<br/>Europe/Madrid<"), ("active 1 minute after", "active 5 minutes after")],
         ),
     )
     place(

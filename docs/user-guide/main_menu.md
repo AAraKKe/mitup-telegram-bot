@@ -49,7 +49,7 @@ Your meetings sit in three lists, each with its count next to the label. A list 
 
 * *📂 Active*{.button-like}: meetings you created that are still active.
 * *👥 Joined*{.button-like}: meetings you joined but don't own. Handy when the message with the card is buried in a chat.
-* *💾 Past*{.button-like}: your inactive meetings, the ones you haven't deleted yet.
+* *💾 Past*{.button-like}: your inactive meetings, the ones you haven't deleted yet. This one closes with *🗑️ Delete all past meetings*{.button-like}, which empties the list after a confirmation.
 
 <!-- mock:active_list -->
 <div class="mitup-annotated">

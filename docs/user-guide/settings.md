@@ -19,15 +19,31 @@ Open *⚙️ Settings*{.button-like} from the main menu. Everything about your a
       </div>
     </div>
     <div class="mitup-annotated__body">
-      <div class="mitup-bot-msg"><div class="mitup-bot-msg__content"><div class="mitup-bot-msg__sender">mitupbot</div><div class="mitup-bot-msg__text"><span class="mitup-card__title">⚙️ Settings</span><hr class="mitup-card__rule"/><span class="mitup-card__section"><strong>🔣 Language</strong></span><div class="mitup-bot-msg__row" style="--cols: 3"><div class="mitup-key mitup-key--rich mitup-key--primary">🇺🇸 English</div><div class="mitup-key mitup-key--rich">🇪🇸 Spanish</div><div class="mitup-key mitup-key--rich">🇪🇸 Galician</div></div><div class="mitup-bot-msg__row" style="--cols: 3"><div class="mitup-key mitup-key--rich">🇩🇪 German</div><div class="mitup-key mitup-key--rich">🇧🇷 Portuguese</div><div class="mitup-key mitup-key--rich">🇮🇹 Italian</div></div><hr class="mitup-card__rule"/><span class="mitup-card__section"><strong>🌐 <span data-note="0">Timezone</strong></span></span> <span class="mitup-chip">✏️ Change</span><br/>Europe/Madrid<br/><br/><span class="mitup-card__section"><strong>⏰ Notifications</strong></span> <span class="mitup-chip mitup-chip--success">Enabled</span><br/>5 minutes before a meeting starts <span class="mitup-chip">✏️ Change</span><br/><br/><span class="mitup-card__section"><strong>⌛ Timeout</strong></span> <span class="mitup-chip">✏️ Change</span><br/>A meeting without an end time stays active 5 minutes after it starts.<hr class="mitup-card__rule"/><span class="mitup-card__section"><strong>👥 <span data-note="1">Default Options</strong></span></span> <span class="mitup-chip">Open</span><br/>What every meeting you create starts with.<br/><br/><span class="mitup-card__section"><strong>🛡️ Privacy</strong></span> <span class="mitup-chip">Open</span><br/>Your data, the policy, export and deletion.<hr class="mitup-card__rule"/><div class="mitup-bot-msg__row"><div class="mitup-key mitup-key--rich">≪ Main Menu</div></div></div></div></div>
+      <div class="mitup-bot-msg"><div class="mitup-bot-msg__content"><div class="mitup-bot-msg__sender">mitupbot</div><div class="mitup-bot-msg__text"><span class="mitup-card__title">⚙️ Settings</span><hr class="mitup-card__rule"/><span class="mitup-card__section"><strong>🔣 <span data-note="0">Language</strong></span></span><div class="mitup-bot-msg__row" style="--cols: 3"><div class="mitup-key mitup-key--rich mitup-key--primary">🇺🇸 English</div><div class="mitup-key mitup-key--rich">🇪🇸 Spanish</div><div class="mitup-key mitup-key--rich">🇪🇸 Galician</div></div><div class="mitup-bot-msg__row" style="--cols: 3"><div class="mitup-key mitup-key--rich">🇩🇪 German</div><div class="mitup-key mitup-key--rich">🇧🇷 Portuguese</div><div class="mitup-key mitup-key--rich">🇮🇹 Italian</div></div><hr class="mitup-card__rule"/><span class="mitup-card__section"><strong>🌐 <span data-note="1">Timezone</strong></span></span> <span class="mitup-chip">✏️ Change</span><br/>Europe/Madrid<hr class="mitup-card__rule"/><span class="mitup-card__section"><strong>⏰ <span data-note="2">Notifications</strong></span></span> <span class="mitup-chip mitup-chip--success">Enabled</span><br/><br/><span class="mitup-card__section"><strong>Reminder</strong></span> <span class="mitup-chip mitup-chip--success">Enabled</span> <span class="mitup-chip">✏️ Change</span><br/>5 minutes before a meeting starts<br/><br/><span class="mitup-card__section"><strong>Deletion warning</strong></span> <span class="mitup-chip mitup-chip--success">Enabled</span><br/>7 days before a meeting is permanently deleted<br/><br/><span class="mitup-card__section"><strong>Deletion notice</strong></span> <span class="mitup-chip mitup-chip--success">Enabled</span><br/>Once a meeting is deleted<hr class="mitup-card__rule"/><span class="mitup-card__section"><strong>⌛ <span data-note="3">Timeout</strong></span></span> <span class="mitup-chip">✏️ Change</span><br/>A meeting without an end time stays active 5 minutes after it starts.<hr class="mitup-card__rule"/><span class="mitup-card__section"><strong>👥 <span data-note="4">Default Options</strong></span></span> <span class="mitup-chip">Open</span><br/>What every meeting you create starts with.<hr class="mitup-card__rule"/><span class="mitup-card__section"><strong>🛡️ <span data-note="5">Privacy</strong></span></span> <span class="mitup-chip">Open</span><br/>Your data, the policy, export and deletion.<hr class="mitup-card__rule"/><div class="mitup-bot-msg__row"><div class="mitup-key mitup-key--rich">≪ Main Menu</div></div></div></div></div>
     </div>
   </div>
-  <span class="mitup-annotation mitup-annotation--right" data-for="0" style="top: 277px;">
-    <span class="mitup-annotation__label">Change chips</span>
+  <span class="mitup-annotation mitup-annotation--left" data-for="0" style="top: 154px;">
+    <span class="mitup-annotation__label">Language</span>
     <span class="mitup-annotation__line"></span>
   </span>
-  <span class="mitup-annotation mitup-annotation--left" data-for="1" style="top: 482px;">
-    <span class="mitup-annotation__label">Defaults</span>
+  <span class="mitup-annotation mitup-annotation--right" data-for="1" style="top: 277px;">
+    <span class="mitup-annotation__label">Timezone</span>
+    <span class="mitup-annotation__line"></span>
+  </span>
+  <span class="mitup-annotation mitup-annotation--left" data-for="2" style="top: 353px;">
+    <span class="mitup-annotation__label">Notifications</span>
+    <span class="mitup-annotation__line"></span>
+  </span>
+  <span class="mitup-annotation mitup-annotation--right" data-for="3" style="top: 575px;">
+    <span class="mitup-annotation__label">Timeout</span>
+    <span class="mitup-annotation__line"></span>
+  </span>
+  <span class="mitup-annotation mitup-annotation--left" data-for="4" style="top: 669px;">
+    <span class="mitup-annotation__label">Default options</span>
+    <span class="mitup-annotation__line"></span>
+  </span>
+  <span class="mitup-annotation mitup-annotation--right" data-for="5" style="top: 745px;">
+    <span class="mitup-annotation__label">Privacy</span>
     <span class="mitup-annotation__line"></span>
   </span>
 </div>
@@ -43,7 +59,7 @@ Tap *✏️ Change*{.button-like} under Timezone and send a city name, or share 
 
 ## Notifications
 
-Reminders can be turned off, and you choose how many minutes before a meeting they arrive.
+Mitup sends you three notifications, each with its own switch. A reminder before a meeting starts, where you also choose how many minutes ahead it arrives. A warning a week before one of your inactive meetings is removed for good. A confirmation once it is gone. All three start on, and the switch on the section header turns them all on or off at once. Silencing the two deletion notifications changes nothing about the deletion itself, which runs on [its own schedule](meeting_lifecycle.md#how-long-an-inactive-meeting-is-kept).
 
 ## Timeout
 

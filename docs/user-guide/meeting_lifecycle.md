@@ -125,21 +125,26 @@ A reactivated meeting counts towards your [active meetings](limits.md#active-mee
 
 You can delete an active meeting from its card with *🗑️ Delete*{.button-like}, an inactive one from the screen above, or either straight from its list. Mitup asks you to confirm before anything happens.
 
+To clear the whole backlog in one go, open *💾 Past*{.button-like} and use *🗑️ Delete all past meetings*{.button-like} at the end of the list. Mitup tells you how many meetings that is and waits for *Delete them all*{.button-like}. It takes every inactive meeting you own and leaves the active ones alone.
+
 !!! warning "Deletion is permanent"
 
     Deleting a meeting removes it right away, with no grace period and no undo. The meeting,
     its participant list, and the invited-only guests attached to it are gone for good. If you
-    might want it back, reactivate it instead of deleting it.
+    might want it back, reactivate it instead of deleting it. Clearing the whole list at once
+    works the same way, on every inactive meeting you have.
 
 ## How long an inactive meeting is kept
 
 Mitup keeps an inactive meeting for 90 days, or a year if you're a [Gamemaster or a Commissioner](limits.md#how-long-a-finished-meeting-is-kept), counting from the day it became inactive. Then it's deleted permanently.
 
-A week before that, the bot sends you a one-time heads-up naming the meeting, with a *Reactivate meeting*{.button-like} button. Reactivating takes the meeting off the clock entirely.
+A week before that, the bot sends you a one-time heads-up naming the meeting, with a *Reactivate meeting*{.button-like} button. Reactivating takes the meeting off the clock entirely. A second message tells you once the meeting is gone.
+
+Each of those two messages has its own switch under [Notifications](settings.md#notifications), and both start on. Turn one off if you would rather not hear about it.
 
 !!! warning "The deletion doesn't wait for the heads-up"
 
     The heads-up is a message from the bot, so it only reaches you if the bot can still write to
-    you. If you blocked it or deleted the chat, the message doesn't arrive and the deletion
-    happens on schedule anyway. Unblock the bot and send `/start` if you want to keep getting
-    those.
+    you. If you blocked it, deleted the chat, or turned the message off, it doesn't arrive and
+    the deletion happens on schedule anyway. Unblock the bot and send `/start` if you want to
+    keep getting those.
