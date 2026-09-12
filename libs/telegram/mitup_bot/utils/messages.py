@@ -220,6 +220,9 @@ class MeetingListMessages(MessageBase):
     ACTIVE_EMPTY_ALERT = "You have no active meetings. Tap New meeting to create one."
     JOINED_EMPTY_ALERT = "You have not joined any meeting yet."
     PAST_EMPTY_ALERT = "You have no past meetings yet."
+    # The deletion line under a past meeting's title, wrapped in italics by the list card.
+    DELETION_DATE = "Deleted on ${date} unless you reactivate it"
+    DELETION_COUNTDOWN = f"{Emojis.WARNING} Deleted in ${{duration}} unless you reactivate it"
 
 
 # --- Cross-screen / shared messages ---
@@ -857,15 +860,17 @@ class InlineQueryMessages(MessageBase):
 
 
 class NotificationMessages(MessageBase):
-    DELETION_WARNING = (
-        "The meeting <b>${meeting_title}</b> will be permanently deleted in <b>${days_until_deletion} days</b>.\n\n"
-        "To prevent this from happening, you can reactivate the meeting by selecting "
-        "the <b>${reactivate_meeting_button}</b> button below.\n\n"
-        "Remember that you can always reactivate any past meeting from the"
-        " <b>${past_meetings_button}</b> button in the main menu.\n\n"
-        "If you do not want to reactivate the meeting, you can ignore this message."
-    )
-    DELETED = "The meeting <b>${meeting_title}</b> has been permanently deleted."
+    # The deletion warning digest.
+    DELETION_WARNING_HEADING = f"{Emojis.HOURGLASS} About to be deleted"
+    DELETION_WARNING_DEADLINE = "These meetings will be permanently deleted in <b>${days_until_deletion} days</b>."
+    DELETION_WARNING_REACTIVATE = "Reactivate any of them from ${button_past_meetings} and they stay."
+    DELETION_WARNING_IGNORE = "Ignore this message to let them go."
+    # The deletion notice digest.
+    DELETION_NOTICE_HEADING = f"{Emojis.DELETE} Meetings deleted"
+    DELETION_NOTICE_BODY = "These meetings are now permanently deleted."
+    # One meeting of either digest, and the line closing a list cut short.
+    DELETION_MEETING_LINE = "<b>${meeting_title}</b> <i>created ${created}</i>"
+    DELETION_MORE_MEETINGS = "and ${count} more"
     STARTING_SOON_HEADING = f"{Emojis.NOTIF} Starting soon"
     STARTED_HEADING = f"{Emojis.GREEN_CIRCLE} Started"
     CANNOT_MAKE_IT = "Can't make it? ${button_leave}"

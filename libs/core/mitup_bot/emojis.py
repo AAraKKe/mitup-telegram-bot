@@ -58,6 +58,7 @@ class Emojis(Enum):
     DEATTACH = "⬆"
     SEARCH = "🔍"
     HOURGLASS = "⌛"
+    WARNING = "⚠️"
     NOTIF = "⏰"
     LANG = "🔣"
     WAITING = "😴"

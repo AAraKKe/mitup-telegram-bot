@@ -145,9 +145,14 @@ def build_broadcast_bot(config: BotConfig) -> ExtBot:
     )
 
 
+# High-volume, not time-sensitive fan-outs, kept off the shared bot's rate budget.
+BROADCAST_LIMITED_EVENTS = frozenset({EventType.SEND_BROADCASTS, EventType.MEETUPS_CLEANUP})
+
+
 def select_bot(event_type: EventType, bot: ExtBot, broadcast_bot: ExtBot) -> ExtBot:
-    """SEND_BROADCASTS runs on the rate-capped broadcast bot; every other event on the shared one."""
-    return broadcast_bot if event_type is EventType.SEND_BROADCASTS else bot
+    """A broadcast-limited event runs on the rate-capped broadcast bot; every other one on the
+    shared bot. Both carry the same token, so a reader sees the same bot either way."""
+    return broadcast_bot if event_type in BROADCAST_LIMITED_EVENTS else bot
 
 
 async def dispatch_event(

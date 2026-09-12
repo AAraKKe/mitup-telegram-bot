@@ -1,14 +1,17 @@
 import datetime as dt
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from dataclasses import replace
 from typing import Protocol
 from unittest.mock import patch
 
 import pytest
 
+from mitup_bot import lifecycle
 from mitup_bot.emojis import Emojis
 from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.models import JoinedUsers, Meetup, MeetupLocation
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import (
@@ -21,7 +24,7 @@ from mitup_bot.utils.messages import (
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.datetime_format import relative_time_content
 from mitup_bot.views.mitup_view import MitupView
-from tests.helpers import create_joined_link, create_settings, create_user
+from tests.helpers import create_joined_link, create_meetup, create_settings, create_user
 from tests.telegram.views.meeting.helpers import BAR, owned_meeting, section_header_line, with_images
 
 STARTS_AT = dt.datetime(2026, 9, 1, 18, 0, tzinfo=dt.UTC)
@@ -33,6 +36,10 @@ NOW = STARTS_AT - dt.timedelta(minutes=25)
 
 class NotificationView(Protocol):
     def __call__(self, link: JoinedUsers, *, now: dt.datetime) -> MitupView: ...
+
+
+class DigestView(Protocol):
+    def __call__(self, meetups: Sequence[Meetup]) -> MitupView: ...
 
 
 # The two cards a meeting's start produces, each with the heading it opens on. Everything under the
@@ -347,3 +354,156 @@ def test_a_notification_draws_no_photos(card: NotificationView):
     meeting = with_images(scheduled_meeting("en"), 3)
 
     assert "<img" not in card(reader_link(meeting, "en"), now=NOW).message.html
+
+
+# --- The deletion digests ---
+
+
+CREATED_AT = dt.datetime(2025, 7, 12, 14, 30, tzinfo=dt.UTC)
+
+DIGESTS: list[tuple[DigestView, MessageBase]] = [
+    (meeting_views.deletion_warning_view, NotificationMessages.DELETION_WARNING_HEADING),
+    (meeting_views.deletion_notice_view, NotificationMessages.DELETION_NOTICE_HEADING),
+]
+DIGEST_VIEWS = [view for view, _ in DIGESTS]
+DIGEST_IDS = ["warning", "notice"]
+
+
+def expiring_meetings(
+    count: int,
+    *,
+    lang: str = "en",
+    timezone: str = "UTC",
+    supporter_level: SupporterLevel = SupporterLevel.NONE,
+) -> list[Meetup]:
+    """*count* meetings of one owner, created a day apart, the shape a cleanup digest names."""
+    owner = create_user(
+        id=1,
+        tg_user_id=1,
+        first_name="Owner",
+        settings=create_settings(id=1, language=lang, timezone=timezone),
+        supporter_level=supporter_level,
+    )
+    return [
+        create_meetup(
+            id=index + 1,
+            title=f"Meeting {index}",
+            owner=owner,
+            created_time=CREATED_AT + dt.timedelta(days=index),
+        )
+        for index in range(count)
+    ]
+
+
+@pytest.mark.parametrize("digest, heading", DIGESTS, ids=DIGEST_IDS)
+def test_the_digest_opens_on_what_is_happening_to_the_meetings(digest: DigestView, heading: MessageBase, lang: str):
+    meetings = expiring_meetings(1, lang=lang)
+
+    assert digest(meetings).message.html.startswith(f"<h2>{heading.rich(lang=lang).html}</h2>")
+
+
+@pytest.mark.parametrize("digest", DIGEST_VIEWS, ids=DIGEST_IDS)
+@pytest.mark.parametrize("count", [1, 5], ids=["one", "five"])
+def test_a_short_digest_names_every_meeting_it_covers(digest: DigestView, count: int, lang: str):
+    meetings = expiring_meetings(count, lang=lang)
+    body = digest(meetings).message
+
+    assert body.html.count("<li>") == count
+    assert NotificationMessages.DELETION_MORE_MEETINGS.rich(lang=lang, count=1).text not in body.text
+
+
+@pytest.mark.parametrize("digest", DIGEST_VIEWS, ids=DIGEST_IDS)
+def test_a_long_digest_names_the_first_five_and_counts_the_rest(digest: DigestView, lang: str):
+    """Eighty-three lines would be unreadable, so the digest names as many as a reader can take in
+    and says how many it left out."""
+    meetings = expiring_meetings(83, lang=lang)
+    body = digest(meetings).message
+
+    assert body.html.count("<li>") == 5
+    assert meetings[4].title in body.text
+    assert meetings[5].title not in body.text
+    assert NotificationMessages.DELETION_MORE_MEETINGS.rich(lang=lang, count=78).html in body.html
+
+
+@pytest.mark.parametrize("digest", DIGEST_VIEWS, ids=DIGEST_IDS)
+def test_each_meeting_is_listed_with_when_it_was_created(digest: DigestView, lang: str):
+    meetings = expiring_meetings(1, lang=lang)
+    html = digest(meetings).message.html
+
+    assert f"<li><b>{meetings[0].title}</b>" in html
+    assert f'<tg-time unix="{int(CREATED_AT.timestamp())}"' in html
+
+
+@pytest.mark.parametrize("digest", DIGEST_VIEWS, ids=DIGEST_IDS)
+def test_a_meeting_with_no_title_is_listed_as_untitled(digest: DigestView, lang: str):
+    meetings = expiring_meetings(1, lang=lang)
+    meetings[0].title = " "
+
+    assert MeetingDisplayMessages.UNTITLED.rich(lang=lang).text in digest(meetings).message.text
+
+
+@pytest.mark.parametrize("digest", DIGEST_VIEWS, ids=DIGEST_IDS)
+def test_the_creation_moment_is_written_in_the_owners_own_timezone(digest: DigestView):
+    """The owner reads the list against the clock they set, not the one the rows are stored in."""
+    tokyo = digest(expiring_meetings(1, timezone="Asia/Tokyo")).message.text
+    utc = digest(expiring_meetings(1)).message.text
+
+    assert "23:30" in tokyo
+    assert "14:30" in utc
+
+
+@pytest.mark.parametrize("digest", DIGEST_VIEWS, ids=DIGEST_IDS)
+def test_the_digest_is_written_in_the_language_its_owner_picked(digest: DigestView, lang: str):
+    meetings = expiring_meetings(1, lang=lang)
+    other = expiring_meetings(1, lang=other_language(lang))
+
+    assert digest(meetings).message.html != digest(other).message.html
+
+
+def test_the_warning_promises_the_owners_own_tier_deadline(monkeypatch: pytest.MonkeyPatch):
+    """The message promises a deadline, so a Host owner must be told their own tier's lead.
+
+    Both tiers carry the same lead today, which is exactly why this test moves the Host one: with
+    the shipped values the assertion would hold whichever policy the view read.
+    """
+    host_lead = dt.timedelta(days=14)
+    monkeypatch.setattr(lifecycle, "PATRON_POLICY", replace(lifecycle.PATRON_POLICY, deletion_warning_lead=host_lead))
+    meetings = expiring_meetings(1, supporter_level=SupporterLevel.HOST_3)
+
+    html = meeting_views.deletion_warning_view(meetings).message.html
+
+    assert NotificationMessages.DELETION_WARNING_DEADLINE.rich(lang="en", days_until_deletion=14).html in html
+
+
+def test_the_warning_points_at_the_list_the_meetings_can_be_reactivated_from(lang: str):
+    meetings = expiring_meetings(1, lang=lang)
+    past_meetings = ButtonConfig(text=ButtonMessages.PAST_MEETINGS.text(lang=lang), callback_data=cb.PAST_MEETINGS)
+    hint = NotificationMessages.DELETION_WARNING_REACTIVATE.rich(lang=lang, button_past_meetings=past_meetings)
+
+    assert hint.html in meeting_views.deletion_warning_view(meetings).message.html
+
+
+def test_the_warning_closes_on_the_main_menu_however_many_meetings_it_left_unnamed(lang: str):
+    """The reactivate hint is the only route into the meetings, so the menu stays navigation only."""
+    short = meeting_views.deletion_warning_view(expiring_meetings(5, lang=lang))
+    long = meeting_views.deletion_warning_view(expiring_meetings(6, lang=lang))
+
+    assert callback_datas(short.menu) == [str(cb.MAIN_MENU)]
+    assert callback_datas(long.menu) == [str(cb.MAIN_MENU)]
+
+
+def test_the_notice_offers_no_way_into_meetings_that_no_longer_exist(lang: str):
+    """The rows are gone by the time the notice is sent, so every button on it would open nothing."""
+    notice = meeting_views.deletion_notice_view(expiring_meetings(83, lang=lang))
+
+    assert callback_datas(notice.menu) == [str(cb.MAIN_MENU)]
+    assert "<tg-button" not in notice.message.html
+
+
+@pytest.mark.parametrize("digest", DIGEST_VIEWS, ids=DIGEST_IDS)
+def test_every_digest_closes_on_the_way_back_into_the_bot(digest: DigestView, lang: str):
+    """A digest arrives unprompted, so it carries the navigation its reader has no other way to."""
+    menu = digest(expiring_meetings(1, lang=lang)).menu
+
+    assert menu[-1][0].text == ButtonMessages.MAIN_MENU.back(lang=lang)
+    assert menu[-1][0].callback_data == cb.MAIN_MENU

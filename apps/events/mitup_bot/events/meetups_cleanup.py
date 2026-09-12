@@ -1,4 +1,5 @@
 import datetime as dt
+from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -13,14 +14,11 @@ from sqlmodel.sql.expression import SelectOfScalar
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.datetimes import as_utc
-from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Meetup, Settings, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
-from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
 from mitup_bot.views import MitupView
-from mitup_bot.views.meeting_text import title_content
+from mitup_bot.views import meeting as meeting_views
 
 from .lifecycle_queries import loggable_windows, owner_tier_window_elapsed
 from .telemetry import supporter_level_counts
@@ -82,7 +80,10 @@ class WarningDelivery(StrEnum):
 
 @dataclass
 class SendOutcome:
-    """The meetups of one cleanup fan-out, bucketed by how the notice to their owner resolved."""
+    """The meetups of one cleanup fan-out, bucketed by how the digest to their owner resolved.
+
+    An owner is written to once per phase, so every meetup of one digest shares its outcome.
+    """
 
     delivered: list[Meetup] = field(default_factory=list)
     unreachable: list[Meetup] = field(default_factory=list)
@@ -101,35 +102,44 @@ def partition_by_opt_in(
     return wanted, opted_out
 
 
-def bucket_meetup(_user: User, *, bucket: list[Meetup], meetup: Meetup):
-    bucket.append(meetup)
+def group_by_owner(meetups: Sequence[Meetup]) -> list[list[Meetup]]:
+    """The nominated meetups of each owner, one group per owner, in the order they were nominated."""
+    groups: dict[int, list[Meetup]] = defaultdict(list)
+    for meetup in meetups:
+        groups[meetup.owner.db_id].append(meetup)
+    return list(groups.values())
 
 
-def bucket_failed_meetup(_user: User, _error: Exception, *, bucket: list[Meetup], meetup: Meetup):
-    bucket.append(meetup)
+def owner_count(meetups: Sequence[Meetup]) -> int:
+    """How many owners a bucket of meetups belongs to."""
+    return len({meetup.owner.db_id for meetup in meetups})
+
+
+def bucket_meetups(_user: User, *, bucket: list[Meetup], meetups: Sequence[Meetup]):
+    bucket.extend(meetups)
+
+
+def bucket_failed_meetups(_user: User, _error: Exception, *, bucket: list[Meetup], meetups: Sequence[Meetup]):
+    bucket.extend(meetups)
 
 
 async def notify_owners(
-    api: TelegramApiWrapper, meetups: Sequence[Meetup], build_view: Callable[[Meetup], MitupView]
+    api: TelegramApiWrapper, meetups: Sequence[Meetup], build_view: Callable[[Sequence[Meetup]], MitupView]
 ) -> SendOutcome:
-    """Send `build_view(meetup)` to each meetup's owner and report which meetups reached them."""
+    """Send each owner one digest of their nominated meetups and report which meetups reached them."""
     outcome = SendOutcome()
-    if not meetups:
+    groups = group_by_owner(meetups)
+    if not groups:
         return outcome
 
     await api.send_messages_to_users(
-        users=[meetup.owner for meetup in meetups],
-        views=[build_view(meetup) for meetup in meetups],
-        on_success=[partial(bucket_meetup, bucket=outcome.delivered, meetup=meetup) for meetup in meetups],
-        on_unreachable=[partial(bucket_meetup, bucket=outcome.unreachable, meetup=meetup) for meetup in meetups],
-        on_error=[partial(bucket_failed_meetup, bucket=outcome.failed, meetup=meetup) for meetup in meetups],
+        users=[group[0].owner for group in groups],
+        views=[build_view(group) for group in groups],
+        on_success=[partial(bucket_meetups, bucket=outcome.delivered, meetups=group) for group in groups],
+        on_unreachable=[partial(bucket_meetups, bucket=outcome.unreachable, meetups=group) for group in groups],
+        on_error=[partial(bucket_failed_meetups, bucket=outcome.failed, meetups=group) for group in groups],
     )
     return outcome
-
-
-def owner_policy(meetup: Meetup) -> LifecyclePolicy:
-    """The lifecycle policy this meeting runs on, read off its owner's current tier."""
-    return LifecyclePolicy.get(meetup.owner.supporter_level)
 
 
 def window_days(meetup: Meetup, duration_of: Callable[[LifecyclePolicy], dt.timedelta]) -> int:
@@ -138,33 +148,13 @@ def window_days(meetup: Meetup, duration_of: Callable[[LifecyclePolicy], dt.time
     The same `LifecyclePolicy.get(level)` lookup the statement's SQL branches are generated from,
     resolved against the owner row the statement already joined and loaded.
     """
-    return LifecyclePolicy.interval_days(duration_of(owner_policy(meetup)))
+    return LifecyclePolicy.interval_days(duration_of(meetup.lifecycle_policy))
 
 
 def warning_due_time(meetup: Meetup) -> dt.datetime | None:
     """When the warning became due, or None when the meetup never expired."""
     expiration = meetup.expiration_time
-    return None if expiration is None else as_utc(expiration) + owner_policy(meetup).deletion_warning_delay
-
-
-def deletion_due_time(meetup: Meetup) -> dt.datetime | None:
-    """The later of the two gates the deletion statement applies, or None when neither stamp is set.
-
-    Retention runs from the deactivation stamp, and the owner is owed a full `deletion_warning_lead`
-    from the moment their warning was recorded — so a meetup still inside that lead is waiting
-    lawfully rather than running late, and measuring it against retention alone would report it as
-    overdue for as long as the warning was delayed.
-    """
-    policy = owner_policy(meetup)
-    gates = [
-        as_utc(stamp) + duration
-        for stamp, duration in (
-            (meetup.expiration_time, policy.inactive_retention),
-            (meetup.warned_time, policy.deletion_warning_lead),
-        )
-        if stamp is not None
-    ]
-    return max(gates) if gates else None
+    return None if expiration is None else as_utc(expiration) + meetup.lifecycle_policy.deletion_warning_delay
 
 
 def days_overdue(due: dt.datetime | None) -> int | None:
@@ -219,39 +209,6 @@ def failed_meeting_properties(meetups: Sequence[Meetup]) -> dict[str, Any] | Non
     return {"failed_meeting_ids": [meetup.id for meetup in meetups]} if meetups else None
 
 
-def deletion_warning_view(meetup: Meetup) -> MitupView:
-    return MitupView(
-        message=NotificationMessages.DELETION_WARNING.rich(
-            lang=meetup.lang,
-            meeting_title=title_content(meetup),
-            # The message promises a deadline, so the lead has to be the owner's own: the free
-            # policy's value is only right for a free owner.
-            days_until_deletion=window_days(meetup, lambda policy: policy.deletion_warning_lead),
-            past_meetings_button=ButtonMessages.PAST_MEETINGS.text(lang=meetup.user_language),
-            reactivate_meeting_button=ButtonMessages.REACTIVATE_MEETING.text(lang=meetup.user_language),
-        ),
-        menu=[
-            [
-                ButtonConfig(
-                    text=ButtonMessages.REACTIVATE_MEETING.text(lang=meetup.user_language),
-                    callback_data=cb.REACTIVATE_MEETING.with_id(cast(int, meetup.id)),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.MAIN_MENU.back(lang=meetup.user_language),
-                    callback_data=cb.MAIN_MENU,
-                ),
-            ]
-        ],
-    )
-
-
-def deletion_notice_view(meetup: Meetup) -> MitupView:
-    return MitupView(
-        message=NotificationMessages.DELETED.rich(lang=meetup.lang, meeting_title=title_content(meetup)),
-        menu=[],
-    )
-
-
 def record_warning(meetup: Meetup, delivery: WarningDelivery):
     """The mutation record for `record_deletion_warning`.
 
@@ -273,16 +230,16 @@ def record_warning(meetup: Meetup, delivery: WarningDelivery):
 
 
 async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: TelegramApiWrapper, metrics: MetricsClient):
-    """Warn every owner whose meeting is a week away from permanent deletion.
+    """Warn every owner whose meetings are a week away from permanent deletion, one digest each.
 
     An owner who has blocked the bot can never receive the warning, and one who turned the warning
     off does not want it, so either way the meeting is marked as warned and moves on to the
-    deletion pool instead of being re-warned on every run. A send that raised leaves the meeting in
-    the pool for the next run to retry.
+    deletion pool instead of being re-warned on every run. A send that raised leaves every meeting
+    of that owner's digest in the pool for the next run to retry.
     """
     meetups = (await session.exec(MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT)).all()
     wanted, opted_out = partition_by_opt_in(meetups, lambda settings: settings.deletion_warning)
-    outcome = await notify_owners(api, wanted, deletion_warning_view)
+    outcome = await notify_owners(api, wanted, meeting_views.deletion_warning_view)
 
     log_residues(
         outcome,
@@ -308,6 +265,10 @@ async def notify_meetups_about_to_be_deleted(session: AsyncSession, api: Telegra
         unreachable=len(outcome.unreachable),
         opted_out=len(opted_out),
         failed=len(outcome.failed),
+        owners_messaged=owner_count(outcome.delivered),
+        owners_unreachable=owner_count(outcome.unreachable),
+        owners_opted_out=owner_count(opted_out),
+        owners_failed=owner_count(outcome.failed),
         windows=loggable_windows(lambda policy: policy.deletion_warning_delay),
         reason="warning_window_elapsed",
     )
@@ -329,15 +290,16 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
     Delivering the notice is not a precondition for the deletion: an owner who has blocked the
     bot has opted out of the notice, one who turned it off said so outright, and keeping their
     expired meetings alive to keep retrying it would retain the data forever. Only a send that
-    raised, a transient Telegram failure, defers the deletion to the next run.
+    raised, a transient Telegram failure, defers the deletion to the next run, and it defers every
+    meeting of that owner's digest.
     """
     meetups = (await session.exec(MEETUPS_TO_DELETE_STATEMENT)).all()
     wanted, opted_out = partition_by_opt_in(meetups, lambda settings: settings.deletion_notice)
-    outcome = await notify_owners(api, wanted, deletion_notice_view)
+    outcome = await notify_owners(api, wanted, meeting_views.deletion_notice_view)
 
     log_residues(
         outcome,
-        deletion_due_time,
+        lambda meetup: meetup.deletion_due_time,
         unreachable_event="Meeting deleted without notifying its owner",
         failed_event="Meeting deletion deferred",
     )
@@ -354,6 +316,7 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
     log.info(
         "Meetups purged",
         count=len(deletable),
+        owners=owner_count(deletable),
         meeting_ids=meeting_ids,
         supporter_levels=supporter_level_counts(meetup.owner.supporter_level for meetup in deletable),
         windows=loggable_windows(lambda policy: policy.inactive_retention),
@@ -378,6 +341,10 @@ async def delete_meetups(session: AsyncSession, api: TelegramApiWrapper, metrics
         unreachable=len(outcome.unreachable),
         opted_out=len(opted_out),
         failed=len(outcome.failed),
+        owners_messaged=owner_count(outcome.delivered),
+        owners_unreachable=owner_count(outcome.unreachable),
+        owners_opted_out=owner_count(opted_out),
+        owners_failed=owner_count(outcome.failed),
         purged=len(deletable),
         invitee_users_purged=len(outside_user_ids),
     )

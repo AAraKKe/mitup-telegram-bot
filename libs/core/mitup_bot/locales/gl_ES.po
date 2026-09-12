@@ -791,12 +791,6 @@ msgstr "Aínda non se compartiu ningunha quedada neste chat"
 msgid "InlineQueryMessages.NO_RESULTS_MESSAGE"
 msgstr "<i>Aínda non se compartiu ningunha quedada neste chat.</i>"
 
-msgid "NotificationMessages.DELETION_WARNING"
-msgstr "A quedada <b>${meeting_title}</b> será eliminada permanentemente en <b>${days_until_deletion} días</b>.\n\nPara evitar isto, podes reactivar a quedada seleccionando o botón <b>${reactivate_meeting_button}</b> de abaixo.\n\nLembra que sempre podes reactivar calquera quedada pasada desde o botón <b>${past_meetings_button}</b> no menú principal.\n\nSe non queres reactivar a quedada, podes ignorar esta mensaxe."
-
-msgid "NotificationMessages.DELETED"
-msgstr "A quedada <b>${meeting_title}</b> foi eliminada permanentemente."
-
 msgid "NotificationMessages.STARTING_SOON_HEADING"
 msgstr "⏰ Comeza axiña"
 
@@ -1219,3 +1213,34 @@ msgstr "Aviso de eliminación"
 
 msgid "SettingsMessages.DELETION_NOTICE_LABEL"
 msgstr "Confirmación de eliminación"
+
+
+msgid "NotificationMessages.DELETION_WARNING_HEADING"
+msgstr "⌛ A piques de eliminarse"
+
+msgid "NotificationMessages.DELETION_WARNING_DEADLINE"
+msgstr "Estas quedadas eliminaranse definitivamente en <b>${days_until_deletion} días</b>."
+
+msgid "NotificationMessages.DELETION_WARNING_REACTIVATE"
+msgstr "Reactiva calquera desde ${button_past_meetings} e conservarase."
+
+msgid "NotificationMessages.DELETION_WARNING_IGNORE"
+msgstr "Ignora esta mensaxe para deixar que se eliminen."
+
+msgid "NotificationMessages.DELETION_NOTICE_HEADING"
+msgstr "🗑️ Quedadas eliminadas"
+
+msgid "NotificationMessages.DELETION_NOTICE_BODY"
+msgstr "Estas quedadas xa se eliminaron definitivamente."
+
+msgid "NotificationMessages.DELETION_MEETING_LINE"
+msgstr "<b>${meeting_title}</b> <i>creada o ${created}</i>"
+
+msgid "NotificationMessages.DELETION_MORE_MEETINGS"
+msgstr "e ${count} máis"
+
+msgid "MeetingListMessages.DELETION_DATE"
+msgstr "Eliminarase o ${date} se non a reactivas"
+
+msgid "MeetingListMessages.DELETION_COUNTDOWN"
+msgstr "⚠️ Eliminarase en ${duration} se non a reactivas"

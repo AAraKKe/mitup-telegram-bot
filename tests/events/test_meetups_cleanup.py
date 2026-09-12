@@ -2,8 +2,6 @@ import datetime as dt
 import logging
 import re
 from collections.abc import Callable
-from dataclasses import replace
-from typing import cast
 
 import pytest
 from sqlalchemy.dialects import postgresql
@@ -12,19 +10,15 @@ from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 from telegram.error import BadRequest
 
-from mitup_bot import lifecycle
 from mitup_bot.events import meetups_cleanup
 from mitup_bot.events.service import EventType
 from mitup_bot.exceptions import InactiveUserInteraction
-from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Meetup
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricKey, MetricsClient
 from mitup_bot.supporter import SupporterLevel
-from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, NotificationMessages
-from mitup_bot.views import MitupView
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     MockApi,
     MockDbSession,
@@ -102,33 +96,11 @@ async def test_notify_meeting_about_to_be_deleted(
     await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
     await metrics_client.flush()
 
-    expected_view = MitupView(
-        message=NotificationMessages.DELETION_WARNING.rich(
-            lang=meeting.lang,
-            meeting_title=meeting.title,
-            days_until_deletion=7,
-            past_meetings_button=ButtonMessages.PAST_MEETINGS.text(lang=meeting.user_language),
-            reactivate_meeting_button=ButtonMessages.REACTIVATE_MEETING.text(lang=meeting.user_language),
-        ),
-        menu=[
-            [
-                ButtonConfig(
-                    text=ButtonMessages.REACTIVATE_MEETING.text(lang=meeting.user_language),
-                    callback_data=cb.REACTIVATE_MEETING.with_id(cast(int, meeting.id)),
-                ),
-                ButtonConfig(
-                    text=ButtonMessages.MAIN_MENU.back(lang=meeting.user_language),
-                    callback_data=cb.MAIN_MENU,
-                ),
-            ]
-        ],
-    )
-
     # MockApi does not override send_messages_to_users, so the real TelegramApi implementation
     # runs. It iterates over users and calls self.send_message_to_user(...) per user, which
     # MockApi does override and routes through call_mock → AsyncMock. The assertion therefore
     # lands on the real mock and is meaningful.
-    api.assert_send_message_to_user_called(user=owner, view=expected_view)
+    api.assert_send_message_to_user_called(user=owner, view=meeting_views.deletion_warning_view([meeting]))
 
     # The on_success callback fires after a successful send and sets this flag.
     assert meeting.expiration_notification_sent is True
@@ -265,16 +237,11 @@ async def test_delete_meeting_successfully(
     await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
     await metrics_client.flush()
 
-    expected_view = MitupView(
-        message=NotificationMessages.DELETED.rich(lang=meeting.lang, meeting_title=meeting.title),
-        menu=[],
-    )
-
     # MockApi does not override send_messages_to_users, so the real TelegramApi implementation
     # runs. It iterates over users and calls self.send_message_to_user(...) per user, which
     # MockApi does override and routes through call_mock → AsyncMock. The assertion therefore
     # lands on the real mock and is meaningful.
-    api.assert_send_message_to_user_called(user=owner, view=expected_view)
+    api.assert_send_message_to_user_called(user=owner, view=meeting_views.deletion_notice_view([meeting]))
 
     # The meeting was notified, so it is part of the DELETE.
     assert "DELETE FROM meetups WHERE meetups.id IN (1)" in mock_session.queries_executed
@@ -576,35 +543,6 @@ async def test_a_meeting_waiting_out_its_lead_is_not_counted_as_overdue(
     assert record.__dict__["days_overdue"] == 1
 
 
-def test_warning_deadline_comes_from_the_owners_own_policy(monkeypatch: pytest.MonkeyPatch):
-    """The message promises a deadline, so a Patron owner must be told their own tier's lead.
-
-    Both tiers carry the same lead today, which is exactly why this test moves the Patron one: with
-    the shipped values the assertion would hold whichever policy the view read.
-    """
-    patron_lead = dt.timedelta(days=14)
-    monkeypatch.setattr(lifecycle, "PATRON_POLICY", replace(lifecycle.PATRON_POLICY, deletion_warning_lead=patron_lead))
-
-    meeting = create_meetup(id=1, title="Patron Meeting")
-    create_user(
-        id=1,
-        tg_user_id=10,
-        owned_meetings=[meeting],
-        settings=create_settings(id=1),
-        supporter_level=SupporterLevel.HOST_3,
-    )
-
-    view = meetups_cleanup.deletion_warning_view(meeting)
-
-    assert view.message == NotificationMessages.DELETION_WARNING.rich(
-        lang=meeting.lang,
-        meeting_title=meeting.title,
-        days_until_deletion=patron_lead.days,
-        past_meetings_button=ButtonMessages.PAST_MEETINGS.text(lang=meeting.user_language),
-        reactivate_meeting_button=ButtonMessages.REACTIVATE_MEETING.text(lang=meeting.user_language),
-    )
-
-
 async def test_a_repeatedly_failing_send_escalates_instead_of_warning_daily_forever(
     mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
 ):
@@ -705,7 +643,7 @@ async def test_the_warning_sweep_counts_the_owners_who_turned_it_off(
     with capture_logs(processors=[merge_contextvars]) as logs:
         await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
 
-    api.assert_send_message_to_user_called(user=owner, view=meetups_cleanup.deletion_warning_view(warned))
+    api.assert_send_message_to_user_called(user=owner, view=meeting_views.deletion_warning_view([warned]))
     api.assert_method_just_called("send_message_to_user", times=1)
 
     sweep = next(entry for entry in logs if entry["event"] == "Deletion warning sweep complete")
@@ -757,9 +695,155 @@ async def test_the_purge_writes_only_to_the_owners_who_still_want_the_notice(
     with capture_logs(processors=[merge_contextvars]) as logs:
         await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
 
-    api.assert_send_message_to_user_called(user=owner, view=meetups_cleanup.deletion_notice_view(told))
+    api.assert_send_message_to_user_called(user=owner, view=meeting_views.deletion_notice_view([told]))
     api.assert_method_just_called("send_message_to_user", times=1)
     assert deleted_meetup_ids(mock_session) == {1, 2}
 
     summary = next(entry for entry in logs if entry["event"] == "Meetup purge sweep complete")
     assert (summary["nominated"], summary["delivered"], summary["opted_out"], summary["purged"]) == (2, 1, 1, 2)
+
+
+# ---------------------------------------------------------------------------
+# One digest per owner
+# ---------------------------------------------------------------------------
+
+
+def owned_meetups(owner_id: int, count: int, *, first_meeting_id: int) -> list[Meetup]:
+    """*count* meetings of one owner, numbered from *first_meeting_id*."""
+    meetings = [create_meetup(id=first_meeting_id + index, title=f"Meeting {index}") for index in range(count)]
+    create_user(
+        id=owner_id,
+        tg_user_id=owner_id * 10,
+        owned_meetings=meetings,
+        settings=create_settings(id=owner_id),
+    )
+    return meetings
+
+
+async def test_an_owner_with_several_expiring_meetings_is_warned_once(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """The warning is one digest naming every nominated meeting, and every meeting it named is
+    recorded as warned by that single send."""
+    meetings = owned_meetups(1, 3, first_meeting_id=1)
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, tuple(meetings))
+
+    await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
+
+    api.assert_send_message_to_user_called(user=meetings[0].owner, view=meeting_views.deletion_warning_view(meetings))
+    assert all(meeting.expiration_notification_sent for meeting in meetings)
+
+
+async def test_every_owner_gets_a_digest_of_their_own_meetings(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    first = owned_meetups(1, 2, first_meeting_id=1)
+    second = owned_meetups(2, 1, first_meeting_id=3)
+    # Interleaved, the order the statement can return them in.
+    nominated = (first[0], second[0], first[1])
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, nominated)
+
+    await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
+
+    api.assert_method_just_called("send_message_to_user", times=2)
+    sent = {call.kwargs["user"].db_id: call.kwargs["view"] for call in api.call_args_list("send_message_to_user")}
+    assert sent[1] == meeting_views.deletion_warning_view(first)
+    assert sent[2] == meeting_views.deletion_warning_view(second)
+
+
+async def test_a_digest_of_more_than_five_meetings_warns_every_one_of_them(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """The digest names only its first few meetings, but the warning it records covers all of them:
+    a meeting left out of the list still moves on to the deletion pool."""
+    meetings = owned_meetups(1, 8, first_meeting_id=1)
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, tuple(meetings))
+
+    await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
+
+    api.assert_method_just_called("send_message_to_user", times=1)
+    assert all(meeting.expiration_notification_sent for meeting in meetings)
+
+
+async def test_a_failed_warning_digest_leaves_every_meeting_it_named_for_the_next_run(
+    mock_session: MockDbSession, metrics_client: MetricsClient, metrics: MetricAssertions, api: MockApi
+):
+    meetings = owned_meetups(1, 3, first_meeting_id=1)
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, tuple(meetings))
+    api.mock_method("send_message_to_user").side_effect = BadRequest("Bad Request: chat is temporarily unavailable")
+
+    await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
+    await metrics_client.flush()
+
+    assert not any(meeting.expiration_notification_sent for meeting in meetings)
+    metrics.assert_emitted(
+        name=MetricKey.EXPIRATION_NOTIFICATIONS_FAILED,
+        value=3,
+        properties={"failed_meeting_ids": [1, 2, 3]},
+        dimensions={"EventType": EventType.MEETUPS_CLEANUP.value},
+    )
+
+
+async def test_an_owner_whose_meetings_are_deleted_is_told_once(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    meetings = owned_meetups(1, 3, first_meeting_id=1)
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, tuple(meetings))
+
+    await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
+
+    api.assert_send_message_to_user_called(user=meetings[0].owner, view=meeting_views.deletion_notice_view(meetings))
+    assert deleted_meetup_ids(mock_session) == {1, 2, 3}
+
+
+async def test_a_failed_notice_digest_defers_every_meeting_it_named(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    meetings = owned_meetups(1, 3, first_meeting_id=1)
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, tuple(meetings))
+    api.mock_method("send_message_to_user").side_effect = BadRequest("Bad Request: chat is unavailable")
+
+    await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
+
+    assert deleted_meetup_ids(mock_session) == set()
+
+
+async def test_the_sweep_summaries_count_owners_beside_meetings(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """A run's volume is owners messaged, not meetings nominated: with the digest the two numbers
+    part company, and only the first one says how many messages went out."""
+    reached = owned_meetups(1, 3, first_meeting_id=1)
+    blocked = owned_meetups(2, 2, first_meeting_id=4)
+    silent = create_meetup(id=6, title="Opted Out")
+    create_user(id=3, tg_user_id=30, owned_meetings=[silent], settings=create_settings(id=3, deletion_warning=False))
+
+    mock_session.add_objects_with_statement(
+        meetups_cleanup.MEETUPS_ABOUT_TO_BE_DELETED_STATEMENT, (*reached, *blocked, silent)
+    )
+    api.mock_method("send_message_to_user").side_effect = [None, InactiveUserInteraction(20, private=True)]
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await meetups_cleanup.notify_meetups_about_to_be_deleted(mock_session, api, metrics_client)
+
+    sweep = next(entry for entry in logs if entry["event"] == "Deletion warning sweep complete")
+    assert (sweep["delivered"], sweep["unreachable"], sweep["opted_out"]) == (3, 2, 1)
+    assert (sweep["owners_messaged"], sweep["owners_unreachable"], sweep["owners_opted_out"]) == (1, 1, 1)
+    assert (sweep["owners_failed"], sweep["failed"]) == (0, 0)
+
+
+async def test_the_purge_lines_count_owners_beside_meetings(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    first = owned_meetups(1, 3, first_meeting_id=1)
+    second = owned_meetups(2, 1, first_meeting_id=4)
+    mock_session.add_objects_with_statement(meetups_cleanup.MEETUPS_TO_DELETE_STATEMENT, (*first, *second))
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await meetups_cleanup.delete_meetups(mock_session, api, metrics_client)
+
+    purged = next(entry for entry in logs if entry["event"] == "Meetups purged")
+    assert (purged["count"], purged["owners"]) == (4, 2)
+
+    summary = next(entry for entry in logs if entry["event"] == "Meetup purge sweep complete")
+    assert (summary["delivered"], summary["owners_messaged"]) == (4, 2)

@@ -6,7 +6,9 @@ import pytest
 
 from mitup_bot.datetimes import DateFormat, TimeFormat
 from mitup_bot.keyboards import ButtonConfig
+from mitup_bot.lifecycle import FREE_POLICY, PATRON_POLICY
 from mitup_bot.models import Meetup, User
+from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages
 from mitup_bot.utils.rich_message import RichContent
@@ -402,3 +404,54 @@ def test_the_time_format_reads_the_three_stored_settings():
     meeting.date_format = DateFormat.LONG
 
     assert meeting.time_format == TimeFormat(show_timezone=False, clock_24h=False, date_format=DateFormat.LONG)
+
+
+def inactive_meeting(*, expiration_time: datetime | None = None, warned_time: datetime | None = None) -> Meetup:
+    """A deactivated meeting carrying the two stamps the deletion gates read, either of them unset."""
+    meeting = create_meetup(id=1, owner=create_user(id=1, first_name="Owner"))
+    meeting.active = False
+    meeting.expiration_time = expiration_time
+    meeting.expiration_notification_sent = warned_time is not None
+    meeting.warned_time = warned_time
+    return meeting
+
+
+def test_the_lifecycle_policy_follows_the_owners_current_tier():
+    free = create_meetup(id=1, owner=create_user(id=1, first_name="Free"))
+    host = create_meetup(id=2, owner=create_user(id=2, first_name="Host", supporter_level=SupporterLevel.HOST_2))
+
+    assert free.lifecycle_policy is FREE_POLICY
+    assert host.lifecycle_policy is PATRON_POLICY
+
+
+def test_the_deletion_due_time_runs_the_retention_from_the_deactivation_stamp():
+    expired = datetime.now(UTC) - timedelta(days=10)
+
+    meeting = inactive_meeting(expiration_time=expired)
+
+    assert meeting.deletion_due_time == expired + FREE_POLICY.inactive_retention
+
+
+def test_a_late_warning_still_buys_the_owner_a_full_warning_lead():
+    """Retention has already run out here, so measuring against it alone would read as overdue."""
+    now = datetime.now(UTC)
+    warned = now - timedelta(days=1)
+
+    meeting = inactive_meeting(
+        expiration_time=now - FREE_POLICY.inactive_retention - timedelta(days=30), warned_time=warned
+    )
+
+    assert meeting.deletion_due_time == warned + FREE_POLICY.deletion_warning_lead
+
+
+def test_a_warning_issued_on_time_leaves_the_retention_as_the_later_gate():
+    now = datetime.now(UTC)
+    expired = now - FREE_POLICY.deletion_warning_delay
+
+    meeting = inactive_meeting(expiration_time=expired, warned_time=now)
+
+    assert meeting.deletion_due_time == expired + FREE_POLICY.inactive_retention
+
+
+def test_a_meeting_that_never_expired_has_no_deletion_due_time():
+    assert inactive_meeting().deletion_due_time is None

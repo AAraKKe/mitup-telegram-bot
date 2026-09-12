@@ -4,12 +4,13 @@ import pytest
 
 from mitup_bot.callback_data import CallbackData, MeetingListSource
 from mitup_bot.emojis import Emojis
+from mitup_bot.lifecycle import FREE_POLICY
 from mitup_bot.models import Meetup, MeetupLocation
 from mitup_bot.translations import SUPPORTED_LANGUAGES
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages
+from mitup_bot.utils.messages import ButtonMessages, MeetingDisplayMessages, MeetingListMessages
 from mitup_bot.utils.rich_message import RichContent
-from mitup_bot.views.datetime_format import RANGE_SEPARATOR
+from mitup_bot.views.datetime_format import RANGE_SEPARATOR, duration_days_content, localized_date
 from mitup_bot.views.meeting.list_card import list_heading, meeting_list_section
 from mitup_bot.views.meeting.sections import participants_count_line
 from mitup_bot.views.meeting.shared_card import when_lines
@@ -21,15 +22,30 @@ PLACE = MeetupLocation(name=PLACE_NAME, coordinates=(2.34, 48.85))
 STARTS_AT = dt.datetime(2026, 9, 1, 18, 0, tzinfo=dt.UTC)
 ENDS_AT = dt.datetime(2026, 9, 1, 21, 0, tzinfo=dt.UTC)
 
+# Half a day past the whole days asked for, so the count does not tip down while the test runs.
+DUE_CUSHION = dt.timedelta(hours=12)
+
 
 def open_callback(meeting: Meetup) -> CallbackData:
     return cb.SHOW_MEETING.with_page(meeting.db_id, 2, MeetingListSource.ACTIVE)
 
 
-def section_lines(meeting: Meetup, lang: str) -> list[str]:
+def section_lines(meeting: Meetup, lang: str, *, with_deletion_notice: bool = False) -> list[str]:
     """The text lines of a section, without the button row that closes it."""
-    html = meeting_list_section(meeting, open_callback(meeting), lang).html
+    html = meeting_list_section(meeting, open_callback(meeting), lang, with_deletion_notice=with_deletion_notice).html
     return RichContent.from_markup(html.split("<tg-button-row>")[0]).text.splitlines()
+
+
+def past_meeting(lang: str, *, days_left: int, warned: bool) -> Meetup:
+    """An inactive meeting *days_left* whole days from deletion, warned about or not yet."""
+    due = dt.datetime.now(dt.UTC) + dt.timedelta(days=days_left) + DUE_CUSHION
+    meeting = owned_meeting(lang=lang)
+    meeting.active = False
+    meeting.expiration_time = due - FREE_POLICY.inactive_retention
+    if warned:
+        meeting.expiration_notification_sent = True
+        meeting.warned_time = due - FREE_POLICY.deletion_warning_lead
+    return meeting
 
 
 def scheduled_meeting(lang: str, *, ends: bool = False) -> Meetup:
@@ -147,3 +163,68 @@ def test_a_list_row_draws_no_photos():
     meeting = with_images(owned_meeting(), 3)
 
     assert "<img" not in meeting_list_section(meeting, cb.SHOW_MEETING.with_id(7), "en").html
+
+
+def test_a_past_meeting_says_the_day_it_will_be_deleted(lang: str):
+    meeting = past_meeting(lang, days_left=40, warned=False)
+
+    lines = section_lines(meeting, lang, with_deletion_notice=True)
+
+    due = meeting.deletion_due_time
+    assert due is not None
+    date = localized_date(
+        due,
+        lang=lang,
+        tz=meeting.timezone,
+        created=dt.datetime.now(dt.UTC),
+        date_format=meeting.time_format.date_format,
+    )
+    assert lines[1] == MeetingListMessages.DELETION_DATE.rich(lang=lang, date=date).text
+
+
+def test_a_past_meeting_already_warned_about_counts_the_days_it_has_left(lang: str):
+    meeting = past_meeting(lang, days_left=6, warned=True)
+
+    lines = section_lines(meeting, lang, with_deletion_notice=True)
+
+    duration = duration_days_content(6, lang=lang)
+    assert lines[1] == MeetingListMessages.DELETION_COUNTDOWN.rich(lang=lang, duration=duration).text
+
+
+def test_the_deletion_line_sits_under_the_title_in_italics(lang: str):
+    meeting = past_meeting(lang, days_left=40, warned=False)
+
+    html = meeting_list_section(meeting, open_callback(meeting), lang, with_deletion_notice=True).html
+
+    assert html.startswith(f"<b>{meeting.plain_title}</b><br/><i>")
+
+
+def test_a_countdown_that_has_run_out_still_reads_as_a_whole_day(lang: str):
+    """The sweep deletes on its own schedule, and nothing is deleted in zero days."""
+    meeting = past_meeting(lang, days_left=-3, warned=True)
+
+    lines = section_lines(meeting, lang, with_deletion_notice=True)
+
+    duration = duration_days_content(1, lang=lang)
+    assert lines[1] == MeetingListMessages.DELETION_COUNTDOWN.rich(lang=lang, duration=duration).text
+
+
+def test_a_meeting_no_stamp_dates_says_nothing_about_deletion(lang: str):
+    meeting = owned_meeting(lang=lang)
+    meeting.active = False
+
+    assert section_lines(meeting, lang, with_deletion_notice=True) == [
+        meeting.plain_title,
+        f"{Emojis.JOINED} {participants_count_line(meeting).text}",
+    ]
+
+
+@pytest.mark.parametrize("warned", [False, True], ids=["unwarned", "warned"])
+def test_the_other_lists_say_nothing_about_deletion(lang: str, warned: bool):
+    """Only the past list offers reactivation, and a joined list would name someone else's deadline."""
+    meeting = past_meeting(lang, days_left=6, warned=warned)
+
+    text = meeting_list_section(meeting, open_callback(meeting), lang).text
+
+    assert MeetingListMessages.DELETION_DATE.rich(lang=lang, date="").text.strip() not in text
+    assert str(Emojis.WARNING) not in text

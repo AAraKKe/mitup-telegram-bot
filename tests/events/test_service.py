@@ -20,6 +20,7 @@ from structlog.testing import capture_logs
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.config import BotConfig
 from mitup_bot.events.service import (
+    BROADCAST_LIMITED_EVENTS,
     DEFAULT_USER_CLEANUP_INTERVAL,
     EventType,
     IntervalsConfiguration,
@@ -116,18 +117,25 @@ def test_build_broadcast_bot_applies_configured_rate(mock_ext_bot: MagicMock, mo
 
 
 @pytest.mark.parametrize(
-    "event_type", [event for event in EventType if event is not EventType.SEND_BROADCASTS], ids=lambda e: e.name
+    "event_type",
+    [event for event in EventType if event not in BROADCAST_LIMITED_EVENTS],
+    ids=lambda e: e.name,
 )
-def test_select_bot_uses_shared_bot_for_non_broadcast_events(event_type: EventType):
+def test_select_bot_uses_shared_bot_for_time_sensitive_events(event_type: EventType):
     bot, broadcast_bot = MagicMock(), MagicMock()
 
     assert select_bot(event_type, bot, broadcast_bot) is bot
 
 
-def test_select_bot_uses_broadcast_bot_for_send_broadcasts():
+@pytest.mark.parametrize(
+    "event_type", [event for event in EventType if event in BROADCAST_LIMITED_EVENTS], ids=lambda e: e.name
+)
+def test_select_bot_uses_broadcast_bot_for_high_volume_events(event_type: EventType):
+    """The daily cleanup writes one digest to every owner it nominated, which is broadcast-shaped
+    traffic: it runs on the capped limiter so it cannot crowd out a meeting reminder."""
     bot, broadcast_bot = MagicMock(), MagicMock()
 
-    assert select_bot(EventType.SEND_BROADCASTS, bot, broadcast_bot) is broadcast_bot
+    assert select_bot(event_type, bot, broadcast_bot) is broadcast_bot
 
 
 # Async event types use `await module.run(...)`, sync ones call directly.
@@ -795,9 +803,9 @@ async def test_run_all_tasks_creates_all_tasks():
 
     assert set(created_tasks) == set(EventType)
     assert propagated_start_times == [start_time] * len(EventType)
-    # Only SEND_BROADCASTS runs on the rate-capped broadcast bot; every other event on the shared one.
-    assert bots_by_event[EventType.SEND_BROADCASTS] is broadcast_bot
-    assert all(bots_by_event[event] is bot for event in EventType if event is not EventType.SEND_BROADCASTS)
+    # The high-volume events run on the rate-capped broadcast bot; every other one on the shared bot.
+    assert all(bots_by_event[event] is broadcast_bot for event in BROADCAST_LIMITED_EVENTS)
+    assert all(bots_by_event[event] is bot for event in EventType if event not in BROADCAST_LIMITED_EVENTS)
 
 
 def test_cli_invokes_with_defaults():

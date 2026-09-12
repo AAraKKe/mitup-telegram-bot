@@ -791,12 +791,6 @@ msgstr "In diesem Chat wurden noch keine Treffen geteilt"
 msgid "InlineQueryMessages.NO_RESULTS_MESSAGE"
 msgstr "<i>In diesem Chat wurden noch keine Treffen geteilt.</i>"
 
-msgid "NotificationMessages.DELETION_WARNING"
-msgstr "Das Treffen <b>${meeting_title}</b> wird in <b>${days_until_deletion} Tagen</b> dauerhaft gelöscht.\n\nUm dies zu verhindern, kannst du das Treffen reaktivieren, indem du unten auf den Button <b>${reactivate_meeting_button}</b> tippst.\n\nDenke daran, dass du alle vergangenen Treffen jederzeit über den Button <b>${past_meetings_button}</b> im Hauptmenü reaktivieren kannst.\n\nWenn du das Treffen nicht reaktivieren möchtest, kannst du diese Nachricht ignorieren."
-
-msgid "NotificationMessages.DELETED"
-msgstr "Das Treffen <b>${meeting_title}</b> wurde dauerhaft gelöscht."
-
 msgid "NotificationMessages.STARTING_SOON_HEADING"
 msgstr "⏰ Beginnt bald"
 
@@ -1219,3 +1213,34 @@ msgstr "Löschwarnung"
 
 msgid "SettingsMessages.DELETION_NOTICE_LABEL"
 msgstr "Löschbestätigung"
+
+
+msgid "NotificationMessages.DELETION_WARNING_HEADING"
+msgstr "⌛ Werden bald gelöscht"
+
+msgid "NotificationMessages.DELETION_WARNING_DEADLINE"
+msgstr "Diese Treffen werden in <b>${days_until_deletion} Tagen</b> endgültig gelöscht."
+
+msgid "NotificationMessages.DELETION_WARNING_REACTIVATE"
+msgstr "Reaktiviere ein Treffen über ${button_past_meetings}, dann bleibt es erhalten."
+
+msgid "NotificationMessages.DELETION_WARNING_IGNORE"
+msgstr "Ignoriere diese Nachricht, um sie löschen zu lassen."
+
+msgid "NotificationMessages.DELETION_NOTICE_HEADING"
+msgstr "🗑️ Treffen gelöscht"
+
+msgid "NotificationMessages.DELETION_NOTICE_BODY"
+msgstr "Diese Treffen sind jetzt endgültig gelöscht."
+
+msgid "NotificationMessages.DELETION_MEETING_LINE"
+msgstr "<b>${meeting_title}</b> <i>erstellt am ${created}</i>"
+
+msgid "NotificationMessages.DELETION_MORE_MEETINGS"
+msgstr "und ${count} weitere"
+
+msgid "MeetingListMessages.DELETION_DATE"
+msgstr "Wird am ${date} gelöscht, wenn du es nicht reaktivierst"
+
+msgid "MeetingListMessages.DELETION_COUNTDOWN"
+msgstr "⚠️ Wird in ${duration} gelöscht, wenn du es nicht reaktivierst"

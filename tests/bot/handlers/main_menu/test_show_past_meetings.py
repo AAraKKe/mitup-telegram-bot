@@ -1,3 +1,4 @@
+import datetime as dt
 import re
 
 import pytest
@@ -30,6 +31,7 @@ def expected_view(user: User, meetings: list[Meetup], page_number: int = 1) -> P
                 cb.SHOW_PAST_MEETING.with_page(meeting.db_id, page_number),
                 user.lang,
                 delete_callback=cb.DELETE_PAST_MEETING.with_page(meeting.db_id, page_number),
+                with_deletion_notice=True,
             )
             for meeting in meetings
         ],
@@ -68,6 +70,50 @@ async def test_show_past_meetings_entry_lists_every_past_meeting_as_a_section(
     context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, handler_context=handler_context)
 
     context.api.assert_edit_message_called(update, expected_view(user_with_settings, past_meetings))
+
+
+def expired_days_ago(days: int) -> dt.datetime:
+    return dt.datetime.now(dt.UTC) - dt.timedelta(days=days)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.PAST_MEETINGS)], indirect=True)
+async def test_show_past_meetings_lists_the_nearest_deletion_first(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    """The list is read top down, so the meetings running out of time have to open it."""
+    almost_gone = create_meetup(id=12, active=False, expiration_time=expired_days_ago(80))
+    still_waiting = create_meetup(id=11, active=False, expiration_time=expired_days_ago(10))
+    never_stamped = create_meetup(id=10, active=False)
+    user_with_settings.meetups = [never_stamped, still_waiting, almost_gone]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, handler_context=handler_context)
+
+    context.api.assert_edit_message_called(
+        update, expected_view(user_with_settings, [almost_gone, still_waiting, never_stamped])
+    )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.PAST_MEETINGS)], indirect=True)
+async def test_show_past_meetings_keeps_one_order_for_meetings_facing_the_same_day(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    """Without a tie-breaker the page a meeting sits on would move between two identical screens."""
+    expired = expired_days_ago(30)
+    first = create_meetup(id=10, active=False, expiration_time=expired)
+    second = create_meetup(id=11, active=False, expiration_time=expired)
+    user_with_settings.meetups = [second, first]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(MainMenuHandlerId.SHOW_PAST_MEETINGS_CALLBACK, handler_context=handler_context)
+
+    context.api.assert_edit_message_called(update, expected_view(user_with_settings, [first, second]))
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.SHOW_PAST_MEETING_PAGE.with_id(1))], indirect=True)

@@ -791,12 +791,6 @@ msgstr "Aún no se ha compartido ninguna quedada en este chat"
 msgid "InlineQueryMessages.NO_RESULTS_MESSAGE"
 msgstr "<i>Aún no se ha compartido ninguna quedada en este chat.</i>"
 
-msgid "NotificationMessages.DELETION_WARNING"
-msgstr "La quedada <b>${meeting_title}</b> será eliminada permanentemente en <b>${days_until_deletion} días</b>.\n\nPara evitarlo, puedes reactivar la quedada seleccionando el botón <b>${reactivate_meeting_button}</b> abajo.\n\nRecuerda que siempre puedes reactivar cualquier quedada pasada desde el botón <b>${past_meetings_button}</b> en el menú principal.\n\nSi no quieres reactivar la quedada, puedes ignorar este mensaje."
-
-msgid "NotificationMessages.DELETED"
-msgstr "La quedada <b>${meeting_title}</b> ha sido eliminada permanentemente."
-
 msgid "NotificationMessages.STARTING_SOON_HEADING"
 msgstr "⏰ Empieza pronto"
 
@@ -1219,3 +1213,34 @@ msgstr "Aviso de eliminación"
 
 msgid "SettingsMessages.DELETION_NOTICE_LABEL"
 msgstr "Confirmación de eliminación"
+
+
+msgid "NotificationMessages.DELETION_WARNING_HEADING"
+msgstr "⌛ A punto de eliminarse"
+
+msgid "NotificationMessages.DELETION_WARNING_DEADLINE"
+msgstr "Estas quedadas se eliminarán definitivamente en <b>${days_until_deletion} días</b>."
+
+msgid "NotificationMessages.DELETION_WARNING_REACTIVATE"
+msgstr "Reactiva cualquiera desde ${button_past_meetings} y se conservará."
+
+msgid "NotificationMessages.DELETION_WARNING_IGNORE"
+msgstr "Ignora este mensaje para dejar que se eliminen."
+
+msgid "NotificationMessages.DELETION_NOTICE_HEADING"
+msgstr "🗑️ Quedadas eliminadas"
+
+msgid "NotificationMessages.DELETION_NOTICE_BODY"
+msgstr "Estas quedadas ya se han eliminado definitivamente."
+
+msgid "NotificationMessages.DELETION_MEETING_LINE"
+msgstr "<b>${meeting_title}</b> <i>creada el ${created}</i>"
+
+msgid "NotificationMessages.DELETION_MORE_MEETINGS"
+msgstr "y ${count} más"
+
+msgid "MeetingListMessages.DELETION_DATE"
+msgstr "Se eliminará el ${date} si no la reactivas"
+
+msgid "MeetingListMessages.DELETION_COUNTDOWN"
+msgstr "⚠️ Se eliminará en ${duration} si no la reactivas"

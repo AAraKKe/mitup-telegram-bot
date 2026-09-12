@@ -791,12 +791,6 @@ msgstr "Nenhum evento foi compartilhado neste chat ainda"
 msgid "InlineQueryMessages.NO_RESULTS_MESSAGE"
 msgstr "<i>Nenhum evento foi compartilhado neste chat ainda.</i>"
 
-msgid "NotificationMessages.DELETION_WARNING"
-msgstr "O evento <b>${meeting_title}</b> será permanentemente excluído em <b>${days_until_deletion} dias</b>.\n\nPara evitar que isso aconteça, você pode reativar o evento selecionando o botão <b>${reactivate_meeting_button}</b> abaixo.\n\nLembre-se de que você sempre pode reativar qualquer evento anterior pelo botão <b>${past_meetings_button}</b> no menu principal.\n\nSe você não deseja reativar o evento, pode ignorar esta mensagem."
-
-msgid "NotificationMessages.DELETED"
-msgstr "O evento <b>${meeting_title}</b> foi permanentemente excluído."
-
 msgid "NotificationMessages.STARTING_SOON_HEADING"
 msgstr "⏰ Começa em breve"
 
@@ -1219,3 +1213,34 @@ msgstr "Aviso de exclusão"
 
 msgid "SettingsMessages.DELETION_NOTICE_LABEL"
 msgstr "Confirmação de exclusão"
+
+
+msgid "NotificationMessages.DELETION_WARNING_HEADING"
+msgstr "⌛ Prestes a serem excluídos"
+
+msgid "NotificationMessages.DELETION_WARNING_DEADLINE"
+msgstr "Estes eventos serão excluídos permanentemente em <b>${days_until_deletion} dias</b>."
+
+msgid "NotificationMessages.DELETION_WARNING_REACTIVATE"
+msgstr "Reative qualquer um deles em ${button_past_meetings} e ele permanece."
+
+msgid "NotificationMessages.DELETION_WARNING_IGNORE"
+msgstr "Ignore esta mensagem para deixá-los ir."
+
+msgid "NotificationMessages.DELETION_NOTICE_HEADING"
+msgstr "🗑️ Eventos excluídos"
+
+msgid "NotificationMessages.DELETION_NOTICE_BODY"
+msgstr "Estes eventos foram excluídos permanentemente."
+
+msgid "NotificationMessages.DELETION_MEETING_LINE"
+msgstr "<b>${meeting_title}</b> <i>criado em ${created}</i>"
+
+msgid "NotificationMessages.DELETION_MORE_MEETINGS"
+msgstr "e mais ${count}"
+
+msgid "MeetingListMessages.DELETION_DATE"
+msgstr "Será excluído em ${date} se você não o reativar"
+
+msgid "MeetingListMessages.DELETION_COUNTDOWN"
+msgstr "⚠️ Será excluído em ${duration} se você não o reativar"

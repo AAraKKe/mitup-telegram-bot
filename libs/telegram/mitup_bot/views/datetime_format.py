@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import math
 import re
 from zoneinfo import ZoneInfo
 
@@ -107,6 +108,18 @@ def localized_datetime(
     return str(locale.datetime_formats["short"]).format(f"{time}{zone}", date)
 
 
+def localized_date(
+    value: dt.datetime, *, lang: str, tz: ZoneInfo, created: dt.datetime | None, date_format: DateFormat
+) -> str:
+    """The date half of *value* read in *tz*, written the way *lang* writes it.
+
+    The counterpart of `localized_datetime` for a moment whose time of day says nothing.
+    """
+    local_value = in_timezone(value, tz)
+    date, _ = date_texts(local_value, locale=locale_for(lang), created=created, tz=tz, date_format=date_format)
+    return date
+
+
 def date_content(value: dt.datetime, date: str, day: str) -> RichContent:
     """*date* with *day*, the part of it a date entity may carry, inside the entity."""
     weekday, _, rest = date.partition(day)
@@ -183,6 +196,17 @@ def relative_time_content(moment: dt.datetime, *, now: dt.datetime, lang: str) -
 def duration_minutes_content(minutes: int, *, lang: str) -> RichContent:
     """A count of minutes with its unit spelled the way *lang* spells it ("1 minute", "25 minutes")."""
     return RichContent(format_unit(minutes, "duration-minute", length="long", locale=locale_for(lang)))
+
+
+def duration_days_content(days: int, *, lang: str) -> RichContent:
+    """A count of days with its unit spelled the way *lang* spells it ("1 day", "6 days")."""
+    # Babel has no long `duration-day` unit for half the shipped languages; the infinite threshold
+    # keeps format_timedelta counting in days instead of rounding a long span up to weeks.
+    return RichContent(
+        format_timedelta(
+            dt.timedelta(days=days), granularity="day", threshold=math.inf, locale=locale_for(lang), format="long"
+        )
+    )
 
 
 def weekday_names(lang: str) -> list[str]:

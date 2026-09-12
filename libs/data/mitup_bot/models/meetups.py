@@ -13,6 +13,7 @@ from mitup_bot.exceptions import MeetupNotFound
 from mitup_bot.format_tags import strip_format_tags
 from mitup_bot.images import ImageLayout
 from mitup_bot.keyboards import Keyboard
+from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Message
 
 from .base_model import BaseModel
@@ -165,6 +166,25 @@ class Meetup(BaseModel, SQLModel, table=True):
         `record_deletion_warning`, and equally indivisible."""
         self.expiration_notification_sent = False
         self.warned_time = None
+
+    @property
+    def lifecycle_policy(self) -> LifecyclePolicy:
+        """The lifecycle policy this meeting runs on, read off its owner's current tier."""
+        return LifecyclePolicy.get(self.owner.supporter_level)
+
+    @property
+    def deletion_due_time(self) -> dt.datetime | None:
+        """The later of the two gates the deletion sweep applies, or None when neither stamp is set."""
+        policy = self.lifecycle_policy
+        gates = [
+            as_utc(stamp) + duration
+            for stamp, duration in (
+                (self.expiration_time, policy.inactive_retention),
+                (self.warned_time, policy.deletion_warning_lead),
+            )
+            if stamp is not None
+        ]
+        return max(gates) if gates else None
 
     @property
     def tagged_title(self) -> str:

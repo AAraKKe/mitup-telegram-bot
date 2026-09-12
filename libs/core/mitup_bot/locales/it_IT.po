@@ -791,12 +791,6 @@ msgstr "Nessun incontro è stato ancora condiviso in questa chat"
 msgid "InlineQueryMessages.NO_RESULTS_MESSAGE"
 msgstr "<i>Nessun incontro è stato ancora condiviso in questa chat.</i>"
 
-msgid "NotificationMessages.DELETION_WARNING"
-msgstr "L'incontro <b>${meeting_title}</b> sarà eliminato permanentemente tra <b>${days_until_deletion} giorni</b>.\n\nPer evitare che ciò accada, puoi riattivare l'incontro selezionando il pulsante <b>${reactivate_meeting_button}</b> qui sotto.\n\nRicorda che puoi sempre riattivare qualsiasi incontro passato dal pulsante <b>${past_meetings_button}</b> nel menu principale.\n\nSe non desideri riattivare l'incontro, puoi ignorare questo messaggio."
-
-msgid "NotificationMessages.DELETED"
-msgstr "L'incontro <b>${meeting_title}</b> è stato eliminato permanentemente."
-
 msgid "NotificationMessages.STARTING_SOON_HEADING"
 msgstr "⏰ Inizia a breve"
 
@@ -1219,3 +1213,34 @@ msgstr "Avviso di eliminazione"
 
 msgid "SettingsMessages.DELETION_NOTICE_LABEL"
 msgstr "Conferma di eliminazione"
+
+
+msgid "NotificationMessages.DELETION_WARNING_HEADING"
+msgstr "⌛ In procinto di essere eliminati"
+
+msgid "NotificationMessages.DELETION_WARNING_DEADLINE"
+msgstr "Questi incontri verranno eliminati definitivamente tra <b>${days_until_deletion} giorni</b>."
+
+msgid "NotificationMessages.DELETION_WARNING_REACTIVATE"
+msgstr "Riattiva quelli che vuoi da ${button_past_meetings} e resteranno."
+
+msgid "NotificationMessages.DELETION_WARNING_IGNORE"
+msgstr "Ignora questo messaggio per lasciarli andare."
+
+msgid "NotificationMessages.DELETION_NOTICE_HEADING"
+msgstr "🗑️ Incontri eliminati"
+
+msgid "NotificationMessages.DELETION_NOTICE_BODY"
+msgstr "Questi incontri sono stati eliminati definitivamente."
+
+msgid "NotificationMessages.DELETION_MEETING_LINE"
+msgstr "<b>${meeting_title}</b> <i>creato il ${created}</i>"
+
+msgid "NotificationMessages.DELETION_MORE_MEETINGS"
+msgstr "e altri ${count}"
+
+msgid "MeetingListMessages.DELETION_DATE"
+msgstr "Verrà eliminato il ${date} se non lo riattivi"
+
+msgid "MeetingListMessages.DELETION_COUNTDOWN"
+msgstr "⚠️ Verrà eliminato tra ${duration} se non lo riattivi"

@@ -5,19 +5,25 @@ from typing import TYPE_CHECKING
 
 from mitup_bot.datetimes import as_utc
 from mitup_bot.keyboards import ButtonConfig
-from mitup_bot.utils import ButtonMessages, NotificationMessages
+from mitup_bot.lifecycle import LifecyclePolicy
+from mitup_bot.utils import ButtonMessages, MeetingDisplayMessages, NotificationMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.rich_message import RichContent, RichTag, horizontal_rule_content
-from mitup_bot.views.datetime_format import relative_time_content
+from mitup_bot.utils.rich_message import RichContent, RichTag, horizontal_rule_content, unordered_list_content
+from mitup_bot.views.datetime_format import datetime_content, relative_time_content
 from mitup_bot.views.meeting.shared_card import when_section, where_section
 from mitup_bot.views.meeting_text import title_content
 from mitup_bot.views.mitup_view import MitupView
 
 if TYPE_CHECKING:
-    from mitup_bot.models import JoinedUsers
+    from collections.abc import Sequence
+
+    from mitup_bot.models import JoinedUsers, Meetup, User
     from mitup_bot.utils.messages import MessageBase
 
 JUST_NOW = dt.timedelta(minutes=1)
+
+# A deletion digest names this many meetings and counts the rest in its closing line.
+DIGEST_MEETINGS_NAMED = 5
 
 
 def countdown_line(link: JoinedUsers, message: MessageBase, *, now: dt.datetime) -> RichContent:
@@ -76,3 +82,71 @@ def started_view(link: JoinedUsers, *, now: dt.datetime) -> MitupView:
     else:
         countdown = countdown_line(link, NotificationMessages.STARTED_AGO, now=now)
     return notification_card(link, NotificationMessages.STARTED_HEADING, countdown)
+
+
+def digest_meeting_line(meetup: Meetup, owner: User) -> RichContent:
+    """One meeting of a deletion digest: its title, and when it was created in the owner's formats."""
+    lang = owner.lang
+    title = RichContent(meetup.plain_title.strip()) or MeetingDisplayMessages.UNTITLED.rich(lang=lang)
+    if meetup.created_time is None:
+        return title.wrap(RichTag.BOLD)
+    created = datetime_content(
+        meetup.created_time,
+        lang=lang,
+        tz=owner.settings.tz,
+        created=dt.datetime.now(dt.UTC),
+        time_format=owner.settings.default_time_format,
+    )
+    return NotificationMessages.DELETION_MEETING_LINE.rich(lang=lang, meeting_title=title, created=created)
+
+
+def digest_list(meetups: Sequence[Meetup], owner: User) -> RichContent:
+    """The first `DIGEST_MEETINGS_NAMED` meetings as a list, closed by a count of the rest."""
+    named = unordered_list_content(digest_meeting_line(meetup, owner) for meetup in meetups[:DIGEST_MEETINGS_NAMED])
+    unnamed = len(meetups) - DIGEST_MEETINGS_NAMED
+    if unnamed < 1:
+        return named
+    return named.append(NotificationMessages.DELETION_MORE_MEETINGS.rich(lang=owner.lang, count=unnamed))
+
+
+def deletion_warning_view(meetups: Sequence[Meetup]) -> MitupView:
+    """Warn the owner of *meetups*, all of which are theirs, about every one of them at once."""
+    owner = meetups[0].owner
+    lang = owner.lang
+    policy = LifecyclePolicy.get(owner.supporter_level)
+    deadline = NotificationMessages.DELETION_WARNING_DEADLINE.rich(
+        lang=lang, days_until_deletion=LifecyclePolicy.interval_days(policy.deletion_warning_lead)
+    )
+    past_meetings = ButtonConfig(text=ButtonMessages.PAST_MEETINGS.text(lang=lang), callback_data=cb.PAST_MEETINGS)
+    closing = RichContent.join(
+        "\n",
+        [
+            NotificationMessages.DELETION_WARNING_REACTIVATE.rich(lang=lang, button_past_meetings=past_meetings),
+            NotificationMessages.DELETION_WARNING_IGNORE.rich(lang=lang),
+        ],
+    )
+    body = RichContent.join(
+        horizontal_rule_content(),
+        [
+            NotificationMessages.DELETION_WARNING_HEADING.rich(lang=lang).wrap(RichTag.H2).append(deadline),
+            digest_list(meetups, owner),
+            closing,
+        ],
+    )
+    return MitupView(body).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
+
+
+def deletion_notice_view(meetups: Sequence[Meetup]) -> MitupView:
+    """Tell the owner of *meetups*, all of which were theirs, that every one of them is gone."""
+    owner = meetups[0].owner
+    lang = owner.lang
+    body = RichContent.join(
+        horizontal_rule_content(),
+        [
+            NotificationMessages.DELETION_NOTICE_HEADING.rich(lang=lang)
+            .wrap(RichTag.H2)
+            .append(NotificationMessages.DELETION_NOTICE_BODY.rich(lang=lang)),
+            digest_list(meetups, owner),
+        ],
+    )
+    return MitupView(body).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)

@@ -1,3 +1,5 @@
+import datetime as dt
+
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
@@ -15,9 +17,15 @@ from mitup_bot.views import meeting as meeting_views
 from .enums import MainMenuHandlerId
 from .utils import MEETINGS_PER_PAGE, MeetingList, log_meeting_list
 
+# Undated meetings sort after every meeting with a deletion due time.
+UNDATED_DELETION = dt.datetime.max.replace(tzinfo=dt.UTC)
+
 
 async def show_past_meetings_page(user: User, requested_page: int, update: Update, context: TMitupContext):
-    past_meetings = sorted([m for m in user.meetups if not m.active], key=lambda m: m.db_id)
+    past_meetings = sorted(
+        [meeting for meeting in user.meetups if not meeting.active],
+        key=lambda meeting: (meeting.deletion_due_time or UNDATED_DELETION, meeting.db_id),
+    )
     page_number = PaginatedMitupView.clamp_page(requested_page, len(past_meetings), MEETINGS_PER_PAGE)
 
     log_meeting_list(
@@ -44,6 +52,7 @@ async def show_past_meetings_page(user: User, requested_page: int, update: Updat
                 cb.SHOW_PAST_MEETING.with_page(meeting.db_id, page_number),
                 user.lang,
                 delete_callback=cb.DELETE_PAST_MEETING.with_page(meeting.db_id, page_number),
+                with_deletion_notice=True,
             )
             for meeting in past_meetings
         ],

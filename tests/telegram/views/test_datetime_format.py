@@ -13,8 +13,10 @@ from mitup_bot.views.datetime_format import (
     TIME_ENTITY_FORMAT,
     datetime_content,
     datetime_range_content,
+    duration_days_content,
     duration_minutes_content,
     locale_for,
+    localized_date,
     localized_datetime,
     month_name,
     relative_time_content,
@@ -215,6 +217,35 @@ def test_localized_datetime_falls_back_to_english_for_a_language_babel_does_not_
 
 def test_locale_for_reads_both_spellings_of_a_locale():
     assert locale_for("es-ES") == locale_for("es_ES")
+
+
+@pytest.mark.parametrize("language", LOCALIZED_MOMENT)
+def test_localized_date_writes_the_date_half_of_the_localized_moment(language: str):
+    """A moment whose time of day says nothing is written as its date alone."""
+    rendered = localized_date(
+        MOMENT, lang=language, tz=MADRID, created=CREATED_SAME_YEAR, date_format=DateFormat.DEFAULT
+    )
+
+    assert LOCALIZED_MOMENT[language].startswith(rendered)
+    assert "22:45" not in rendered
+
+
+def test_localized_date_spells_the_year_out_for_a_moment_outside_the_year_it_is_measured_against():
+    same_year = localized_date(MOMENT, lang="en", tz=MADRID, created=CREATED_SAME_YEAR, date_format=DateFormat.DEFAULT)
+    other_year = localized_date(
+        MOMENT, lang="en", tz=MADRID, created=CREATED_YEAR_BEFORE, date_format=DateFormat.DEFAULT
+    )
+
+    assert "2027" not in same_year
+    assert "2027" in other_year
+
+
+def test_localized_date_reads_the_moment_in_the_given_timezone():
+    """Madrid is a day ahead of UTC at this hour, so the two zones name different days."""
+    midnight = dt.datetime(2027, 3, 17, 23, 30, tzinfo=dt.UTC)
+
+    assert "18" in localized_date(midnight, lang="en", tz=MADRID, created=None, date_format=DateFormat.DEFAULT)
+    assert "17" in localized_date(midnight, lang="en", tz=UTC, created=None, date_format=DateFormat.DEFAULT)
 
 
 def test_datetime_content_reads_as_the_localized_text():
@@ -457,3 +488,37 @@ def test_every_shipped_language_has_an_expected_minute_count():
 
 def test_a_count_of_minutes_falls_back_to_english_for_a_language_babel_does_not_know():
     assert duration_minutes_content(1, lang="zz_ZZ").text == "1 minute"
+
+
+# How each shipped language names a single day and a run of them.
+DAY_COUNTS = {
+    "en": ("1 day", "6 days"),
+    "es_ES": ("1 día", "6 días"),
+    "gl_ES": ("1 día", "6 días"),
+    "de_DE": ("1 Tag", "6 Tage"),
+    "pt_BR": ("1 dia", "6 dias"),
+    "it_IT": ("1 giorno", "6 giorni"),
+}
+
+
+@pytest.mark.parametrize("language", DAY_COUNTS)
+def test_a_count_of_days_carries_the_unit_each_language_spells_for_it(language: str):
+    singular, plural = DAY_COUNTS[language]
+
+    assert duration_days_content(1, lang=language).text == singular
+    assert duration_days_content(6, lang=language).text == plural
+
+
+def test_every_shipped_language_has_an_expected_day_count():
+    """A language added to the bot must be given its expected wording here, not left unchecked."""
+    assert sorted(DAY_COUNTS) == sorted(SUPPORTED_LANGUAGES)
+
+
+@pytest.mark.parametrize("days", [8, 30, 365], ids=["over_a_week", "over_a_month", "over_a_year"])
+def test_a_long_count_of_days_is_still_counted_in_days(days: int, lang: str):
+    """Babel would round a longer span up to weeks or months, which no longer answers how long."""
+    assert duration_days_content(days, lang=lang).text.startswith(str(days))
+
+
+def test_a_count_of_days_falls_back_to_english_for_a_language_babel_does_not_know():
+    assert duration_days_content(1, lang="zz_ZZ").text == "1 day"
