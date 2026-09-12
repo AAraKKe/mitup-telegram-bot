@@ -129,6 +129,9 @@ class ButtonMessages(MessageBase):
     OPEN_MEETING = f"{Emojis.LIST} Open meeting"
     # Rides the title line of a meeting in a list, where the title already names what opens.
     DELETE = f"{Emojis.DELETE} Delete"
+    DELETE_ALL_PAST_MEETINGS = f"{Emojis.DELETE} Delete all past meetings"
+    CONFIRM_DELETE_ALL_PAST_MEETINGS = "Delete them all"
+    DECLINE_DELETE_ALL_PAST_MEETINGS = "Keep them"
     EDIT = f"{Emojis.EDIT} Edit"
     SHARE = f"{Emojis.SHARE} Share"
     # Redraws the card in place with the meeting's current state.
@@ -632,6 +635,8 @@ class MeetingLifecycleMessages(MessageBase):
     DELETE_CONFIRMATION = "Are you sure you want to delete this meeting?"
     DELETE_SUCCESS = "Meeting deleted."
     DELETE_DECLINED = "The meeting won't be deleted"
+    DELETE_ALL_CONFIRMATION = "This deletes every past meeting you have, ${count} in total. It cannot be undone."
+    DELETE_ALL_SUCCESS = "Past meetings deleted: ${count}."
 
 
 class MeetingAttachMessages(MessageBase):

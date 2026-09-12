@@ -1244,3 +1244,17 @@ msgstr "Verrà eliminato il ${date} se non lo riattivi"
 
 msgid "MeetingListMessages.DELETION_COUNTDOWN"
 msgstr "⚠️ Verrà eliminato tra ${duration} se non lo riattivi"
+msgid "ButtonMessages.DELETE_ALL_PAST_MEETINGS"
+msgstr "🗑️ Elimina tutti gli incontri passati"
+
+msgid "ButtonMessages.CONFIRM_DELETE_ALL_PAST_MEETINGS"
+msgstr "Eliminali tutti"
+
+msgid "ButtonMessages.DECLINE_DELETE_ALL_PAST_MEETINGS"
+msgstr "Conservali"
+
+msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
+msgstr "Questo elimina tutti i tuoi incontri passati, ${count} in totale. Non si può annullare."
+
+msgid "MeetingLifecycleMessages.DELETE_ALL_SUCCESS"
+msgstr "Incontri passati eliminati: ${count}."

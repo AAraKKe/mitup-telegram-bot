@@ -173,6 +173,15 @@ msgstr "📂 Open meeting"
 msgid "ButtonMessages.DELETE"
 msgstr "🗑️ Delete"
 
+msgid "ButtonMessages.DELETE_ALL_PAST_MEETINGS"
+msgstr "🗑️ Delete all past meetings"
+
+msgid "ButtonMessages.CONFIRM_DELETE_ALL_PAST_MEETINGS"
+msgstr "Delete them all"
+
+msgid "ButtonMessages.DECLINE_DELETE_ALL_PAST_MEETINGS"
+msgstr "Keep them"
+
 msgid "ButtonMessages.EDIT"
 msgstr "✏️ Edit"
 
@@ -673,6 +682,12 @@ msgstr "Meeting deleted."
 
 msgid "MeetingLifecycleMessages.DELETE_DECLINED"
 msgstr "The meeting won't be deleted"
+
+msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
+msgstr "This deletes every past meeting you have, ${count} in total. It cannot be undone."
+
+msgid "MeetingLifecycleMessages.DELETE_ALL_SUCCESS"
+msgstr "Past meetings deleted: ${count}."
 
 msgid "MeetingAttachMessages.STATE_NOT_SEARCHABLE"
 msgstr "🔍 Not searchable in this chat yet"

@@ -62,6 +62,12 @@ REACTIVATE_MEETING = CallbackData(action="reac", entity="meeting")
 DELETE_PAST_MEETING = PaginatedCallbackData(action="delete", entity="past_meeting")
 CONFIRM_DELETE_PAST_MEETING = PaginatedCallbackData(action="confirm_delete", entity="past_meeting")
 DECLINE_DELETE_PAST_MEETING = PaginatedCallbackData(action="decline_delete", entity="past_meeting")
+# The bulk past-meetings delete. The set of meetings is resolved server-side from the account that
+# presses the button, so the callbacks carry no id: a forged confirm can only empty the forger's own
+# past list.
+DELETE_ALL_PAST_MEETINGS = CallbackData(action="delete", entity="past_meetings")
+CONFIRM_DELETE_ALL_PAST_MEETINGS = CallbackData(action="confirm_delete", entity="past_meetings")
+DECLINE_DELETE_ALL_PAST_MEETINGS = CallbackData(action="decline_delete", entity="past_meetings")
 CONFIRM_INVITE_USER = CallbackData(action="confirm", entity="invite")
 CANCEL_INVITE_USER = CallbackData(action="cancel", entity="invite")
 

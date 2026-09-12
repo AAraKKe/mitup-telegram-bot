@@ -1244,3 +1244,17 @@ msgstr "Se eliminará el ${date} si no la reactivas"
 
 msgid "MeetingListMessages.DELETION_COUNTDOWN"
 msgstr "⚠️ Se eliminará en ${duration} si no la reactivas"
+msgid "ButtonMessages.DELETE_ALL_PAST_MEETINGS"
+msgstr "🗑️ Eliminar todas las quedadas pasadas"
+
+msgid "ButtonMessages.CONFIRM_DELETE_ALL_PAST_MEETINGS"
+msgstr "Eliminarlas todas"
+
+msgid "ButtonMessages.DECLINE_DELETE_ALL_PAST_MEETINGS"
+msgstr "Conservarlas"
+
+msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
+msgstr "Esto elimina todas las quedadas pasadas que tienes, ${count} en total. No se puede deshacer."
+
+msgid "MeetingLifecycleMessages.DELETE_ALL_SUCCESS"
+msgstr "Quedadas pasadas eliminadas: ${count}."

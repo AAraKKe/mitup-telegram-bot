@@ -1244,3 +1244,17 @@ msgstr "Wird am ${date} gelöscht, wenn du es nicht reaktivierst"
 
 msgid "MeetingListMessages.DELETION_COUNTDOWN"
 msgstr "⚠️ Wird in ${duration} gelöscht, wenn du es nicht reaktivierst"
+msgid "ButtonMessages.DELETE_ALL_PAST_MEETINGS"
+msgstr "🗑️ Alle vergangenen Treffen löschen"
+
+msgid "ButtonMessages.CONFIRM_DELETE_ALL_PAST_MEETINGS"
+msgstr "Alle löschen"
+
+msgid "ButtonMessages.DECLINE_DELETE_ALL_PAST_MEETINGS"
+msgstr "Behalten"
+
+msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
+msgstr "Damit werden alle deine vergangenen Treffen gelöscht, insgesamt ${count}. Das lässt sich nicht rückgängig machen."
+
+msgid "MeetingLifecycleMessages.DELETE_ALL_SUCCESS"
+msgstr "Gelöschte vergangene Treffen: ${count}."

@@ -2,12 +2,13 @@ from functools import partial
 from typing import cast
 
 import structlog
-from sqlmodel import and_, col, delete, null, select, true
+from sqlmodel import and_, col, null, select, true
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
+from mitup_bot.deletion import purge_meetups
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.views import meeting as meeting_views
@@ -66,35 +67,20 @@ async def delete_owner_chunk(session: AsyncSession, api: TelegramApiWrapper, own
     )
 
     deletable = outcome.settled
-    meeting_ids = [cast(int, meetup.id) for meetup in deletable]
-    # Invited users exist only in the context of the meeting they were invited to.
-    outside_user_ids = [
-        cast(int, link.user.id) for meetup in deletable for link in meetup.joined_links if link.user.tg_user_id == -1
-    ]
-    outcome.invitees_purged = len(outside_user_ids)
 
-    # Named before the DELETE: after it nothing can reconstruct which meetings a run took, and the
-    # invitee rows have no other trace at all.
+    # Named before the DELETE: after it nothing can reconstruct which meetings a run took.
     log.info(
         "Meetups purged",
         count=len(deletable),
         owners=owner_count(deletable),
-        meeting_ids=meeting_ids,
+        meeting_ids=[cast(int, meetup.id) for meetup in deletable],
         supporter_levels=supporter_level_counts(meetup.owner.supporter_level for meetup in deletable),
         windows=loggable_windows(lambda policy: policy.inactive_retention),
         unnotified=len(outcome.unreachable),
         opted_out=len(outcome.opted_out),
         reason="retention_elapsed",
     )
-    log.info(
-        "Invitee users purged",
-        count=len(outside_user_ids),
-        user_ids=outside_user_ids,
-        reason="cascade_of_purged_meetups",
-    )
-
-    await session.exec(delete(Meetup).where(col(Meetup.id).in_(meeting_ids)))
-    await session.exec(delete(User).where(col(User.id).in_(outside_user_ids)))
+    outcome.invitees_purged = len(await purge_meetups(session, deletable))
 
     return outcome
 

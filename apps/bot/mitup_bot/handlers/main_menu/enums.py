@@ -14,5 +14,9 @@ class MainMenuHandlerId(HandlerId):
     # Show past meetings
     SHOW_PAST_MEETINGS_CALLBACK = auto()
     SHOW_PAST_MEETING_PAGE_CALLBACK = auto()
+    # Delete every past meeting the acting user owns
+    DELETE_ALL_PAST_MEETINGS_CALLBACK = auto()
+    CONFIRM_DELETE_ALL_PAST_MEETINGS_CALLBACK = auto()
+    DECLINE_DELETE_ALL_PAST_MEETINGS_CALLBACK = auto()
     # Show the in-bot help screen
     SHOW_HELP_CALLBACK = auto()

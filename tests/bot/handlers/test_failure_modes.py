@@ -466,6 +466,24 @@ CONTEXTS = [
         id="show_past_meeting_page_malformed",
     ),
     Context(
+        handler_id=MainMenuHandlerId.DELETE_ALL_PAST_MEETINGS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DELETE_ALL_PAST_MEETINGS),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="delete_all_past_meetings",
+    ),
+    Context(
+        handler_id=MainMenuHandlerId.CONFIRM_DELETE_ALL_PAST_MEETINGS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.CONFIRM_DELETE_ALL_PAST_MEETINGS),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="confirm_delete_all_past_meetings",
+    ),
+    Context(
+        handler_id=MainMenuHandlerId.DECLINE_DELETE_ALL_PAST_MEETINGS_CALLBACK,
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_ALL_PAST_MEETINGS),
+        error_modes={ErrorMode.USER_NOT_FOUND},
+        id="decline_delete_all_past_meetings",
+    ),
+    Context(
         handler_id=MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK,
         update_request=UpdateRequest(callback_query=cb.SHOW_PAST_MEETING.with_id(MEETING_ID_NOT_OWNED)),
         error_modes={ErrorMode.MEETING_NOT_OWNED, ErrorMode.USER_NOT_FOUND},

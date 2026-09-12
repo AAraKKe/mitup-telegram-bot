@@ -10,11 +10,21 @@ from mitup_bot.handlers.main_menu.show_past_meetings import callback_query_show_
 from mitup_bot.handlers.main_menu.utils import MEETINGS_PER_PAGE
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
-from mitup_bot.utils import ButtonMessages, MeetingListMessages
+from mitup_bot.models.users import past_meetings_count_statement
+from mitup_bot.utils import ButtonMessages, MeetingLifecycleMessages, MeetingListMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views import RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.mitup_view import MitupView, PaginatedMitupView
-from tests.helpers import HandlerContext, StubMitupContext, UpdateRequest, call_handler, create_meetup
+from tests.helpers import (
+    HandlerContext,
+    StubMitupContext,
+    UpdateRequest,
+    call_handler,
+    create_joined_link,
+    create_meetup,
+    create_user,
+)
 from tests.helpers.stub_db import MockDbSession
 
 
@@ -39,7 +49,16 @@ def expected_view(user: User, meetings: list[Meetup], page_number: int = 1) -> P
         page_number=page_number,
         navigation_callback_data=cb.SHOW_PAST_MEETING_PAGE,
     ).with_context_menu(
-        [[ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=user.lang), callback_data=cb.MAIN_MENU)]]
+        [
+            [
+                ButtonConfig(
+                    text=ButtonMessages.DELETE_ALL_PAST_MEETINGS.text(lang=user.lang),
+                    callback_data=cb.DELETE_ALL_PAST_MEETINGS,
+                    style="danger",
+                )
+            ],
+            [ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=user.lang), callback_data=cb.MAIN_MENU)],
+        ]
     )
 
 
@@ -223,3 +242,125 @@ async def test_show_past_meetings_page_answers_an_alert_when_the_list_emptied(
         show_alert=True,
     )
     context.api.assert_edit_message_not_called()
+
+
+def deleted_meetup_ids(session: MockDbSession) -> set[int]:
+    """The meetup ids the handler's DELETE removed, read back from the SQL it executed."""
+    ids: set[int] = set()
+    for query in session.queries_executed:
+        if (found := re.search(r"DELETE FROM meetups WHERE meetups\.id IN \(([^)]*)\)", query)) is not None:
+            ids.update(int(part) for part in found.group(1).split(", ") if part.isdigit())
+    return ids
+
+
+def success_view(user: User, count: int) -> MitupView:
+    return MitupView(
+        meeting_views.list_heading(ButtonMessages.PAST_MEETINGS, user.lang),
+        [[ButtonConfig(text=ButtonMessages.MAIN_MENU.back(lang=user.lang), callback_data=cb.MAIN_MENU)]],
+    ).with_context(MeetingLifecycleMessages.DELETE_ALL_SUCCESS.rich(lang=user.lang, count=count))
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DELETE_ALL_PAST_MEETINGS)], indirect=True)
+async def test_delete_all_past_meetings_prompts_with_the_count_it_reads_from_the_database(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_objects_with_statement(past_meetings_count_statement(user_with_settings), (83,))
+
+    context, _ = await call_handler(
+        MainMenuHandlerId.DELETE_ALL_PAST_MEETINGS_CALLBACK, handler_context=handler_context
+    )
+
+    context.api.assert_edit_message_called(
+        update,
+        factory.confirmation_view(
+            RenderContext(lang=user_with_settings.lang),
+            message=MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION.rich(lang=user_with_settings.lang, count=83),
+            confirm_callback_data=cb.CONFIRM_DELETE_ALL_PAST_MEETINGS,
+            decline_callback_data=cb.DECLINE_DELETE_ALL_PAST_MEETINGS,
+            confirm_label=ButtonMessages.CONFIRM_DELETE_ALL_PAST_MEETINGS,
+            decline_label=ButtonMessages.DECLINE_DELETE_ALL_PAST_MEETINGS,
+        ),
+    )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_ALL_PAST_MEETINGS)], indirect=True)
+async def test_confirm_delete_all_past_meetings_deletes_every_past_meeting_and_leaves_the_active_ones(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    """The set is derived from the account that pressed the button, not from the button itself, and
+    an active meeting is never in it."""
+    past_meetings = [create_meetup(id=meeting_id, active=False) for meeting_id in range(10, 13)]
+    user_with_settings.meetups = [*past_meetings, create_meetup(id=20, active=True)]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(
+        MainMenuHandlerId.CONFIRM_DELETE_ALL_PAST_MEETINGS_CALLBACK, handler_context=handler_context
+    )
+
+    assert deleted_meetup_ids(mock_session) == {10, 11, 12}
+    context.api.assert_edit_message_called(update, success_view(user_with_settings, 3))
+    context.api.assert_send_message_not_called()
+    context.api.assert_update_meeting_messages_not_called()
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_ALL_PAST_MEETINGS)], indirect=True)
+async def test_confirm_delete_all_past_meetings_purges_the_users_invited_into_them(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    past = create_meetup(id=10, active=False)
+    invited = create_user(id=3, tg_user_id=-1, first_name="Outside")
+    create_joined_link(user=invited, meetup=past, id=1)
+    user_with_settings.meetups = [past]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    await call_handler(MainMenuHandlerId.CONFIRM_DELETE_ALL_PAST_MEETINGS_CALLBACK, handler_context=handler_context)
+
+    assert "DELETE FROM users WHERE users.id IN (3)" in mock_session.queries_executed
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_ALL_PAST_MEETINGS)], indirect=True)
+async def test_confirm_delete_all_past_meetings_deletes_nothing_when_the_list_emptied_meanwhile(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    """A confirmation rendered against 83 meetings still deletes only what the account owns now."""
+    user_with_settings.meetups = [create_meetup(id=20, active=True)]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(
+        MainMenuHandlerId.CONFIRM_DELETE_ALL_PAST_MEETINGS_CALLBACK, handler_context=handler_context
+    )
+
+    assert deleted_meetup_ids(mock_session) == set()
+    context.api.assert_edit_message_called(update, success_view(user_with_settings, 0))
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DECLINE_DELETE_ALL_PAST_MEETINGS)], indirect=True)
+async def test_decline_delete_all_past_meetings_returns_to_the_past_meetings_screen(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+):
+    past_meetings = [create_meetup(id=meeting_id, active=False) for meeting_id in range(10, 13)]
+    user_with_settings.meetups = past_meetings
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(
+        MainMenuHandlerId.DECLINE_DELETE_ALL_PAST_MEETINGS_CALLBACK, handler_context=handler_context
+    )
+
+    assert deleted_meetup_ids(mock_session) == set()
+    context.api.assert_edit_message_called(update, expected_view(user_with_settings, past_meetings))
