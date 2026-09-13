@@ -178,7 +178,7 @@ Mitup sends three kinds of message about your own meetings: a reminder before on
 
 When several of your meetings reach that deadline on the same day, the warning arrives as one message listing them. Your past meetings also carry the date each one is set to be deleted, right under the title.
 
-A large batch of those falls in October. Mitup keeps an inactive meeting for 90 days, a year for Gamemasters and Commissioners, and plenty of meetings carried over from the old bot finished long outside that window. Owners get the usual week's notice, which points at *💾 Past meetings*{.button-like}, where anything worth keeping can be reactivated.button-like} button on anything worth keeping. [Meeting lifecycle](../user-guide/meeting_lifecycle.md) follows the whole path.
+A large batch of those falls in October. Mitup keeps an inactive meeting for 90 days, a year for Gamemasters and Commissioners, and plenty of meetings carried over from the old bot finished long outside that window. Owners get the usual week's notice, which points at *💾 Past meetings*{.button-like}, where anything worth keeping can be reactivated. [Meeting lifecycle](../user-guide/meeting_lifecycle.md) follows the whole path.
 
 ## What comes next
 
