@@ -7,7 +7,7 @@ hide:
 
 # Mitup 2.0
 
-<span class="news-meta">19 September 2026</span>
+<span class="news-meta">13 September 2026</span>
 
 Mitup moved to a new platform in July. Same bot, same meetings, new machinery underneath. The point was never the move itself, it was what the move would let us do next.
 

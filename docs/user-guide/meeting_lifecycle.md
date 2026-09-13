@@ -32,7 +32,7 @@ Every meeting has two lives. While it's active, people can join, leave, and see 
   </div>
   <div class="mlc__notes">
     <div class="mlc__note mlc__note--loop">Reactivate takes an inactive meeting back to Active as a fresh start: same details, a fresh sign-up list, no date yet.</div>
-    <div class="mlc__note mlc__note--flag">A week before deletion the bot sends a one-time heads-up with a button to reactivate.</div>
+    <div class="mlc__note mlc__note--flag">A week before deletion the bot sends a one-time heads-up pointing at your past meetings, where you can reactivate.</div>
   </div>
 </div>
 
@@ -138,7 +138,7 @@ To clear the whole backlog in one go, open *💾 Past*{.button-like} and use *�
 
 Mitup keeps an inactive meeting for 90 days, or a year if you're a [Gamemaster or a Commissioner](limits.md#how-long-a-finished-meeting-is-kept), counting from the day it became inactive. Then it's deleted permanently.
 
-A week before that, the bot sends you a one-time heads-up naming the meeting, with a *Reactivate meeting*{.button-like} button. Reactivating takes the meeting off the clock entirely. A second message tells you once the meeting is gone.
+A week before that, the bot sends you a one-time heads-up listing the meetings it is about to delete, with a *💾 Past meetings*{.button-like} button. Reactivating a meeting from there takes it off the clock entirely. A second message tells you once they are gone.
 
 Each of those two messages has its own switch under [Notifications](settings.md#notifications), and both start on. Turn one off if you would rather not hear about it.
 

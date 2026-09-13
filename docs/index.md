@@ -11,7 +11,7 @@ hide:
      (max-width: 768px) so the pill stays on one line; keep it inside the
      news-pill__tail span. assets/javascripts/news-banner.js hides the whole pill 14
      days after data-published. -->
-<div class="news-banner news-pill" data-published="2026-09-19" markdown>
+<div class="news-banner news-pill" data-published="2026-09-13" markdown>
 
 [:fontawesome-solid-bullhorn: **New** · Mitup 2.0 is here <span class="news-pill__tail">· Read the post</span> →](news/mitup_2_0.md){.news-pill__link}
 
