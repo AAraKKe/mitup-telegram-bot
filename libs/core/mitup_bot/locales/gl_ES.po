@@ -309,7 +309,7 @@ msgid "CommonMessages.STALE_CANCEL_ALERT"
 msgstr "Xa respondiches a esta pregunta"
 
 msgid "CommonMessages.EDITING_REVAMP_BANNER"
-msgstr "✨ Renovamos a edición! Agora todo se fai na propia páxina da quedada."
+msgstr "✨ Renovamos a edición! Agora todo se fai na propia quedada."
 
 msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "Vaia! Isto non parece un número válido. Por favor, envíame un número enteiro positivo. Non se permiten decimais!"
@@ -459,7 +459,7 @@ msgid "MeetingCreationMessages.PROMPT"
 msgstr "Imos crear unha quedada. Cal é o título?\n\n<i>Consello: tamén podes usar ${datetime_link} para incluír unha data e hora directamente.</i>"
 
 msgid "MeetingCreationMessages.CREATED"
-msgstr "Quedada creada: <b>${title}</b>\n\nPodes completala coas opcións da súa páxina, aquí abaixo. A información que non engadas non se mostrará ao compartir a quedada."
+msgstr "Quedada creada: <b>${title}</b>\n\nPodes completala coas opcións de aquí abaixo. A información que non engadas non se mostrará ao compartir a quedada."
 
 msgid "MeetingCreationMessages.INVALID_TITLE"
 msgstr "Non recoñecín o que enviaches como un título válido 🤔.\n\nEnvía unha mensaxe co título da quedada ou fai clic en <b>Cancelar</b>."
@@ -1149,7 +1149,7 @@ msgid "MeetingImagesMessages.TITLE"
 msgstr "Imaxes"
 
 msgid "MeetingImagesMessages.LEAD"
-msgstr "Envía unha ou varias fotos para mostralas na páxina da quedada, na orde en que deben aparecer. Unha quedada admite ata ${limit} fotos, e as apaisadas vense mellor."
+msgstr "Envía unha ou varias fotos para mostralas na quedada, na orde en que deben aparecer. Unha quedada admite ata ${limit} fotos, e as apaisadas vense mellor."
 
 msgid "MeetingImagesMessages.REPLACING"
 msgstr "Envía a foto que substitúe a imaxe ${number}."
@@ -1161,16 +1161,16 @@ msgid "MeetingImagesMessages.LAYOUT"
 msgstr "Disposición"
 
 msgid "MeetingImagesMessages.LAYOUT_EXPLANATION"
-msgstr "Como se dispoñen varias fotos na páxina: nunha colaxe vense todas á vez, nun pase vense unha a unha."
+msgstr "Como se dispoñen varias fotos na quedada: nunha colaxe vense todas á vez, nun pase vense unha a unha."
 
 msgid "MeetingImagesMessages.LOCKED"
-msgstr "As fotos na páxina da quedada son unha das vantaxes de Host. Faite Host de Mitup en Patreon para levalas ás túas quedadas. Tes todos os detalles en Colabora, xusto debaixo."
+msgstr "As fotos na quedada son unha das vantaxes de Host. Faite Host de Mitup en Patreon para levalas ás túas quedadas. Tes todos os detalles en Colabora, xusto debaixo."
 
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "Esta quedada xa ten as súas ${limit} fotos. Elimina unha para facer sitio a outra."
 
 msgid "MeetingImagesMessages.SEND_AS_PHOTO"
-msgstr "Iso chegou como ficheiro. Envíao como foto para poñelo na páxina."
+msgstr "Iso chegou como ficheiro. Envíao como foto para poñelo na quedada."
 
 msgid "MeetingImagesMessages.ON_EXIT"
 msgstr "<i>Estabas a cambiar as fotos da túa quedada.</i>\nEnvía unha foto para continuar, ou toca ${button_cancel} para saír."
@@ -1200,10 +1200,10 @@ msgid "MeetingCardSectionMessages.END_TIME"
 msgstr "Hora de remate: ${when}"
 
 msgid "MeetingImagesMessages.REMOVE_CONFIRMATION"
-msgstr "Isto elimina a imaxe ${number} da tarxeta. Seguro que queres continuar?"
+msgstr "Isto elimina a imaxe ${number} da quedada. Seguro que queres continuar?"
 
 msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
-msgstr "Isto elimina todas as fotos da tarxeta. Seguro que queres continuar?"
+msgstr "Isto elimina todas as fotos da quedada. Seguro que queres continuar?"
 
 msgid "SettingsMessages.DELETION_WARNING_LINE"
 msgstr "${days} días antes de que unha quedada se elimine definitivamente"

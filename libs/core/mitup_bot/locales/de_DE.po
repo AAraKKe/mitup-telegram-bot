@@ -309,7 +309,7 @@ msgid "CommonMessages.STALE_CANCEL_ALERT"
 msgstr "Du hast diese Frage bereits beantwortet"
 
 msgid "CommonMessages.EDITING_REVAMP_BANNER"
-msgstr "✨ Das Bearbeiten wurde überarbeitet! Alles passiert jetzt direkt auf der Seite des Treffens."
+msgstr "✨ Das Bearbeiten wurde überarbeitet! Alles passiert jetzt direkt im Treffen selbst."
 
 msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "Ups! Das sieht nicht wie eine gültige Zahl aus. Bitte gib eine positive ganze Zahl ein. Keine Dezimalzahlen erlaubt!"
@@ -459,7 +459,7 @@ msgid "MeetingCreationMessages.PROMPT"
 msgstr "Lass uns ein Treffen erstellen. Wie lautet der Titel?\n\n<i>Tipp: Du kannst auch ${datetime_link} verwenden, um Datum und Uhrzeit direkt einzufügen.</i>"
 
 msgid "MeetingCreationMessages.CREATED"
-msgstr "Treffen erstellt: <b>${title}</b>\n\nDu kannst das Treffen mit den Optionen unten auf seiner Seite vervollständigen. Angaben, die du nicht ergänzt, werden beim Teilen des Treffens nicht angezeigt."
+msgstr "Treffen erstellt: <b>${title}</b>\n\nDu kannst das Treffen mit den Optionen unten vervollständigen. Angaben, die du nicht ergänzt, werden beim Teilen des Treffens nicht angezeigt."
 
 msgid "MeetingCreationMessages.INVALID_TITLE"
 msgstr "Ich habe das, was du gesendet hast, nicht als gültigen Titel erkannt 🤔.\n\nSende eine Nachricht mit dem Titel des Treffens oder tippe auf <b>Abbrechen</b>."
@@ -1149,7 +1149,7 @@ msgid "MeetingImagesMessages.TITLE"
 msgstr "Bilder"
 
 msgid "MeetingImagesMessages.LEAD"
-msgstr "Sende ein oder mehrere Fotos, um sie auf der Karte des Treffens zu zeigen, in der Reihenfolge, in der sie erscheinen sollen. Ein Treffen fasst bis zu ${limit} Fotos, und breite wirken am besten."
+msgstr "Sende ein oder mehrere Fotos, um sie im Treffen zu zeigen, in der Reihenfolge, in der sie erscheinen sollen. Ein Treffen fasst bis zu ${limit} Fotos, und breite wirken am besten."
 
 msgid "MeetingImagesMessages.REPLACING"
 msgstr "Sende das Foto, das Bild ${number} ersetzen soll."
@@ -1161,16 +1161,16 @@ msgid "MeetingImagesMessages.LAYOUT"
 msgstr "Anordnung"
 
 msgid "MeetingImagesMessages.LAYOUT_EXPLANATION"
-msgstr "Wie mehrere Fotos auf der Karte erscheinen: Eine Collage zeigt alle auf einmal, eine Diashow zeigt eins nach dem anderen."
+msgstr "Wie mehrere Fotos im Treffen erscheinen: Eine Collage zeigt alle auf einmal, eine Diashow zeigt eins nach dem anderen."
 
 msgid "MeetingImagesMessages.LOCKED"
-msgstr "Fotos auf der Karte des Treffens gehören zu den Extras für Hosts. Werde Mitup-Host auf Patreon, um sie für deine Treffen freizuschalten. Alle Details findest du direkt unten unter Mithelfen."
+msgstr "Fotos im Treffen gehören zu den Extras für Hosts. Werde Mitup-Host auf Patreon, um sie für deine Treffen freizuschalten. Alle Details findest du direkt unten unter Mithelfen."
 
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "Dieses Treffen hat bereits seine ${limit} Fotos. Entferne eins, um Platz für ein weiteres zu schaffen."
 
 msgid "MeetingImagesMessages.SEND_AS_PHOTO"
-msgstr "Das ist als Datei angekommen. Sende es als Foto, damit es auf die Karte kommt."
+msgstr "Das ist als Datei angekommen. Sende es als Foto, damit es ins Treffen kommt."
 
 msgid "MeetingImagesMessages.ON_EXIT"
 msgstr "<i>Du warst gerade dabei, die Fotos deines Treffens zu ändern.</i>\nSende ein Foto, um fortzufahren, oder tippe auf ${button_cancel}."
@@ -1200,10 +1200,10 @@ msgid "MeetingCardSectionMessages.END_TIME"
 msgstr "Endzeit: ${when}"
 
 msgid "MeetingImagesMessages.REMOVE_CONFIRMATION"
-msgstr "Damit wird Bild ${number} von der Karte entfernt. Bist du sicher?"
+msgstr "Damit wird Bild ${number} aus dem Treffen entfernt. Bist du sicher?"
 
 msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
-msgstr "Damit werden alle Fotos von der Karte entfernt. Bist du sicher?"
+msgstr "Damit werden alle Fotos aus dem Treffen entfernt. Bist du sicher?"
 
 msgid "SettingsMessages.DELETION_WARNING_LINE"
 msgstr "${days} Tage, bevor ein Treffen endgültig gelöscht wird"

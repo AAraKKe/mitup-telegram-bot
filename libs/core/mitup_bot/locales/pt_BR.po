@@ -309,7 +309,7 @@ msgid "CommonMessages.STALE_CANCEL_ALERT"
 msgstr "Você já respondeu essa pergunta"
 
 msgid "CommonMessages.EDITING_REVAMP_BANNER"
-msgstr "✨ A edição está de cara nova! Agora tudo acontece na própria página do evento."
+msgstr "✨ A edição está de cara nova! Agora tudo acontece no próprio evento."
 
 msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "Opa! Isso não parece um número válido. Por favor, digite um número inteiro positivo. Nada de decimais!"
@@ -459,7 +459,7 @@ msgid "MeetingCreationMessages.PROMPT"
 msgstr "Vamos criar um evento. Qual o título?\n\n<i>Dica: você também pode usar ${datetime_link} para incluir uma data e hora diretamente.</i>"
 
 msgid "MeetingCreationMessages.CREATED"
-msgstr "Evento criado: <b>${title}</b>\n\nVocê pode completar as informações do evento com as opções na página dele, logo abaixo. O que você não preencher não aparece quando o evento for compartilhado."
+msgstr "Evento criado: <b>${title}</b>\n\nVocê pode completar as informações do evento com as opções logo abaixo. O que você não preencher não aparece quando o evento for compartilhado."
 
 msgid "MeetingCreationMessages.INVALID_TITLE"
 msgstr "Não reconheci o que você enviou como um título válido 🤔.\n\nEnvie uma mensagem com o título do evento ou clique em <b>Cancelar</b>."
@@ -1158,7 +1158,7 @@ msgid "MeetingImagesMessages.TITLE"
 msgstr "Imagens"
 
 msgid "MeetingImagesMessages.LEAD"
-msgstr "Envie uma ou mais fotos para mostrá-las na página do evento, na ordem em que devem aparecer. Cada evento comporta até ${limit} fotos, e as horizontais ficam melhores."
+msgstr "Envie uma ou mais fotos para mostrá-las no evento, na ordem em que devem aparecer. Cada evento comporta até ${limit} fotos, e as horizontais ficam melhores."
 
 msgid "MeetingImagesMessages.REPLACING"
 msgstr "Envie a foto que vai substituir a imagem ${number}."
@@ -1170,16 +1170,16 @@ msgid "MeetingImagesMessages.LAYOUT"
 msgstr "Layout"
 
 msgid "MeetingImagesMessages.LAYOUT_EXPLANATION"
-msgstr "Como várias fotos aparecem na página do evento: a colagem mostra todas de uma vez, o slideshow mostra uma de cada vez."
+msgstr "Como várias fotos aparecem no evento: a colagem mostra todas de uma vez, o slideshow mostra uma de cada vez."
 
 msgid "MeetingImagesMessages.LOCKED"
-msgstr "As fotos na página do evento são uma das vantagens de Host. Torne-se Host do Mitup no Patreon para levá-las aos seus eventos. Você encontra todos os detalhes no Colabore, logo abaixo."
+msgstr "As fotos no evento são uma das vantagens de Host. Torne-se Host do Mitup no Patreon para levá-las aos seus eventos. Você encontra todos os detalhes no Colabore, logo abaixo."
 
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "Este evento já chegou ao limite de ${limit} fotos. Remova uma para abrir espaço para outra."
 
 msgid "MeetingImagesMessages.SEND_AS_PHOTO"
-msgstr "Isso chegou como arquivo. Envie a imagem como foto para ela aparecer na página do evento."
+msgstr "Isso chegou como arquivo. Envie a imagem como foto para ela aparecer no evento."
 
 msgid "MeetingImagesMessages.ON_EXIT"
 msgstr "<i>Você estava alterando as fotos do seu evento.</i>\nEnvie uma foto para continuar, ou toque em ${button_cancel} para sair."
@@ -1200,10 +1200,10 @@ msgid "MeetingCardSectionMessages.END_TIME"
 msgstr "Horário de término: ${when}"
 
 msgid "MeetingImagesMessages.REMOVE_CONFIRMATION"
-msgstr "Isso remove a imagem ${number} do cartão. Tem certeza?"
+msgstr "Isso remove a imagem ${number} do evento. Tem certeza?"
 
 msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
-msgstr "Isso remove todas as fotos do cartão. Tem certeza?"
+msgstr "Isso remove todas as fotos do evento. Tem certeza?"
 
 msgid "SettingsMessages.DELETION_WARNING_LINE"
 msgstr "${days} dias antes de um evento ser excluído permanentemente"

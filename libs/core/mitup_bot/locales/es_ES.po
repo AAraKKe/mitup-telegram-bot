@@ -1200,10 +1200,10 @@ msgid "MeetingCardSectionMessages.END_TIME"
 msgstr "Hora de finalización: ${when}"
 
 msgid "MeetingImagesMessages.REMOVE_CONFIRMATION"
-msgstr "Esto elimina la imagen ${number} de la tarjeta. ¿Quieres continuar?"
+msgstr "Esto elimina la imagen ${number} de la quedada. ¿Quieres continuar?"
 
 msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
-msgstr "Esto elimina todas las fotos de la tarjeta. ¿Quieres continuar?"
+msgstr "Esto elimina todas las fotos de la quedada. ¿Quieres continuar?"
 
 msgid "SettingsMessages.DELETION_WARNING_LINE"
 msgstr "${days} días antes de que una quedada se elimine definitivamente"

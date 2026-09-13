@@ -309,7 +309,7 @@ msgid "CommonMessages.STALE_CANCEL_ALERT"
 msgstr "Hai già risposto a questa domanda"
 
 msgid "CommonMessages.EDITING_REVAMP_BANNER"
-msgstr "✨ La modifica degli incontri si è rinnovata! Ora si fa tutto direttamente sulla scheda dell'incontro."
+msgstr "✨ La modifica degli incontri si è rinnovata! Ora si fa tutto direttamente sull'incontro."
 
 msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "Ops! Non sembra un numero valido. Per favore, inserisci un numero intero positivo. Non sono consentiti decimali!"
@@ -459,7 +459,7 @@ msgid "MeetingCreationMessages.PROMPT"
 msgstr "Creiamo un incontro. Qual è il titolo?\n\n<i>Suggerimento: puoi anche usare ${datetime_link} per includere una data e un'ora direttamente.</i>"
 
 msgid "MeetingCreationMessages.CREATED"
-msgstr "Incontro creato: <b>${title}</b>\n\nPuoi completare l'incontro con le opzioni sulla sua scheda qui sotto. Le informazioni che non hai aggiunto non compariranno quando condividi l'incontro."
+msgstr "Incontro creato: <b>${title}</b>\n\nPuoi completare l'incontro con le opzioni qui sotto. Le informazioni che non hai aggiunto non compariranno quando condividi l'incontro."
 
 msgid "MeetingCreationMessages.INVALID_TITLE"
 msgstr "Non ho riconosciuto quello che hai inviato come titolo valido 🤔.\n\nInvia un messaggio con il titolo dell'incontro o fai clic su <b>Annulla</b>."
@@ -1149,7 +1149,7 @@ msgid "MeetingImagesMessages.TITLE"
 msgstr "Immagini"
 
 msgid "MeetingImagesMessages.LEAD"
-msgstr "Inviami una o più foto da mostrare sulla scheda dell'incontro, nell'ordine in cui vuoi che appaiano. Un incontro ospita fino a ${limit} foto, e quelle orizzontali rendono meglio."
+msgstr "Inviami una o più foto da mostrare sull'incontro, nell'ordine in cui vuoi che appaiano. Un incontro ospita fino a ${limit} foto, e quelle orizzontali rendono meglio."
 
 msgid "MeetingImagesMessages.REPLACING"
 msgstr "Inviami la foto che sostituirà l'immagine ${number}."
@@ -1161,16 +1161,16 @@ msgid "MeetingImagesMessages.LAYOUT"
 msgstr "Disposizione"
 
 msgid "MeetingImagesMessages.LAYOUT_EXPLANATION"
-msgstr "Come vengono mostrate più foto sulla scheda: il collage le mostra tutte insieme, la presentazione una alla volta."
+msgstr "Come vengono mostrate più foto sull'incontro: il collage le mostra tutte insieme, la presentazione una alla volta."
 
 msgid "MeetingImagesMessages.LOCKED"
-msgstr "Le foto sulla scheda dell'incontro sono uno degli extra riservati agli Host. Diventa Host di Mitup su Patreon per averle nei tuoi incontri. Trovi tutti i dettagli in Collabora, qui sotto."
+msgstr "Le foto sull'incontro sono uno degli extra riservati agli Host. Diventa Host di Mitup su Patreon per averle nei tuoi incontri. Trovi tutti i dettagli in Collabora, qui sotto."
 
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "Questo incontro contiene già le sue ${limit} foto. Rimuovine una per fare spazio a un'altra."
 
 msgid "MeetingImagesMessages.SEND_AS_PHOTO"
-msgstr "Questa è arrivata come file. Inviala come foto per metterla sulla scheda."
+msgstr "Questa è arrivata come file. Inviala come foto per metterla sull'incontro."
 
 msgid "MeetingImagesMessages.ON_EXIT"
 msgstr "<i>Stavi cambiando le foto del tuo incontro.</i>\nInvia una foto per continuare, oppure tocca ${button_cancel} per uscire."
@@ -1200,10 +1200,10 @@ msgid "MeetingCardSectionMessages.END_TIME"
 msgstr "Orario di fine: ${when}"
 
 msgid "MeetingImagesMessages.REMOVE_CONFIRMATION"
-msgstr "Questo rimuove l'immagine ${number} dalla scheda. Confermi?"
+msgstr "Questo rimuove l'immagine ${number} dall'incontro. Confermi?"
 
 msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
-msgstr "Questo rimuove tutte le foto dalla scheda. Confermi?"
+msgstr "Questo rimuove tutte le foto dall'incontro. Confermi?"
 
 msgid "SettingsMessages.DELETION_WARNING_LINE"
 msgstr "${days} giorni prima che un incontro venga eliminato definitivamente"

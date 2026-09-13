@@ -262,7 +262,9 @@ class CommonMessages(MessageBase):
     STALE_CANCEL_ALERT = "You've already answered this question"
     # Shown above the editor when a button no current screen renders brought the user here, so
     # the unfamiliar screen explains itself.
-    EDITING_REVAMP_BANNER = f"{Emojis.SPARKLES} Editing got a revamp! Everything now happens right on the meeting card."
+    EDITING_REVAMP_BANNER = (
+        f"{Emojis.SPARKLES} Editing got a revamp! Everything now happens right on the meeting itself."
+    )
     # Positive-integer validation for flows without an upper bound (notification time)
     POSITIVE_INTEGER_INVALID = (
         "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
@@ -514,7 +516,7 @@ class MeetingCreationMessages(MessageBase):
     )
     CREATED = (
         "Meeting created: <b>${title}</b>\n\n"
-        "You can complete the meeting with the options on its card below. "
+        "You can complete the meeting with the options below. "
         "The information which has not been added won't be shown when the meeting is shared."
     )
     INVALID_TITLE = (
@@ -810,25 +812,26 @@ class MeetingImagesMessages(MessageBase):
 
     TITLE = "Images"
     LEAD = (
-        "Send one or more photos to show them on the meeting card, in the order they should "
+        "Send one or more photos to show them on the meeting, in the order they should "
         "appear. A meeting holds up to ${limit} photos, and wide ones look best."
     )
     REPLACING = "Send the photo that replaces image ${number}."
     IMAGE_LABEL = "Image ${number}"
     LAYOUT = "Layout"
     LAYOUT_EXPLANATION = (
-        "How several photos are drawn on the card: a collage shows them all at once, a slideshow shows one at a time."
+        "How several photos are shown on the meeting: a collage shows them all at once, a slideshow shows one "
+        "at a time."
     )
     LOCKED = (
-        "Photos on the meeting card are one of the extras Hosts get. Become a Mitup Host on "
+        "Photos on a meeting are one of the extras Hosts get. Become a Mitup Host on "
         "Patreon to bring them to your meetings. Collaborate below has all the details."
     )
     LIMIT_REACHED = "This meeting already holds its ${limit} photos. Remove one to make room for another."
     # TRANSLATORS: Prompt after tapping Remove beside photo ${number} on the Images screen.
-    REMOVE_CONFIRMATION = "This removes image ${number} from the card. Are you sure?"
+    REMOVE_CONFIRMATION = "This removes image ${number} from the meeting. Are you sure?"
     # TRANSLATORS: Prompt after tapping Remove all on the Images screen.
-    REMOVE_ALL_CONFIRMATION = "This removes every photo from the card. Are you sure?"
-    SEND_AS_PHOTO = "That arrived as a file. Send it as a photo to put it on the card."
+    REMOVE_ALL_CONFIRMATION = "This removes every photo from the meeting. Are you sure?"
+    SEND_AS_PHOTO = "That arrived as a file. Send it as a photo to put it on the meeting."
     # Draft shown while the photos of an album are still arriving; the Images screen replaces it.
     ADDING_PHOTOS = "Adding your photos"
     ON_EXIT = (

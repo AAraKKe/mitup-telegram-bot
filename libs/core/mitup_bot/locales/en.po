@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-09-13 12:37\n"
+"PO-Revision-Date: 2026-09-13 13:01\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -373,7 +373,7 @@ msgid "CommonMessages.STALE_CANCEL_ALERT"
 msgstr "You've already answered this question"
 
 msgid "CommonMessages.EDITING_REVAMP_BANNER"
-msgstr "✨ Editing got a revamp! Everything now happens right on the meeting card."
+msgstr "✨ Editing got a revamp! Everything now happens right on the meeting itself."
 
 msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "Oops! That doesn't look like a valid number. Please enter a positive whole number. No decimals allowed!"
@@ -553,7 +553,7 @@ msgid "MeetingCreationMessages.PROMPT"
 msgstr "Let's create a meeting. What is the title?\n\n<i>Tip: you can also use ${datetime_link} to include a date and time directly.</i>"
 
 msgid "MeetingCreationMessages.CREATED"
-msgstr "Meeting created: <b>${title}</b>\n\nYou can complete the meeting with the options on its card below. The information which has not been added won't be shown when the meeting is shared."
+msgstr "Meeting created: <b>${title}</b>\n\nYou can complete the meeting with the options below. The information which has not been added won't be shown when the meeting is shared."
 
 msgid "MeetingCreationMessages.INVALID_TITLE"
 msgstr "I did not recognize what you sent as a valid title 🤔.\n\nSend a message with the title of the meeting or click on <b>Cancel</b>."
@@ -853,7 +853,7 @@ msgid "MeetingImagesMessages.TITLE"
 msgstr "Images"
 
 msgid "MeetingImagesMessages.LEAD"
-msgstr "Send one or more photos to show them on the meeting card, in the order they should appear. A meeting holds up to ${limit} photos, and wide ones look best."
+msgstr "Send one or more photos to show them on the meeting, in the order they should appear. A meeting holds up to ${limit} photos, and wide ones look best."
 
 msgid "MeetingImagesMessages.REPLACING"
 msgstr "Send the photo that replaces image ${number}."
@@ -865,24 +865,24 @@ msgid "MeetingImagesMessages.LAYOUT"
 msgstr "Layout"
 
 msgid "MeetingImagesMessages.LAYOUT_EXPLANATION"
-msgstr "How several photos are drawn on the card: a collage shows them all at once, a slideshow shows one at a time."
+msgstr "How several photos are shown on the meeting: a collage shows them all at once, a slideshow shows one at a time."
 
 msgid "MeetingImagesMessages.LOCKED"
-msgstr "Photos on the meeting card are one of the extras Hosts get. Become a Mitup Host on Patreon to bring them to your meetings. Collaborate below has all the details."
+msgstr "Photos on a meeting are one of the extras Hosts get. Become a Mitup Host on Patreon to bring them to your meetings. Collaborate below has all the details."
 
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "This meeting already holds its ${limit} photos. Remove one to make room for another."
 
 #. Prompt after tapping Remove beside photo ${number} on the Images screen.
 msgid "MeetingImagesMessages.REMOVE_CONFIRMATION"
-msgstr "This removes image ${number} from the card. Are you sure?"
+msgstr "This removes image ${number} from the meeting. Are you sure?"
 
 #. Prompt after tapping Remove all on the Images screen.
 msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
-msgstr "This removes every photo from the card. Are you sure?"
+msgstr "This removes every photo from the meeting. Are you sure?"
 
 msgid "MeetingImagesMessages.SEND_AS_PHOTO"
-msgstr "That arrived as a file. Send it as a photo to put it on the card."
+msgstr "That arrived as a file. Send it as a photo to put it on the meeting."
 
 msgid "MeetingImagesMessages.ADDING_PHOTOS"
 msgstr "Adding your photos"
