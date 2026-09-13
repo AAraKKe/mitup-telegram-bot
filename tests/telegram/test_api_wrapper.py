@@ -27,7 +27,6 @@ from telegram.warnings import PTBUserWarning
 from mitup_bot.api_wrapper import (
     ANSWER_INLINE_QUERY_ENDPOINT,
     CALLBACK_QUERY_TEXT_LIMIT,
-    DISSOLVE_ANIMATION_SECONDS,
     EDIT_MESSAGE_TEXT_ENDPOINT,
     MESSAGE_DELETION_WINDOW,
     QUEUED_CALL_ATTEMPTS,
@@ -49,6 +48,7 @@ from mitup_bot.api_wrapper import (
     message_is_deletable,
     modelled_endpoint_advisory,
     replace_message,
+    screen_replacement_strategy,
     silence_modelled_endpoint_advisory,
 )
 from mitup_bot.card_refresh import RefreshQueue
@@ -302,21 +302,6 @@ async def test_handle_edit_errors_reraises_other_bad_request(adapter: BotAdapter
 # ---------------------------------------------------------------------------
 # send_message_to_user
 # ---------------------------------------------------------------------------
-
-
-async def test_send_message_after_seconds_waits_before_sending(
-    telegram_api: TelegramApi, bot: AsyncMock, monkeypatch: pytest.MonkeyPatch
-):
-    order: list[str] = []
-    waited = AsyncMock(side_effect=lambda seconds: order.append(f"slept {seconds}"))
-    monkeypatch.setattr("mitup_bot.api_wrapper.sleep", waited)
-    bot.do_api_request.side_effect = lambda *args, **kwargs: order.append("sent")
-    update = MagicMock(spec=Update)
-    update.effective_chat.id = 42
-
-    await telegram_api.send_message(update, "hello", after_seconds=1.5)
-
-    assert order == ["slept 1.5", "sent"]
 
 
 async def test_send_message_to_user_with_mitup_view(telegram_api: TelegramApi, bot: AsyncMock):
@@ -909,7 +894,7 @@ async def test_replace_message_dissolves_the_tapped_message_and_sends_the_view()
     await replace_message(api, update, view)
 
     api.assert_delete_message_called(update)
-    api.assert_send_message_called(update, view, after_seconds=DISSOLVE_ANIMATION_SECONDS)
+    api.assert_send_message_called(update, view, strategy=screen_replacement_strategy(DEFAULT_CHAT_ID))
     api.assert_edit_message_not_called()
 
 

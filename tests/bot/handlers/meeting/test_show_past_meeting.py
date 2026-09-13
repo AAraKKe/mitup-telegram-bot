@@ -1,7 +1,7 @@
 import pytest
 from telegram import Update
 
-from mitup_bot.api_wrapper import DISSOLVE_ANIMATION_SECONDS
+from mitup_bot.api_wrapper import screen_replacement_strategy
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import MeetingCounts, Meetup, User
@@ -15,7 +15,7 @@ from tests.helpers import (
     UpdateRequest,
     call_handler,
 )
-from tests.helpers.constants import FRESH_MESSAGE_DATE
+from tests.helpers.constants import DEFAULT_CHAT_ID, FRESH_MESSAGE_DATE
 
 MEETING_ID = 1
 
@@ -207,7 +207,7 @@ async def test_confirm_delete_past_meeting_dissolves_the_card_and_opens_the_main
         factory.main_menu_view(
             RenderContext(lang=user_with_settings.lang), counts=MeetingCounts(active=0, joined=0, past=0)
         ),
-        after_seconds=DISSOLVE_ANIMATION_SECONDS,
+        strategy=screen_replacement_strategy(DEFAULT_CHAT_ID),
     )
     context.api.assert_edit_message_not_called()
 

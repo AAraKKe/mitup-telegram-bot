@@ -62,16 +62,11 @@ class MockApi(TelegramApi):
         view: MitupView | RichContent | str,
         *,
         strategy: OutboxStrategy | None = None,
-        after_seconds: float = 0,
     ):
-        # A missing strategy or delay is recorded as an absent argument, so the assertions of the
-        # callers that never pass one keep naming the two arguments they care about.
+        # A missing strategy is recorded as an absent argument, so the assertions of the callers
+        # that never pass one keep naming the two arguments they care about.
         return self.call_mock(
-            "send_message",
-            update=update,
-            view=view,
-            strategy=DEFAULT_NONE if strategy is None else strategy,
-            after_seconds=DEFAULT_NONE if after_seconds == 0 else after_seconds,
+            "send_message", update=update, view=view, strategy=DEFAULT_NONE if strategy is None else strategy
         )
 
     def send_rich_payload(self, chat_id: int, message: RichMessagePayload):
@@ -209,11 +204,8 @@ class MockApi(TelegramApi):
         view: MitupView | RichContent | str,
         times: int = 1,
         strategy: OutboxStrategy | None = None,
-        after_seconds: float = 0,
     ):
-        self.assert_method_called(
-            "send_message", update=update, view=view, times=times, strategy=strategy, after_seconds=after_seconds
-        )
+        self.assert_method_called("send_message", update=update, view=view, times=times, strategy=strategy)
 
     def assert_send_message_to_user_called(self, user: User, view: MitupView | RichContent | str, times: int = 1):
         if times == 1:
@@ -349,7 +341,6 @@ class MockApi(TelegramApi):
         view: MitupView | RichContent | str,
         times: int,
         strategy: OutboxStrategy | None = None,
-        after_seconds: float = 0,
     ):
         # Validate that the update has been properly generated.
         # Bot-chat updates have effective_chat + effective_message.
@@ -364,8 +355,6 @@ class MockApi(TelegramApi):
         arguments: dict[str, Any] = {"update": update, "view": view}
         if strategy is not None:
             arguments["strategy"] = strategy
-        if after_seconds:
-            arguments["after_seconds"] = after_seconds
         if times == 1:
             assert_awaited_once_with_diff(self.mock_method(method_name), **arguments)
         else:

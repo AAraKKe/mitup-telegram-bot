@@ -608,6 +608,12 @@ MESSAGE_DELETION_WINDOW = dt.timedelta(hours=48)
 DISSOLVE_ANIMATION_SECONDS = 1.0
 
 
+def screen_replacement_strategy(chat_id: int) -> OutboxStrategy:
+    """The hand-off for the screen that follows a dissolved message in *chat_id*: the worker sends
+    it once the animation has played, off the request that answered the tap."""
+    return OutboxStrategy(("screen", chat_id), hold_seconds=DISSOLVE_ANIMATION_SECONDS)
+
+
 def message_is_deletable(update: Update) -> bool:
     """Whether the bot may still remove the message *update* was tapped on.
 
@@ -654,7 +660,6 @@ class TelegramApiWrapper(Protocol):
         view: MitupView | RichContent | str,
         *,
         strategy: OutboxStrategy | None = None,
-        after_seconds: float = 0,
     ) -> Message | None: ...
     async def send_rich_payload(self, chat_id: int, message: RichMessagePayload) -> Message | None: ...
     async def send_draft(self, update: Update, view: MitupView | RichContent | str, *, draft_id: int): ...
@@ -719,14 +724,16 @@ async def replace_message(api: TelegramApiWrapper, update: Update, view: MitupVi
     """Put *view* in the chat in place of the tapped message.
 
     Every client plays a dissolve animation on a message the bot removes, so the screen the tap
-    acted on is seen going away, and *view* follows once the animation has run. Past the deletion
-    window there is nothing to dissolve and *view* is edited over it instead.
+    acted on is seen going away, and *view* follows from the background worker once the animation
+    has run, off the request that answered the tap. Past the deletion window there is nothing to
+    dissolve and *view* is edited over it instead.
     """
     if not message_is_deletable(update):
         await api.edit_message(update=update, view=view)
         return
     await api.delete_message(update=update)
-    await api.send_message(update=update, view=view, after_seconds=DISSOLVE_ANIMATION_SECONDS)
+    chat_id = get_update_guards().chat(update).id
+    await api.send_message(update=update, view=view, strategy=screen_replacement_strategy(chat_id))
 
 
 class _ImmediateApi:
@@ -956,14 +963,12 @@ class TelegramApi:
         view: MitupView | RichContent | str,
         *,
         strategy: OutboxStrategy | None = None,
-        after_seconds: float = 0,
     ) -> Message | None:
         """Send *view* to the chat *update* came from.
 
         With a *strategy*, the rendered message is handed to the background worker under the
         strategy's key instead of being sent here, so a burst of updates leaves one message in
-        the chat. Without a background queue the message is sent as usual. *after_seconds* holds
-        the send back, under capture as part of the queued call, so the drain waits with it.
+        the chat. Without a background queue the message is sent as usual.
         """
         chat_id = get_update_guards().chat(update).id
         resolved = resolve_view(view, "send_message")
@@ -978,15 +983,7 @@ class TelegramApi:
             )
             self._enqueue("submit_keyed_send", partial(self.submit_keyed_send, send), payload)
             return None
-        if after_seconds > 0:
-            return await self._call_or_enqueue(
-                "send_message", partial(self._send_after, after_seconds, chat_id, resolved), None, payload
-            )
         return await self._call_or_enqueue("send_message", partial(self._send_now, chat_id, resolved), None, payload)
-
-    async def _send_after(self, seconds: float, chat_id: int, view: MitupView) -> Message | None:
-        await sleep(seconds)
-        return await self._send_now(chat_id, view)
 
     async def send_draft(self, update: Update, view: MitupView | RichContent | str, *, draft_id: int):
         """Show *view* right away as a draft in the chat *update* came from.

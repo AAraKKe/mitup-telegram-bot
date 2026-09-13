@@ -4,7 +4,7 @@ import re
 import pytest
 from telegram import Update
 
-from mitup_bot.api_wrapper import DISSOLVE_ANIMATION_SECONDS
+from mitup_bot.api_wrapper import screen_replacement_strategy
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.main_menu.show_past_meetings import callback_query_show_past_meeting_page
@@ -25,7 +25,7 @@ from tests.helpers import (
     create_meetup,
     create_user,
 )
-from tests.helpers.constants import FRESH_MESSAGE_DATE
+from tests.helpers.constants import DEFAULT_CHAT_ID, FRESH_MESSAGE_DATE
 from tests.helpers.stub_db import MockDbSession
 from tests.helpers.types import SeedMeetingCounts
 
@@ -393,7 +393,7 @@ async def test_confirm_delete_all_past_meetings_deletes_every_past_meeting_and_l
     assert deleted_meetup_ids(mock_session) == {10, 11, 12}
     context.api.assert_delete_message_called(update)
     context.api.assert_send_message_called(
-        update, success_view(user_with_settings, counts), after_seconds=DISSOLVE_ANIMATION_SECONDS
+        update, success_view(user_with_settings, counts), strategy=screen_replacement_strategy(DEFAULT_CHAT_ID)
     )
     context.api.assert_edit_message_not_called()
     context.api.assert_update_meeting_messages_not_called()
