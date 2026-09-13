@@ -98,7 +98,7 @@ libs/                   # uv workspace libraries sharing the mitup_bot namespace
 └── patreon/            # mitup-patreon: the Patreon API client, OAuth flow, membership webhooks,
                         #   and encrypted token storage (shared by the bot and events apps)
 
-tools/                  # Dev-only members: the mb CLI (tools/mb/) and the one-off rails-migration tool
+tools/                  # Dev-only members: the mb CLI (tools/mb/)
 tests/                  # Test suite (single suite covering every member)
 .agents/skills/         # Domain knowledge skills (cross-harness; .claude/skills symlinks here)
 .claude/agents/         # Claude Code specialist agents

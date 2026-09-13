@@ -17,7 +17,6 @@ members = [
     "mitup-lambda-migrations-app",
     "mitup-monitoring",
     "mitup-patreon",
-    "mitup-rails-migration",
     "mitup-telegram",
 ]
 
@@ -50,7 +49,6 @@ workspace = [
     { name = "mitup-lambda-migrations-app", editable = "apps/lambda-migrations" },
     { name = "mitup-monitoring", editable = "libs/monitoring" },
     { name = "mitup-patreon", editable = "libs/patreon" },
-    { name = "mitup-rails-migration", editable = "tools/rails-migration" },
     { name = "mitup-telegram", editable = "libs/telegram" },
 ]
 
@@ -1212,33 +1210,6 @@ requires-dist = [
     { name = "mitup-core", editable = "libs/core" },
     { name = "mitup-data", editable = "libs/data" },
     { name = "mitup-monitoring", editable = "libs/monitoring" },
-]
-
-[[package]]
-name = "mitup-rails-migration"
-version = "0.0.1"
-source = { editable = "tools/rails-migration" }
-dependencies = [
-    { name = "boto3" },
-    { name = "click" },
-    { name = "mitup-core" },
-    { name = "mitup-data" },
-    { name = "mitup-monitoring" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "pyyaml" },
-    { name = "rich" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "boto3", specifier = "~=1.34" },
-    { name = "click", specifier = "==8.5.0" },
-    { name = "mitup-core", editable = "libs/core" },
-    { name = "mitup-data", editable = "libs/data" },
-    { name = "mitup-monitoring", editable = "libs/monitoring" },
-    { name = "psycopg", extras = ["binary"], specifier = "==3.3.5" },
-    { name = "pyyaml", specifier = "==6.0.3" },
-    { name = "rich", specifier = "==15.0.0" },
 ]
 
 [[package]]

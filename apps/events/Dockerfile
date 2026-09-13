@@ -29,7 +29,6 @@ COPY apps/events/pyproject.toml apps/events/pyproject.toml
 COPY apps/lambda-migrations/pyproject.toml apps/lambda-migrations/pyproject.toml
 COPY apps/lambda-alarm/pyproject.toml apps/lambda-alarm/pyproject.toml
 COPY tools/mb/pyproject.toml tools/mb/pyproject.toml
-COPY tools/rails-migration/pyproject.toml tools/rails-migration/pyproject.toml
 RUN uv sync --frozen --no-default-groups --no-install-workspace --package mitup-events-app
 
 # Application layer. The worker localizes the notifications it sends, so it needs the compiled .mo

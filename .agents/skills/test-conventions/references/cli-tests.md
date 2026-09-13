@@ -2,7 +2,7 @@
 
 ## Overview
 
-Each app owns one CLI entry module — `apps/bot/mitup_bot/bot_cli.py` (`launch`) and `apps/events/mitup_bot/events_cli.py` (`recurrent-events`); the rails tool's is `tools/rails-migration/mitup_bot/migration/cli.py`. Tests live in `tests/cli/` (bot) and `tests/events/` (events). CLI tests typically use `click.testing.CliRunner` and heavy patching since the commands orchestrate configuration, DB, metrics, and the bot.
+Each app owns one CLI entry module — `apps/bot/mitup_bot/bot_cli.py` (`launch`) and `apps/events/mitup_bot/events_cli.py` (`recurrent-events`). Tests live in `tests/cli/` (bot) and `tests/events/` (events). CLI tests typically use `click.testing.CliRunner` and heavy patching since the commands orchestrate configuration, DB, metrics, and the bot.
 
 Both app entry modules expose a Click **group** named `cli`; the actual command is a subcommand of it (`launch`, `recurrent-events`). Import the subcommand callback directly when a test invokes it in isolation, or invoke the group with the subcommand name.
 

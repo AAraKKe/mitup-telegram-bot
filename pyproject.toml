@@ -47,7 +47,6 @@ include = [
     "libs/data/mitup_bot",
     "libs/telegram/mitup_bot",
     "libs/patreon/mitup_bot",
-    "tools/rails-migration/mitup_bot",
     "tests",
 ]
 exclude = [
@@ -133,7 +132,6 @@ src = [
     "libs/data",
     "libs/telegram",
     "libs/patreon",
-    "tools/rails-migration",
     "tests",
 ]
 
@@ -185,7 +183,6 @@ keep-runtime-typing = true
 [tool.uv.workspace]
 members = [
     "tools/mb",
-    "tools/rails-migration",
     "libs/core",
     "libs/monitoring",
     "libs/data",
@@ -209,7 +206,6 @@ mitup-bot-app = { workspace = true }
 mitup-events-app = { workspace = true }
 mitup-lambda-migrations-app = { workspace = true }
 mitup-lambda-alarm-app = { workspace = true }
-mitup-rails-migration = { workspace = true }
 
 # With no root [project], a plain `uv sync` installs the dependency-groups only. The `workspace`
 # group lists every member so `uv sync` (which installs the default groups) still assembles the
@@ -234,7 +230,6 @@ workspace = [
     "mitup-events-app",
     "mitup-lambda-migrations-app",
     "mitup-lambda-alarm-app",
-    "mitup-rails-migration",
 ]
 dev = [
     "pytest~=9.1.1",

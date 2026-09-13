@@ -23,7 +23,7 @@ The repository is a [uv workspace](https://docs.astral.sh/uv/concepts/projects/w
 * [`libs/monitoring`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/libs/monitoring) (`mitup-monitoring`): CloudWatch EMF metrics emission.
 * [`libs/patreon`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/libs/patreon) (`mitup-patreon`): the Patreon API client, OAuth flow, membership webhooks, and encrypted token storage.
 
-**`tools/`** holds dev-only members that never ship: the [`mb`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/tools/mb) developer CLI and the one-off rails-migration tool. [`tests/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/tests) is a single suite covering every member.
+**`tools/`** holds dev-only members that never ship: the [`mb`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/tools/mb) developer CLI. [`tests/`](https://gitlab.com/meetupbot/mitup-telegram-bot/-/tree/main/tests) is a single suite covering every member.
 
 ## Who owns what
 

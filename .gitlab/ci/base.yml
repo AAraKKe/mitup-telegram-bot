@@ -18,7 +18,6 @@ variables:
   - pyproject.toml
   - uv.lock
   - tools/mb/pyproject.toml
-  - tools/rails-migration/pyproject.toml
   - libs/core/pyproject.toml
   - libs/monitoring/pyproject.toml
   - libs/data/pyproject.toml

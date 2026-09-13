@@ -56,7 +56,6 @@ COPY pyproject.toml uv.lock LICENSE ./
 # member's pyproject must exist too. Copying only the pyprojects (not the sources) keeps this
 # layer's cache keyed on dependency metadata.
 COPY tools/mb/pyproject.toml tools/mb/pyproject.toml
-COPY tools/rails-migration/pyproject.toml tools/rails-migration/pyproject.toml
 COPY libs/core/pyproject.toml libs/core/pyproject.toml
 COPY libs/monitoring/pyproject.toml libs/monitoring/pyproject.toml
 COPY libs/data/pyproject.toml libs/data/pyproject.toml
@@ -72,8 +71,6 @@ COPY apps/lambda-alarm/pyproject.toml apps/lambda-alarm/pyproject.toml
 # member is stubbed with one touched module so hatchling has something to build.
 RUN mkdir -p tools/mb/src/mb && \
     touch tools/mb/src/mb/__init__.py tools/mb/src/mb/main.py && \
-    mkdir -p tools/rails-migration/mitup_bot/migration && \
-    touch tools/rails-migration/mitup_bot/migration/cli.py && \
     mkdir -p libs/core/mitup_bot && \
     touch libs/core/mitup_bot/config.py && \
     mkdir -p libs/monitoring/mitup_bot/monitoring && \

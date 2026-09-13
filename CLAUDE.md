@@ -14,7 +14,7 @@ For single-domain tasks or targeted fixes, **delegate to the appropriate special
 | Files in `libs/telegram/mitup_bot/views/` | `view-expert` |
 | Files in `tests/` | `test-expert` |
 | Files in `apps/lambda-migrations/` or `apps/lambda-alarm/` | `lambda-expert` |
-| App CLI entry modules (`apps/bot/mitup_bot/bot_cli.py`, `apps/events/mitup_bot/events_cli.py`, `tools/rails-migration/mitup_bot/migration/cli.py`) | `cli-expert` |
+| App CLI entry modules (`apps/bot/mitup_bot/bot_cli.py`, `apps/events/mitup_bot/events_cli.py`) | `cli-expert` |
 | User-facing message text / button labels | `bot-copywriter` |
 | Translation `.po`/`.pot` files | `translator` |
 | Documentation in `docs/` | `docs-writer` |

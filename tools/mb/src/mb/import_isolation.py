@@ -75,12 +75,6 @@ MEMBERS = (
         "import mitup_bot.lambdas.alarm_action",
         forbidden_imports=("telegram",),
     ),
-    Member(
-        "mitup-rails-migration",
-        ("tools/rails-migration", CORE, DATA, MONITORING),
-        "import mitup_bot.migration; import mitup_bot.migration.cli",
-        forbidden_imports=("telegram",),
-    ),
 )
 
 

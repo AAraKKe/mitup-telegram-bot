@@ -99,22 +99,6 @@ class MetricKey(CamelCaseStrEnum):
     """FastAPI/uvicorn lifespan failed during startup"""
     LIFESPAN_SHUTDOWN_FAILED = auto()
     """FastAPI/uvicorn lifespan failed during shutdown"""
-    MIGRATION_ROWS_READ = auto()
-    """Number of rows read from the source Rails table during a Rails → Python migration run"""
-    MIGRATION_ROWS_INSERTED = auto()
-    """Number of rows written (or that would be written, in dry-run) to the new schema"""
-    MIGRATION_ROWS_SKIPPED = auto()
-    """Number of rows skipped during migration (already imported, deduped, phantom user, etc.)"""
-    MIGRATION_ROWS_FAILED = auto()
-    """Number of rows that failed to migrate due to mapping or insert errors"""
-    MIGRATION_PHASE_DURATION_MS = auto()
-    """Wall-clock duration of a migration phase, in milliseconds"""
-    MIGRATION_VERIFICATION_DELTA = auto()
-    """Difference between Rails row count and new-DB row count for a given table after verification"""
-    MIGRATION_ARCHIVE_BYTES = auto()
-    """Total bytes written (or stubbed in dry-run) to S3 for an archived table"""
-    MIGRATION_ARCHIVE_ROWS = auto()
-    """Number of rows streamed to S3 for an archived table"""
     JOINED_ONLY_USERS = auto()
     """Gauge for users with status JOINED_ONLY (joined via inline button, never DM-ed the bot)"""
     DB_POOL_CONNECTIONS_IN_USE = auto()

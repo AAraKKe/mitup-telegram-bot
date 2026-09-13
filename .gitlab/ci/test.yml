@@ -121,7 +121,6 @@ test-suite:
           - libs/patreon
           - apps/lambda-migrations
           - apps/lambda-alarm
-          - tools/rails-migration
           - tools/mb
       - TARGET:
           - apps/bot
