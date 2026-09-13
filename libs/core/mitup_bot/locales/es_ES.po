@@ -105,7 +105,7 @@ msgid "ButtonMessages.PUBLIC"
 msgstr "Pública"
 
 msgid "ButtonMessages.OPEN_INVITATION"
-msgstr "Con invitación"
+msgstr "Invitaciones abiertas"
 
 msgid "ButtonMessages.INCOGNITO"
 msgstr "Incógnito"
