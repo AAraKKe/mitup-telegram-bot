@@ -105,7 +105,7 @@ msgid "ButtonMessages.PUBLIC"
 msgstr "Pública"
 
 msgid "ButtonMessages.OPEN_INVITATION"
-msgstr "Invitaciones abiertas"
+msgstr "Con invitación"
 
 msgid "ButtonMessages.INCOGNITO"
 msgstr "Incógnito"
@@ -315,7 +315,7 @@ msgid "CommonMessages.POSITIVE_INTEGER_INVALID"
 msgstr "¡Vaya! Parece que ese no es un número válido. Por favor, envíame un número entero positivo. ¡No se permiten decimales!"
 
 msgid "CommonMessages.TIME_PROMPT"
-msgstr "Envíame la hora de la quedada en formato <i>HH:MM</i> (por ejemplo, 21:30)"
+msgstr "Envíame la hora de la quedada usando el formato <i>HH:MM</i> (por ejemplo, 21:30)"
 
 msgid "CommonMessages.TIME_INVALID_VALUE"
 msgstr "Mi reloj interno es un poco antiguo y no entiende esa hora tan futurista 🛸.\n\nIntenta de nuevo con una hora que tenga horas válidas (00-23) y minutos (00-59), ¡seguro que así me ubico mejor 🧠!"
@@ -948,10 +948,10 @@ msgid "SupporterNotificationMessages.GRANT_REMOVED"
 msgstr "<b>Tus ventajas de Host regaladas han terminado</b>\n\nEl nivel de Host que te regalaron ya no está activo. Puedes hacerte Host cuando quieras desde el menú Colabora."
 
 msgid "SupporterNotificationMessages.HOSTS_GROUP_REMOVED"
-msgstr "<b>Tu acceso al Grupo de Hosts ha terminado</b>\n\nTu apoyo como Host ha llegado a su fin, y te agradecemos el tiempo que has respaldado a Mitup. Por ahora te hemos quitado del Grupo de Hosts. Cuando vuelvas a ser Host, podrás unirte de nuevo desde el menú Colabora."
+msgstr "<b>Ya no tienes acceso al grupo de Hosts</b>\n\nTu apoyo como Host ha llegado a su fin, y te agradecemos el tiempo que has respaldado a Mitup. Por ahora te hemos quitado del Grupo de Hosts. Cuando vuelvas a ser Host, podrás unirte de nuevo desde el menú Colabora."
 
 msgid "SupporterNotificationMessages.HOSTS_GROUP_READMITTED"
-msgstr "<b>Tu acceso de Host ha vuelto</b>\n\nNos alegra tenerte de vuelta. Tus ventajas de Host están activas otra vez y el Grupo de Hosts te espera. Toca abajo para volver a unirte."
+msgstr "<b>Vuelves a tener acceso al grupo de Hosts</b>\n\nNos alegra tenerte de vuelta. Tus ventajas de Host están activas otra vez y el Grupo de Hosts te espera. Toca abajo para volver a unirte."
 
 msgid "Languages.SPANISH"
 msgstr "🇪🇸 Español"
@@ -1068,7 +1068,7 @@ msgid "AdminMessages.BUTTON_ADMIN"
 msgstr "🛠️ Admin"
 
 msgid "AdminMessages.BUTTON_BROADCAST"
-msgstr "📨 Difusión"
+msgstr "📨 Broadcast"
 
 msgid "CommonMessages.STALE_BUTTONS_NOTICE"
 msgstr "Estos botones son de un mensaje antiguo y ya no recuerdo qué estábamos haciendo ahí. He convertido este mensaje en el menú principal, así puedes continuar desde aquí."
@@ -1164,7 +1164,7 @@ msgid "MeetingImagesMessages.LAYOUT_EXPLANATION"
 msgstr "Cómo se ven varias fotos en la quedada: en un collage aparecen todas a la vez y en un carrusel pasan de una en una."
 
 msgid "MeetingImagesMessages.LOCKED"
-msgstr "Poner fotos en la quedada es una de las ventajas de ser Host. Hazte Host de Mitup en Patreon para llevarlas a tus quedadas. Tienes todos los detalles en Colabora, justo debajo."
+msgstr "Poner fotos en la quedada es una de las ventajas de ser Host. Hazte Host de Mitup en Patreon para poder añadirlas a tus quedadas. Tienes todos los detalles en Colabora, justo debajo."
 
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "Esta quedada ya tiene sus ${limit} fotos. Elimina una para hacer hueco a otra."
@@ -1210,7 +1210,6 @@ msgstr "Aviso de eliminación"
 
 msgid "SettingsMessages.DELETION_NOTICE_LABEL"
 msgstr "Confirmación de eliminación"
-
 
 msgid "NotificationMessages.DELETION_WARNING_HEADING"
 msgstr "⌛ A punto de eliminarse"
