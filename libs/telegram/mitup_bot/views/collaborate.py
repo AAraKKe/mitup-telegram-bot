@@ -5,7 +5,7 @@ from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, CollaborateMessages, SupporterNotificationMessages
-from mitup_bot.utils.rich_message import RichContent, RichTag, horizontal_rule_content, table_content
+from mitup_bot.utils.rich_message import RichContent, RichTag, horizontal_rule_content, unordered_list_content
 from mitup_bot.utils.rich_template import render_rich
 from mitup_bot.views import factory
 from mitup_bot.views.context import RenderContext
@@ -194,28 +194,18 @@ def ways_to_help_section(lang: str) -> RichContent:
     )
 
 
-def tiers_table(lang: str) -> RichContent:
-    header = [
-        RichContent(),
-        CollaborateMessages.TABLE_BADGE.rich(lang=lang),
-        CollaborateMessages.TABLE_GROUP.rich(lang=lang),
-        CollaborateMessages.TABLE_LIMITS.rich(lang=lang),
-    ]
-    granted = RichContent(str(Emojis.CHECK))
-    rows = []
-    for level, badge in TIER_BADGES.items():
-        name = CollaborateMessages.tier_name_for(level).rich(lang=lang)
-        limits = CollaborateMessages.tier_limits_for(level).rich(lang=lang)
-        rows.append([render_rich(t"{badge} {name}"), granted, granted, limits])
-    return table_content(header, rows)
+def tier_line(level: SupporterLevel, lang: str) -> RichContent:
+    """One line of the Become a Host section: the tier's badge and name, then what it does to the limits."""
+    name = CollaborateMessages.tier_name_for(level).rich(lang=lang).wrap(RichTag.BOLD)
+    return CollaborateMessages.tier_limits_for(level).rich(lang=lang, tier=render_rich(t"{TIER_BADGES[level]} {name}"))
 
 
 def become_host_section(lang: str) -> RichContent:
     limits_page = ButtonConfig(text=ButtonMessages.LIMITS_PAGE.text(lang=lang), url=docs_links.limits_url())
     body = (
         CollaborateMessages.BECOME_HOST.rich(lang=lang)
-        .append(tiers_table(lang))
-        .append(CollaborateMessages.LIMITS_PAGE_LINE.rich(lang=lang, button_limits_page=limits_page))
+        .append(unordered_list_content([tier_line(level, lang) for level in TIER_BADGES]))
+        .append(CollaborateMessages.HOST_PERKS_LINE.rich(lang=lang, button_limits_page=limits_page))
     )
     return card_section(CollaborateMessages.BECOME_HOST_TITLE, Emojis.DONATE, lang, body)
 

@@ -941,21 +941,21 @@ class CollaborateMessages(MessageBase):
         "Tell your friends, translate, report bugs, or back the project. "
         "The ${button_collaborate_page} page walks through every one."
     )
-    # "Become a Host" section, shown to anyone who is not a Host yet: the lead sentence, then the
-    # tier table, then a closing line whose `${button_limits_page}` chip opens the docs limits page.
+    # "Become a Host" section, shown to anyone who is not a Host yet: the lead sentence, one line
+    # per tier, then the perks line whose `${button_limits_page}` chip opens the docs limits page.
     BECOME_HOST_TITLE = "Become a Host"
-    BECOME_HOST = (
-        "The most direct way to help. Hosts get a badge, a members-only group and raised limits depending on the tier."
+    BECOME_HOST = "The most direct way to help. Hosts back Mitup on Patreon at one of three tiers:"
+    # TRANSLATORS: First of the three tier lines under Become a Host; ${tier} is the tier's badge and name.
+    TIER_LIMITS_FREE = "${tier} keeps the standard limits."
+    # TRANSLATORS: Second tier line; ${tier} is the tier's badge and name, "them" are the limits.
+    TIER_LIMITS_RAISED = "${tier} raises them."
+    # TRANSLATORS: Third tier line; ${tier} is the tier's badge and name, "them" are the limits.
+    TIER_LIMITS_NONE = "${tier} lifts them altogether."
+    # TRANSLATORS: Closing line of Become a Host; ${button_limits_page} is the chip opening the docs page.
+    HOST_PERKS_LINE = (
+        "Every Host gets the badge, the Hosts-only group and photos on their meetings, whatever the tier. "
+        "The ${button_limits_page} page has the numbers and every perk."
     )
-    LIMITS_PAGE_LINE = "The ${button_limits_page} page has the numbers."
-    # Column headings of the tier table. The first column holds the tier names and has none.
-    TABLE_BADGE = "Badge"
-    TABLE_GROUP = "Group"
-    TABLE_LIMITS = "Limits"
-    # The Limits cell of the tier table, one per tier: free-tier limits, raised limits, no limits.
-    TIER_LIMITS_FREE = "free"
-    TIER_LIMITS_RAISED = "raised"
-    TIER_LIMITS_NONE = "none"
     # Status section of the Collaborate screen for a linked account with no active pledge.
     LINKED_TITLE = "Patreon account linked"
     LINKED_NOT_HOST = (
@@ -1116,7 +1116,7 @@ class CollaborateMessages(MessageBase):
 
     @classmethod
     def tier_limits_for(cls, level: SupporterLevel) -> CollaborateMessages:
-        """The Limits cell of the tier table, raising on NONE, which the table never lists."""
+        """The tier line of the Become a Host section, raising on NONE, which has no line."""
         match level:
             case SupporterLevel.HOST_1:
                 return cls.TIER_LIMITS_FREE

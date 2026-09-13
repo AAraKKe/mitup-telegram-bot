@@ -101,29 +101,19 @@ def test_a_screen_without_a_pledge_explains_becoming_a_host(lang: str, build: Sc
     chip = ButtonConfig(text=ButtonMessages.LIMITS_PAGE.text(lang=lang), url=LIMITS_PAGE_URL)
     assert section_title(CollaborateMessages.BECOME_HOST_TITLE, Emojis.DONATE, lang) in view.message.html
     assert CollaborateMessages.BECOME_HOST.text(lang=lang) in view.message.text
-    assert CollaborateMessages.LIMITS_PAGE_LINE.rich(lang=lang, button_limits_page=chip).html in view.message.html
-
-
-@pytest.mark.parametrize("build", NO_PLEDGE_SCREENS, ids=NO_PLEDGE_IDS)
-def test_the_tier_table_heads_its_columns(lang: str, build: ScreenBuilder):
-    view = build(lang)
-
-    headings = [CollaborateMessages.TABLE_BADGE, CollaborateMessages.TABLE_GROUP, CollaborateMessages.TABLE_LIMITS]
-    expected = "<tr><th></th>" + "".join(f"<th>{heading.text(lang=lang)}</th>" for heading in headings) + "</tr>"
-    assert expected in view.message.html
+    assert CollaborateMessages.HOST_PERKS_LINE.rich(lang=lang, button_limits_page=chip).html in view.message.html
 
 
 @pytest.mark.parametrize("build", NO_PLEDGE_SCREENS, ids=NO_PLEDGE_IDS)
 @pytest.mark.parametrize("level", [SupporterLevel.HOST_1, SupporterLevel.HOST_2, SupporterLevel.HOST_3])
-def test_the_tier_table_names_every_paying_tier_and_what_it_carries(
+def test_every_paying_tier_gets_a_line_naming_it_and_what_it_does_to_the_limits(
     lang: str, build: ScreenBuilder, level: SupporterLevel
 ):
     view = build(lang)
 
     name = CollaborateMessages.tier_name_for(level).text(lang=lang)
-    limits = CollaborateMessages.tier_limits_for(level).text(lang=lang)
-    assert f"<td>{TIER_BADGES[level]} {name}</td>" in view.message.html
-    assert f"<td>{Emojis.CHECK}</td><td>{Emojis.CHECK}</td><td>{limits}</td>" in view.message.html
+    expected = CollaborateMessages.tier_limits_for(level).text(lang=lang, tier=f"{TIER_BADGES[level]} {name}")
+    assert expected in view.message.text
 
 
 def test_not_linked_view_pitches_the_project_and_offers_the_link_button(lang: str):

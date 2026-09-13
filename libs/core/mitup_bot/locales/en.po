@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-09-13 13:01\n"
+"PO-Revision-Date: 2026-09-13 13:15\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -1016,28 +1016,23 @@ msgid "CollaborateMessages.BECOME_HOST_TITLE"
 msgstr "Become a Host"
 
 msgid "CollaborateMessages.BECOME_HOST"
-msgstr "The most direct way to help. Hosts get a badge, a members-only group and raised limits depending on the tier."
+msgstr "The most direct way to help. Hosts back Mitup on Patreon at one of three tiers:"
 
-msgid "CollaborateMessages.LIMITS_PAGE_LINE"
-msgstr "The ${button_limits_page} page has the numbers."
-
-msgid "CollaborateMessages.TABLE_BADGE"
-msgstr "Badge"
-
-msgid "CollaborateMessages.TABLE_GROUP"
-msgstr "Group"
-
-msgid "CollaborateMessages.TABLE_LIMITS"
-msgstr "Limits"
-
+#. First of the three tier lines under Become a Host; ${tier} is the tier's badge and name.
 msgid "CollaborateMessages.TIER_LIMITS_FREE"
-msgstr "free"
+msgstr "${tier} keeps the standard limits."
 
+#. Second tier line; ${tier} is the tier's badge and name, "them" are the limits.
 msgid "CollaborateMessages.TIER_LIMITS_RAISED"
-msgstr "raised"
+msgstr "${tier} raises them."
 
+#. Third tier line; ${tier} is the tier's badge and name, "them" are the limits.
 msgid "CollaborateMessages.TIER_LIMITS_NONE"
-msgstr "none"
+msgstr "${tier} lifts them altogether."
+
+#. Closing line of Become a Host; ${button_limits_page} is the chip opening the docs page.
+msgid "CollaborateMessages.HOST_PERKS_LINE"
+msgstr "Every Host gets the badge, the Hosts-only group and photos on their meetings, whatever the tier. The ${button_limits_page} page has the numbers and every perk."
 
 msgid "CollaborateMessages.LINKED_TITLE"
 msgstr "Patreon account linked"

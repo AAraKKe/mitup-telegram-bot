@@ -819,28 +819,19 @@ msgid "CollaborateMessages.BECOME_HOST_TITLE"
 msgstr "Diventa Host"
 
 msgid "CollaborateMessages.BECOME_HOST"
-msgstr "Il modo più diretto per aiutare. Gli Host ricevono un badge, un gruppo riservato e limiti più alti a seconda del livello."
-
-msgid "CollaborateMessages.LIMITS_PAGE_LINE"
-msgstr "Trovi i numeri nella pagina ${button_limits_page}."
-
-msgid "CollaborateMessages.TABLE_BADGE"
-msgstr "Badge"
-
-msgid "CollaborateMessages.TABLE_GROUP"
-msgstr "Gruppo"
-
-msgid "CollaborateMessages.TABLE_LIMITS"
-msgstr "Limiti"
+msgstr "Il modo più diretto per aiutare. Gli Host sostengono Mitup su Patreon a uno di tre livelli:"
 
 msgid "CollaborateMessages.TIER_LIMITS_FREE"
-msgstr "base"
+msgstr "${tier} mantiene i limiti base."
 
 msgid "CollaborateMessages.TIER_LIMITS_RAISED"
-msgstr "più alti"
+msgstr "${tier} li alza."
 
 msgid "CollaborateMessages.TIER_LIMITS_NONE"
-msgstr "nessuno"
+msgstr "${tier} li toglie del tutto."
+
+msgid "CollaborateMessages.HOST_PERKS_LINE"
+msgstr "Ogni Host, a qualunque livello, ha il badge, il gruppo riservato agli Host e le foto nei propri incontri. Trovi i numeri e tutti gli extra nella pagina ${button_limits_page}."
 
 msgid "CollaborateMessages.LINKED_TITLE"
 msgstr "Account Patreon collegato"
