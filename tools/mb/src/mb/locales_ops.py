@@ -3,6 +3,8 @@ from __future__ import annotations
 import datetime as dt
 import difflib
 import hashlib
+import inspect
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -77,17 +79,48 @@ def all_messages() -> list[type[MessageBase]]:
     return [cls for cls in MessageBase.__subclasses__() if cls != MessageBase]
 
 
+NOTE_LINE = re.compile(r"^\s*# TRANSLATORS:\s?(.*)$")
+CLASS_LINE = re.compile(r"^class (\w+)\(")
+MEMBER_LINE = re.compile(r"^    ([A-Z][A-Z0-9_]*) = ")
+
+
+def translator_notes(source: str) -> dict[str, list[str]]:
+    """The `# TRANSLATORS:` comment lines sitting directly above each message member, keyed by
+    `Class.MEMBER`. They become the catalog's `#.` extracted comments, which Crowdin shows as the
+    string's context.
+    """
+    notes: dict[str, list[str]] = {}
+    message_class = None
+    pending: list[str] = []
+    for line in source.splitlines():
+        if class_match := CLASS_LINE.match(line):
+            message_class = class_match.group(1)
+            pending = []
+        elif note_match := NOTE_LINE.match(line):
+            pending.append(note_match.group(1).strip())
+        else:
+            if (member_match := MEMBER_LINE.match(line)) and message_class and pending:
+                notes[f"{message_class}.{member_match.group(1)}"] = pending
+            pending = []
+    return notes
+
+
 def generate_translations(validate: bool):
     po_path = po_file_for_language("en", validate)
+    messages = all_messages()
+    notes = translator_notes(Path(inspect.getfile(messages[0])).read_text())
 
     with open(po_path, "w") as f:
         f.write(METADATA)
 
         f.write("\n\n#: libs/telegram/mitup_bot/utils/messages.py\n")
-        for message_class in all_messages():
+        for message_class in messages:
             for message in message_class:
                 msgstr = repr(message.value)[1:-1].replace('"', r"\"")
-                f.write(f'\nmsgid "{message.id()}"\n')
+                f.write("\n")
+                for note in notes.get(message.id(), []):
+                    f.write(f"#. {note}\n")
+                f.write(f'msgid "{message.id()}"\n')
                 f.write(f'msgstr "{msgstr}"\n')
 
 

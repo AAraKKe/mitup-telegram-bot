@@ -54,6 +54,40 @@ def test_generate_translations_covers_every_message(tmp_path: Path, monkeypatch:
     assert content.count("msgid") - 1 == sum(1 for messages in locales_ops.all_messages() for _ in messages)
 
 
+def test_translator_notes_read_the_comment_lines_directly_above_a_member():
+    source = (
+        "class ButtonMessages(MessageBase):\n"
+        "    # A developer comment stays out of the catalog.\n"
+        "    # TRANSLATORS: Chip under the description that wipes its text.\n"
+        "    # TRANSLATORS: The meeting itself stays.\n"
+        '    CLEAR_DESCRIPTION = "Clear"\n'
+        "    # TRANSLATORS: Dropped: a blank line separates it from the member.\n"
+        "\n"
+        '    REMOVE = "Remove"\n'
+        "class OtherMessages(MessageBase):\n"
+        "    # TRANSLATORS: Multi-line value.\n"
+        "    DELETE = (\n"
+    )
+
+    assert locales_ops.translator_notes(source) == {
+        "ButtonMessages.CLEAR_DESCRIPTION": [
+            "Chip under the description that wipes its text.",
+            "The meeting itself stays.",
+        ],
+        "OtherMessages.DELETE": ["Multi-line value."],
+    }
+
+
+def test_generate_translations_writes_the_notes_as_extracted_comments(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    po_file = tmp_path / "en.po"
+    monkeypatch.setattr(locales_ops, "po_file_for_language", lambda lang, validate=False: po_file)
+
+    locales_ops.generate_translations(validate=False)
+
+    content = po_file.read_text()
+    assert '#. Chip under the description text that wipes it.\nmsgid "ButtonMessages.CLEAR_DESCRIPTION"\n' in content
+
+
 def test_validate_translations_succeeds_when_in_sync(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     po_file = tmp_path / "en.po"
     monkeypatch.setattr(locales_ops, "po_file_for_language", lambda lang, validate=False: po_file)

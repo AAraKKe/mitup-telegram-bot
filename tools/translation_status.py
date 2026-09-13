@@ -60,6 +60,22 @@ def parse_po_entries(text: str) -> list[tuple[str, str]]:
     return entries
 
 
+def parse_po_notes(text: str) -> dict[str, str]:
+    """The extracted comments (`#.` lines) above each msgid, joined into one context line."""
+    notes: dict[str, str] = {}
+    pending: list[str] = []
+    for line in text.splitlines():
+        if line.startswith("#. "):
+            pending.append(line[3:].strip())
+        elif line.startswith("msgid "):
+            if pending:
+                notes[line.split(None, 1)[1].strip('"')] = " ".join(pending)
+            pending = []
+        else:
+            pending = []
+    return notes
+
+
 def get_old_en_entries(git_ref: str) -> dict[str, str] | None:
     """Get English entries from a previous git revision. Returns None on failure."""
     en_po_rel = str(TranslationEngine.LOCALES_DIR.relative_to(REPO_ROOT) / "en.po")
@@ -116,7 +132,9 @@ def main() -> int:
         return 1
 
     # Parse both files
-    en_entries = parse_po_entries(en_path.read_text(encoding="utf-8"))
+    en_text_all = en_path.read_text(encoding="utf-8")
+    en_entries = parse_po_entries(en_text_all)
+    en_notes = parse_po_notes(en_text_all)
     lang_entries = parse_po_entries(lang_path.read_text(encoding="utf-8"))
 
     en_dict = dict(en_entries)
@@ -146,6 +164,8 @@ def main() -> int:
             en_text = en_dict.get(msgid, "")
             print(f'  msgid "{msgid}"')
             print(f'  English text: "{en_text}"')
+            if msgid in en_notes:
+                print(f"  Context: {en_notes[msgid]}")
             print()
 
     if empty_msgstr:
@@ -154,6 +174,8 @@ def main() -> int:
             en_text = en_dict.get(msgid, "")
             print(f'  msgid "{msgid}"')
             print(f'  English text: "{en_text}"')
+            if msgid in en_notes:
+                print(f"  Context: {en_notes[msgid]}")
             print()
 
     if stale_msgids:

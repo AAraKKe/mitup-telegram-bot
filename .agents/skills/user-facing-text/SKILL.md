@@ -47,6 +47,8 @@ All user-facing strings are `StrEnum` members of `MessageBase` subclasses in `li
 | `NotificationMessages` | Meeting deletion and start notifications |
 | `Languages` | Language selection labels |
 
+A `# TRANSLATORS:` comment line directly above a member is the string's translator context: it reaches Crowdin and the translator agents through `en.po`, so give one to every short label or any string with a pronoun or placeholder a translator could misread (see the `translations` skill). A plain `#` comment is for developers only.
+
 The list above is illustrative — treat `messages.py` as the source of truth and grep for the actual class before adding a new member, because new classes (or merges between existing ones) happen over time.
 
 ## Critical rules

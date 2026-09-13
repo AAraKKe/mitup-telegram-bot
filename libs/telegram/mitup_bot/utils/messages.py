@@ -66,7 +66,9 @@ class ButtonMessages(MessageBase):
     MAIN_MENU = "Main Menu"
     GO_BACK = "≪"
     GO_FORWARD = "≫"
+    # TRANSLATORS: Green key of a generic yes/no prompt; the red one beside it is Decline.
     CONFIRM = f"{Emojis.CHECK} Confirm"
+    # TRANSLATORS: Red key of a generic yes/no prompt; the green one beside it is Confirm.
     DECLINE = f"{Emojis.CANCEL} Decline"
 
     # Main Menu buttons
@@ -117,6 +119,7 @@ class ButtonMessages(MessageBase):
     # Meeting buttons
     # The back-button label every meeting sub-screen carries: it names the card the tap returns to.
     MEETING = "Meeting"
+    # TRANSLATORS: Key that leaves a text prompt without changing anything.
     CANCEL = f"{Emojis.CANCEL} Cancel"
     DATE_TIME = f"{Emojis.CALENDAR} Date & Time"
     END_DATE_TIME = f"{Emojis.CALENDAR} End Date & Time"
@@ -128,17 +131,26 @@ class ButtonMessages(MessageBase):
     LEAVE = f"{Emojis.CANCEL} Leave"
     OPEN_MEETING = f"{Emojis.LIST} Open meeting"
     # Rides the title line of a meeting in a list, where the title already names what opens.
+    # TRANSLATORS: Red key on the owner's meeting card and on a row of the past-meetings list: opens
+    # TRANSLATORS: the prompt that deletes that meeting for good.
     DELETE = f"{Emojis.DELETE} Delete"
+    # TRANSLATORS: Red key at the end of the past-meetings list: opens the prompt that deletes every inactive meeting.
     DELETE_ALL_PAST_MEETINGS = f"{Emojis.DELETE} Delete all past meetings"
+    # TRANSLATORS: Red key of the delete-all prompt; 'them' are the past meetings listed above it.
     CONFIRM_DELETE_ALL_PAST_MEETINGS = "Delete them all"
+    # TRANSLATORS: Key beside Delete them all that keeps every past meeting.
     DECLINE_DELETE_ALL_PAST_MEETINGS = "Keep them"
     # The keys of the prompt under a single meeting's card.
+    # TRANSLATORS: Red key under one meeting's card on the delete prompt; 'it' is that meeting.
     CONFIRM_DELETE_MEETING = "Delete it for good"
+    # TRANSLATORS: Key beside Delete it for good that keeps the meeting.
     DECLINE_DELETE_MEETING = "Keep it"
     EDIT = f"{Emojis.EDIT} Edit"
     SHARE = f"{Emojis.SHARE} Share"
     # Redraws the card in place with the meeting's current state.
     REFRESH = f"{Emojis.ACTIVATE} Refresh"
+    # TRANSLATORS: Chip on the participants section of the owner's card and on each row of the
+    # TRANSLATORS: kick-out screen: removes a person from the meeting.
     MEETING_KICK_OUT = "Kick out"
 
     # Meeting editor inline chips. A "+" marks a field still unset; the pencil marks one already
@@ -146,22 +158,29 @@ class ButtonMessages(MessageBase):
     ADD_DESCRIPTION = "+ Add description"
     SET_DATETIME = "+ Set date & time"
     SELECT_DATE_FIRST = "Select a date first"
+    # TRANSLATORS: Key on the date editor that clears the meeting's start time, and the end time with it.
     REMOVE_DATETIME = "Remove date & time"
+    # TRANSLATORS: Key on the end-time editor that clears the meeting's end time.
     REMOVE_END_DATETIME = "Remove end time"
     SET_END_DATETIME = "+ Set end time"
     SET_LOCATION_NAME = "+ Set name"
     SET_COORDINATES = "+ Set map pin"
     SET_PARTICIPANT_LIMIT = "Set limit"
     CHANGE_PARTICIPANT_LIMIT = "Change limit"
+    # TRANSLATORS: Chip beside a value set on the owner's card (start time, end time, place name, map
+    # TRANSLATORS: pin) and beside each photo on the Images screen: unsets that one value; the meeting stays.
     REMOVE = "Remove"
     # Chips that take one thing off the card each carry their own label; equal English values would
     # collapse into one enum member and one translation.
+    # TRANSLATORS: Chip under the description text that wipes it.
     CLEAR_DESCRIPTION = "Clear"
+    # TRANSLATORS: Chip beside Change limit that lifts the participant limit; 'it' is the limit.
     REMOVE_LIMIT = "Remove it"
     ADD_IMAGES = "+ Add images"
     EDIT_IMAGES = f"{Emojis.EDIT} Edit images"
     # Images screen chips: Replace acts on one photo, Remove all on every photo.
     REPLACE = "Replace"
+    # TRANSLATORS: Red key on the Images screen that takes every photo off the card.
     REMOVE_ALL = "Remove all"
     # The layout buttons on the Images screen; the current layout is highlighted.
     COLLAGE = "Collage"
@@ -639,9 +658,12 @@ class MeetingInviteMessages(MessageBase):
 class MeetingLifecycleMessages(MessageBase):
     PAST_DESCRIPTION = "This meeting is no longer active. Reactivate it to share it again, or delete it permanently."
     REACTIVATE_SUCCESS = "Meeting reactivated. You can edit and share it again."
+    # TRANSLATORS: Line closing the meeting's card on the delete prompt, above the Delete it for good and Keep it keys.
     DELETE_CONFIRMATION = "This deletes the meeting for good. It cannot be undone."
     DELETE_SUCCESS = "Meeting deleted."
+    # TRANSLATORS: Line above the owner's card after tapping Keep it.
     DELETE_DECLINED = "The meeting won't be deleted"
+    # TRANSLATORS: Line under the past-meetings list on the delete-all prompt; ${count} is how many meetings it lists.
     DELETE_ALL_CONFIRMATION = "This deletes every past meeting you have, ${count} in total. It cannot be undone."
     DELETE_ALL_SUCCESS = "Past meetings deleted: ${count}."
 
@@ -683,6 +705,7 @@ class MeetingEditContentMessages(MessageBase):
     DESCRIPTION_TOO_LONG = (
         "That description is ${length} characters, over the limit of ${limit}. Send me a shorter one."
     )
+    # TRANSLATORS: Prompt after tapping Clear under the description; ${description} is the text about to go.
     REMOVE_DESCRIPTION_CONFIRMATION = (
         "Are you sure you want to remove the description of your meeting?\n\n${description}"
     )
@@ -710,7 +733,9 @@ class MeetingEditLocationMessages(MessageBase):
         "<i>You were in the middle of setting the map pin.</i>\n"
         "Send the location of your meeting to continue, or ${button_cancel} to exit."
     )
+    # TRANSLATORS: Prompt after tapping Remove beside the place name on the owner's card.
     REMOVE_NAME_CONFIRMATION = "This removes the meeting's place name. Are you sure?"
+    # TRANSLATORS: Prompt after tapping Remove beside the map pin on the owner's card.
     REMOVE_COORDINATES_CONFIRMATION = "This removes the meeting's map pin. Are you sure?"
 
 
@@ -724,6 +749,8 @@ class MeetingEditParticipantsMessages(MessageBase):
     MAX_SUCCESS = "Max participants set to: <b>${max_participants}</b>"
     # Shown to capped owners only: their removed limit resolves to the plan's cap
     # (Meetup.effective_max_members), so removing it must not read as "unlimited".
+    # TRANSLATORS: Prompt after tapping Remove it beside Change limit; ${cap} is the plan's participant
+    # TRANSLATORS: ceiling the limit falls back to.
     REMOVE_LIMIT_CONFIRMATION = (
         "Removing the limit sets it back to <b>${cap}</b>, the most participants your meetings can have. "
         "Do you want to continue?\n\n"
@@ -731,6 +758,7 @@ class MeetingEditParticipantsMessages(MessageBase):
     )
     NO_LIMIT_LABEL = "No limit"
     MAX_INVALID = "The maximum number of participants must be a number greater than 0. Please, try again"
+    # TRANSLATORS: Heading of the kick-out screen, above one row per participant with a Kick out chip.
     KICK_OUT_DESCRIPTION = "These are the users that joined the meeting. Choose who you want to kick out."
     KICK_OUT_CONFIRMATION = (
         "Are you sure you want to kick out <b>${participant}</b> from the meeting <b>${meeting_title}</b>?"
@@ -796,7 +824,9 @@ class MeetingImagesMessages(MessageBase):
         "Patreon to bring them to your meetings. Collaborate below has all the details."
     )
     LIMIT_REACHED = "This meeting already holds its ${limit} photos. Remove one to make room for another."
+    # TRANSLATORS: Prompt after tapping Remove beside photo ${number} on the Images screen.
     REMOVE_CONFIRMATION = "This removes image ${number} from the card. Are you sure?"
+    # TRANSLATORS: Prompt after tapping Remove all on the Images screen.
     REMOVE_ALL_CONFIRMATION = "This removes every photo from the card. Are you sure?"
     SEND_AS_PHOTO = "That arrived as a file. Send it as a photo to put it on the card."
     # Draft shown while the photos of an album are still arriving; the Images screen replaces it.
@@ -831,7 +861,9 @@ class MeetingEditDateTimeMessages(MessageBase):
 class MeetingEditWhenMessages(MessageBase):
     # The start's remove chip clears the whole schedule: an end time cannot exist without a start,
     # so the confirmation states the full effect. The start lock is a standing setting and stays.
+    # TRANSLATORS: Prompt after tapping Remove beside the start time on the owner's card.
     REMOVE_TIMES_CONFIRMATION = "This removes the meeting's start time, and the end time along with it. Are you sure?"
+    # TRANSLATORS: Prompt after tapping Remove beside the end time on the owner's card.
     REMOVE_END_CONFIRMATION = "This removes the meeting's end time. Are you sure?"
 
 

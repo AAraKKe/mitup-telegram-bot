@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-09-13 12:04\n"
+"PO-Revision-Date: 2026-09-13 12:37\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -29,9 +29,11 @@ msgstr "≪"
 msgid "ButtonMessages.GO_FORWARD"
 msgstr "≫"
 
+#. Green key of a generic yes/no prompt; the red one beside it is Decline.
 msgid "ButtonMessages.CONFIRM"
 msgstr "✅ Confirm"
 
+#. Red key of a generic yes/no prompt; the green one beside it is Confirm.
 msgid "ButtonMessages.DECLINE"
 msgstr "❌ Decline"
 
@@ -146,6 +148,7 @@ msgstr "Disabled"
 msgid "ButtonMessages.MEETING"
 msgstr "Meeting"
 
+#. Key that leaves a text prompt without changing anything.
 msgid "ButtonMessages.CANCEL"
 msgstr "❌ Cancel"
 
@@ -170,21 +173,28 @@ msgstr "❌ Leave"
 msgid "ButtonMessages.OPEN_MEETING"
 msgstr "📂 Open meeting"
 
+#. Red key on the owner's meeting card and on a row of the past-meetings list: opens
+#. the prompt that deletes that meeting for good.
 msgid "ButtonMessages.DELETE"
 msgstr "🗑️ Delete"
 
+#. Red key at the end of the past-meetings list: opens the prompt that deletes every inactive meeting.
 msgid "ButtonMessages.DELETE_ALL_PAST_MEETINGS"
 msgstr "🗑️ Delete all past meetings"
 
+#. Red key of the delete-all prompt; 'them' are the past meetings listed above it.
 msgid "ButtonMessages.CONFIRM_DELETE_ALL_PAST_MEETINGS"
 msgstr "Delete them all"
 
+#. Key beside Delete them all that keeps every past meeting.
 msgid "ButtonMessages.DECLINE_DELETE_ALL_PAST_MEETINGS"
 msgstr "Keep them"
 
+#. Red key under one meeting's card on the delete prompt; 'it' is that meeting.
 msgid "ButtonMessages.CONFIRM_DELETE_MEETING"
 msgstr "Delete it for good"
 
+#. Key beside Delete it for good that keeps the meeting.
 msgid "ButtonMessages.DECLINE_DELETE_MEETING"
 msgstr "Keep it"
 
@@ -197,6 +207,8 @@ msgstr "📨 Share"
 msgid "ButtonMessages.REFRESH"
 msgstr "🔄 Refresh"
 
+#. Chip on the participants section of the owner's card and on each row of the
+#. kick-out screen: removes a person from the meeting.
 msgid "ButtonMessages.MEETING_KICK_OUT"
 msgstr "Kick out"
 
@@ -209,9 +221,11 @@ msgstr "+ Set date & time"
 msgid "ButtonMessages.SELECT_DATE_FIRST"
 msgstr "Select a date first"
 
+#. Key on the date editor that clears the meeting's start time, and the end time with it.
 msgid "ButtonMessages.REMOVE_DATETIME"
 msgstr "Remove date & time"
 
+#. Key on the end-time editor that clears the meeting's end time.
 msgid "ButtonMessages.REMOVE_END_DATETIME"
 msgstr "Remove end time"
 
@@ -230,12 +244,16 @@ msgstr "Set limit"
 msgid "ButtonMessages.CHANGE_PARTICIPANT_LIMIT"
 msgstr "Change limit"
 
+#. Chip beside a value set on the owner's card (start time, end time, place name, map
+#. pin) and beside each photo on the Images screen: unsets that one value; the meeting stays.
 msgid "ButtonMessages.REMOVE"
 msgstr "Remove"
 
+#. Chip under the description text that wipes it.
 msgid "ButtonMessages.CLEAR_DESCRIPTION"
 msgstr "Clear"
 
+#. Chip beside Change limit that lifts the participant limit; 'it' is the limit.
 msgid "ButtonMessages.REMOVE_LIMIT"
 msgstr "Remove it"
 
@@ -248,6 +266,7 @@ msgstr "✏️ Edit images"
 msgid "ButtonMessages.REPLACE"
 msgstr "Replace"
 
+#. Red key on the Images screen that takes every photo off the card.
 msgid "ButtonMessages.REMOVE_ALL"
 msgstr "Remove all"
 
@@ -686,15 +705,18 @@ msgstr "This meeting is no longer active. Reactivate it to share it again, or de
 msgid "MeetingLifecycleMessages.REACTIVATE_SUCCESS"
 msgstr "Meeting reactivated. You can edit and share it again."
 
+#. Line closing the meeting's card on the delete prompt, above the Delete it for good and Keep it keys.
 msgid "MeetingLifecycleMessages.DELETE_CONFIRMATION"
 msgstr "This deletes the meeting for good. It cannot be undone."
 
 msgid "MeetingLifecycleMessages.DELETE_SUCCESS"
 msgstr "Meeting deleted."
 
+#. Line above the owner's card after tapping Keep it.
 msgid "MeetingLifecycleMessages.DELETE_DECLINED"
 msgstr "The meeting won't be deleted"
 
+#. Line under the past-meetings list on the delete-all prompt; ${count} is how many meetings it lists.
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
 msgstr "This deletes every past meeting you have, ${count} in total. It cannot be undone."
 
@@ -731,6 +753,7 @@ msgstr "<i>You were in the middle of changing the description.</i>\nSend the new
 msgid "MeetingEditContentMessages.DESCRIPTION_TOO_LONG"
 msgstr "That description is ${length} characters, over the limit of ${limit}. Send me a shorter one."
 
+#. Prompt after tapping Clear under the description; ${description} is the text about to go.
 msgid "MeetingEditContentMessages.REMOVE_DESCRIPTION_CONFIRMATION"
 msgstr "Are you sure you want to remove the description of your meeting?\n\n${description}"
 
@@ -752,9 +775,11 @@ msgstr "That place name is ${length} characters, over the limit of ${limit}. Sen
 msgid "MeetingEditLocationMessages.COORDINATES_ON_EXIT"
 msgstr "<i>You were in the middle of setting the map pin.</i>\nSend the location of your meeting to continue, or ${button_cancel} to exit."
 
+#. Prompt after tapping Remove beside the place name on the owner's card.
 msgid "MeetingEditLocationMessages.REMOVE_NAME_CONFIRMATION"
 msgstr "This removes the meeting's place name. Are you sure?"
 
+#. Prompt after tapping Remove beside the map pin on the owner's card.
 msgid "MeetingEditLocationMessages.REMOVE_COORDINATES_CONFIRMATION"
 msgstr "This removes the meeting's map pin. Are you sure?"
 
@@ -764,6 +789,8 @@ msgstr "Send me the maximum number of participants allowed in the meeting (must 
 msgid "MeetingEditParticipantsMessages.MAX_SUCCESS"
 msgstr "Max participants set to: <b>${max_participants}</b>"
 
+#. Prompt after tapping Remove it beside Change limit; ${cap} is the plan's participant
+#. ceiling the limit falls back to.
 msgid "MeetingEditParticipantsMessages.REMOVE_LIMIT_CONFIRMATION"
 msgstr "Removing the limit sets it back to <b>${cap}</b>, the most participants your meetings can have. Do you want to continue?\n\nNeed bigger meetings? Become a Mitup Host on Patreon to raise the ceiling: ${button_collaborate}"
 
@@ -773,6 +800,7 @@ msgstr "No limit"
 msgid "MeetingEditParticipantsMessages.MAX_INVALID"
 msgstr "The maximum number of participants must be a number greater than 0. Please, try again"
 
+#. Heading of the kick-out screen, above one row per participant with a Kick out chip.
 msgid "MeetingEditParticipantsMessages.KICK_OUT_DESCRIPTION"
 msgstr "These are the users that joined the meeting. Choose who you want to kick out."
 
@@ -845,9 +873,11 @@ msgstr "Photos on the meeting card are one of the extras Hosts get. Become a Mit
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "This meeting already holds its ${limit} photos. Remove one to make room for another."
 
+#. Prompt after tapping Remove beside photo ${number} on the Images screen.
 msgid "MeetingImagesMessages.REMOVE_CONFIRMATION"
 msgstr "This removes image ${number} from the card. Are you sure?"
 
+#. Prompt after tapping Remove all on the Images screen.
 msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
 msgstr "This removes every photo from the card. Are you sure?"
 
@@ -878,9 +908,11 @@ msgstr "The new start time is after the end time, so the end time has been clear
 msgid "MeetingEditDateTimeMessages.START_IN_PAST"
 msgstr "The start time must be in the future."
 
+#. Prompt after tapping Remove beside the start time on the owner's card.
 msgid "MeetingEditWhenMessages.REMOVE_TIMES_CONFIRMATION"
 msgstr "This removes the meeting's start time, and the end time along with it. Are you sure?"
 
+#. Prompt after tapping Remove beside the end time on the owner's card.
 msgid "MeetingEditWhenMessages.REMOVE_END_CONFIRMATION"
 msgstr "This removes the meeting's end time. Are you sure?"
 

@@ -32,7 +32,8 @@ uv run mb locales build            # compile .po → .mo
 uv run mb locales sync
 ```
 
-3. **One physical line per `msgstr`.** PO follows C string-literal rules: adjacent quoted lines
+3. **Context travels as a `# TRANSLATORS:` comment.** A comment line starting with `# TRANSLATORS:` directly above a member in `messages.py` is written into `en.po` as a gettext extracted comment (`#.`), which Crowdin shows as the string's context and the translator agents see in the status script's work list. Write one for every short or ambiguous string (what it is, where it shows, what a pronoun or placeholder refers to); a plain `#` comment stays in the code and never reaches translators.
+4. **One physical line per `msgstr`.** PO follows C string-literal rules: adjacent quoted lines
    concatenate with **no separator**, so a msgstr "wrapped" across continuation lines silently
    glues sentences together in production (`"…Mitup Bot!""Elige una opción"` renders as
    `…Mitup Bot!Elige una opción`). Encode every line break as `\n` inside a single quoted string
