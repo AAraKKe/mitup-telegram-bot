@@ -467,7 +467,7 @@ CONTEXTS = [
     ),
     Context(
         handler_id=MainMenuHandlerId.DELETE_ALL_PAST_MEETINGS_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DELETE_ALL_PAST_MEETINGS),
+        update_request=UpdateRequest(callback_query=cb.DELETE_ALL_PAST_MEETINGS.with_id(1)),
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="delete_all_past_meetings",
     ),
@@ -479,7 +479,7 @@ CONTEXTS = [
     ),
     Context(
         handler_id=MainMenuHandlerId.DECLINE_DELETE_ALL_PAST_MEETINGS_CALLBACK,
-        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_ALL_PAST_MEETINGS),
+        update_request=UpdateRequest(callback_query=cb.DECLINE_DELETE_ALL_PAST_MEETINGS.with_id(1)),
         error_modes={ErrorMode.USER_NOT_FOUND},
         id="decline_delete_all_past_meetings",
     ),

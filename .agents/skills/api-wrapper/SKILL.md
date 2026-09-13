@@ -120,11 +120,18 @@ A non-handler broadcast (mutate state, then fan out) wraps each critical section
 | `send_message_to_user()` | Send a message to a user by their `tg_user_id` |
 | `send_messages_to_users()` | Batch send to multiple users with error handling |
 | `edit_message()` | Edit an existing message (handles inline messages too) |
+| `delete_message()` | Remove the message an update was tapped on, answering whether Telegram took it |
 | `answer_inline_query()` | Respond to an inline query with results (`cache_time` defaults to 60s; pass `0` for dynamic results) |
 | `answer_callback_query()` | Acknowledge a button press |
 | `update_single_meeting_message()` | Update one stored meeting message |
 | `update_meeting_messages()` | Broadcast meeting state to all stored messages |
 | `notify_users_promoted_from_waiting_list()` | Notify users promoted from waiting list |
+
+Beside them, the module-level `replace_message(api, update, view)` puts *view* where the tapped
+message was: it deletes that message and sends the view, so the client plays its dissolve
+animation, and edits instead once `message_is_deletable` reads the message as past the 48 hour
+window Telegram allows or as addressed by `inline_message_id`. A screen that answers a destructive
+tap uses it rather than calling the three methods itself.
 
 ## Error handling patterns
 

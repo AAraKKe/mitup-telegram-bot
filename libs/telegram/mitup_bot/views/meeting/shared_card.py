@@ -196,9 +196,11 @@ def shared_body(meeting: Meetup, shown: int | None = None, *, finished: bool = F
     return RichContent.join(horizontal_rule_content(), [block for block in blocks if block])
 
 
-def fitted_shared_body(meeting: Meetup) -> RichContent:
+def fitted_shared_body(meeting: Meetup, *, finished: bool = False) -> RichContent:
     """The shared body, naming as many attendees and waiters as the budget has room for."""
-    return fitted_body(partial(shared_body, meeting), max(len(meeting.participants), meeting.n_waiting))
+    return fitted_body(
+        partial(shared_body, meeting, finished=finished), max(len(meeting.participants), meeting.n_waiting)
+    )
 
 
 def external_view(meeting: Meetup, back_button: ButtonConfig | None = None) -> MitupView:

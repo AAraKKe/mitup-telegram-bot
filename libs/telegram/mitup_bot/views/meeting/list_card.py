@@ -4,7 +4,7 @@ import datetime as dt
 from typing import TYPE_CHECKING
 
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.keyboards import ButtonConfig
+from mitup_bot.keyboards import ButtonConfig, ButtonRow
 from mitup_bot.utils import ButtonMessages, Emojis, MeetingDisplayMessages, MeetingListMessages
 from mitup_bot.utils.rich_message import RichContent, RichTag, keyboard_content
 from mitup_bot.utils.rich_template import render_rich
@@ -41,14 +41,17 @@ def deletion_line(meeting: Meetup, lang: str) -> RichContent:
 
 def meeting_list_section(
     meeting: Meetup,
-    open_callback: CallbackData,
+    open_callback: CallbackData | None,
     lang: str,
     delete_callback: CallbackData | None = None,
     *,
     with_deletion_notice: bool = False,
 ) -> RichContent:
     """One meeting of a list: its title and key lines, then a button row to open it and, on the
-    lists of meetings the user owns, to delete it right away."""
+    lists of meetings the user owns, to delete it right away.
+
+    With neither callback the section renders no key row.
+    """
     title = title_content(meeting) if meeting.plain_title.strip() else MeetingDisplayMessages.UNTITLED.rich(lang=lang)
     lines = [title.wrap(RichTag.BOLD)]
     if with_deletion_notice and (deletion := deletion_line(meeting, lang)):
@@ -60,9 +63,14 @@ def meeting_list_section(
         lines.append(render_rich(t"{Emojis.MAP} {location_name}"))
     count = participants_count_line(meeting)
     lines.append(render_rich(t"{Emojis.JOINED} {count}"))
-    buttons = [ButtonConfig(text=ButtonMessages.OPEN.text(lang=lang), callback_data=open_callback, style="primary")]
+    buttons: ButtonRow = []
+    if open_callback is not None:
+        buttons.append(
+            ButtonConfig(text=ButtonMessages.OPEN.text(lang=lang), callback_data=open_callback, style="primary")
+        )
     if delete_callback is not None:
         buttons.append(
             ButtonConfig(text=ButtonMessages.DELETE.text(lang=lang), callback_data=delete_callback, style="danger")
         )
-    return RichContent.join("\n", lines).append(keyboard_content([buttons]))
+    body = RichContent.join("\n", lines)
+    return body.append(keyboard_content([buttons])) if buttons else body

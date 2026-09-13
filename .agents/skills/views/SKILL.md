@@ -13,7 +13,7 @@ When building a new screen, check the **factory catalogue** below *first* — re
 ## Critical rules
 
 <critical_rules>
-  <rule>MUST use the `confirmation_view` factory for any accept/decline dialog. Never build confirm/decline keyboards by hand.</rule>
+  <rule>MUST use the `confirmation_view` factory for any accept/decline dialog, or `confirmation_row` when the screen is its own prompt and the two keys close a view built elsewhere. Never build confirm/decline keyboards by hand.</rule>
   <rule>All callbacks involved in a destructive action MUST follow the pattern `DELETE_<DESCRIPTION>` (trigger), `CONFIRM_<DESCRIPTION>` (confirm), `DECLINE_<DESCRIPTION>` (decline). This keeps the flow greppable and consistent across features.</rule>
   <rule>NEVER reimplement date picking. Always use `Calendar` from `views/calendar.py`.</rule>
   <rule>Pass `MessageBase.rich()` output directly as `description`, never flattening it to a string first, since that strips the formatting the message carries.</rule>
@@ -119,6 +119,7 @@ The snapshot below describes the factories that exist at the time of writing. **
 | `change_settings_element_view()` | Settings input with Cancel back to settings |
 | `language_grid_content()` | The language grid as content, the current language accented |
 | `confirmation_view()` | Yes/no confirmation dialog — MUST use for any accept/decline flow |
+| `confirmation_row()` | The two keys of that dialog on their own, for a screen that is its own prompt |
 | `toggle_chip()` | Inline state chip for a boolean setting: green Enabled / red Disabled, tap flips |
 | `reactivation_prompt_view()` | Prompt shown to meeting owner when their inactive meeting is accessed |
 
@@ -169,6 +170,7 @@ Screens rendered *from* a domain model (the meeting card, its settings and inlin
 | `owner_card.py` | `owner_view` and the section builders of its body |
 | `attendees.py` | The participants section of the owner card, and the attendance questions it asks |
 | `shared_card.py` | `external_view`, `inline_view`, `build_inline_keyboard` |
+| `delete_prompt.py` | `delete_prompt_view`, the card of a meeting about to be deleted |
 | `settings_card.py` | `settings_view` |
 | `audience.py` | `view_for` and `keyboard_for_update`, which pick a screen for whoever is looking |
 

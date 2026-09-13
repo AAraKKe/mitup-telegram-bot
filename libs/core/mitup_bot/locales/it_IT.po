@@ -594,7 +594,7 @@ msgid "MeetingLifecycleMessages.REACTIVATE_SUCCESS"
 msgstr "Incontro riattivato. Ora puoi modificarlo e condividerlo di nuovo."
 
 msgid "MeetingLifecycleMessages.DELETE_CONFIRMATION"
-msgstr "Vuoi davvero eliminare questo incontro?"
+msgstr "Questo elimina l'incontro per sempre. Non si può annullare."
 
 msgid "MeetingLifecycleMessages.DELETE_SUCCESS"
 msgstr "Incontro eliminato."
@@ -1252,6 +1252,12 @@ msgstr "Eliminali tutti"
 
 msgid "ButtonMessages.DECLINE_DELETE_ALL_PAST_MEETINGS"
 msgstr "Conservali"
+
+msgid "ButtonMessages.CONFIRM_DELETE_MEETING"
+msgstr "Eliminalo per sempre"
+
+msgid "ButtonMessages.DECLINE_DELETE_MEETING"
+msgstr "Conservalo"
 
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
 msgstr "Questo elimina tutti i tuoi incontri passati, ${count} in totale. Non si può annullare."

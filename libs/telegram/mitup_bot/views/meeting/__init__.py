@@ -10,6 +10,7 @@ One module per surface, plus the pieces they share:
 - `attendees`: the participants section of that card.
 - `shared_card`: the meeting as everyone else sees it, in the bot chat and inline, and the
   screen shown after leaving it from the bot chat.
+- `delete_prompt`: the card of a meeting about to be deleted, closed by the two keys deciding it.
 - `list_card`: the meeting as one section of a list screen.
 - `notifications`: the cards telling a participant their meeting is about to start, or has,
   and the digests telling an owner their meetings are about to be deleted, or have been.
@@ -22,6 +23,7 @@ __all__ = (
     "banner_content",
     "behavior_view",
     "build_inline_keyboard",
+    "delete_prompt_view",
     "deletion_notice_view",
     "deletion_warning_view",
     "external_view",
@@ -47,6 +49,7 @@ __all__ = (
 
 from .audience import keyboard_for_update, view_for
 from .banner import banner_content, meeting_photos
+from .delete_prompt import delete_prompt_view
 from .images_card import images_locked_view, images_view, remove_all_images_prompt, remove_image_prompt
 from .list_card import list_heading, meeting_list_section
 from .notifications import deletion_notice_view, deletion_warning_view, started_view, starting_soon_view

@@ -594,7 +594,7 @@ msgid "MeetingLifecycleMessages.REACTIVATE_SUCCESS"
 msgstr "Das Treffen wurde reaktiviert. Du kannst es jetzt erneut bearbeiten und teilen."
 
 msgid "MeetingLifecycleMessages.DELETE_CONFIRMATION"
-msgstr "Bist du sicher, dass du dieses Treffen löschen willst?"
+msgstr "Damit wird das Treffen endgültig gelöscht. Das lässt sich nicht rückgängig machen."
 
 msgid "MeetingLifecycleMessages.DELETE_SUCCESS"
 msgstr "Treffen gelöscht."
@@ -1251,6 +1251,12 @@ msgid "ButtonMessages.CONFIRM_DELETE_ALL_PAST_MEETINGS"
 msgstr "Alle löschen"
 
 msgid "ButtonMessages.DECLINE_DELETE_ALL_PAST_MEETINGS"
+msgstr "Behalten"
+
+msgid "ButtonMessages.CONFIRM_DELETE_MEETING"
+msgstr "Endgültig löschen"
+
+msgid "ButtonMessages.DECLINE_DELETE_MEETING"
 msgstr "Behalten"
 
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"

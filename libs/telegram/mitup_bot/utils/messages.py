@@ -132,6 +132,9 @@ class ButtonMessages(MessageBase):
     DELETE_ALL_PAST_MEETINGS = f"{Emojis.DELETE} Delete all past meetings"
     CONFIRM_DELETE_ALL_PAST_MEETINGS = "Delete them all"
     DECLINE_DELETE_ALL_PAST_MEETINGS = "Keep them"
+    # The keys of the prompt under a single meeting's card.
+    CONFIRM_DELETE_MEETING = "Delete it for good"
+    DECLINE_DELETE_MEETING = "Keep it"
     EDIT = f"{Emojis.EDIT} Edit"
     SHARE = f"{Emojis.SHARE} Share"
     # Redraws the card in place with the meeting's current state.
@@ -632,7 +635,7 @@ class MeetingInviteMessages(MessageBase):
 class MeetingLifecycleMessages(MessageBase):
     PAST_DESCRIPTION = "This meeting is no longer active. Reactivate it to share it again, or delete it permanently."
     REACTIVATE_SUCCESS = "Meeting reactivated. You can edit and share it again."
-    DELETE_CONFIRMATION = "Are you sure you want to delete this meeting?"
+    DELETE_CONFIRMATION = "This deletes the meeting for good. It cannot be undone."
     DELETE_SUCCESS = "Meeting deleted."
     DELETE_DECLINED = "The meeting won't be deleted"
     DELETE_ALL_CONFIRMATION = "This deletes every past meeting you have, ${count} in total. It cannot be undone."

@@ -6,13 +6,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot import guards
+from mitup_bot.api_wrapper import replace_message
 from mitup_bot.db import with_session
-from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
-from mitup_bot.utils import ButtonMessages, MeetingLifecycleMessages
+from mitup_bot.utils import MeetingLifecycleMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import MitupView, factory
+from mitup_bot.views import factory
 from mitup_bot.views import meeting as meeting_views
 
 from ..registry import HandlersRegistry
@@ -35,7 +35,7 @@ async def callback_query_delete_meeting(session: AsyncSession, update: Update, c
 
     user = await guards.current_user(update, session)
 
-    await guards.meeting(
+    meeting = await guards.meeting(
         session,
         user,
         callback_data.id,
@@ -48,9 +48,9 @@ async def callback_query_delete_meeting(session: AsyncSession, update: Update, c
 
     await context.api.edit_message(
         update=update,
-        view=factory.confirmation_view(
+        view=meeting_views.delete_prompt_view(
             guards.render_context(user, update, context),
-            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.rich(lang=user.lang),
+            meeting,
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING.with_id(callback_data.id),
             decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(callback_data.id),
         ),
@@ -69,9 +69,8 @@ async def callback_query_confirm_delete_meeting(session: AsyncSession, update: U
 
     user = await guards.current_user(update, session)
 
-    # lock: the invited-user cleanup below reads joined_links and the DELETE races with concurrent
-    # joins (a link inserted between the read and the delete would leak its invited user), so the
-    # meeting is resolved under the per-meeting row lock.
+    # The invited-user cleanup reads joined_links and the DELETE races with concurrent joins, so
+    # the meeting is resolved under the per-meeting row lock.
     meeting = await guards.meeting(
         session,
         user,
@@ -82,9 +81,8 @@ async def callback_query_confirm_delete_meeting(session: AsyncSession, update: U
         lock=True,
     )
 
-    # Rendered (and queued) before the rows are deleted below; the edits themselves run after
-    # the deletion commits. The tapped message is left out of the fan-out because this handler
-    # edits it itself, straight to the deleted screen, so the banner never flashes on it first.
+    # Rendered (and queued) before the rows are deleted below; the edits themselves run after the
+    # deletion commits. The tapped message is left out because this handler replaces it itself.
     await context.api.update_meeting_messages(
         meeting=meeting,
         current_message=meeting.message_from_update(update),
@@ -92,13 +90,10 @@ async def callback_query_confirm_delete_meeting(session: AsyncSession, update: U
         was_deleted=True,
     )
 
-    # Keep all invited users ides to also delete them
     invited_users_ids = [cast(int, link.user_id) for link in meeting.joined_links if link.user.tg_user_id == -1]
 
-    # The rows go for good, so this line is the only evidence any of them existed. The invited ids
-    # are named individually because they are the answer to "why was user N deleted?" — the meeting
-    # that took them is otherwise unrecoverable. Written before the DELETEs, while the counts still
-    # have something to count.
+    # The rows go for good, so this line is the only evidence any of them existed. Written before
+    # the DELETEs, while the counts still have something to count.
     log.info(
         "Meeting deleted",
         user_id=user.db_id,
@@ -114,18 +109,12 @@ async def callback_query_confirm_delete_meeting(session: AsyncSession, update: U
     await session.exec(delete(User).where(col(User.id).in_(invited_users_ids)))
     await session.delete(meeting)
 
-    view = MitupView(
+    view = factory.main_menu_view(
+        guards.render_context(user, update, context),
         message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user.lang),
-        menu=[
-            [
-                ButtonConfig(
-                    text=ButtonMessages.ACTIVE_MEETINGS.back(lang=user.lang),
-                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
-                )
-            ]
-        ],
+        counts=await user.meeting_counts(session),
     )
-    await context.api.edit_message(update=update, view=view)
+    await replace_message(context.api, update, view)
 
 
 @HandlersRegistry.register_callback_query(

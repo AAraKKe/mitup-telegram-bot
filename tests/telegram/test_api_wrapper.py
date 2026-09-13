@@ -1,5 +1,6 @@
 """Tests for the real TelegramApi class with a mocked bot."""
 
+import datetime as dt
 import logging
 import re
 import warnings
@@ -27,6 +28,7 @@ from mitup_bot.api_wrapper import (
     ANSWER_INLINE_QUERY_ENDPOINT,
     CALLBACK_QUERY_TEXT_LIMIT,
     EDIT_MESSAGE_TEXT_ENDPOINT,
+    MESSAGE_DELETION_WINDOW,
     QUEUED_CALL_ATTEMPTS,
     SEND_RICH_MESSAGE_ENDPOINT,
     ApiOutbox,
@@ -43,7 +45,9 @@ from mitup_bot.api_wrapper import (
     chat_member_is_present,
     handle_edit_errors,
     meeting_job_key,
+    message_is_deletable,
     modelled_endpoint_advisory,
+    replace_message,
     silence_modelled_endpoint_advisory,
 )
 from mitup_bot.card_refresh import RefreshQueue
@@ -75,8 +79,18 @@ from mitup_bot.utils.rich_message import (
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.meeting import shared_card
-from tests.helpers import RichCall, log_record, make_test_metrics_client, only_rich_call, rich_call, rich_calls
-from tests.helpers.fixtures import create_joined_link, create_meetup, create_message, create_user
+from tests.helpers import (
+    MockApi,
+    RichCall,
+    UpdateRequest,
+    log_record,
+    make_test_metrics_client,
+    only_rich_call,
+    rich_call,
+    rich_calls,
+)
+from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID, FRESH_MESSAGE_DATE
+from tests.helpers.fixtures import create_joined_link, create_meetup, create_message, create_update, create_user
 from tests.helpers.monitoring import MetricAssertions
 
 
@@ -807,6 +821,95 @@ async def test_edit_message_raises_no_message_available(telegram_api: TelegramAp
 
 
 # ---------------------------------------------------------------------------
+# delete_message and replace_message
+# ---------------------------------------------------------------------------
+
+
+def callback_update(message_date: dt.datetime) -> Update:
+    return create_update(UpdateRequest(callback_query=cb.MAIN_MENU, message_date=message_date))
+
+
+async def test_delete_message_removes_the_tapped_message(telegram_api: TelegramApi, bot: AsyncMock):
+    bot.delete_message.return_value = True
+
+    assert await telegram_api.delete_message(callback_update(FRESH_MESSAGE_DATE)) is True
+
+    bot.delete_message.assert_awaited_once_with(DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID)
+
+
+@pytest.mark.parametrize(
+    "error_message",
+    ["Message to delete not found", "Message can't be deleted"],
+    ids=["already_gone", "too_old"],
+)
+async def test_delete_message_answers_false_when_telegram_keeps_it(
+    telegram_api: TelegramApi, bot: AsyncMock, error_message: str
+):
+    """Both answers leave the chat as the caller wanted it, so neither reaches the error handler."""
+    bot.delete_message.side_effect = BadRequest(error_message)
+
+    assert await telegram_api.delete_message(callback_update(FRESH_MESSAGE_DATE)) is False
+
+
+async def test_delete_message_reraises_other_bad_request(telegram_api: TelegramApi, bot: AsyncMock):
+    bot.delete_message.side_effect = BadRequest("Chat not found")
+
+    with pytest.raises(BadRequest):
+        await telegram_api.delete_message(callback_update(FRESH_MESSAGE_DATE))
+
+
+async def test_delete_message_refuses_an_inline_addressed_message(telegram_api: TelegramApi):
+    update = MagicMock(spec=Update)
+    update.effective_message = None
+    update.callback_query.inline_message_id = "inline_999"
+
+    with pytest.raises(NoMessageAvailable):
+        await telegram_api.delete_message(update)
+
+
+@pytest.mark.parametrize(
+    "message_date, deletable",
+    [
+        (FRESH_MESSAGE_DATE, True),
+        (dt.datetime.now(dt.UTC) - MESSAGE_DELETION_WINDOW - dt.timedelta(minutes=1), False),
+    ],
+    ids=["inside_the_window", "past_the_window"],
+)
+def test_a_message_is_deletable_only_inside_telegrams_window(message_date: dt.datetime, deletable: bool):
+    assert message_is_deletable(callback_update(message_date)) is deletable
+
+
+def test_an_inline_addressed_message_is_never_deletable():
+    update = create_update(UpdateRequest(callback_query=cb.MAIN_MENU, from_bot_chat=False))
+
+    assert message_is_deletable(update) is False
+
+
+async def test_replace_message_dissolves_the_tapped_message_and_sends_the_view():
+    api = MockApi()
+    update = callback_update(FRESH_MESSAGE_DATE)
+    view = MitupView(RichContent("fresh screen"), [])
+
+    await replace_message(api, update, view)
+
+    api.assert_delete_message_called(update)
+    api.assert_send_message_called(update, view)
+    api.assert_edit_message_not_called()
+
+
+async def test_replace_message_edits_over_a_message_too_old_to_delete():
+    api = MockApi()
+    update = callback_update(dt.datetime.now(dt.UTC) - MESSAGE_DELETION_WINDOW - dt.timedelta(minutes=1))
+    view = MitupView(RichContent("fresh screen"), [])
+
+    await replace_message(api, update, view)
+
+    api.assert_edit_message_called(update, view)
+    api.assert_delete_message_not_called()
+    api.assert_send_message_not_called()
+
+
+# ---------------------------------------------------------------------------
 # answer_inline_query
 # ---------------------------------------------------------------------------
 
@@ -1329,6 +1432,7 @@ async def test_enqueued_calls_declare_whether_a_repeat_can_double_post(telegram_
     await telegram_api.send_message(update, "sent")
     await telegram_api.send_message_to_user(create_user(id=1, tg_user_id=100), "dm")
     await telegram_api.edit_message(update, "edited")
+    await telegram_api.delete_message(callback_update(FRESH_MESSAGE_DATE))
     await telegram_api.answer_callback_query(update, "ack", show_alert=False)
     await telegram_api.update_single_meeting_message(msg, meeting)
     telegram_api.end_capture()
@@ -1337,6 +1441,7 @@ async def test_enqueued_calls_declare_whether_a_repeat_can_double_post(telegram_
         "send_message": False,
         "send_message_to_user": False,
         "edit_message": True,
+        "delete_message": True,
         "answer_callback_query": True,
         "update_meeting_message": True,
     }

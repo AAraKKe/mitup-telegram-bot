@@ -1,3 +1,4 @@
+import datetime as dt
 import json
 import re
 import warnings
@@ -66,6 +67,12 @@ MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
     re.compile(r"Chat not found"),
 ]
 EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS = [re.compile(r"Message is not modified")]
+# A message Telegram will not remove: already gone, or past the window a bot may delete its
+# own messages in. Both leave the chat as the caller wanted it, so neither raises.
+MESSAGE_NOT_DELETED_ERROR_PATTERNS = [
+    re.compile(r"message to delete not found", re.IGNORECASE),
+    re.compile(r"message can't be deleted", re.IGNORECASE),
+]
 # Sending custom_emoji entities requires the bot owner's Telegram Premium; when that lapses
 # Telegram rejects the whole call. Matched conservatively: only errors that name the entity.
 CUSTOM_EMOJI_REJECTION_PATTERN = re.compile(r"custom[ _]emoji", re.IGNORECASE)
@@ -595,6 +602,22 @@ def edit_target(update: Update) -> EditTarget:
     raise NoMessageAvailable("Cannot edit message, neither message_id nor inline_message_id is available")
 
 
+# Telegram lets a bot remove its own message in a private chat only while it is under 48 hours old.
+MESSAGE_DELETION_WINDOW = dt.timedelta(hours=48)
+
+
+def message_is_deletable(update: Update) -> bool:
+    """Whether the bot may still remove the message *update* was tapped on.
+
+    A message addressed by `inline_message_id` sits in a chat the bot is not in, and an
+    inaccessible one carries the epoch as its date, so both read as undeletable.
+    """
+    query = update.callback_query
+    if query is None or query.inline_message_id is not None or query.message is None:
+        return False
+    return dt.datetime.now(dt.UTC) - query.message.date < MESSAGE_DELETION_WINDOW
+
+
 def ambient_update_id() -> int | None:
     """The update this invocation runs under, bound once by the handler entry point.
 
@@ -638,6 +661,7 @@ class TelegramApiWrapper(Protocol):
         on_unreachable: Sequence[Callable[[User], None]] | None = None,
     ): ...
     async def edit_message(self, update: Update, view: MitupView | RichContent | str) -> Message | bool: ...
+    async def delete_message(self, update: Update) -> bool: ...
     async def edit_message_for_user(
         self, user: User, message_id: int, view: MitupView | RichContent | str
     ) -> Message | bool: ...
@@ -682,6 +706,20 @@ class TelegramApiWrapper(Protocol):
     async def is_chat_member(self, chat_id: int, tg_user_id: int) -> bool: ...
     async def is_chat_admin(self, chat_id: int, tg_user_id: int) -> bool: ...
     async def is_chat_banned(self, chat_id: int, tg_user_id: int) -> bool: ...
+
+
+async def replace_message(api: TelegramApiWrapper, update: Update, view: MitupView | RichContent | str):
+    """Put *view* in the chat in place of the tapped message.
+
+    Every client plays a dissolve animation on a message the bot removes, so the screen the tap
+    acted on is seen going away. Past the deletion window there is nothing to dissolve and *view*
+    is edited over it instead.
+    """
+    if not message_is_deletable(update):
+        await api.edit_message(update=update, view=view)
+        return
+    await api.delete_message(update=update)
+    await api.send_message(update=update, view=view)
 
 
 class _ImmediateApi:
@@ -1121,6 +1159,28 @@ class TelegramApi:
                 view.carries_custom_emoji,
             )
         return False
+
+    async def delete_message(self, update: Update) -> bool:
+        """Remove the message *update* was tapped on, answering whether Telegram took it."""
+        chat_id, message_id, _ = edit_target(update)
+        if chat_id is None or message_id is None:
+            raise NoMessageAvailable("Cannot delete message, it is addressed by inline_message_id")
+        return await self._call_or_enqueue(
+            "delete_message",
+            partial(self._delete_message_now, chat_id, message_id),
+            False,
+            {"chat_id": chat_id, "message_id": message_id},
+            idempotent=True,
+        )
+
+    async def _delete_message_now(self, chat_id: int, message_id: int) -> bool:
+        try:
+            return await self.adapter.bot.delete_message(chat_id, message_id)
+        except BadRequest as error:
+            if not any(pattern.findall(error.message) for pattern in MESSAGE_NOT_DELETED_ERROR_PATTERNS):
+                raise
+            log.info("Message to delete stays in the chat", reason="message_not_deleted", chat_id=chat_id)
+            return False
 
     async def edit_message_for_user(
         self, user: User, message_id: int, view: MitupView | RichContent | str

@@ -9,6 +9,8 @@ DEFAULT_CURRENT_MESSAGE = Message(id=99999, inline_message_id="default_current_m
 
 
 DEFAULT_TEST_DATE = dt.datetime(2023, 1, 1, 12, 00, tzinfo=dt.UTC)
+# A message the bot may still delete: the fixed test date is long past the 48 hour window.
+FRESH_MESSAGE_DATE = dt.datetime.now(dt.UTC)
 DEFAULT_USER_ID = 123
 DEFAULT_CHAT_ID = 123
 DEFAULT_MESSAGE_ID = 123

@@ -594,7 +594,7 @@ msgid "MeetingLifecycleMessages.REACTIVATE_SUCCESS"
 msgstr "Evento reativado. Você pode editá-lo e compartilhá-lo novamente."
 
 msgid "MeetingLifecycleMessages.DELETE_CONFIRMATION"
-msgstr "Tem certeza de que deseja excluir este evento?"
+msgstr "Isso exclui o evento de vez. Não é possível desfazer."
 
 msgid "MeetingLifecycleMessages.DELETE_SUCCESS"
 msgstr "Evento excluído."
@@ -1251,6 +1251,12 @@ msgid "ButtonMessages.CONFIRM_DELETE_ALL_PAST_MEETINGS"
 msgstr "Excluir todos"
 
 msgid "ButtonMessages.DECLINE_DELETE_ALL_PAST_MEETINGS"
+msgstr "Manter"
+
+msgid "ButtonMessages.CONFIRM_DELETE_MEETING"
+msgstr "Excluir de vez"
+
+msgid "ButtonMessages.DECLINE_DELETE_MEETING"
 msgstr "Manter"
 
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"

@@ -71,6 +71,8 @@ class UpdateRequest:
             message of a media group. Defaults to None.
         language_code (str | None, optional): When set, overrides the sender's Telegram ``language_code``
             (the IETF BCP-47 client-language tag). Defaults to None, leaving the fixture user's value.
+        message_date (dt.datetime, optional): When the message the update carries was sent. Handlers
+            that delete the message they were tapped on read it. Defaults to DEFAULT_TEST_DATE.
     """
 
     user: bool = True
@@ -92,6 +94,7 @@ class UpdateRequest:
     chat_join_request: bool = False
     language_code: str | None = None
     rich_message: bool = False
+    message_date: dt.datetime = DEFAULT_TEST_DATE
 
 
 def create_meetup(
@@ -362,6 +365,14 @@ def callback_query_from_callback_data(
     )
 
 
+def callback_message(request: UpdateRequest, tg_message: Message | None, chat: Chat, user: TgUser) -> Message:
+    """The message a callback query sits on. A request with the default date keeps the fixture
+    message."""
+    if tg_message is not None and request.message_date == DEFAULT_TEST_DATE:
+        return tg_message
+    return Message(DEFAULT_MESSAGE_ID, date=request.message_date, chat=chat, from_user=user, text="")
+
+
 def create_test_app() -> Application:
     builder = ApplicationBuilder()
     # The bot needs to be set but we canont allow it to have defaults or
@@ -407,7 +418,7 @@ def create_update(
             "update_id": DEFAULT_MESSAGE_ID,
             "message": {
                 "message_id": DEFAULT_MESSAGE_ID,
-                "date": int(DEFAULT_TEST_DATE.timestamp()),
+                "date": int(request.message_date.timestamp()),
                 "chat": chat.to_dict(),
                 "from": user.to_dict(),
                 "rich_message": {"kind": "rich"},
@@ -424,7 +435,7 @@ def create_update(
             text = f"{text} {request.command_args}"
         message = Message(
             DEFAULT_MESSAGE_ID,
-            date=DEFAULT_TEST_DATE,
+            date=request.message_date,
             chat=chat,
             from_user=user,
             entities=[MessageEntity(type=MessageEntity.BOT_COMMAND, offset=0, length=len(bot_command) + 1, user=user)],
@@ -433,8 +444,7 @@ def create_update(
         return Update(DEFAULT_MESSAGE_ID, message=message)
 
     if request.callback_query:
-        # If no message provided for callback, create a minimal one
-        msg = tg_message or Message(DEFAULT_MESSAGE_ID, date=DEFAULT_TEST_DATE, chat=chat, from_user=user, text="")
+        msg = callback_message(request, tg_message, chat, user)
 
         # If no default callback query provided, create one
         default_cb = tg_callback_query or CallbackQuery(
@@ -489,7 +499,7 @@ def create_update(
         DEFAULT_MESSAGE_ID,
         Message(
             DEFAULT_MESSAGE_ID,
-            date=DEFAULT_TEST_DATE,
+            date=request.message_date,
             chat=chat,
             from_user=user,
             text=request.message_text,

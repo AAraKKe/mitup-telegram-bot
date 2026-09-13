@@ -6,12 +6,11 @@ from telegram import Update
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.meeting import MeetingHandlerId
-from mitup_bot.keyboards import ButtonConfig
-from mitup_bot.models import Settings, User
+from mitup_bot.models import MeetingCounts, Settings, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.utils.messages import ButtonMessages, MeetingLifecycleMessages
-from mitup_bot.views import MitupView, RenderContext, factory
+from mitup_bot.utils.messages import MeetingLifecycleMessages
+from mitup_bot.views import RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     AnyFloat,
@@ -23,10 +22,15 @@ from tests.helpers import (
     create_meetup,
     create_message,
 )
-from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID
+from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID, FRESH_MESSAGE_DATE
 from tests.helpers.fixtures import create_joined_link, create_user
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
+from tests.helpers.types import SeedMeetingCounts
+
+CONFIRM_DELETE_FRESH_MESSAGE = UpdateRequest(
+    callback_query=cb.CONFIRM_DELETE_MEETING.with_id(1), message_date=FRESH_MESSAGE_DATE
+)
 
 
 def failure_cases(callback_data: CallbackData):
@@ -74,9 +78,9 @@ async def test_delete_meeting_works(
     mock_session.assert_not_deleted()
     context.api.assert_edit_message_called(
         update,
-        factory.confirmation_view(
+        meeting_views.delete_prompt_view(
             RenderContext(lang=user_with_settings.lang),
-            message=MeetingLifecycleMessages.DELETE_CONFIRMATION.rich(lang=user_with_settings.lang),
+            user_with_settings.meetups[0],
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING.with_id(1),
             decline_callback_data=cb.DECLINE_DELETE_MEETING.with_id(1),
         ),
@@ -168,14 +172,17 @@ async def test_delete_meeting_buttons_fails_with_meeting_that_does_not_belong_to
         )
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(1))], indirect=True)
-async def test_confirm_delete_meeting_works(
+@pytest.mark.parametrize("update", [CONFIRM_DELETE_FRESH_MESSAGE], indirect=True)
+async def test_confirm_delete_meeting_dissolves_the_card_and_opens_the_main_menu(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
     handler_context: HandlerContext,
+    seed_meeting_counts: SeedMeetingCounts,
 ):
     mock_session.add_object(user_with_settings, "tg_user_id")
+    counts = MeetingCounts(active=2, joined=1, past=3)
+    seed_meeting_counts(user_with_settings, counts)
 
     meeting_deleted = user_with_settings.meetups[0]
     mock_session.add_object(meeting_deleted)
@@ -184,38 +191,56 @@ async def test_confirm_delete_meeting_works(
 
     mock_session.assert_deleted(meeting_deleted)
 
-    # Regression for issue #171: the success view must route back to the Active
-    # meetings list the user came from, not the Main Menu.
-    expected_view = MitupView(
-        message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user_with_settings.lang),
-        menu=[
-            [
-                ButtonConfig(
-                    text=ButtonMessages.ACTIVE_MEETINGS.back(lang=user_with_settings.lang),
-                    callback_data=cb.SHOW_ACTIVE_MEETING_PAGE.with_id(1),
-                )
-            ]
-        ],
+    context.api.assert_delete_message_called(update)
+    context.api.assert_send_message_called(
+        update,
+        factory.main_menu_view(
+            RenderContext(lang=user_with_settings.lang),
+            message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user_with_settings.lang),
+            counts=counts,
+        ),
     )
+    context.api.assert_edit_message_not_called()
 
-    context.api.assert_edit_message_called(update, expected_view)
-    context.api.assert_method_just_called("send_message", times=0)
-
-    # The handler already edited the tapped message, so the update of the stored meeting messages skips it
+    # The tapped message goes from the chat, so the fan-out over the stored ones leaves it out.
     context.api.assert_update_meeting_messages_called(
         meeting=meeting_deleted, current_message=None, skip_current=True, was_deleted=True
     )
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING.with_id(1))], indirect=True)
+async def test_confirm_delete_meeting_edits_a_card_too_old_to_delete(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """The fixture stamps the tapped message long past Telegram's deletion window."""
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(user_with_settings.meetups[0])
+
+    context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, handler_context=handler_context)
+
+    context.api.assert_edit_message_called(
+        update,
+        factory.main_menu_view(
+            RenderContext(lang=user_with_settings.lang),
+            message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user_with_settings.lang),
+            counts=MeetingCounts(active=0, joined=0, past=0),
+        ),
+    )
+    context.api.assert_delete_message_not_called()
+    context.api.assert_send_message_not_called()
+
+
+@pytest.mark.parametrize("update", [CONFIRM_DELETE_FRESH_MESSAGE], indirect=True)
 async def test_confirm_delete_redraws_an_already_stored_bot_chat_message_only_once(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    """Without the skip, the stored message would first get the deleted-meeting banner and then the
-    handler's deleted screen."""
+    """Without the skip, the stored message would get the deleted-meeting banner on its way out."""
     mock_session.add_object(user_with_settings, "tg_user_id")
     meeting = user_with_settings.meetups[0]
     mock_session.add_object(meeting)
@@ -229,7 +254,7 @@ async def test_confirm_delete_redraws_an_already_stored_bot_chat_message_only_on
 
     context, _ = await call_handler(MeetingHandlerId.CONFIRM_DELETE_MEETING_CALLBACK, handler_context=handler_context)
 
-    context.api.assert_method_just_called("edit_message", times=1)
+    context.api.assert_delete_message_called(update)
     context.api.assert_update_meeting_messages_called(
         meeting=meeting, current_message=linked_message, skip_current=True, was_deleted=True
     )

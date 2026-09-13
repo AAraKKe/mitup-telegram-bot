@@ -78,6 +78,9 @@ class MockApi(TelegramApi):
     def edit_message(self, update: Update, view: MitupView | RichContent | str):
         return self.call_mock("edit_message", update=update, view=view)
 
+    def delete_message(self, update: Update):
+        return self.call_mock("delete_message", update=update)
+
     def edit_message_for_user(self, user: User, message_id: int, view: MitupView | RichContent | str):
         return self.call_mock("edit_message_for_user", user=user, message_id=message_id, view=view)
 
@@ -321,6 +324,15 @@ class MockApi(TelegramApi):
 
     def assert_edit_message_not_called(self):
         self.mock_method("edit_message").assert_not_called()
+
+    def assert_delete_message_called(self, update: Update, times: int = 1):
+        if times == 1:
+            assert_awaited_once_with_diff(self.mock_method("delete_message"), update=update)
+        else:
+            assert_awaited_with_diff(self.mock_method("delete_message"), times, update=update)
+
+    def assert_delete_message_not_called(self):
+        self.mock_method("delete_message").assert_not_called()
 
     def assert_method_called(
         self,

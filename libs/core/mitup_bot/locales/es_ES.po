@@ -594,7 +594,7 @@ msgid "MeetingLifecycleMessages.REACTIVATE_SUCCESS"
 msgstr "La quedada ha sido reactivada. Ahora puedes editarla y compartirla de nuevo."
 
 msgid "MeetingLifecycleMessages.DELETE_CONFIRMATION"
-msgstr "¿Estás seguro de que quieres eliminar esta quedada?"
+msgstr "Esto elimina la quedada para siempre. No se puede deshacer."
 
 msgid "MeetingLifecycleMessages.DELETE_SUCCESS"
 msgstr "La quedada se ha eliminado correctamente"
@@ -1252,6 +1252,12 @@ msgstr "Eliminarlas todas"
 
 msgid "ButtonMessages.DECLINE_DELETE_ALL_PAST_MEETINGS"
 msgstr "Conservarlas"
+
+msgid "ButtonMessages.CONFIRM_DELETE_MEETING"
+msgstr "Eliminarla para siempre"
+
+msgid "ButtonMessages.DECLINE_DELETE_MEETING"
+msgstr "Conservarla"
 
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
 msgstr "Esto elimina todas las quedadas pasadas que tienes, ${count} en total. No se puede deshacer."

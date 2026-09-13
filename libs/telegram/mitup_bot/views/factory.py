@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from mitup_bot import docs_links
 from mitup_bot.callback_data import CallbackData
-from mitup_bot.keyboards import ButtonConfig, Keyboard
+from mitup_bot.keyboards import ButtonConfig, ButtonRow, ButtonStyle, Keyboard
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import MeetingCounts, Settings, User
 from mitup_bot.supporter import SupporterLevel
@@ -375,6 +375,24 @@ def broadcast_recipient_view(body: str, lang: str) -> MitupView:
     return MitupView(RichContent.from_markup(body), broadcast_recipient_keyboard(lang))
 
 
+def confirmation_row(
+    lang: str,
+    *,
+    confirm_callback_data: CallbackData,
+    decline_callback_data: CallbackData,
+    confirm_label: ButtonMessages = ButtonMessages.CONFIRM,
+    decline_label: ButtonMessages = ButtonMessages.DECLINE,
+    confirm_style: ButtonStyle | None = "success",
+    decline_style: ButtonStyle | None = "danger",
+) -> ButtonRow:
+    """The two keys a confirmation closes on. A caller overrides the labels where a bare "Confirm"
+    would under-describe the act, and the styles where the confirm key is the destructive one."""
+    return [
+        ButtonConfig(text=confirm_label.text(lang=lang), callback_data=confirm_callback_data, style=confirm_style),
+        ButtonConfig(text=decline_label.text(lang=lang), callback_data=decline_callback_data, style=decline_style),
+    ]
+
+
 def confirmation_view(
     ctx: RenderContext,
     *,
@@ -383,28 +401,24 @@ def confirmation_view(
     decline_callback_data: CallbackData,
     confirm_label: ButtonMessages = ButtonMessages.CONFIRM,
     decline_label: ButtonMessages = ButtonMessages.DECLINE,
+    confirm_style: ButtonStyle | None = "success",
+    decline_style: ButtonStyle | None = "danger",
     photos: Sequence[RichPhoto] = (),
 ) -> MitupView:
-    """Accept/decline dialog. The labels default to the generic pair, and a caller overrides them
-    where a bare "Confirm" would under-describe what is being agreed to: a prompt whose whole
-    purpose is to make someone stop and read needs a button that names the act. *photos* are the
-    ones the message shows, when the prompt draws what is about to go."""
-    lang = ctx.lang
+    """Accept/decline dialog. *photos* are the ones the message shows, when the prompt draws what
+    is about to go."""
     return MitupView(
         message,
         [
-            [
-                ButtonConfig(
-                    text=confirm_label.text(lang=lang),
-                    callback_data=confirm_callback_data,
-                    style="success",
-                ),
-                ButtonConfig(
-                    text=decline_label.text(lang=lang),
-                    callback_data=decline_callback_data,
-                    style="danger",
-                ),
-            ],
+            confirmation_row(
+                ctx.lang,
+                confirm_callback_data=confirm_callback_data,
+                decline_callback_data=decline_callback_data,
+                confirm_label=confirm_label,
+                decline_label=decline_label,
+                confirm_style=confirm_style,
+                decline_style=decline_style,
+            )
         ],
         photos=photos,
     )
