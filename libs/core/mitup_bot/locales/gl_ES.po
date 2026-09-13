@@ -579,7 +579,7 @@ msgid "MeetingInviteMessages.MEETING_FULL"
 msgstr "Sen lugares\n\nA lista de convidados está chea. Non podes engadir a ninguén máis a menos que se libere un lugar."
 
 msgid "MeetingInviteMessages.INVITES_DISABLED"
-msgstr "Lista de convidados pechada\n\nXa non se permiten máis convites nesta quedada. O organizador pechou a lista."
+msgstr "Lista de convidados pechada\n\nXa non se permiten máis convites nesta quedada. Quen organiza a quedada pechou a lista."
 
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
 msgstr "Quedada non atopada\n\nA quedada á que intentas convidar a alguén non existe."

@@ -579,7 +579,7 @@ msgid "MeetingInviteMessages.MEETING_FULL"
 msgstr "Sem vagas\n\nA lista de convidados está cheia. Você não pode adicionar mais ninguém, a menos que uma vaga abra."
 
 msgid "MeetingInviteMessages.INVITES_DISABLED"
-msgstr "Lista de convidados fechada\n\nNão é mais possível adicionar convidados a este evento. O organizador fechou a lista."
+msgstr "Lista de convidados fechada\n\nNão é mais possível adicionar convidados a este evento. Quem organiza o evento fechou a lista."
 
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
 msgstr "Evento não encontrado\n\nO evento para o qual você está tentando convidar alguém não existe mais."
@@ -687,7 +687,7 @@ msgid "MeetingEditParticipantsMessages.KICK_OUT_CONFIRMATION"
 msgstr "Tem certeza de que deseja remover <b>${participant}</b> do evento <b>${meeting_title}</b>?"
 
 msgid "MeetingEditParticipantsMessages.KICK_OUT_NOT_IN_MEETING"
-msgstr "O participante que você tentou remover não está mais no evento."
+msgstr "A pessoa que você tentou remover não está mais no evento."
 
 msgid "MeetingEditParticipantsMessages.MAX_ON_EXIT"
 msgstr "<i>Você estava definindo o limite de participantes.</i>\nEnvie o número máximo de participantes para continuar, ou toque em ${button_cancel} para sair."
@@ -882,7 +882,7 @@ msgid "CollaborateMessages.UNLINK_CONFIRM_HOST"
 msgstr "<b>Desconectar sua conta do Patreon?</b>\n\nVocê é um ${current_tier} hoje. Desconectar desativa seu selo de ${current_tier} e seus limites ampliados, e seu acesso ao Grupo Exclusivo de Hosts termina.\n\nSua contribuição no Patreon não é cancelada automaticamente. Se quiser parar de pagar, cancele-a no Patreon. Se você conectar sua conta novamente enquanto sua contribuição estiver ativa, suas vantagens de Host voltam."
 
 msgid "CollaborateMessages.LINK_CONFIRMED_NO_PATRON"
-msgstr "<b>Conta do Patreon conectada</b>\n\nVocê está conectado. Torne-se um Host para desbloquear suas vantagens de Host. Elas serão ativadas automaticamente assim que sua contribuição estiver ativa."
+msgstr "<b>Conta do Patreon conectada</b>\n\nSua conta está conectada. Torne-se um Host para desbloquear suas vantagens de Host. Elas serão ativadas automaticamente assim que sua contribuição estiver ativa."
 
 msgid "CollaborateMessages.LINK_CONFIRM"
 msgstr "<b>${patreon_name}</b>\n\nEssa é a conta do Patreon que este link conectaria ao Mitup.\n\nVocê só deveria estar vendo isto logo depois de você ter autorizado pessoalmente o Mitup no Patreon. Se você não acabou de fazer isso, o link de outra pessoa chegou a este chat.\n\nEntão conecte esta conta só se você reconhecer o nome, e toque em Agora não se ele não significar nada para você. De um jeito ou de outro, nada muda até você confirmar."

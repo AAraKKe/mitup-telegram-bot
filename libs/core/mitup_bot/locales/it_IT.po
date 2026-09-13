@@ -579,7 +579,7 @@ msgid "MeetingInviteMessages.MEETING_FULL"
 msgstr "Nessun posto libero\n\nLa lista degli ospiti è attualmente piena. Non puoi aggiungere nessun altro a meno che non si liberi un posto."
 
 msgid "MeetingInviteMessages.INVITES_DISABLED"
-msgstr "Lista degli ospiti chiusa\n\nNon si possono più aggiungere persone a questo incontro. L'organizzatore ha chiuso la lista."
+msgstr "Lista degli ospiti chiusa\n\nNon si possono più aggiungere persone a questo incontro. Chi organizza l'incontro ha chiuso la lista."
 
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
 msgstr "Incontro non trovato\n\nL'incontro a cui stai cercando di invitare qualcuno non esiste più."
@@ -687,7 +687,7 @@ msgid "MeetingEditParticipantsMessages.KICK_OUT_CONFIRMATION"
 msgstr "Vuoi davvero cacciare <b>${participant}</b> dall'incontro <b>${meeting_title}</b>?"
 
 msgid "MeetingEditParticipantsMessages.KICK_OUT_NOT_IN_MEETING"
-msgstr "Il partecipante che hai cercato di cacciare non è più nell'incontro."
+msgstr "La persona che hai cercato di cacciare non è più nell'incontro."
 
 msgid "MeetingEditParticipantsMessages.MAX_ON_EXIT"
 msgstr "<i>Stavi impostando il limite di partecipanti.</i>\nInvia il numero massimo di partecipanti per continuare, oppure tocca ${button_cancel} per uscire."

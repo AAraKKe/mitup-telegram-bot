@@ -57,7 +57,7 @@ and register. They take priority over existing `.po` entries when there is a con
 ## Punctuation
 
 - Exclamations always open with inverted mark: `¡Estás dentro!`
-- Questions always open with inverted mark: `¿Estás seguro?`
+- Questions always open with inverted mark: `¿Seguro que quieres continuar?` (never `¿Estás seguro?`, which genders the reader)
 
 ## Grammar
 

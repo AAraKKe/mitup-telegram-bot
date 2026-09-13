@@ -564,7 +564,7 @@ msgid "MeetingInviteMessages.PROMPT"
 msgstr "<b>Añadir a la lista de invitados</b>\n\nPor favor, responde con el nombre de la persona que quieres añadir."
 
 msgid "MeetingInviteMessages.CONFIRMATION"
-msgstr "<b>Confirmar invitación</b>\n\n¿Estás seguro de que quieres añadir a <b>${name}</b> a la quedada <b>${meeting_title}</b>?"
+msgstr "<b>Confirmar invitación</b>\n\n¿Seguro que quieres añadir a <b>${name}</b> a la quedada <b>${meeting_title}</b>?"
 
 msgid "MeetingInviteMessages.OPEN_CHAT"
 msgstr "Abrir chat privado\n\nPara añadir participantes, necesitas abrir un chat conmigo primero."
@@ -579,7 +579,7 @@ msgid "MeetingInviteMessages.MEETING_FULL"
 msgstr "No quedan plazas\n\nLa lista de invitados está completa. No puedes añadir a nadie más a menos que se libere una plaza."
 
 msgid "MeetingInviteMessages.INVITES_DISABLED"
-msgstr "Lista de invitados cerrada\n\nYa no se permiten más invitaciones para esta quedada. El organizador ha cerrado la lista."
+msgstr "Lista de invitados cerrada\n\nYa no se permiten más invitaciones para esta quedada. Quien organiza la quedada ha cerrado la lista."
 
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
 msgstr "Quedada no encontrada\n\nLa quedada a la que intentas invitar a alguien ya no existe."
@@ -684,10 +684,10 @@ msgid "MeetingEditParticipantsMessages.KICK_OUT_DESCRIPTION"
 msgstr "Estas son las personas que se han unido a la quedada. Escoge a quién quieres expulsar."
 
 msgid "MeetingEditParticipantsMessages.KICK_OUT_CONFIRMATION"
-msgstr "¿Estás seguro de que quieres expulsar a <b>${participant}</b> de la quedada <b>${meeting_title}</b>?"
+msgstr "¿Seguro que quieres expulsar a <b>${participant}</b> de la quedada <b>${meeting_title}</b>?"
 
 msgid "MeetingEditParticipantsMessages.KICK_OUT_NOT_IN_MEETING"
-msgstr "El participante que intentaste expulsar ya no está en la quedada."
+msgstr "La persona que intentaste expulsar ya no está en la quedada."
 
 msgid "MeetingEditParticipantsMessages.MAX_ON_EXIT"
 msgstr "<i>Estabas poniendo el límite de participantes.</i>\nEnvíame el número máximo de participantes para continuar, o toca ${button_cancel} para salir."

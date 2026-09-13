@@ -579,7 +579,7 @@ msgid "MeetingInviteMessages.MEETING_FULL"
 msgstr "Keine Plätze mehr\n\nDie Gästeliste ist derzeit voll. Du kannst niemanden hinzufügen, es sei denn, es wird ein Platz frei."
 
 msgid "MeetingInviteMessages.INVITES_DISABLED"
-msgstr "Gästeliste geschlossen\n\nFür dieses Treffen können keine Gäste mehr hinzugefügt werden. Der Veranstalter hat die Liste geschlossen."
+msgstr "Gästeliste geschlossen\n\nFür dieses Treffen können keine Gäste mehr hinzugefügt werden. Wer das Treffen organisiert, hat die Liste geschlossen."
 
 msgid "MeetingInviteMessages.MEETING_NOT_FOUND"
 msgstr "Treffen nicht gefunden\n\nDas Treffen, zu dem du jemanden einladen möchtest, existiert nicht mehr."
@@ -687,7 +687,7 @@ msgid "MeetingEditParticipantsMessages.KICK_OUT_CONFIRMATION"
 msgstr "Bist du sicher, dass du <b>${participant}</b> aus dem Treffen <b>${meeting_title}</b> entfernen möchtest?"
 
 msgid "MeetingEditParticipantsMessages.KICK_OUT_NOT_IN_MEETING"
-msgstr "Der Teilnehmer, den du entfernen wolltest, ist nicht mehr im Treffen."
+msgstr "Die Person, die du entfernen wolltest, ist nicht mehr im Treffen."
 
 msgid "MeetingEditParticipantsMessages.MAX_ON_EXIT"
 msgstr "<i>Du warst gerade dabei, das Teilnehmerlimit festzulegen.</i>\nSende die maximale Anzahl an Teilnehmern, um fortzufahren, oder tippe auf ${button_cancel}."
