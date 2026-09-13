@@ -59,7 +59,7 @@ The list above is illustrative — treat `messages.py` as the source of truth an
   <rule>NEVER use MarkdownV2 syntax (`*bold*`, `_italic_`) in message values. Use the HTML-like tags listed below.</rule>
   <rule>Template placeholders use `${variable_name}` syntax — not `{variable_name}` or `%s`.</rule>
   <rule>An unclosed or unbalanced inline-formatting tag raises when the message renders, which in a catalog nobody reads in every language means a screen that fails for one language alone. Always close every tag you open.</rule>
-  <rule>A short status or label string (e.g. "Enabled") may render in exactly ONE sentence context. Gendered languages must inflect it to agree with what it describes, so reusing it under a second referent makes correct translation impossible. When a new screen needs the same English word, add a new enum member instead of reusing the existing one.</rule>
+  <rule>A short status or label string (e.g. "Enabled") may render in exactly ONE sentence context. Gendered languages must inflect it to agree with what it describes, so reusing it under a second referent makes correct translation impossible. When a new screen needs the same English word, add a new enum member instead of reusing the existing one, and give it English that differs by at least a word: a `StrEnum` makes a member with an equal value an alias of the first, so `CLEAR_DESCRIPTION = "Remove"` next to `REMOVE = "Remove"` is the same member and the same msgid.</rule>
 </critical_rules>
 
 ## Rendering strings: `.rich()` / `.text()` / `.back()`
