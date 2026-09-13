@@ -402,6 +402,23 @@ The annotation chips render in the 70 px gutter on either side of the chat. Keep
 
 **User names in chat showcases must be fictitious.** Use plausible first names or first-name-plus-surname, varied across pages. The canon examples are `Ana`, `Ana Marín`, `Marta`, `Diego`, `Sara`, `Tomás` (already used in the home-page animation). Never use real maintainer or contributor names. The same rule applies anywhere a user identity appears — message senders, "Created by:" lines, avatar initials, participant lists, annotation labels.
 
+### `.mitup-two-up`
+
+Puts two showcases side by side, each with a caption line under it, for a page that shows a pair of screens without walking through either. The items are centred against each other so a short screen sits level with a tall one, nested showcases lose their annotation gutter, and the pair collapses to one column under 768px.
+
+```html
+<div class="mitup-two-up">
+  <div class="mitup-two-up__item">
+    <!-- a .mitup-annotated showcase -->
+    <span class="mitup-two-up__caption">Main menu</span>
+  </div>
+  <div class="mitup-two-up__item">
+    <!-- a second .mitup-annotated showcase -->
+    <span class="mitup-two-up__caption">Your settings</span>
+  </div>
+</div>
+```
+
 ### Admonitions
 
 Use mkdocs-material admonition syntax. **Never** write raw HTML divs for callouts. The Markdown form gets the right Material icon and the tinted styling automatically.

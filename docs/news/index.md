@@ -10,6 +10,15 @@ Announcements, milestones, and notes on where Mitup is headed. Newest first.
 
 <div class="grid cards" markdown>
 
+- :fontawesome-solid-newspaper: **Mitup 2.0**
+
+    ---
+    <span class="news-card__date">19 September 2026</span>
+
+    Every screen rebuilt on Telegram's new message format. Editing happens on the meeting card itself, photos come to Hosts, and this is the first of many updates.
+
+    [Read the post →](mitup_2_0.md)
+
 - :fontawesome-solid-newspaper: **Does Telegram have events like WhatsApp?**
 
     ---

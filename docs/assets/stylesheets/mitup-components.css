@@ -9,6 +9,8 @@
                                   (animations, multi-step shots)
    ・ .mitup-annotated            annotated chat showcase
                                   (static explainers, user-guide)
+   ・ .mitup-two-up               a pair of showcases side by side,
+                                  each with a caption under it
    ・ .md-typeset .admonition     mkdocs-material admonitions —
                                   re-styled to the "single tint
                                   with hairline under title" look.
@@ -845,4 +847,50 @@
   .mlc__stage { max-width: none; width: 100%; }
   .mlc__arrow { flex-direction: row; }
   .mlc__arrow-glyph { transform: rotate(90deg); }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   .mitup-two-up: a pair of showcases side by side
+   ─────────────────────────────────────────────────────────────
+   Each item holds a showcase and a caption line under it; the
+   items are centred against each other and collapse to one
+   column under 768px.
+   ───────────────────────────────────────────────────────────── */
+.mitup-two-up {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  margin: 1.6em 0;
+}
+.mitup-two-up__item {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 340px;
+}
+.mitup-two-up .mitup-annotated {
+  --gutter: 0px;
+  max-width: none;
+  padding: 0;
+  box-sizing: border-box;
+}
+.mitup-two-up .mitup-annotation { display: none; }
+.mitup-two-up__caption {
+  display: block;
+  margin-top: 10px;
+  text-align: center;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--mitup-ink-3);
+}
+@media (max-width: 768px) {
+  .mitup-two-up {
+    flex-direction: column;
+    gap: 22px;
+  }
+  .mitup-two-up__item {
+    width: 100%;
+    max-width: 340px;
+  }
 }
