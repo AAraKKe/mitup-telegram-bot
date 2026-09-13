@@ -212,6 +212,12 @@ msgstr "Limit ändern"
 msgid "ButtonMessages.REMOVE"
 msgstr "Entfernen"
 
+msgid "ButtonMessages.REMOVE_LIMIT"
+msgstr "Aufheben"
+
+msgid "ButtonMessages.CLEAR_DESCRIPTION"
+msgstr "Löschen"
+
 msgid "ButtonMessages.MAKE_SEARCHABLE"
 msgstr "Auffindbar machen"
 
@@ -633,7 +639,7 @@ msgid "MeetingEditContentMessages.DESCRIPTION_TOO_LONG"
 msgstr "Die Beschreibung ist ${length} Zeichen lang und damit über dem Limit von ${limit}. Sende mir eine kürzere."
 
 msgid "MeetingEditContentMessages.REMOVE_DESCRIPTION_CONFIRMATION"
-msgstr "Bist du sicher, dass du die Beschreibung deines Treffens entfernen möchtest?\n\n${description}"
+msgstr "Bist du sicher, dass du die Beschreibung deines Treffens löschen möchtest?\n\n${description}"
 
 msgid "MeetingEditLocationMessages.NAME_PROMPT"
 msgstr "Sende mir den Namen des Ortes."

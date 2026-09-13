@@ -39,7 +39,7 @@ def kick_out_users_view(meeting: Meetup, current_user: User) -> MitupView:
             continue
         name = participant_name(participant)
         chip = ButtonConfig(
-            text=ButtonMessages.REMOVE.text(lang=current_user.lang),
+            text=ButtonMessages.MEETING_KICK_OUT.text(lang=current_user.lang),
             callback_data=cb.EDIT_MEETING_KICK_OUT_ACTION.with_ids(meeting.db_id, participant.user.db_id),
             style="danger",
         )

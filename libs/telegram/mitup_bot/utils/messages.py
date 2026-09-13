@@ -154,6 +154,10 @@ class ButtonMessages(MessageBase):
     SET_PARTICIPANT_LIMIT = "Set limit"
     CHANGE_PARTICIPANT_LIMIT = "Change limit"
     REMOVE = "Remove"
+    # Chips that take one thing off the card each carry their own label; equal English values would
+    # collapse into one enum member and one translation.
+    CLEAR_DESCRIPTION = "Clear"
+    REMOVE_LIMIT = "Remove it"
     ADD_IMAGES = "+ Add images"
     EDIT_IMAGES = f"{Emojis.EDIT} Edit images"
     # Images screen chips: Replace acts on one photo, Remove all on every photo.

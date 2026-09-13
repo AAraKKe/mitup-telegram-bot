@@ -46,7 +46,7 @@ def test_kickout_view_lists_every_participant_with_a_kick_chip():
         assert (
             button_markup(
                 ButtonConfig(
-                    text=ButtonMessages.REMOVE.text(lang=current_user.lang),
+                    text=ButtonMessages.MEETING_KICK_OUT.text(lang=current_user.lang),
                     callback_data=cb.EDIT_MEETING_KICK_OUT_ACTION.with_ids(meetup.db_id, participant.db_id),
                     style="danger",
                 )

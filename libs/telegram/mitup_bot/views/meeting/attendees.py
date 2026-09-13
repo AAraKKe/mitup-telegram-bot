@@ -41,7 +41,7 @@ def editor_participants_chips(meeting: Meetup) -> RichContent:
     # The remove chip needs a set limit to remove: a capped owner with no explicit limit already
     # sits at the plan's cap, which is not removable.
     if meeting.max_members is not None:
-        chips.append(meeting_chip(ButtonMessages.REMOVE, meeting, cb.DELETE_MEETING_LIMIT, style="danger"))
+        chips.append(meeting_chip(ButtonMessages.REMOVE_LIMIT, meeting, cb.DELETE_MEETING_LIMIT, style="danger"))
     if any(link.user_id != meeting.owner_id for link in meeting.joined_links):
         chips.append(
             ButtonConfig(

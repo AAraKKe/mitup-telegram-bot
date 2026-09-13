@@ -186,10 +186,10 @@ msgid "ButtonMessages.SELECT_DATE_FIRST"
 msgstr "Escolle primeiro unha data"
 
 msgid "ButtonMessages.REMOVE_DATETIME"
-msgstr "Quitar data e hora"
+msgstr "Eliminar data e hora"
 
 msgid "ButtonMessages.REMOVE_END_DATETIME"
-msgstr "Quitar hora de remate"
+msgstr "Eliminar hora de remate"
 
 msgid "ButtonMessages.SET_END_DATETIME"
 msgstr "+ Definir hora de remate"
@@ -210,7 +210,13 @@ msgid "ButtonMessages.CHANGE_PARTICIPANT_LIMIT"
 msgstr "Cambiar límite"
 
 msgid "ButtonMessages.REMOVE"
-msgstr "Quitar"
+msgstr "Eliminar"
+
+msgid "ButtonMessages.REMOVE_LIMIT"
+msgstr "Quitalo"
+
+msgid "ButtonMessages.CLEAR_DESCRIPTION"
+msgstr "Borrar"
 
 msgid "ButtonMessages.MAKE_SEARCHABLE"
 msgstr "Permite a busca"
@@ -633,7 +639,7 @@ msgid "MeetingEditContentMessages.DESCRIPTION_TOO_LONG"
 msgstr "Esa descrición ten ${length} caracteres, por enriba do límite de ${limit}. Envíame unha máis curta."
 
 msgid "MeetingEditContentMessages.REMOVE_DESCRIPTION_CONFIRMATION"
-msgstr "Seguro que queres quitar a descrición da túa quedada?\n\n${description}"
+msgstr "Seguro que queres borrar a descrición da túa quedada?\n\n${description}"
 
 msgid "MeetingEditLocationMessages.NAME_PROMPT"
 msgstr "Envíame o nome do lugar."
@@ -654,10 +660,10 @@ msgid "MeetingEditLocationMessages.COORDINATES_ON_EXIT"
 msgstr "<i>Estabas a definir a localización.</i>\nEnvía a localización da quedada para continuar, ou toca ${button_cancel} para saír."
 
 msgid "MeetingEditLocationMessages.REMOVE_NAME_CONFIRMATION"
-msgstr "Isto quita o nome do lugar da quedada. Seguro que queres continuar?"
+msgstr "Isto elimina o nome do lugar da quedada. Seguro que queres continuar?"
 
 msgid "MeetingEditLocationMessages.REMOVE_COORDINATES_CONFIRMATION"
-msgstr "Isto quita a localización da quedada. Seguro que queres continuar?"
+msgstr "Isto elimina a localización da quedada. Seguro que queres continuar?"
 
 msgid "MeetingEditParticipantsMessages.LIMIT_PROMPT"
 msgstr "Envíame o número máximo de participantes que admite a quedada (debe ser un número maior que 0)."
@@ -741,10 +747,10 @@ msgid "MeetingEditDateTimeMessages.START_IN_PAST"
 msgstr "A hora de inicio non pode estar no pasado."
 
 msgid "MeetingEditWhenMessages.REMOVE_TIMES_CONFIRMATION"
-msgstr "Isto quita a hora de inicio da quedada, e con ela a hora de remate. Seguro que queres continuar?"
+msgstr "Isto elimina a hora de inicio da quedada, e con ela a hora de remate. Seguro que queres continuar?"
 
 msgid "MeetingEditWhenMessages.REMOVE_END_CONFIRMATION"
-msgstr "Isto quita a hora de remate da quedada. Seguro que queres continuar?"
+msgstr "Isto elimina a hora de remate da quedada. Seguro que queres continuar?"
 
 msgid "MeetingEditDurationMessages.EXPLANATION"
 msgstr "A quedada comeza o <b>${start_datetime}</b>. Escolle no calendario a data e a hora en que remata.\n\n<i>Consello: tamén podes enviar unha mensaxe usando ${datetime_link} para definir a data e a hora dunha vez.</i>"
@@ -1128,7 +1134,7 @@ msgid "ButtonMessages.REPLACE"
 msgstr "Substituír"
 
 msgid "ButtonMessages.REMOVE_ALL"
-msgstr "Quitar todas"
+msgstr "Eliminar todas"
 
 msgid "ButtonMessages.COLLAGE"
 msgstr "Colaxe"
@@ -1161,7 +1167,7 @@ msgid "MeetingImagesMessages.LOCKED"
 msgstr "As fotos na páxina da quedada son unha das vantaxes de Host. Faite Host de Mitup en Patreon para levalas ás túas quedadas. Tes todos os detalles en Colabora, xusto debaixo."
 
 msgid "MeetingImagesMessages.LIMIT_REACHED"
-msgstr "Esta quedada xa ten as súas ${limit} fotos. Quita unha para facer sitio a outra."
+msgstr "Esta quedada xa ten as súas ${limit} fotos. Elimina unha para facer sitio a outra."
 
 msgid "MeetingImagesMessages.SEND_AS_PHOTO"
 msgstr "Iso chegou como ficheiro. Envíao como foto para poñelo na páxina."
@@ -1194,10 +1200,10 @@ msgid "MeetingCardSectionMessages.END_TIME"
 msgstr "Hora de remate: ${when}"
 
 msgid "MeetingImagesMessages.REMOVE_CONFIRMATION"
-msgstr "Isto quita a imaxe ${number} da tarxeta. Seguro que queres continuar?"
+msgstr "Isto elimina a imaxe ${number} da tarxeta. Seguro que queres continuar?"
 
 msgid "MeetingImagesMessages.REMOVE_ALL_CONFIRMATION"
-msgstr "Isto quita todas as fotos da tarxeta. Seguro que queres continuar?"
+msgstr "Isto elimina todas as fotos da tarxeta. Seguro que queres continuar?"
 
 msgid "SettingsMessages.DELETION_WARNING_LINE"
 msgstr "${days} días antes de que unha quedada se elimine definitivamente"

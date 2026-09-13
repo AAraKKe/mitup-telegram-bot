@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-09-12 22:00\n"
+"PO-Revision-Date: 2026-09-13 12:04\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -232,6 +232,12 @@ msgstr "Change limit"
 
 msgid "ButtonMessages.REMOVE"
 msgstr "Remove"
+
+msgid "ButtonMessages.CLEAR_DESCRIPTION"
+msgstr "Clear"
+
+msgid "ButtonMessages.REMOVE_LIMIT"
+msgstr "Remove it"
 
 msgid "ButtonMessages.ADD_IMAGES"
 msgstr "+ Add images"

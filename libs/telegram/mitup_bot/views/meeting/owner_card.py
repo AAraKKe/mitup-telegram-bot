@@ -38,7 +38,7 @@ def editor_description_lines(meeting: Meetup) -> RichContent:
     if description is None:
         return button_content(meeting_chip(ButtonMessages.ADD_DESCRIPTION, meeting, cb.EDIT_MEETING_DESCRIPTION))
     edit = meeting_chip(ButtonMessages.EDIT, meeting, cb.EDIT_MEETING_DESCRIPTION)
-    remove = meeting_chip(ButtonMessages.REMOVE, meeting, cb.DELETE_MEETING_DESCRIPTION, style="danger")
+    remove = meeting_chip(ButtonMessages.CLEAR_DESCRIPTION, meeting, cb.DELETE_MEETING_DESCRIPTION, style="danger")
     # The chips get their own line: trailing a multi-line description, they would wrap apart from
     # each other at whatever point the last line happens to end.
     return render_rich(t"{description}\n{edit} {remove}")
