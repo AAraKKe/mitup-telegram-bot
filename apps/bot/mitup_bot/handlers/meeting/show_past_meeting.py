@@ -148,7 +148,6 @@ async def callback_query_confirm_delete_past_meeting(session: AsyncSession, upda
 
     view = factory.main_menu_view(
         guards.render_context(user, update, context),
-        message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user.lang),
         counts=await user.meeting_counts(session),
     )
     await replace_message(context.api, update, view)

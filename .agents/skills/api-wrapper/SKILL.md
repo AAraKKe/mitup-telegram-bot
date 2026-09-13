@@ -128,8 +128,8 @@ A non-handler broadcast (mutate state, then fan out) wraps each critical section
 | `notify_users_promoted_from_waiting_list()` | Notify users promoted from waiting list |
 
 Beside them, the module-level `replace_message(api, update, view)` puts *view* where the tapped
-message was: it deletes that message and sends the view, so the client plays its dissolve
-animation, and edits instead once `message_is_deletable` reads the message as past the 48 hour
+message was: it deletes that message and sends the view `DISSOLVE_ANIMATION_SECONDS` later, so
+the client's dissolve animation plays out before the view lands, and edits instead once `message_is_deletable` reads the message as past the 48 hour
 window Telegram allows or as addressed by `inline_message_id`. A screen that answers a destructive
 tap uses it rather than calling the three methods itself.
 

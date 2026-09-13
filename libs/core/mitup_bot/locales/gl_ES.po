@@ -602,9 +602,6 @@ msgstr "A quedada foi reactivada. Agora podes editala e compartila de novo."
 msgid "MeetingLifecycleMessages.DELETE_CONFIRMATION"
 msgstr "Isto elimina a quedada para sempre. Non se pode desfacer."
 
-msgid "MeetingLifecycleMessages.DELETE_SUCCESS"
-msgstr "A quedada foi eliminada correctamente."
-
 msgid "MeetingLifecycleMessages.DELETE_DECLINED"
 msgstr "Non se vai eliminar a quedada."
 
@@ -1211,7 +1208,6 @@ msgstr "Aviso de eliminación"
 msgid "SettingsMessages.DELETION_NOTICE_LABEL"
 msgstr "Confirmación de eliminación"
 
-
 msgid "NotificationMessages.DELETION_WARNING_HEADING"
 msgstr "⌛ A piques de eliminarse"
 
@@ -1258,6 +1254,3 @@ msgstr "Conservala"
 
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
 msgstr "Isto elimina todas as quedadas pasadas que tes, ${count} en total. Non se pode desfacer."
-
-msgid "MeetingLifecycleMessages.DELETE_ALL_SUCCESS"
-msgstr "Quedadas pasadas eliminadas: ${count}."

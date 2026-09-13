@@ -662,12 +662,10 @@ class MeetingLifecycleMessages(MessageBase):
     REACTIVATE_SUCCESS = "Meeting reactivated. You can edit and share it again."
     # TRANSLATORS: Line closing the meeting's card on the delete prompt, above the Delete it for good and Keep it keys.
     DELETE_CONFIRMATION = "This deletes the meeting for good. It cannot be undone."
-    DELETE_SUCCESS = "Meeting deleted."
     # TRANSLATORS: Line above the owner's card after tapping Keep it.
     DELETE_DECLINED = "The meeting won't be deleted"
     # TRANSLATORS: Line under the past-meetings list on the delete-all prompt; ${count} is how many meetings it lists.
     DELETE_ALL_CONFIRMATION = "This deletes every past meeting you have, ${count} in total. It cannot be undone."
-    DELETE_ALL_SUCCESS = "Past meetings deleted: ${count}."
 
 
 class MeetingAttachMessages(MessageBase):

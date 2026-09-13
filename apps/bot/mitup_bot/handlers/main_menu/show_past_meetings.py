@@ -200,7 +200,6 @@ async def callback_query_confirm_delete_all_past_meetings(
 
     view = factory.main_menu_view(
         guards.render_context(user, update, context),
-        message=MeetingLifecycleMessages.DELETE_ALL_SUCCESS.rich(lang=user.lang, count=len(past_meetings)),
         counts=await user.meeting_counts(session),
     )
     await replace_message(context.api, update, view)

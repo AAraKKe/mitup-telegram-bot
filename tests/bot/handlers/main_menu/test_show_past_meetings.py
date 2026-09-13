@@ -4,6 +4,7 @@ import re
 import pytest
 from telegram import Update
 
+from mitup_bot.api_wrapper import DISSOLVE_ANIMATION_SECONDS
 from mitup_bot.exceptions import MalformedCallbackData
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.main_menu.show_past_meetings import callback_query_show_past_meeting_page
@@ -288,12 +289,8 @@ def deleted_meetup_ids(session: MockDbSession) -> set[int]:
     return ids
 
 
-def success_view(user: User, count: int, counts: MeetingCounts = NO_MEETINGS_LEFT) -> MitupView:
-    return factory.main_menu_view(
-        RenderContext(lang=user.lang),
-        message=MeetingLifecycleMessages.DELETE_ALL_SUCCESS.rich(lang=user.lang, count=count),
-        counts=counts,
-    )
+def success_view(user: User, counts: MeetingCounts = NO_MEETINGS_LEFT) -> MitupView:
+    return factory.main_menu_view(RenderContext(lang=user.lang), counts=counts)
 
 
 @pytest.mark.parametrize(
@@ -395,7 +392,9 @@ async def test_confirm_delete_all_past_meetings_deletes_every_past_meeting_and_l
 
     assert deleted_meetup_ids(mock_session) == {10, 11, 12}
     context.api.assert_delete_message_called(update)
-    context.api.assert_send_message_called(update, success_view(user_with_settings, 3, counts))
+    context.api.assert_send_message_called(
+        update, success_view(user_with_settings, counts), after_seconds=DISSOLVE_ANIMATION_SECONDS
+    )
     context.api.assert_edit_message_not_called()
     context.api.assert_update_meeting_messages_not_called()
 
@@ -434,7 +433,7 @@ async def test_confirm_delete_all_past_meetings_deletes_nothing_when_the_list_em
     )
 
     assert deleted_meetup_ids(mock_session) == set()
-    context.api.assert_edit_message_called(update, success_view(user_with_settings, 0))
+    context.api.assert_edit_message_called(update, success_view(user_with_settings))
 
 
 @pytest.mark.parametrize(

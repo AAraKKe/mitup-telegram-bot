@@ -602,9 +602,6 @@ msgstr "Evento reativado. Você pode editá-lo e compartilhá-lo novamente."
 msgid "MeetingLifecycleMessages.DELETE_CONFIRMATION"
 msgstr "Isso exclui o evento de vez. Não é possível desfazer."
 
-msgid "MeetingLifecycleMessages.DELETE_SUCCESS"
-msgstr "Evento excluído."
-
 msgid "MeetingLifecycleMessages.DELETE_DECLINED"
 msgstr "O evento não será excluído"
 
@@ -1211,7 +1208,6 @@ msgstr "Aviso de exclusão"
 msgid "SettingsMessages.DELETION_NOTICE_LABEL"
 msgstr "Confirmação de exclusão"
 
-
 msgid "NotificationMessages.DELETION_WARNING_HEADING"
 msgstr "⌛ Prestes a serem excluídos"
 
@@ -1258,6 +1254,3 @@ msgstr "Manter"
 
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
 msgstr "Isso exclui todos os seus eventos anteriores, ${count} no total. Não é possível desfazer."
-
-msgid "MeetingLifecycleMessages.DELETE_ALL_SUCCESS"
-msgstr "Eventos anteriores excluídos: ${count}."

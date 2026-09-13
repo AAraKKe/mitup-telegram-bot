@@ -3,6 +3,7 @@ import logging
 import pytest
 from telegram import Update
 
+from mitup_bot.api_wrapper import DISSOLVE_ANIMATION_SECONDS
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.meeting import MeetingHandlerId
@@ -194,11 +195,8 @@ async def test_confirm_delete_meeting_dissolves_the_card_and_opens_the_main_menu
     context.api.assert_delete_message_called(update)
     context.api.assert_send_message_called(
         update,
-        factory.main_menu_view(
-            RenderContext(lang=user_with_settings.lang),
-            message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user_with_settings.lang),
-            counts=counts,
-        ),
+        factory.main_menu_view(RenderContext(lang=user_with_settings.lang), counts=counts),
+        after_seconds=DISSOLVE_ANIMATION_SECONDS,
     )
     context.api.assert_edit_message_not_called()
 
@@ -224,9 +222,7 @@ async def test_confirm_delete_meeting_edits_a_card_too_old_to_delete(
     context.api.assert_edit_message_called(
         update,
         factory.main_menu_view(
-            RenderContext(lang=user_with_settings.lang),
-            message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user_with_settings.lang),
-            counts=MeetingCounts(active=0, joined=0, past=0),
+            RenderContext(lang=user_with_settings.lang), counts=MeetingCounts(active=0, joined=0, past=0)
         ),
     )
     context.api.assert_delete_message_not_called()

@@ -1,6 +1,7 @@
 import pytest
 from telegram import Update
 
+from mitup_bot.api_wrapper import DISSOLVE_ANIMATION_SECONDS
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import MeetingCounts, Meetup, User
@@ -204,10 +205,9 @@ async def test_confirm_delete_past_meeting_dissolves_the_card_and_opens_the_main
     context.api.assert_send_message_called(
         update,
         factory.main_menu_view(
-            RenderContext(lang=user_with_settings.lang),
-            message=MeetingLifecycleMessages.DELETE_SUCCESS.rich(lang=user_with_settings.lang),
-            counts=MeetingCounts(active=0, joined=0, past=0),
+            RenderContext(lang=user_with_settings.lang), counts=MeetingCounts(active=0, joined=0, past=0)
         ),
+        after_seconds=DISSOLVE_ANIMATION_SECONDS,
     )
     context.api.assert_edit_message_not_called()
 

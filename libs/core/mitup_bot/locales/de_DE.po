@@ -602,9 +602,6 @@ msgstr "Das Treffen wurde reaktiviert. Du kannst es jetzt erneut bearbeiten und 
 msgid "MeetingLifecycleMessages.DELETE_CONFIRMATION"
 msgstr "Damit wird das Treffen endgültig gelöscht. Das lässt sich nicht rückgängig machen."
 
-msgid "MeetingLifecycleMessages.DELETE_SUCCESS"
-msgstr "Treffen gelöscht."
-
 msgid "MeetingLifecycleMessages.DELETE_DECLINED"
 msgstr "Das Treffen wird nicht gelöscht"
 
@@ -1211,7 +1208,6 @@ msgstr "Löschwarnung"
 msgid "SettingsMessages.DELETION_NOTICE_LABEL"
 msgstr "Löschbestätigung"
 
-
 msgid "NotificationMessages.DELETION_WARNING_HEADING"
 msgstr "⌛ Werden bald gelöscht"
 
@@ -1258,6 +1254,3 @@ msgstr "Behalten"
 
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
 msgstr "Damit werden alle deine vergangenen Treffen gelöscht, insgesamt ${count}. Das lässt sich nicht rückgängig machen."
-
-msgid "MeetingLifecycleMessages.DELETE_ALL_SUCCESS"
-msgstr "Gelöschte vergangene Treffen: ${count}."

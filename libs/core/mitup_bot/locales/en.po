@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-09-13 13:15\n"
+"PO-Revision-Date: 2026-09-13 19:51\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -709,9 +709,6 @@ msgstr "Meeting reactivated. You can edit and share it again."
 msgid "MeetingLifecycleMessages.DELETE_CONFIRMATION"
 msgstr "This deletes the meeting for good. It cannot be undone."
 
-msgid "MeetingLifecycleMessages.DELETE_SUCCESS"
-msgstr "Meeting deleted."
-
 #. Line above the owner's card after tapping Keep it.
 msgid "MeetingLifecycleMessages.DELETE_DECLINED"
 msgstr "The meeting won't be deleted"
@@ -719,9 +716,6 @@ msgstr "The meeting won't be deleted"
 #. Line under the past-meetings list on the delete-all prompt; ${count} is how many meetings it lists.
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
 msgstr "This deletes every past meeting you have, ${count} in total. It cannot be undone."
-
-msgid "MeetingLifecycleMessages.DELETE_ALL_SUCCESS"
-msgstr "Past meetings deleted: ${count}."
 
 msgid "MeetingAttachMessages.STATE_NOT_SEARCHABLE"
 msgstr "🔍 Not searchable in this chat yet"
