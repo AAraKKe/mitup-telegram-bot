@@ -25,8 +25,9 @@ UNLINK_EVENT = "Patreon unlink confirmed"
 async def callback_query_collaborate(session: AsyncSession, update: Update, context: TMitupContext):
     # `build_collaborate_view` reads `user.lang`/`user.id`/`user.tg_user_id`/`user.supporter_level`
     # only (never the meetups/joined_links collections), so skip loading them.
+    origin = cb.COLLABORATE.parse(context.match).origin
     user = await guards.current_user(update, session)
-    view = await build_collaborate_view(session, user, context)
+    view = await build_collaborate_view(session, user, context, origin)
     await context.api.edit_message(update=update, view=view)
 
 
@@ -39,17 +40,18 @@ async def callback_query_unlink_patreon(session: AsyncSession, update: Update, c
     tap must not be enough: the prompt spells out what confirming costs, in the variant matching
     the tier the user holds right now.
     """
+    origin = cb.UNLINK_PATREON.parse(context.match).origin
     user = await guards.current_user(update, session)
 
     subscription = await subscription_for_user(session, user)
     if subscription is None:
         # A stale button: nothing is linked, so there is nothing to confirm — show the current
         # screen instead of a prompt about a connection that does not exist.
-        await context.api.edit_message(update=update, view=await build_collaborate_view(session, user, context))
+        await context.api.edit_message(update=update, view=await build_collaborate_view(session, user, context, origin))
         return
 
     view = patreon_unlink_confirmation_view(
-        guards.render_context(user, update, context), current_level=user.supporter_level
+        guards.render_context(user, update, context), current_level=user.supporter_level, origin=origin
     )
     await context.api.edit_message(update=update, view=view)
 
@@ -63,6 +65,7 @@ async def callback_query_confirm_unlink_patreon(session: AsyncSession, update: U
     # `build_collaborate_view`, both of which touch only scalar columns — never the
     # meetups/joined_links collections, so skip loading them. Write mode: the group removal and its
     # DM must only run once the row deletion has committed.
+    origin = cb.CONFIRM_PATREON_UNLINK.parse(context.match).origin
     user = await guards.current_user(update, session)
 
     subscription = await subscription_for_user(session, user)
@@ -107,7 +110,7 @@ async def callback_query_confirm_unlink_patreon(session: AsyncSession, update: U
 
     # The pending delete flushes before build_collaborate_view re-reads the subscription, so the
     # view resolves to the not-linked state; the context line confirms the unlink above it.
-    view = (await build_collaborate_view(session, user, context)).with_context(
+    view = (await build_collaborate_view(session, user, context, origin)).with_context(
         CollaborateMessages.UNLINKED.rich(lang=user.lang)
     )
     await context.api.edit_message(update=update, view=view)
@@ -119,5 +122,6 @@ async def callback_query_confirm_unlink_patreon(session: AsyncSession, update: U
 @with_session
 async def callback_query_decline_unlink_patreon(session: AsyncSession, update: Update, context: TMitupContext):
     """Back out of the unlink prompt: nothing was written, back to the Collaborate screen."""
+    origin = cb.DECLINE_PATREON_UNLINK.parse(context.match).origin
     user = await guards.current_user(update, session)
-    await context.api.edit_message(update=update, view=await build_collaborate_view(session, user, context))
+    await context.api.edit_message(update=update, view=await build_collaborate_view(session, user, context, origin))

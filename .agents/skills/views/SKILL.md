@@ -59,6 +59,13 @@ Carries `message` (`RichContent`), `menu` (list of `ButtonRow`) and `document` (
 - `with_back_button(text, lang, callback_data)` — appends a single back-navigation row.
 - `with_footnote(text)` — appends a footnote (secondary, non-critical info) below the description.
 
+A screen reachable from several places does not decide its own back button. It takes an
+`origin: BackOrigin | None` and closes itself with `back_button_for(origin, lang)` from
+`views/navigation.py`, which resolves the `BackTarget` the tapped callback carried and falls back to
+the main menu when it carried none. The button that opens such a screen names the screen it sits on
+with `with_origin(...)`, and the destination's own sub-screens pass the same origin on to their
+buttons so a deeper back still returns there.
+
 ### `MitupInlineView`
 
 Extends `MitupView` with `title`, `inline_description`, and `id` for use as inline query results.

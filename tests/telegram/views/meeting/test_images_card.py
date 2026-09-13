@@ -1,4 +1,5 @@
 from mitup_bot import limits
+from mitup_bot.callback_data import BackOrigin, BackTarget
 from mitup_bot.images import ImageLayout
 from mitup_bot.models import Meetup
 from mitup_bot.utils import callbacks as cb
@@ -197,12 +198,14 @@ def test_the_locked_screen_keeps_the_title_and_says_what_photos_are_for(lang: st
 
 
 def test_the_locked_screen_offers_the_way_to_become_a_host(lang: str):
+    """Collaborate carries this meeting's editor as its origin, so backing out of it returns to the
+    card the locked screen was opened from."""
     meeting = owned_meeting(lang=lang)
 
     menu = images_card.images_locked_view(meeting).menu
 
     assert [str(button.callback_data) for row in menu for button in row] == [
-        str(cb.COLLABORATE),
+        str(cb.COLLABORATE.with_origin(BackOrigin(BackTarget.MEETING_EDITOR, meeting.db_id))),
         str(cb.EDIT_MEETING.with_id(meeting.db_id)),
     ]
 

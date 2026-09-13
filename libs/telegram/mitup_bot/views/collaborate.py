@@ -1,4 +1,5 @@
 from mitup_bot import docs_links, supporter
+from mitup_bot.callback_data import BackOrigin
 from mitup_bot.emojis import Emojis
 from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.supporter import SupporterLevel
@@ -9,6 +10,7 @@ from mitup_bot.utils.rich_template import render_rich
 from mitup_bot.views import factory
 from mitup_bot.views.context import RenderContext
 from mitup_bot.views.mitup_view import MitupView
+from mitup_bot.views.navigation import back_button_for
 from mitup_bot.views.sections import card_section, chip_section
 
 # The paying tiers in the order the tier table lists them, each with the badge titling its screen.
@@ -19,16 +21,22 @@ TIER_BADGES: dict[SupporterLevel, Emojis] = {
 }
 
 
-def collaborate_button(lang: str) -> ButtonConfig:
-    """Button opening the Collaborate screen, for upsell surfaces outside the main menu."""
-    return ButtonConfig(text=ButtonMessages.COLLABORATE.text(lang=lang), callback_data=cb.COLLABORATE)
+def collaborate_button(lang: str, origin: BackOrigin | None = None) -> ButtonConfig:
+    """Button opening the Collaborate screen, for upsell surfaces outside the main menu.
+
+    *origin* is the screen the button sits on, so the Collaborate screen it opens comes back here
+    instead of dropping the user at the main menu.
+    """
+    return ButtonConfig(
+        text=ButtonMessages.COLLABORATE.text(lang=lang), callback_data=cb.COLLABORATE.with_origin(origin)
+    )
 
 
-def supporter_upsell_view(text: RichContent, lang: str) -> MitupView:
+def supporter_upsell_view(text: RichContent, lang: str, origin: BackOrigin | None = None) -> MitupView:
     """Plan-limit notice sent as a message: the rejection text plus a Collaborate button, so the
     user can act on the upsell right where they hit the limit instead of navigating to the main
     menu first."""
-    return MitupView(message=text, menu=[[collaborate_button(lang)]])
+    return MitupView(message=text, menu=[[collaborate_button(lang, origin)]])
 
 
 def link_confirmation_view(text: RichContent, lang: str) -> MitupView:
@@ -80,7 +88,9 @@ def patreon_link_confirmation_view(
     )
 
 
-def patreon_unlink_confirmation_view(ctx: RenderContext, *, current_level: SupporterLevel) -> MitupView:
+def patreon_unlink_confirmation_view(
+    ctx: RenderContext, *, current_level: SupporterLevel, origin: BackOrigin | None = None
+) -> MitupView:
     """The prompt the Unlink button opens: what disconnecting costs, before anything is written.
 
     ``current_level`` picks the variant: a Host reads which tier gets switched off and that their
@@ -97,8 +107,8 @@ def patreon_unlink_confirmation_view(ctx: RenderContext, *, current_level: Suppo
     return factory.confirmation_view(
         ctx,
         message=message,
-        confirm_callback_data=cb.CONFIRM_PATREON_UNLINK,
-        decline_callback_data=cb.DECLINE_PATREON_UNLINK,
+        confirm_callback_data=cb.CONFIRM_PATREON_UNLINK.with_origin(origin),
+        decline_callback_data=cb.DECLINE_PATREON_UNLINK.with_origin(origin),
         confirm_label=ButtonMessages.CONFIRM_PATREON_UNLINK,
         decline_label=ButtonMessages.DECLINE_PATREON_UNLINK,
     )
@@ -166,8 +176,12 @@ def collaborate_heading(lang: str) -> RichContent:
     return ButtonMessages.COLLABORATE.rich(lang=lang).wrap(RichTag.H2)
 
 
-def unlink_chip(lang: str) -> ButtonConfig:
-    return ButtonConfig(text=ButtonMessages.UNLINK.text(lang=lang), callback_data=cb.UNLINK_PATREON, style="danger")
+def unlink_chip(lang: str, origin: BackOrigin | None = None) -> ButtonConfig:
+    return ButtonConfig(
+        text=ButtonMessages.UNLINK.text(lang=lang),
+        callback_data=cb.UNLINK_PATREON.with_origin(origin),
+        style="danger",
+    )
 
 
 def ways_to_help_section(lang: str) -> RichContent:
@@ -206,19 +220,19 @@ def become_host_section(lang: str) -> RichContent:
     return card_section(CollaborateMessages.BECOME_HOST_TITLE, Emojis.DONATE, lang, body)
 
 
-def collaborate_not_linked_view(lang: str, authorization_url: str) -> MitupView:
+def collaborate_not_linked_view(lang: str, authorization_url: str, origin: BackOrigin | None = None) -> MitupView:
     heading = collaborate_heading(lang).append(CollaborateMessages.PITCH.rich(lang=lang))
     body = RichContent.join(horizontal_rule_content(), [heading, ways_to_help_section(lang), become_host_section(lang)])
     link = ButtonConfig(text=ButtonMessages.LINK_PATREON.text(lang=lang), url=authorization_url, style="primary")
-    return MitupView(message=body, menu=[[link]]).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
+    return MitupView(message=body, menu=[[link]]).with_context_menu([[back_button_for(origin, lang)]])
 
 
-def collaborate_linked_not_patron_view(lang: str, pledge_url: str) -> MitupView:
+def collaborate_linked_not_patron_view(lang: str, pledge_url: str, origin: BackOrigin | None = None) -> MitupView:
     status = chip_section(
         CollaborateMessages.LINKED_TITLE,
         Emojis.LINK,
         lang,
-        unlink_chip(lang),
+        unlink_chip(lang, origin),
         CollaborateMessages.LINKED_NOT_HOST.rich(lang=lang),
     )
     body = RichContent.join(
@@ -226,7 +240,7 @@ def collaborate_linked_not_patron_view(lang: str, pledge_url: str) -> MitupView:
         [collaborate_heading(lang).append(status), ways_to_help_section(lang), become_host_section(lang)],
     )
     pledge = ButtonConfig(text=ButtonMessages.BECOME_PATRON.text(lang=lang), url=pledge_url, style="primary")
-    return MitupView(message=body, menu=[[pledge]]).with_back_button(ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU)
+    return MitupView(message=body, menu=[[pledge]]).with_context_menu([[back_button_for(origin, lang)]])
 
 
 def collaborate_linked_patron_view(
@@ -236,6 +250,7 @@ def collaborate_linked_patron_view(
     scheduling_days: int,
     hosts_group_url: str | None = None,
     in_group: bool = False,
+    origin: BackOrigin | None = None,
 ) -> MitupView:
     """``hosts_group_url`` is the shared group invite link; when it is None the feature is
     unconfigured and the group section is omitted. ``in_group`` picks its chip: Open when the host
@@ -244,7 +259,7 @@ def collaborate_linked_patron_view(
         CollaborateMessages.status_title_for(level),
         TIER_BADGES[level],
         lang,
-        unlink_chip(lang),
+        unlink_chip(lang, origin),
         CollaborateMessages.status_for(level).rich(
             lang=lang, active_meetings=active_meetings, scheduling_days=scheduling_days
         ),
@@ -262,6 +277,6 @@ def collaborate_linked_patron_view(
             )
         )
     blocks.append(ways_to_help_section(lang))
-    return MitupView(message=RichContent.join(horizontal_rule_content(), blocks)).with_back_button(
-        ButtonMessages.MAIN_MENU, lang, cb.MAIN_MENU
+    return MitupView(message=RichContent.join(horizontal_rule_content(), blocks)).with_context_menu(
+        [[back_button_for(origin, lang)]]
     )

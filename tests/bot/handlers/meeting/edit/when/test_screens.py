@@ -6,12 +6,17 @@ screen is rendered in and the timezone the meeting is scheduled in.
 """
 
 import datetime as dt
+from collections.abc import Callable
 
+import pytest
+
+from mitup_bot.callback_data import BackOrigin, BackTarget
 from mitup_bot.handlers.meeting.edit.when import screens
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages
+from mitup_bot.views import MitupView
 from mitup_bot.views.datetime_format import localized_datetime
 from tests.helpers import create_meetup, create_settings, create_user
 
@@ -154,3 +159,22 @@ def test_datetime_cards_name_the_meeting_card_they_return_to():
     assert end.menu[-1] == [
         ButtonConfig(text=ButtonMessages.MEETING.back(lang="en"), callback_data=cb.CANCEL_END_EDIT.with_id(1))
     ]
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: screens.start_horizon_calendar_view("beyond the horizon", "en", 1, STARTS_AT.date()),
+        lambda: screens.start_horizon_reply_view("beyond the horizon", "en", 1),
+        lambda: screens.end_horizon_calendar_view("beyond the horizon", "en", 1, ENDS_AT.date()),
+        lambda: screens.end_horizon_reply_view("beyond the horizon", "en", 1),
+    ],
+    ids=["start_calendar", "start_reply", "end_calendar", "end_reply"],
+)
+def test_every_horizon_upsell_sends_collaborate_back_to_the_meeting(build: Callable[[], MitupView]):
+    """The upsell stands on a meeting being edited, so the Collaborate screen it opens returns to
+    that meeting rather than to the main menu."""
+    view = build()
+
+    collaborate = view.menu[0][0]
+    assert str(collaborate.callback_data) == str(cb.COLLABORATE.with_origin(BackOrigin(BackTarget.MEETING_EDITOR, 1)))

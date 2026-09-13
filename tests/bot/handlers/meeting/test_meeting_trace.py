@@ -222,7 +222,7 @@ def test_the_scheduling_horizon_refusal_names_which_datetime_was_refused(user_wi
 
 def test_the_participant_capacity_refusal_records_what_was_asked_for(user_with_settings: User):
     with capture_logs() as logs:
-        assert participant_capacity_rejection(user_with_settings, 10_000) is not None
+        assert participant_capacity_rejection(user_with_settings, 10_000, meeting_id=7) is not None
 
     refusal = only(logs, "Participant limit refused by plan cap")
     assert (refusal["reason"], refusal["requested_max"]) == ("participant_capacity_cap", 10_000)
@@ -232,7 +232,7 @@ def test_a_limit_within_the_plan_is_not_a_refusal(user_with_settings: User):
     """A warning must never be the only record of a normal outcome, so the allow path is silent here
     and the change itself is recorded by `Meeting capacity changed`."""
     with capture_logs() as logs:
-        assert participant_capacity_rejection(user_with_settings, 2) is None
+        assert participant_capacity_rejection(user_with_settings, 2, meeting_id=7) is None
 
     assert lines(logs, "Participant limit refused by plan cap") == []
 

@@ -5,7 +5,7 @@ import structlog
 from telegram import Update
 
 from mitup_bot import limits, supporter
-from mitup_bot.callback_data import MeetingListSource
+from mitup_bot.callback_data import BackOrigin, BackTarget, MeetingListSource
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import JoinedUsers, Meetup, User
@@ -148,11 +148,11 @@ def scheduling_horizon_rejection(user: User, when: dt.datetime, *, field: str) -
     return message.text(lang=user.lang, days=days)
 
 
-def participant_capacity_rejection(user: User, max_members: int) -> RichContent | None:
+def participant_capacity_rejection(user: User, max_members: int, meeting_id: int) -> RichContent | None:
     """Rejection when a capped owner sets a participant limit above their cap, else None.
 
     Patron and Organizer owners are uncapped, so they never hit this; a capped owner is pointed at
-    Collaborate through the button the text itself carries.
+    Collaborate through the button the text itself carries, which comes back to this meeting.
     """
     cap = limits.participant_capacity(user)
     if cap is None or max_members <= cap:
@@ -166,7 +166,9 @@ def participant_capacity_rejection(user: User, max_members: int) -> RichContent 
         supporter_level=user.supporter_level.value,
     )
     return SupporterMessages.PARTICIPANT_CAPACITY_EXCEEDED.rich(
-        lang=user.lang, cap=cap, button_collaborate=collaborate_button(user.lang)
+        lang=user.lang,
+        cap=cap,
+        button_collaborate=collaborate_button(user.lang, BackOrigin(BackTarget.MEETING_EDITOR, meeting_id)),
     )
 
 

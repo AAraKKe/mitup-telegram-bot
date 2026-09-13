@@ -8,6 +8,7 @@ from pydantic import SecretStr
 from telegram import Update
 
 from mitup_bot import patreon, supporter
+from mitup_bot.callback_data import BackOrigin, BackTarget
 from mitup_bot.config import BotConfig, LimitsConfig, PatreonConfig
 from mitup_bot.custom_context import BOT_CONFIG_KEY
 from mitup_bot.handlers.collaborate.entry import UNLINK_EVENT
@@ -587,6 +588,120 @@ async def test_declining_unlink_returns_to_collaborate_unchanged(
             user_with_settings.lang, SupporterLevel.HOST_2, PATRON_ACTIVE_MEETINGS, PATRON_SCHEDULING_DAYS
         ),
     )
+
+
+# --- Where Collaborate goes back to ---
+#
+# Collaborate is reachable from the main menu and from every plan-limit upsell, so the screen it
+# opens takes its back button from the origin the tapped button carried, and hands that origin to
+# the buttons leading deeper into it.
+
+MEETING_ORIGIN = BackOrigin(BackTarget.MEETING_EDITOR, 7)
+MEETING_EDITOR_WIRE = "edit;meeting:7"
+
+
+@pytest.mark.parametrize(
+    "update, expected_wire",
+    [
+        (UpdateRequest(callback_query=cb.COLLABORATE), "show;main_menu:"),
+        (UpdateRequest(callback_query=cb.COLLABORATE.with_origin(MEETING_ORIGIN)), MEETING_EDITOR_WIRE),
+    ],
+    ids=["from_the_main_menu", "from_a_meeting_editor"],
+    indirect=["update"],
+)
+async def test_collaborate_goes_back_to_where_it_was_opened_from(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    patreon_config: PatreonConfig,
+    expected_wire: str,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(CollaborateHandlerId.SHOW, handler_context=handler_context)
+
+    view = context.api.call_args("edit_message").kwargs["view"]
+    back_button = view.menu[-1][0]
+    assert str(back_button.callback_data) == expected_wire
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.COLLABORATE.with_origin(MEETING_ORIGIN))], indirect=True
+)
+async def test_the_unlink_chip_hands_the_origin_on(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    patreon_config: PatreonConfig,
+):
+    """The chip that opens the unlink prompt carries the origin, so backing out of the prompt still
+    lands on the screen Collaborate was opened from."""
+    user_with_settings.supporter_level = SupporterLevel.HOST_2
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    subscription = create_supporter_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
+    mock_session.add_object(subscription, "user_id")
+
+    context, _ = await call_handler(CollaborateHandlerId.SHOW, handler_context=handler_context)
+
+    view = context.api.call_args("edit_message").kwargs["view"]
+    assert str(cb.UNLINK_PATREON.with_origin(MEETING_ORIGIN)) in view.message.html
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.UNLINK_PATREON.with_origin(MEETING_ORIGIN))], indirect=True
+)
+async def test_the_unlink_prompt_carries_the_origin_on_both_answers(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    patreon_config: PatreonConfig,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    subscription = create_supporter_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
+    mock_session.add_object(subscription, "user_id")
+
+    context, _ = await call_handler(CollaborateHandlerId.UNLINK, handler_context=handler_context)
+
+    view = context.api.call_args("edit_message").kwargs["view"]
+    confirm, decline = view.menu[0]
+    assert str(confirm.callback_data) == str(cb.CONFIRM_PATREON_UNLINK.with_origin(MEETING_ORIGIN))
+    assert str(decline.callback_data) == str(cb.DECLINE_PATREON_UNLINK.with_origin(MEETING_ORIGIN))
+
+
+@pytest.mark.parametrize(
+    "update, handler_id",
+    [
+        (
+            UpdateRequest(callback_query=cb.DECLINE_PATREON_UNLINK.with_origin(MEETING_ORIGIN)),
+            CollaborateHandlerId.UNLINK_DECLINE,
+        ),
+        (
+            UpdateRequest(callback_query=cb.CONFIRM_PATREON_UNLINK.with_origin(MEETING_ORIGIN)),
+            CollaborateHandlerId.UNLINK_CONFIRM,
+        ),
+    ],
+    ids=["declining", "confirming"],
+    indirect=["update"],
+)
+async def test_answering_the_unlink_prompt_returns_to_the_origin(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    patreon_config: PatreonConfig,
+    handler_id: CollaborateHandlerId,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    subscription = create_supporter_subscription(user_id=user_with_settings.db_id, patreon_user_id="patreon-1")
+    mock_session.add_object(subscription, "user_id")
+
+    context, _ = await call_handler(handler_id, handler_context=handler_context)
+
+    view = context.api.call_args("edit_message").kwargs["view"]
+    assert str(view.menu[-1][0].callback_data) == MEETING_EDITOR_WIRE
 
 
 # --- The tier-loss trail ---

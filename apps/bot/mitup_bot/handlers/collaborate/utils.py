@@ -3,6 +3,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import patreon, supporter
+from mitup_bot.callback_data import BackOrigin
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import SupporterSubscription, User
 from mitup_bot.patreon import oauth
@@ -46,8 +47,13 @@ async def hosts_group_button_state(context: TMitupContext, tg_user_id: int) -> t
     return invite_url, in_group
 
 
-async def build_collaborate_view(session: AsyncSession, user: User, context: TMitupContext) -> MitupView:
+async def build_collaborate_view(
+    session: AsyncSession, user: User, context: TMitupContext, origin: BackOrigin | None = None
+) -> MitupView:
     """Resolve which of the three Collaborate states the user is in and build its view.
+
+    *origin* is the screen the user opened Collaborate from; it decides the back button and rides
+    on every button that leads deeper into this screen.
 
     The resolved state is logged rather than inferred later: "I was shown the wrong screen" is
     otherwise answerable only by replaying the Patreon trail against a since-changed row. The
@@ -58,17 +64,17 @@ async def build_collaborate_view(session: AsyncSession, user: User, context: TMi
     subscription = await subscription_for_user(session, user)
     if subscription is None:
         log_screen_resolved(user, state="not_linked", has_subscription=False)
-        return collaborate_not_linked_view(user.lang, oauth.authorization_url(config))
+        return collaborate_not_linked_view(user.lang, oauth.authorization_url(config), origin)
     if supporter.is_supporter(user.supporter_level):
         active_meetings = supporter.active_meetings_cap(SupporterLevel.HOST_2)
         scheduling_days = supporter.scheduling_horizon_days(SupporterLevel.HOST_2)
         log_screen_resolved(user, state="linked_patron", has_subscription=True)
         hosts_group_url, in_group = await hosts_group_button_state(context, user.tg_user_id)
         return collaborate_linked_patron_view(
-            user.lang, user.supporter_level, active_meetings, scheduling_days, hosts_group_url, in_group
+            user.lang, user.supporter_level, active_meetings, scheduling_days, hosts_group_url, in_group, origin
         )
     log_screen_resolved(user, state="linked_not_patron", has_subscription=True)
-    return collaborate_linked_not_patron_view(user.lang, oauth.campaign_pledge_url(config))
+    return collaborate_linked_not_patron_view(user.lang, oauth.campaign_pledge_url(config), origin)
 
 
 def log_screen_resolved(user: User, *, state: str, has_subscription: bool):

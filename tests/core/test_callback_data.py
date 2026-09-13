@@ -1,10 +1,13 @@
 import datetime as dt
 import logging
 import re
+from collections.abc import Callable
 
 import pytest
 
 from mitup_bot.callback_data import (
+    BackOrigin,
+    BackTarget,
     CallbackData,
     CodeCallbackData,
     DateCallbackData,
@@ -15,6 +18,10 @@ from mitup_bot.callback_data import (
 )
 from mitup_bot.patreon.pairing import generate_pairing_code
 from tests.helpers.logs import log_record
+
+# The optional origin suffix every callback's base body carries, spelled out here rather than
+# imported so the expected patterns below stay literal.
+ORIGIN_GROUP = r"(?:;back:(?P<back>[e])(?P<back_id>\d*))?"
 
 
 @pytest.mark.parametrize(
@@ -58,7 +65,13 @@ def test_callback_data_pattern_recognizes_inputs(action: str | None, entity: str
 def test_callback_data_match():
     callback_data = CallbackData(entity="meeting", action="edit", id=21)
 
-    assert callback_data.match().groupdict() == {"action": "edit", "entity": "meeting", "id": "21"}
+    assert callback_data.match().groupdict() == {
+        "action": "edit",
+        "entity": "meeting",
+        "id": "21",
+        "back": None,
+        "back_id": None,
+    }
 
 
 @pytest.mark.parametrize(
@@ -81,7 +94,9 @@ def test_pattern_is_anchored_pattern_body(callback_data: CallbackData):
 
 def test_date_callback_data_pattern():
     cb = DateCallbackData(entity="meeting", action="edit", id=21)
-    assert cb.pattern == r"^(?P<action>edit);(?P<entity>meeting):(?P<id>\d*);date:(?P<date>\d{4}-\d{2}-\d{2})$"
+    assert cb.pattern == (
+        r"^(?P<action>edit);(?P<entity>meeting):(?P<id>\d*)" + ORIGIN_GROUP + r";date:(?P<date>\d{4}-\d{2}-\d{2})$"
+    )
 
 
 def test_date_callback_data_matches():
@@ -100,7 +115,9 @@ def test_date_callback_data_with_date():
 
 def test_meeting_callback_data_pattern():
     cb = MeetingCallbackData(entity="meeting", action="edit", id=21)
-    assert cb.pattern == r"^(?P<action>edit);(?P<entity>meeting):(?P<id>\d*):(?P<meeting_id>\d*)$"
+    assert cb.pattern == (
+        r"^(?P<action>edit);(?P<entity>meeting):(?P<id>\d*)" + ORIGIN_GROUP + r":(?P<meeting_id>\d*)$"
+    )
 
 
 @pytest.mark.parametrize(
@@ -135,7 +152,8 @@ def test_paginated_callback_data_pattern():
     cb = PaginatedCallbackData(entity="past_meeting", action="show")
     assert cb.pattern == (
         r"^(?P<action>show);(?P<entity>past_meeting):(?P<id>\d*)"
-        r"(?:;page:(?P<page>\d+))?(?:;src:(?P<source>[aj]))?$"
+        + ORIGIN_GROUP
+        + r"(?:;page:(?P<page>\d+))?(?:;src:(?P<source>[aj]))?$"
     )
 
 
@@ -256,7 +274,7 @@ def test_a_full_length_pairing_code_fits_telegrams_callback_budget():
 
 def test_grant_callback_data_pattern():
     cb = GrantCallbackData(entity="grant", action="set", id=42, level=2)
-    assert cb.pattern == r"^(?P<action>set);(?P<entity>grant):(?P<id>\d*);lvl:(?P<level>\d*)$"
+    assert cb.pattern == (r"^(?P<action>set);(?P<entity>grant):(?P<id>\d*)" + ORIGIN_GROUP + r";lvl:(?P<level>\d*)$")
 
 
 @pytest.mark.parametrize(
@@ -317,12 +335,14 @@ def test_a_callback_without_aliases_keeps_its_exact_pattern():
     """The pattern of a callback that declares no alias is a single alternative per part, byte for
     byte. Every registration that renames nothing routes on this exact string."""
     assert CallbackData(action="edit", entity="meeting").pattern == (
-        r"^(?P<action>edit);(?P<entity>meeting):(?P<id>\d*)$"
+        r"^(?P<action>edit);(?P<entity>meeting):(?P<id>\d*)" + ORIGIN_GROUP + "$"
     )
 
 
 def test_an_aliased_pattern_alternates_each_part():
-    assert ALIASED_CALLBACK.pattern == r"^(?P<action>open|edit);(?P<entity>meet_end|meet_duration):(?P<id>\d*)$"
+    assert ALIASED_CALLBACK.pattern == (
+        r"^(?P<action>open|edit);(?P<entity>meet_end|meet_duration):(?P<id>\d*)" + ORIGIN_GROUP + "$"
+    )
 
 
 @pytest.mark.parametrize(
@@ -393,12 +413,12 @@ def test_the_unknown_path_logs_nothing(caplog: pytest.LogCaptureFixture):
     [
         (
             ("edit", "meet_duration"),
-            r"^(?P<action>edit);(?P<entity>meet_end|meet_duration):(?P<id>\d*)$",
+            r"^(?P<action>edit);(?P<entity>meet_end|meet_duration):(?P<id>\d*)" + ORIGIN_GROUP + "$",
             "edit;meet_duration:42",
         ),
         (
             ("open", "meet_end"),
-            r"^(?P<action>edit|open);(?P<entity>meet_end):(?P<id>\d*)$",
+            r"^(?P<action>edit|open);(?P<entity>meet_end):(?P<id>\d*)" + ORIGIN_GROUP + "$",
             "open;meet_end:42",
         ),
     ],
@@ -420,7 +440,9 @@ def test_a_callback_accepts_every_alias_it_declares():
     """A callback renamed more than once has to answer each form it ever shipped, not just the last."""
     callback = CallbackData(action="open", entity="meet_end", aliases=(("edit", "meet_duration"), ("show", "meet_len")))
 
-    assert callback.pattern == (r"^(?P<action>open|edit|show);(?P<entity>meet_end|meet_duration|meet_len):(?P<id>\d*)$")
+    assert callback.pattern == (
+        r"^(?P<action>open|edit|show);(?P<entity>meet_end|meet_duration|meet_len):(?P<id>\d*)" + ORIGIN_GROUP + "$"
+    )
 
     wires = ["open;meet_end:42", "edit;meet_duration:42", "show;meet_len:42"]
     assert [callback.parse(re.match(callback.pattern, wire)).id for wire in wires] == [42, 42, 42]
@@ -454,7 +476,8 @@ def test_a_paginated_subclass_composes_its_suffixes_onto_the_aliased_parts():
 
     assert callback.pattern == (
         r"^(?P<action>show);(?P<entity>past_meeting|old_meeting):(?P<id>\d*)"
-        r"(?:;page:(?P<page>\d+))?(?:;src:(?P<source>[aj]))?$"
+        + ORIGIN_GROUP
+        + r"(?:;page:(?P<page>\d+))?(?:;src:(?P<source>[aj]))?$"
     )
 
     parsed = callback.parse(re.match(callback.pattern, "show;old_meeting:42;page:3;src:j"))
@@ -473,3 +496,119 @@ def test_a_date_subclass_composes_its_mandatory_suffix_onto_the_aliased_parts():
     assert isinstance(parsed, DateCallbackData)
     assert parsed.date == dt.date(2024, 7, 15)
     assert parsed.id == 42
+
+
+# --- The origin facet ---
+#
+# Every callback can name the screen it was built on, so the screen it opens sends the user back
+# there. The suffix is optional, and a callback built without it has to keep the exact wire form it
+# always had: keyboards already sitting in chats are parsed by these same patterns.
+
+
+@pytest.mark.parametrize(
+    "origin, expected",
+    [
+        (BackOrigin(BackTarget.MEETING_EDITOR, 42), "show;collaborate:;back:e42"),
+        (BackOrigin(BackTarget.MEETING_EDITOR), "show;collaborate:;back:e"),
+    ],
+    ids=["with_a_record", "without_one"],
+)
+def test_an_origin_round_trips_through_the_wire(origin: BackOrigin, expected: str):
+    declaration = CallbackData(entity="collaborate")
+    wire = str(declaration.with_origin(origin))
+
+    assert wire == expected
+    assert declaration.parse(re.match(declaration.pattern, wire)).origin == origin
+
+
+def test_a_callback_without_an_origin_keeps_its_wire_form():
+    declaration = CallbackData(entity="collaborate")
+
+    assert str(declaration.with_origin(None)) == str(declaration) == "show;collaborate:"
+
+
+def test_a_wire_form_carrying_no_origin_parses_as_having_none():
+    declaration = CallbackData(action="edit", entity="meeting")
+
+    parsed = declaration.parse(re.match(declaration.pattern, "edit;meeting:42"))
+
+    assert (parsed.id, parsed.back, parsed.back_id, parsed.origin) == (42, None, None, None)
+
+
+def test_an_origin_rides_after_the_id_it_is_attached_to():
+    declaration = CallbackData(action="edit", entity="meeting")
+
+    wire = str(declaration.with_id(42).with_origin(BackOrigin(BackTarget.MEETING_EDITOR, 7)))
+    parsed = declaration.parse(re.match(declaration.pattern, wire))
+
+    assert wire == "edit;meeting:42;back:e7"
+    assert (parsed.id, parsed.origin) == (42, BackOrigin(BackTarget.MEETING_EDITOR, 7))
+
+
+@pytest.mark.parametrize(
+    "declaration, wire",
+    [
+        (DateCallbackData(action="nav", entity="meet_start", id=3, date=dt.date(2024, 7, 15)), "date:2024-07-15"),
+        (MeetingCallbackData(action="kickout", entity="user").with_ids(meeting_id=9, id=3), ":9"),
+        (PaginatedCallbackData(action="show", entity="meeting").with_page(3, 2), "page:2"),
+    ],
+    ids=lambda value: type(value).__name__ if isinstance(value, CallbackData) else value,
+)
+def test_every_subclass_carries_an_origin_through_its_own_suffix(declaration: CallbackData, wire: str):
+    """A subclass must not drop the facet: its own suffix and the origin compose into one form that
+    its pattern still matches."""
+    origin = BackOrigin(BackTarget.MEETING_EDITOR, 42)
+
+    carrying = str(declaration.with_origin(origin))
+
+    assert wire in carrying
+    assert ";back:e42" in carrying
+    assert declaration.parse(re.match(declaration.pattern, carrying)).origin == origin
+
+
+def test_an_unknown_back_target_does_not_match_the_pattern():
+    """A forged target code must not match at all, rather than parse into a target nothing maps."""
+    declaration = CallbackData(entity="collaborate")
+
+    assert re.match(declaration.pattern, "show;collaborate:;back:z") is None
+
+
+@pytest.mark.parametrize(
+    "declaration, build",
+    [
+        (CallbackData(action="edit", entity="meeting"), lambda callback: callback.with_id(1)),
+        (
+            PaginatedCallbackData(action="show", entity="meeting"),
+            lambda callback: callback.with_page(1, 3, MeetingListSource.JOINED),
+        ),
+        (MeetingCallbackData(action="kickout", entity="user"), lambda callback: callback.with_ids(meeting_id=9, id=1)),
+        (
+            DateCallbackData(action="nav", entity="meet_start"),
+            lambda callback: callback.with_date(dt.date(2024, 7, 15)),
+        ),
+        (CodeCallbackData(action="confirm", entity="pl"), lambda callback: callback.with_code("abc")),
+        (GrantCallbackData(action="set", entity="grant"), lambda callback: callback.with_level(1, 2)),
+    ],
+    ids=["with_id", "with_page", "with_ids", "with_date", "with_code", "with_level"],
+)
+def test_an_origin_survives_whichever_order_the_builders_run_in(
+    declaration: CallbackData, build: Callable[[CallbackData], CallbackData]
+):
+    """Every builder copies the callback it is called on, so attaching the origin first and
+    attaching it last produce the same wire form."""
+    origin = BackOrigin(BackTarget.MEETING_EDITOR, 42)
+
+    attached_first = str(build(declaration.with_origin(origin)))
+
+    assert attached_first == str(build(declaration).with_origin(origin))
+    assert ";back:e42" in attached_first
+
+
+def test_an_origin_carrying_callback_fits_telegrams_callback_budget():
+    # Telegram caps callback data at 64 bytes, and the longest origin names a meeting id that
+    # spends every digit a 32-bit primary key can reach.
+    longest = CallbackData(action="confirm", entity="patreon_unlink").with_origin(
+        BackOrigin(BackTarget.MEETING_EDITOR, 2_147_483_647)
+    )
+
+    assert len(str(longest).encode()) <= 64

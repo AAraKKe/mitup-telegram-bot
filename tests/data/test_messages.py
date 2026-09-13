@@ -1,5 +1,5 @@
 from mitup_bot import db
-from mitup_bot.callback_data import CallbackData
+from mitup_bot.callback_data import BackOrigin, BackTarget, CallbackData
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import MessageButtons
 
@@ -9,7 +9,7 @@ from mitup_bot.models import MessageButtons
 # every keyboard already stored in the database.
 STORED_BUTTONS_JSON = (
     '{"keyboard":[['
-    '{"text":"Join","callback_data":{"entity":"meeting","action":"join","id":42},'
+    '{"text":"Join","callback_data":{"entity":"meeting","action":"join","id":42,"back":null,"back_id":null},'
     '"switch_inline_query":null,"switch_inline_query_current_chat":null,"url":null,"style":null,"disabled":false},'
     '{"text":"Share","callback_data":null,"switch_inline_query":"42",'
     '"switch_inline_query_current_chat":null,"url":null,"style":null,"disabled":false}],'
@@ -27,6 +27,20 @@ PRE_STYLE_STORED_BUTTONS_JSON = (
     '"switch_inline_query_current_chat":null,"url":null}],'
     '[{"text":"Edit","callback_data":"edit;meeting:42",'
     '"switch_inline_query":null,"switch_inline_query_current_chat":null,"url":null}]]}'
+)
+
+
+# The same row as it sits in rows written before a callback could name the screen to go back to.
+# Those rows are never rewritten in bulk either, so the origin-less nested callback must keep
+# validating.
+PRE_ORIGIN_STORED_BUTTONS_JSON = (
+    '{"keyboard":[['
+    '{"text":"Join","callback_data":{"entity":"meeting","action":"join","id":42},'
+    '"switch_inline_query":null,"switch_inline_query_current_chat":null,"url":null,"style":null,"disabled":false},'
+    '{"text":"Share","callback_data":null,"switch_inline_query":"42",'
+    '"switch_inline_query_current_chat":null,"url":null,"style":null,"disabled":false}],'
+    '[{"text":"Edit","callback_data":"edit;meeting:42",'
+    '"switch_inline_query":null,"switch_inline_query_current_chat":null,"url":null,"style":null,"disabled":false}]]}'
 )
 
 
@@ -50,6 +64,31 @@ def test_stored_buttons_json_round_trips_byte_for_byte():
 
 def test_pre_style_stored_buttons_json_validates_to_expected_objects():
     assert MessageButtons.model_validate_json(PRE_STYLE_STORED_BUTTONS_JSON) == stored_buttons()
+
+
+def test_pre_origin_stored_buttons_json_validates_to_expected_objects():
+    assert MessageButtons.model_validate_json(PRE_ORIGIN_STORED_BUTTONS_JSON) == stored_buttons()
+
+
+def test_a_stored_origin_survives_the_round_trip():
+    """A keyboard is persisted as JSON, so a button opening a screen with an origin has to come back
+    out of the row still carrying it."""
+    stored = MessageButtons(
+        keyboard=[
+            [
+                ButtonConfig(
+                    text="Collaborate",
+                    callback_data=CallbackData(entity="collaborate").with_origin(
+                        BackOrigin(BackTarget.MEETING_EDITOR, 42)
+                    ),
+                )
+            ]
+        ]
+    )
+
+    restored = MessageButtons.model_validate_json(stored.model_dump_json())
+
+    assert str(restored.keyboard[0][0].callback_data) == "show;collaborate:;back:e42"
 
 
 def test_stored_buttons_json_validates_to_expected_objects():

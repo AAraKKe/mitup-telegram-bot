@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from mitup_bot import limits
+from mitup_bot.callback_data import BackOrigin, BackTarget
 from mitup_bot.images import ImageLayout
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.utils import ButtonMessages, Emojis, MeetingImagesMessages
@@ -132,7 +133,8 @@ def images_locked_view(meeting: Meetup) -> MitupView:
     if meeting.images:
         body = body.append(keyboard_content([[remove_all_chip(meeting)]]))
     # Nothing is waiting for a photo on this screen, so its back button is plain navigation.
-    return MitupView(body, [[collaborate_button(lang)]]).with_back_button(
+    origin = BackOrigin(BackTarget.MEETING_EDITOR, meeting.db_id)
+    return MitupView(body, [[collaborate_button(lang, origin)]]).with_back_button(
         ButtonMessages.MEETING, lang, cb.EDIT_MEETING.with_id(meeting.db_id)
     )
 

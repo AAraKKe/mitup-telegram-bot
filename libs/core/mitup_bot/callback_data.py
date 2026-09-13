@@ -1,7 +1,8 @@
 import datetime as dt
 import re
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import Self, override
+from typing import Any, Self, override
 
 import structlog
 from pydantic import BaseModel, Field, field_validator
@@ -26,6 +27,28 @@ class MeetingListSource(StrEnum):
 
     ACTIVE = "a"
     JOINED = "j"
+
+
+class BackTarget(StrEnum):
+    """A screen a button can name as the one its tap should return to.
+
+    Encoded in the callback data (see `CallbackData.with_origin`) so a screen reachable from
+    several places builds its back button from where the user came from. Values are single
+    characters to stay well within Telegram's 64-byte callback data limit.
+    """
+
+    MEETING_EDITOR = "e"
+
+
+@dataclass(frozen=True)
+class BackOrigin:
+    """The screen a button was pressed on, travelling with the tap to the screen it opens.
+
+    `id` addresses the record that screen renders.
+    """
+
+    target: BackTarget
+    id: int | None = None
 
 
 class ValidCallbackData(BaseModel):
@@ -58,9 +81,15 @@ class CallbackData(BaseModel):
     # Excluded from serialization: keyboards are persisted as message JSON, and that stored wire
     # format carries data only — a row must not embed a matching table that the declaration owns.
     aliases: tuple[tuple[str, str], ...] = Field(default=(), exclude=True)
+    # The screen the button was built on; optional on the wire, so a callback built without one
+    # keeps its format.
+    back: BackTarget | None = None
+    back_id: int | None = Field(default=None, ge=0)
 
     def __str__(self):
-        return f"{self.action};{self.entity}:{'' if self.id is None else self.id}"
+        back_id = "" if self.back_id is None else self.back_id
+        origin = "" if self.back is None else f";back:{self.back.value}{back_id}"
+        return f"{self.action};{self.entity}:{'' if self.id is None else self.id}{origin}"
 
     def parse(self, match: re.Match | None) -> Self:
         if match is None:
@@ -82,6 +111,12 @@ class CallbackData(BaseModel):
         # Allow pydantic to handle conversion from str to int later.
         return value or None if isinstance(value, str) else value
 
+    @field_validator("back", "back_id", mode="before")
+    @classmethod
+    def validate_origin(cls, value: str | int | None) -> str | int | None:
+        # An absent origin is parsed as an empty string from the wire format; normalize it to None.
+        return value or None if isinstance(value, str) else value
+
     @property
     def pattern_body(self) -> str:
         """Unanchored regex for this callback's wire format.
@@ -96,15 +131,35 @@ class CallbackData(BaseModel):
         # forms, so accepting them costs nothing.
         actions = regex_alternation(self.action, *(action for action, _ in self.aliases))
         entities = regex_alternation(self.entity, *(entity for _, entity in self.aliases))
-        return f"(?P<action>{actions});(?P<entity>{entities}):(?P<id>\\d*)"
+        targets = "".join(target.value for target in BackTarget)
+        return (
+            f"(?P<action>{actions});(?P<entity>{entities}):(?P<id>\\d*)"
+            f"(?:;back:(?P<back>[{targets}])(?P<back_id>\\d*))?"
+        )
 
     @property
     def pattern(self) -> str:
         return f"^{self.pattern_body}$"
 
+    def derive(self, **fields: Any) -> Self:
+        """Copy carrying *fields*, keeping every other field this callback already holds.
+
+        `aliases` is the exception: only a declaration carries the retired-forms table.
+        """
+        return self.model_copy(update={"aliases": (), **fields})
+
     def with_id(self, id: int) -> Self:
         """Creates a CallbackData with the same information but different ID"""
-        return self.__class__(entity=self.entity, action=self.action, id=id)
+        return self.derive(id=id)
+
+    @property
+    def origin(self) -> BackOrigin | None:
+        """The screen this callback carries as the one to return to, when it carries one."""
+        return None if self.back is None else BackOrigin(self.back, self.back_id)
+
+    def with_origin(self, origin: BackOrigin | None) -> Self:
+        """Copy of this callback carrying *origin*, so the screen it opens comes back here."""
+        return self if origin is None else self.derive(back=origin.target, back_id=origin.id)
 
     def unknown(self) -> bool:
         return self.entity == UNKNOWN_ENTITY
@@ -147,7 +202,7 @@ class DateCallbackData(CallbackData):
         return rf"{super().pattern_body};date:(?P<date>\d{{4}}-\d{{2}}-\d{{2}})"
 
     def with_date(self, date: dt.date) -> Self:
-        return self.__class__(entity=self.entity, action=self.action, id=self.id, date=date)
+        return self.derive(date=date)
 
 
 class ValidCodeCallbackData(BaseModel):
@@ -195,7 +250,7 @@ class CodeCallbackData(CallbackData):
 
     def with_code(self, code: str) -> Self:
         """Creates a CodeCallbackData with the same information but a different code."""
-        return self.__class__(entity=self.entity, action=self.action, code=code)
+        return self.derive(code=code)
 
 
 class ValidPaginatedCallbackData(ValidCallbackData):
@@ -221,6 +276,9 @@ class PaginatedCallbackData(CallbackData):
     Both suffixes are optional: a plain `with_id(...)` callback keeps the same wire format as
     a non-paginated `CallbackData` (no `;page:`/`;src:` suffix), so callbacks that have no
     originating page stay backward-compatible.
+
+    The page and the list are the list-specific instance of the origin every callback can carry
+    (see `CallbackData.with_origin`): they name a page rather than a screen.
 
     Format string: {action};{entity}:{id}[;page:{page}][;src:{source}]
     Example: "show;meeting:42;page:3;src:j"
@@ -249,11 +307,7 @@ class PaginatedCallbackData(CallbackData):
 
     def with_page(self, id: int, page: int, source: MeetingListSource | None = None) -> Self:
         """Attach the record id, the originating list page, and optionally which list it is."""
-        return self.__class__(entity=self.entity, action=self.action, id=id, page=page, source=source)
-
-    @override
-    def with_id(self, id: int) -> Self:
-        return self.__class__(entity=self.entity, action=self.action, id=id, page=self.page, source=self.source)
+        return self.derive(id=id, page=page, source=source)
 
 
 class ValidGrantCallbackData(ValidCallbackData):
@@ -296,7 +350,7 @@ class GrantCallbackData(CallbackData):
 
     def with_level(self, id: int, level: int) -> Self:
         """Creates a GrantCallbackData addressing the target user `id` with the tier rank `level`."""
-        return self.__class__(entity=self.entity, action=self.action, id=id, level=level)
+        return self.derive(id=id, level=level)
 
 
 class ValidMeetingCallbackData(ValidCallbackData):
@@ -326,7 +380,7 @@ class MeetingCallbackData(CallbackData):
     meeting_id: int | None = None
 
     def __str__(self):
-        return f"{self.action};{self.entity}:{'' if self.id is None else self.id}:{self.meeting_id or ''}"
+        return f"{super().__str__()}:{self.meeting_id or ''}"
 
     @property
     def pattern_body(self) -> str:
@@ -341,8 +395,4 @@ class MeetingCallbackData(CallbackData):
 
     def with_ids(self, meeting_id: int, id: int) -> Self:
         """Creates a MeetingCallbackData with the same information but different IDs"""
-        return self.__class__(entity=self.entity, action=self.action, id=id, meeting_id=meeting_id)
-
-    @override
-    def with_id(self, id: int) -> Self:
-        return self.__class__(entity=self.entity, action=self.action, id=id, meeting_id=self.meeting_id)
+        return self.derive(id=id, meeting_id=meeting_id)

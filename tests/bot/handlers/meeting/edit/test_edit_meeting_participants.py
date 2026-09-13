@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot import supporter
-from mitup_bot.callback_data import CallbackData
+from mitup_bot.callback_data import BackOrigin, BackTarget, CallbackData
 from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
 from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
@@ -565,8 +565,14 @@ async def test_edit_max_participants_free_owner_over_cap_is_rejected(
 
     # The banner is addressed to the acting owner, so it renders in their language with the cap,
     # and carries the Collaborate upsell button inline where the text names it.
+    # The Collaborate button carries this meeting's editor as its origin, so backing out of
+    # Collaborate returns to the card the limit was refused on.
     rejection = SupporterMessages.PARTICIPANT_CAPACITY_EXCEEDED.rich(
-        lang=user_with_settings.lang, cap=20, button_collaborate=collaborate_button(user_with_settings.lang)
+        lang=user_with_settings.lang,
+        cap=20,
+        button_collaborate=collaborate_button(
+            user_with_settings.lang, BackOrigin(BackTarget.MEETING_EDITOR, meeting.db_id)
+        ),
     )
     expected_view = edit_max_participants_view(meeting).with_context(rejection)
 
@@ -986,7 +992,11 @@ async def test_remove_limit_capped_owner_gets_the_cap_confirmation(
         factory.confirmation_view(
             RenderContext(lang=user_with_settings.lang),
             message=MeetingEditParticipantsMessages.REMOVE_LIMIT_CONFIRMATION.rich(
-                lang=user_with_settings.lang, cap=20, button_collaborate=collaborate_button(user_with_settings.lang)
+                lang=user_with_settings.lang,
+                cap=20,
+                button_collaborate=collaborate_button(
+                    user_with_settings.lang, BackOrigin(BackTarget.MEETING_EDITOR, 1)
+                ),
             ),
             confirm_callback_data=cb.CONFIRM_DELETE_MEETING_LIMIT.with_id(1),
             decline_callback_data=cb.DECLINE_DELETE_MEETING_LIMIT.with_id(1),

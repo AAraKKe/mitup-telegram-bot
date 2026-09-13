@@ -96,6 +96,14 @@ All button interactions use `CallbackData` — a Pydantic model defined in `libs
 | `DateCallbackData` | `{action};{entity}:{id};date:{YYYY-MM-DD}` | Action involves a date (e.g., setting a meeting date) |
 | `MeetingCallbackData` | `{action};{entity}:{id}:{meeting_id}` | Action targets a subject (id) within a specific meeting |
 
+### Where the screen a button opens goes back to
+
+A button that opens a screen reachable from several places carries that screen as the origin:
+`cb.COLLABORATE.with_origin(BackOrigin(BackTarget.MEETING_EDITOR, meeting.db_id))`, which adds a
+`;back:` suffix to the wire form. The destination handler reads `parse(context.match).origin` and
+hands it to the view, which resolves the back button through `views/navigation.back_button_for`.
+`PaginatedCallbackData`'s page and list are the list-specific instance of the same pattern.
+
 ### Defining a new callback
 
 ```python

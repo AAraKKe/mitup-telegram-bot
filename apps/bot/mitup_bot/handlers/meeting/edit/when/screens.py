@@ -1,6 +1,6 @@
 import datetime as dt
 
-from mitup_bot.callback_data import CallbackData, DateCallbackData
+from mitup_bot.callback_data import BackOrigin, BackTarget, CallbackData, DateCallbackData
 from mitup_bot.datetimes import in_timezone
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup
@@ -156,7 +156,9 @@ def time_prompt_view(lang: str, cancel_callback: CallbackData) -> MitupView:
 
 def start_horizon_calendar_view(rejection: str, lang: str, meeting_id: int, today: dt.date) -> MitupView:
     """The upsell that replaces the card the owner picked from, with a way back to it."""
-    return supporter_upsell_view(RichContent(rejection), lang).with_context_menu(
+    return supporter_upsell_view(
+        RichContent(rejection), lang, BackOrigin(BackTarget.MEETING_EDITOR, meeting_id)
+    ).with_context_menu(
         [
             [
                 ButtonConfig(
@@ -170,7 +172,9 @@ def start_horizon_calendar_view(rejection: str, lang: str, meeting_id: int, toda
 
 def start_horizon_reply_view(rejection: str, lang: str, meeting_id: int) -> MitupView:
     """The upsell sent as a reply to a typed start, with a way back to the card it was typed into."""
-    return supporter_upsell_view(RichContent(rejection), lang).with_context_menu(
+    return supporter_upsell_view(
+        RichContent(rejection), lang, BackOrigin(BackTarget.MEETING_EDITOR, meeting_id)
+    ).with_context_menu(
         [
             [
                 ButtonConfig(
@@ -184,7 +188,9 @@ def start_horizon_reply_view(rejection: str, lang: str, meeting_id: int) -> Mitu
 
 def end_horizon_calendar_view(rejection: str, lang: str, meeting_id: int, today: dt.date) -> MitupView:
     """The upsell that replaces the card the owner picked from, with a way back to it."""
-    return supporter_upsell_view(RichContent(rejection), lang).with_context_menu(
+    return supporter_upsell_view(
+        RichContent(rejection), lang, BackOrigin(BackTarget.MEETING_EDITOR, meeting_id)
+    ).with_context_menu(
         [
             [
                 ButtonConfig(
@@ -198,7 +204,9 @@ def end_horizon_calendar_view(rejection: str, lang: str, meeting_id: int, today:
 
 def end_horizon_reply_view(rejection: str, lang: str, meeting_id: int) -> MitupView:
     """The upsell sent as a reply to a typed end, with a way back to the card it was typed into."""
-    return supporter_upsell_view(RichContent(rejection), lang).with_context_menu(
+    return supporter_upsell_view(
+        RichContent(rejection), lang, BackOrigin(BackTarget.MEETING_EDITOR, meeting_id)
+    ).with_context_menu(
         [
             [
                 ButtonConfig(

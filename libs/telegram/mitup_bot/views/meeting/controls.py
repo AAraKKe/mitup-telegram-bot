@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from mitup_bot.keyboards import ButtonConfig, ButtonRow, ButtonStyle
 from mitup_bot.utils import ButtonMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views.navigation import main_menu_back_button as main_menu_button
 
 if TYPE_CHECKING:
     from mitup_bot.callback_data import CallbackData
@@ -24,10 +25,7 @@ def meeting_chip(
 
 
 def main_menu_back_button(meeting: Meetup) -> ButtonConfig:
-    return ButtonConfig(
-        text=ButtonMessages.MAIN_MENU.back(lang=meeting.user_language),
-        callback_data=cb.MAIN_MENU,
-    )
+    return main_menu_button(meeting.user_language)
 
 
 def join_chip(meeting: Meetup, lang: str, *, inert_when_full: bool) -> ButtonConfig:

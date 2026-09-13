@@ -6,6 +6,7 @@ from telegram import Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot import guards, limits
+from mitup_bot.callback_data import BackOrigin, BackTarget
 from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_session
 from mitup_bot.exceptions import ContextPropertyNotSetError
@@ -218,7 +219,7 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
     # the conversation open so they can enter a valid number. Supporter owners set any limit. The
     # rejection carries the Collaborate button inline: a raised capacity is exactly what
     # Collaborate offers.
-    if rejection := participant_capacity_rejection(user, requested_max):
+    if rejection := participant_capacity_rejection(user, requested_max, meeting.db_id):
         view = edit_max_participants_view(meeting)
         await context.api.send_message(update=update, view=view.with_context(rejection))
         return ConversationMeetingState.EDIT_MAX_PARTICIPANTS
@@ -321,7 +322,9 @@ async def callback_query_remove_limit(session: AsyncSession, update: Update, con
     view = factory.confirmation_view(
         guards.render_context(user, update, context),
         message=MeetingEditParticipantsMessages.REMOVE_LIMIT_CONFIRMATION.rich(
-            lang=user.lang, cap=cap, button_collaborate=collaborate_button(user.lang)
+            lang=user.lang,
+            cap=cap,
+            button_collaborate=collaborate_button(user.lang, BackOrigin(BackTarget.MEETING_EDITOR, callback_data.id)),
         ),
         confirm_callback_data=cb.CONFIRM_DELETE_MEETING_LIMIT.with_id(callback_data.id),
         decline_callback_data=cb.DECLINE_DELETE_MEETING_LIMIT.with_id(callback_data.id),
