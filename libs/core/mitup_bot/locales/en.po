@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-09-20 18:23\n"
+"PO-Revision-Date: 2026-09-20 19:01\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -326,6 +326,14 @@ msgstr "👥 Join the Hosts-Only Group"
 
 msgid "ButtonMessages.JOIN_GROUP"
 msgstr "Join"
+
+#. Key that opens a private chat with the bot. "Mitup" is the product name, kept as is.
+msgid "ButtonMessages.OPEN_MITUP"
+msgstr "🏠 Open Mitup"
+
+#. Key opening the user guide page about sharing meetings from any chat.
+msgid "ButtonMessages.INLINE_MODE_PAGE"
+msgstr "📖 Sharing from any chat"
 
 msgid "MainMenuMessages.WELCOME"
 msgstr "Welcome to Mitup!"
@@ -957,6 +965,18 @@ msgstr "No meetings have been shared in this chat yet"
 
 msgid "InlineQueryMessages.NO_RESULTS_MESSAGE"
 msgstr "<i>No meetings have been shared in this chat yet.</i>"
+
+#. Title of the message the bot posts in a group somebody added it to.
+#. It greets the whole group on the way out, so keep it warm and plural where the language marks number.
+msgid "GroupFarewellMessages.TITLE"
+msgstr "Hello, and goodbye!"
+
+#. The bot speaks in the first person here, as "I", and says goodbye: keep that voice.
+#. `${bot_handle}` is the bot's @username, typed in the message box to open
+#. Telegram's inline mode. The buttons below the message open the bot and that page.
+#. The third paragraph is general advice about bots, not about Mitup: keep it kind.
+msgid "GroupFarewellMessages.BODY"
+msgstr "Thanks for adding me here. I work from each person's private chat, so I don't stay in groups. Heading out now.\n\nYou can still bring meetings into this chat. Type <code>${bot_handle}</code> in the message box, pick one of your meetings, and it posts right here. No bot in the group needed.\n\nOne small tip on my way out: only add bots you trust to a group, especially before making one an administrator.\n\nThanks for trying Mitup."
 
 msgid "NotificationMessages.DELETION_WARNING_HEADING"
 msgstr "⌛ About to be deleted"

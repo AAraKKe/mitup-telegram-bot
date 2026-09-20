@@ -270,15 +270,20 @@ class BotConfig(BaseModel):
     # MITUPBOT__BOT__HOSTS_GROUP_INVITE_URL).
     hosts_group_chat_id: int | None = None
     hosts_group_invite_url: str | None = None
+    # Telegram chat ids the bot is allowed to stay a member of. Any other group, supergroup or
+    # channel it is added to is left at once. The hosts-only group above is allowed by its own
+    # setting and needs no entry here. Empty by default; not a secret, and in production it is set
+    # via env var override (MITUPBOT__BOT__ALLOWED_GROUP_CHAT_IDS).
+    allowed_group_chat_ids: list[int] = Field(default_factory=list)
 
-    @field_validator("admin_tg_ids", mode="before")
+    @field_validator("admin_tg_ids", "allowed_group_chat_ids", mode="before")
     @classmethod
-    def parse_admin_tg_ids(cls, value: object) -> object:
-        """Coerce the allowlist from every shape a config provider can deliver.
+    def parse_id_list(cls, value: object) -> object:
+        """Coerce an id list from every shape a config provider can deliver.
 
         A native TOML array arrives already as a list. The env provider collapses a single
-        `MITUPBOT__BOT__ADMIN_TG_IDS` var to an int (one id), a comma-separated string, or a
-        JSON array string, so all three must fold back to a list before `list[int]` validation.
+        `MITUPBOT__BOT__*` var to an int (one id), a comma-separated string, or a JSON array
+        string, so all three must fold back to a list before `list[int]` validation.
         """
         if value is None:
             return []

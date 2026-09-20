@@ -1257,3 +1257,15 @@ msgstr "Manter"
 
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
 msgstr "Isso exclui todos os seus eventos anteriores, ${count} no total. Não é possível desfazer."
+
+msgid "ButtonMessages.OPEN_MITUP"
+msgstr "🏠 Abrir o Mitup"
+
+msgid "ButtonMessages.INLINE_MODE_PAGE"
+msgstr "📖 Compartilhar de qualquer chat"
+
+msgid "GroupFarewellMessages.TITLE"
+msgstr "Oi e tchau!"
+
+msgid "GroupFarewellMessages.BODY"
+msgstr "Obrigado por me adicionar aqui. Eu trabalho no chat privado de cada pessoa, então não fico em grupos. Já vou indo.\n\nVocê ainda pode trazer eventos para este chat. Digite <code>${bot_handle}</code> no campo de mensagem, escolha um dos seus eventos e ele aparece aqui mesmo. Não precisa de bot nenhum no grupo.\n\nUma dica rápida antes de eu ir: só adicione a um grupo os bots em que você confia, ainda mais antes de tornar algum deles administrador.\n\nObrigado por experimentar o Mitup."

@@ -33,10 +33,20 @@ def configure(username: str | None):
     BotLinkState.username = username.strip() if username and username.strip() else DEFAULT_USERNAME
 
 
+def bot_handle() -> str:
+    """The bot's `@username`, as it is typed into a message box to open inline mode."""
+    return f"@{BotLinkState.username}"
+
+
+def bot_url() -> str:
+    """A link that opens the bot's own chat, carrying no `/start` payload."""
+    return f"https://t.me/{BotLinkState.username}"
+
+
 def start_link(source: str) -> str:
     """A link that opens the bot with *source* as its `/start` payload.
 
     *source* has to be a bare deep-link token (base64url characters, no separator), or the
     acquisition stamp drops it as hand-typed.
     """
-    return f"https://t.me/{BotLinkState.username}?start={source}"
+    return f"{bot_url()}?start={source}"

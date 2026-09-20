@@ -664,6 +664,7 @@ class TelegramApiWrapper(Protocol):
     async def send_rich_payload(self, chat_id: int, message: RichMessagePayload) -> Message | None: ...
     async def send_draft(self, update: Update, view: MitupView | RichContent | str, *, draft_id: int): ...
     async def send_message_to_user(self, user: User, view: MitupView | RichContent | str) -> Message | None: ...
+    async def send_message_to_chat(self, chat_id: int, view: MitupView | RichContent | str) -> Message | None: ...
     async def send_messages_to_users(
         self,
         users: Sequence[User],
@@ -708,9 +709,10 @@ class TelegramApiWrapper(Protocol):
         joined_users: Sequence[JoinedUsers],
         meeting: Meetup,
     ): ...
-    # Immediate admin operations on a supergroup — never routed through the outbox. Each answers
-    # whether Telegram applied the change, so a caller never records a membership move that a
-    # swallowed Forbidden/BadRequest prevented.
+    # Immediate membership operations on a group or channel, never routed through the outbox. Each
+    # answers whether Telegram applied the change, so a caller never records a membership move that
+    # a swallowed Forbidden/BadRequest prevented.
+    async def leave_chat(self, chat_id: int) -> bool: ...
     async def approve_chat_join_request(self, chat_id: int, tg_user_id: int) -> bool: ...
     async def decline_chat_join_request(self, chat_id: int, tg_user_id: int) -> bool: ...
     async def ban_chat_member(self, chat_id: int, tg_user_id: int) -> bool: ...
@@ -1047,6 +1049,17 @@ class TelegramApi:
             partial(self._send_user_message_now, user.tg_user_id, resolved),
             None,
             {"chat_id": user.tg_user_id} | view_log_payload(resolved),
+        )
+
+    async def send_message_to_chat(self, chat_id: int, view: MitupView | RichContent | str) -> Message | None:
+        """Send *view* to *chat_id* with no update in hand. The recipient is a group or channel the
+        bot is in, so a refusal is an ordinary Telegram error rather than an inactive user."""
+        resolved = resolve_view(view, "send_message_to_chat")
+        return await self._call_or_enqueue(
+            "send_message_to_chat",
+            partial(self._send_now, chat_id, resolved),
+            None,
+            {"chat_id": chat_id} | view_log_payload(resolved),
         )
 
     async def _send_user_message_now(self, tg_user_id: int, view: MitupView) -> Message | None:
@@ -1521,13 +1534,21 @@ class TelegramApi:
                 has_finished=has_finished,
             )
 
-    # -- Supergroup admin operations --------------------------------------------------------
-    # Immediate ops (never enqueued): join-request gating and ban/unban for the hosts-only
-    # group. A Telegram failure is logged and swallowed so it never crashes the caller (the
-    # join-request handler, the daily supporter-check job, or the Collaborate screen render),
+    # -- Chat membership operations ----------------------------------------------------------
+    # Immediate ops (never enqueued): leaving a chat, join-request gating and ban/unban for the
+    # hosts-only group. A Telegram failure is logged and swallowed so it never crashes the caller
+    # (the join-request handler, the daily supporter-check job, or the Collaborate screen render),
     # and reported as False so the caller records what it actually achieved rather than
     # announcing a membership change Telegram refused. The round-trip itself is recorded by the
     # outbound instrumentation, so only the swallowed refusal is logged here.
+
+    async def leave_chat(self, chat_id: int) -> bool:
+        try:
+            await self.adapter.bot.leave_chat(chat_id=chat_id)
+        except (Forbidden, BadRequest) as e:
+            log.warning("Failed to leave chat", chat_id=chat_id, reason=membership_refusal(e), error=str(e))
+            return False
+        return True
 
     async def approve_chat_join_request(self, chat_id: int, tg_user_id: int) -> bool:
         try:

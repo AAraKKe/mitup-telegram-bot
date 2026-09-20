@@ -1257,3 +1257,15 @@ msgstr "Conservalo"
 
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
 msgstr "Questo elimina tutti i tuoi incontri passati, ${count} in totale. Non si può annullare."
+
+msgid "ButtonMessages.OPEN_MITUP"
+msgstr "🏠 Apri Mitup"
+
+msgid "ButtonMessages.INLINE_MODE_PAGE"
+msgstr "📖 Condividere da ogni chat"
+
+msgid "GroupFarewellMessages.TITLE"
+msgstr "Ciao a tutti, e arrivederci!"
+
+msgid "GroupFarewellMessages.BODY"
+msgstr "Grazie per avermi aggiunto qui. Io lavoro nella chat privata di ciascuno, quindi non resto nei gruppi. Ora vi saluto.\n\nPotete comunque portare i vostri incontri in questa chat: scrivete <code>${bot_handle}</code> nel campo del messaggio, scegliete uno dei vostri incontri e compare direttamente qui. Non serve nessun bot nel gruppo.\n\nUn piccolo consiglio prima di andare: aggiungete a un gruppo solo i bot di cui vi fidate, soprattutto prima di renderne uno amministratore.\n\nGrazie per aver provato Mitup."

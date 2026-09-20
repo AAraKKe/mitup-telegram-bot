@@ -1257,3 +1257,15 @@ msgstr "Behalten"
 
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
 msgstr "Damit werden alle deine vergangenen Treffen gelöscht, insgesamt ${count}. Das lässt sich nicht rückgängig machen."
+
+msgid "ButtonMessages.OPEN_MITUP"
+msgstr "🏠 Mitup öffnen"
+
+msgid "ButtonMessages.INLINE_MODE_PAGE"
+msgstr "📖 Aus jedem Chat teilen"
+
+msgid "GroupFarewellMessages.TITLE"
+msgstr "Hallo und tschüss!"
+
+msgid "GroupFarewellMessages.BODY"
+msgstr "Danke, dass ihr mich hier hinzugefügt habt. Ich arbeite mit jeder Person einzeln im privaten Chat, deshalb bleibe ich nicht in Gruppen. Ich mache mich also gleich wieder auf den Weg.\n\nTreffen könnt ihr trotzdem in diesen Chat holen. Schreibt <code>${bot_handle}</code> ins Nachrichtenfeld, wählt eines eurer Treffen aus, und es erscheint direkt hier. Dafür braucht es keinen Bot in der Gruppe.\n\nNoch ein kleiner Tipp zum Abschied: Holt nur Bots in eine Gruppe, denen ihr vertraut. Das gilt besonders, bevor ihr einen davon zum Administrator macht.\n\nDanke, dass ihr Mitup ausprobiert habt."

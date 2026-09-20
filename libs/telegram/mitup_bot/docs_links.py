@@ -13,6 +13,7 @@ USER_GUIDE_PATH = "/user-guide/"
 PRIVACY_PATH = "/faq/privacy/"
 COLLABORATE_PATH = "/collaborate/donation/"
 LIMITS_PATH = "/user-guide/limits/"
+INLINE_MODE_PATH = "/user-guide/inline_mode/"
 
 
 class DocsState:
@@ -55,3 +56,7 @@ def collaborate_url() -> str:
 
 def limits_url() -> str:
     return f"{DocsState.base_url}{LIMITS_PATH}"
+
+
+def inline_mode_url() -> str:
+    return f"{DocsState.base_url}{INLINE_MODE_PATH}"

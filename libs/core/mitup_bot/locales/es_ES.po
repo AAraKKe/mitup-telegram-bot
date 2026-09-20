@@ -1257,3 +1257,15 @@ msgstr "Conservarla"
 
 msgid "MeetingLifecycleMessages.DELETE_ALL_CONFIRMATION"
 msgstr "Esto elimina todas las quedadas pasadas que tienes, ${count} en total. No se puede deshacer."
+
+msgid "ButtonMessages.OPEN_MITUP"
+msgstr "🏠 Abrir Mitup"
+
+msgid "ButtonMessages.INLINE_MODE_PAGE"
+msgstr "📖 Compartir desde cualquier chat"
+
+msgid "GroupFarewellMessages.TITLE"
+msgstr "¡Hola y adiós!"
+
+msgid "GroupFarewellMessages.BODY"
+msgstr "Gracias por añadirme por aquí. Yo trabajo desde el chat privado de cada persona, así que no me quedo en los grupos. Me voy yendo.\n\nAun así, podéis traer quedadas a este chat. Escribid <code>${bot_handle}</code> en el cuadro de texto, elegid una de vuestras quedadas y se publica aquí mismo. No hace falta ningún bot en el grupo.\n\nUn pequeño consejo antes de irme: añadid a los grupos solo bots de confianza, sobre todo antes de hacer administrador a alguno.\n\nGracias por probar Mitup."

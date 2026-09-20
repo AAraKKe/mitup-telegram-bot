@@ -250,6 +250,7 @@ def test_bot_config_admin_tg_ids_defaults_to_empty():
     assert config.admin_tg_ids == []
 
 
+@pytest.mark.parametrize("field", ["admin_tg_ids", "allowed_group_chat_ids"])
 @pytest.mark.parametrize(
     "raw,expected",
     [
@@ -259,16 +260,19 @@ def test_bot_config_admin_tg_ids_defaults_to_empty():
         pytest.param(" 123 , 456 ", [123, 456], id="comma_separated_with_spaces"),
         pytest.param("[123, 456]", [123, 456], id="json_array_string"),
         pytest.param("123456789", [123456789], id="single_id_string"),
+        # Group chat ids are negative, so the sign has to survive the string paths.
+        pytest.param("-1001234567890,-100456", [-1001234567890, -100456], id="negative_ids"),
         pytest.param("", [], id="empty_string"),
         pytest.param([], [], id="empty_list"),
     ],
 )
-def test_bot_config_admin_tg_ids_coercion(raw: object, expected: list[int]):
-    # The before-validator coerces every provider shape (list, int, comma/JSON string) into a
-    # list[int]; cast documents that we deliberately feed it a non-list to exercise that path.
-    config = BotConfig(token=SecretStr("fake-bot-token"), admin_tg_ids=cast(list[int], raw))
+def test_bot_config_admin_tg_ids_and_allowed_group_chat_ids_coercion(field: str, raw: object, expected: list[int]):
+    # Both id lists share one before-validator, which coerces every provider shape (list, int,
+    # comma/JSON string) into a list[int]. The config is built from a mapping keyed by field name,
+    # which is the shape a provider hands over anyway.
+    config = BotConfig.model_validate({"token": "fake-bot-token", field: raw})
 
-    assert config.admin_tg_ids == expected
+    assert getattr(config, field) == expected
 
 
 def test_bot_config_admin_tg_ids_rejects_non_numeric():

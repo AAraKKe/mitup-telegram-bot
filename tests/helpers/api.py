@@ -56,6 +56,9 @@ class MockApi(TelegramApi):
     def send_message_to_user(self, user: User, view: MitupView | RichContent | str):
         return self.call_mock("send_message_to_user", user=user, view=view)
 
+    def send_message_to_chat(self, chat_id: int, view: MitupView | RichContent | str):
+        return self.call_mock("send_message_to_chat", chat_id=chat_id, view=view)
+
     def send_message(
         self,
         update: Update,
@@ -140,6 +143,9 @@ class MockApi(TelegramApi):
             "answer_inline_query", update=update, results=results, button=button, cache_time=cache_time
         )
 
+    async def leave_chat(self, chat_id: int) -> bool:
+        return applied(await self.call_mock("leave_chat", chat_id=chat_id))
+
     async def approve_chat_join_request(self, chat_id: int, tg_user_id: int) -> bool:
         return applied(await self.call_mock("approve_chat_join_request", chat_id=chat_id, tg_user_id=tg_user_id))
 
@@ -212,6 +218,12 @@ class MockApi(TelegramApi):
             assert_awaited_once_with_diff(self.mock_method("send_message_to_user"), user=user, view=view)
         else:
             assert_awaited_with_diff(self.mock_method("send_message_to_user"), times, user=user, view=view)
+
+    def assert_send_message_to_chat_called(self, chat_id: int, view: MitupView | RichContent | str, times: int = 1):
+        if times == 1:
+            assert_awaited_once_with_diff(self.mock_method("send_message_to_chat"), chat_id=chat_id, view=view)
+        else:
+            assert_awaited_with_diff(self.mock_method("send_message_to_chat"), times, chat_id=chat_id, view=view)
 
     def assert_edit_message_called(self, update: Update, view: MitupView | RichContent | str, times: int = 1):
         self.assert_method_called("edit_message", update=update, view=view, times=times)

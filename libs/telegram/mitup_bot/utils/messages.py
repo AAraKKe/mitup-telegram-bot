@@ -220,6 +220,12 @@ class ButtonMessages(MessageBase):
     # Chip on the Hosts-Only Group section; OPEN is its counterpart for a host already in it.
     JOIN_GROUP = "Join"
 
+    # The two keys of the message the bot leaves behind in a group somebody added it to.
+    # TRANSLATORS: Key that opens a private chat with the bot. "Mitup" is the product name, kept as is.
+    OPEN_MITUP = f"{Emojis.HOME} Open Mitup"
+    # TRANSLATORS: Key opening the user guide page about sharing meetings from any chat.
+    INLINE_MODE_PAGE = f"{Emojis.BOOK} Sharing from any chat"
+
     def back(self, lang: str, **kwargs: str) -> str:
         return f"{self.GO_BACK} {self.text(lang=lang, **kwargs)}"
 
@@ -906,6 +912,26 @@ class InlineQueryMessages(MessageBase):
     NO_RESULTS_TITLE = "No meetings found"
     NO_RESULTS_DESCRIPTION = "No meetings have been shared in this chat yet"
     NO_RESULTS_MESSAGE = "<i>No meetings have been shared in this chat yet.</i>"
+
+
+class GroupFarewellMessages(MessageBase):
+    # The message the bot posts in a group it was added to, right before leaving it.
+    # TRANSLATORS: Title of the message the bot posts in a group somebody added it to.
+    # TRANSLATORS: It greets the whole group on the way out, so keep it warm and plural where the language marks number.
+    TITLE = "Hello, and goodbye!"
+    # TRANSLATORS: The bot speaks in the first person here, as "I", and says goodbye: keep that voice.
+    # TRANSLATORS: `${bot_handle}` is the bot's @username, typed in the message box to open
+    # TRANSLATORS: Telegram's inline mode. The buttons below the message open the bot and that page.
+    # TRANSLATORS: The third paragraph is general advice about bots, not about Mitup: keep it kind.
+    BODY = (
+        "Thanks for adding me here. I work from each person's private chat, so I don't stay in groups. "
+        "Heading out now.\n\n"
+        "You can still bring meetings into this chat. Type <code>${bot_handle}</code> in the message box, "
+        "pick one of your meetings, and it posts right here. No bot in the group needed.\n\n"
+        "One small tip on my way out: only add bots you trust to a group, "
+        "especially before making one an administrator.\n\n"
+        "Thanks for trying Mitup."
+    )
 
 
 # --- Notifications ---

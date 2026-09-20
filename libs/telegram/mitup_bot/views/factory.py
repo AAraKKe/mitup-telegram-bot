@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from mitup_bot import docs_links
+from mitup_bot import bot_links, docs_links
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.keyboards import ButtonConfig, ButtonRow, ButtonStyle, Keyboard
 from mitup_bot.lifecycle import LifecyclePolicy
@@ -14,6 +14,7 @@ from mitup_bot.utils import (
     ButtonMessages,
     CommonMessages,
     Emojis,
+    GroupFarewellMessages,
     HelpMessages,
     Languages,
     MainMenuMessages,
@@ -353,6 +354,23 @@ def toggle_chip(callback_data: CallbackData, option: bool, lang: str) -> ButtonC
         text=label.text(lang=lang),
         callback_data=callback_data,
         style="success" if option else "danger",
+    )
+
+
+def group_farewell_view(lang: str) -> MitupView:
+    """The message the bot posts in a group it was added to, in the language of whoever added it.
+
+    Both keys are URL buttons: the message is read in a group the bot is about to leave, where it
+    can answer no callback.
+    """
+    heading = GroupFarewellMessages.TITLE.rich(lang=lang).wrap(RichTag.H2)
+    body = heading.append(GroupFarewellMessages.BODY.rich(lang=lang, bot_handle=bot_links.bot_handle()))
+    return MitupView(
+        body,
+        [
+            [ButtonConfig(text=ButtonMessages.OPEN_MITUP.text(lang=lang), url=bot_links.bot_url(), style="primary")],
+            [ButtonConfig(text=ButtonMessages.INLINE_MODE_PAGE.text(lang=lang), url=docs_links.inline_mode_url())],
+        ],
     )
 
 
