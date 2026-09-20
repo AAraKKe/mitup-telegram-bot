@@ -338,6 +338,9 @@ msgstr "Non hai un account Mitup al momento. Invia /start e ti preparo tutto."
 msgid "CommonMessages.BOT_BLOCKED_ALERT"
 msgstr "Mi hai bloccato, quindi non posso inviarti messaggi. Per usare di nuovo Mitup, sbloccami e invia /start."
 
+msgid "CommonMessages.PRIVATE_CHAT_ONLY_ALERT"
+msgstr "Mitup non è pensato per le chat di gruppo. Apri una chat privata con me per continuare e, se mi hanno aggiunto a questa chat, rimuovimi per favore."
+
 msgid "CommonMessages.CONTEXT_LOST"
 msgstr "<b>Oops, abbiamo perso il filo!</b>\n\nIl bot ha ricevuto un rapido aggiornamento interno e ha dimenticato a che punto eri. Tutto quello che avevi salvato è al sicuro. Ricomincia quello che stavi facendo dal menu qui sotto."
 

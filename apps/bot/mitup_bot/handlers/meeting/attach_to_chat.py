@@ -42,7 +42,9 @@ def same_chat_siblings(meeting: Meetup, current_message: Message) -> list[Messag
     ]
 
 
-@HandlersRegistry.register_callback_query(MeetingHandlerId.ATTACH_TO_CHAT, callback_data=cb.ATTACH_TO_CHAT)
+@HandlersRegistry.register_callback_query(
+    MeetingHandlerId.ATTACH_TO_CHAT, callback_data=cb.ATTACH_TO_CHAT, private_chat_only=False
+)
 @with_session(write=True)
 async def attach_to_chat(session: AsyncSession, update: Update, context: TMitupContext):
     """

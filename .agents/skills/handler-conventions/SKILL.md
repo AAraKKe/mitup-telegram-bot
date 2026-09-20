@@ -21,6 +21,12 @@ A handler is an async function decorated with a `HandlersRegistry` registration 
 
 Every registration method requires a `handler_id` argument — a `HandlerId` enum member that uniquely identifies the handler.
 
+### `private_chat_only`
+
+`register_command`, `register_message` and `register_callback_query` take `private_chat_only`, on by default: the handler only runs in the caller's own chat with the bot. Commands and messages get it as a `ChatType.PRIVATE` filter, so they match nothing elsewhere and the bot stays silent; a callback query gets `guard_private_chat_only`, which answers the dropped query with `CommonMessages.PRIVATE_CHAT_ONLY_ALERT` and closes the invocation as handled. An inline message carries no chat, so it counts as not private.
+
+Pass `private_chat_only=False` only for a surface the bot deliberately puts in somebody else's chat, meaning the buttons of the shared meeting card and of the inline-search message. The opt-outs are the complete list of commands, messages and buttons that work outside the private chat, and `test_registry.py` pins it. The conversation registration takes no flag: it composes handlers that carry their own.
+
 ## Database session
 
 Decorate the handler with `@with_session` from `mitup_bot.db`. This injects an `AsyncSession` as the **first positional argument**; all session I/O and the DB-touching guards are awaited:

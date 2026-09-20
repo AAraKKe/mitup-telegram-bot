@@ -86,7 +86,7 @@ async def ensure_invitations_open(context: TMitupContext, user: User, meeting: M
 
 
 @HandlersRegistry.register_callback_query(
-    MeetingHandlerId.INVITE_USERS_CALLBACK, callback_data=cb.INVITE, bindable=False
+    MeetingHandlerId.INVITE_USERS_CALLBACK, callback_data=cb.INVITE, bindable=False, private_chat_only=False
 )
 @with_session
 async def callback_query_invite_users(

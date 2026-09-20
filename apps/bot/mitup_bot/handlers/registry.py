@@ -23,7 +23,7 @@ from telegram.ext import (
     InlineQueryHandler,
     MessageHandler,
 )
-from telegram.ext.filters import BaseFilter
+from telegram.ext.filters import BaseFilter, ChatType
 from telegram.warnings import PTBUserWarning
 
 from mitup_bot import db, guards
@@ -45,6 +45,7 @@ from mitup_bot.update_trace import current_update_trace, record_handler_invocati
 from .error_handler import FaultOutcome, fault_error_type
 from .error_handler import handler as error_handler
 from .legacy_callbacks import answer_legacy_callback, is_legacy_callback_data
+from .private_chat import answer_outside_private_chat
 from .stale_conversation import answer_stale_conversation_button
 
 # Remove the warning that is sent when using the per_message option in the registry.
@@ -261,6 +262,23 @@ def guard_admin_only(handler_id: HandlerId, callback: HandlerCallback) -> Handle
     return inner
 
 
+def guard_private_chat_only(callback: HandlerCallback) -> HandlerCallback:
+    """Wrap `callback` so it only runs for a query sent from the caller's own chat with the bot.
+
+    `CallbackQueryHandler` accepts no filters, so the `ChatType.PRIVATE` restriction of the other
+    registrations runs here as a guard; an inline message carries no chat and counts as not private.
+    A dropped query is answered with the alert and returns `None`, which changes no conversation state.
+    """
+
+    async def inner(update: Update, context: TMitupContext):
+        if not guards.in_bot_chat(update):
+            await answer_outside_private_chat(context, update)
+            return None
+        return await callback(update, context)
+
+    return inner
+
+
 def handler_log_context(handler_id: HandlerId, handler_type: str, update: Update) -> dict[str, object]:
     """Build the contextvar fields to bind for a handler call, omitting any the update lacks
     (some updates carry no effective_user/chat)."""
@@ -283,6 +301,9 @@ class HandlerWrapper:
     bindable: bool
     group: int = 0
     env: Env | None = None
+    # Whether this registration restricted itself to the caller's own chat with the bot. Only the
+    # command, message and callback-query registrations can, so every other kind reads False.
+    private_chat_only: bool = False
 
     def is_conversation(self) -> bool:
         return isinstance(self.handler, ConversationHandler)
@@ -366,6 +387,7 @@ class HandlersRegistry:
         block: bool = True,
         has_args: bool | int | None = None,
         admin_only: bool = False,
+        private_chat_only: bool = True,
     ) -> Callable[[HandlerCallback], HandlerCallback]:
         """
         Decorator used to register a callback for a CommandHandler.
@@ -374,6 +396,10 @@ class HandlersRegistry:
 
         Set ``admin_only`` to drop updates from non-admins before the callback runs (see
         ``guard_admin_only``).
+
+        ``private_chat_only`` narrows the registration to the caller's own chat with the bot, so
+        the command matches nothing anywhere else and the bot stays silent. Pass it False only for
+        a command meant to be used from a group.
 
         For more information check: https://python-telegram-bot.readthedocs.io/en/stable/telegram.ext.commandhandler.html
         """  # noqa: E501
@@ -394,17 +420,21 @@ class HandlersRegistry:
                 raise HandlerRegisteredError(handler_id)
 
             guarded = guard_admin_only(handler_id, callback) if admin_only else callback
+            command_filters = filters
+            if private_chat_only:
+                command_filters = ChatType.PRIVATE & filters if filters is not None else ChatType.PRIVATE
 
             cls.handlers[handler_id] = HandlerWrapper(
                 handler=CommandHandler(
                     command_name,
                     callback=callback_with_metrics(handler_id, "Command", guarded, cls.env),
-                    filters=filters,
+                    filters=command_filters,
                     block=block,
                     has_args=has_args,
                 ),
                 bindable=bindable,
                 group=group,
+                private_chat_only=private_chat_only,
             )
             return callback
 
@@ -419,6 +449,7 @@ class HandlersRegistry:
         group: int = 0,
         block: bool = True,
         admin_only: bool = False,
+        private_chat_only: bool = True,
     ) -> Callable[[HandlerCallback], HandlerCallback]:
         """
         Decorator used to register a callback for a MessageHandler.
@@ -427,6 +458,10 @@ class HandlersRegistry:
 
         Set ``admin_only`` to drop updates from non-admins before the callback runs (see
         ``guard_admin_only``).
+
+        ``private_chat_only`` narrows the registration to the caller's own chat with the bot, so
+        the handler matches nothing anywhere else and the bot stays silent. Pass it False only for
+        a message meant to be read from a group.
 
         For more information check: https://python-telegram-bot.readthedocs.io/en/stable/telegram.ext.messagehandler.html
         """  # noqa: E501
@@ -441,12 +476,13 @@ class HandlersRegistry:
 
             cls.handlers[handler_id] = HandlerWrapper(
                 handler=MessageHandler(
-                    filters=filters,
+                    filters=ChatType.PRIVATE & filters if private_chat_only else filters,
                     callback=callback_with_metrics(handler_id, "Message", guarded, cls.env),
                     block=block,
                 ),
                 bindable=bindable,
                 group=group,
+                private_chat_only=private_chat_only,
             )
             return callback
 
@@ -462,6 +498,7 @@ class HandlersRegistry:
         callback_data: CallbackData | None = None,
         block: bool = True,
         admin_only: bool = False,
+        private_chat_only: bool = True,
     ) -> Callable[[HandlerCallback], HandlerCallback]:
         """
         Decorator used to register a callback for a CallbackQueryHandler. Set auto_answer to False if you want to answer
@@ -471,6 +508,11 @@ class HandlersRegistry:
         Set ``admin_only`` to drop callback queries from non-admins before the callback runs (see
         ``guard_admin_only``). The gate sits inside the auto-answer wrapper, so a dropped query is
         still answered and the client spinner clears.
+
+        ``private_chat_only`` restricts the button to the caller's own chat with the bot (see
+        ``guard_private_chat_only``). It wraps the auto-answer rather than sitting inside it,
+        because the alert it answers the dropped query with is the whole answer that query gets.
+        Pass it False for a button that rides a card the bot puts in somebody else's chat.
 
         Every argument provided is the same as those that can be provided to a CallbackQueryHandler
 
@@ -493,14 +535,17 @@ class HandlersRegistry:
                         await context.bot.answer_callback_query(update.callback_query.id)
                 return result
 
+            gated = guard_private_chat_only(inner_wrapper) if private_chat_only else inner_wrapper
+
             cls.handlers[handler_id] = HandlerWrapper(
                 handler=CallbackQueryHandler(
                     pattern=callback_data.pattern if callback_data else None,
-                    callback=callback_with_metrics(handler_id, "Callback", inner_wrapper, cls.env),
+                    callback=callback_with_metrics(handler_id, "Callback", gated, cls.env),
                     block=block,
                 ),
                 bindable=bindable,
                 group=group,
+                private_chat_only=private_chat_only,
             )
 
             return callback

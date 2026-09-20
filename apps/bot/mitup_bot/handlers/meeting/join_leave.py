@@ -25,7 +25,7 @@ from .utils import log_waiting_list_promotions
 log = structlog.get_logger(__name__)
 
 
-@HandlersRegistry.register_callback_query(MeetingHandlerId.JOIN, callback_data=cb.JOIN)
+@HandlersRegistry.register_callback_query(MeetingHandlerId.JOIN, callback_data=cb.JOIN, private_chat_only=False)
 @with_session(write=True)
 async def join_meetup(session: AsyncSession, update: Update, context: TMitupContext):
     """
@@ -135,7 +135,7 @@ async def handle_non_existing_user_join(session: AsyncSession, update: Update, c
     )
 
 
-@HandlersRegistry.register_callback_query(MeetingHandlerId.LEAVE, callback_data=cb.LEAVE)
+@HandlersRegistry.register_callback_query(MeetingHandlerId.LEAVE, callback_data=cb.LEAVE, private_chat_only=False)
 @with_session(write=True)
 async def leave_meetup(session: AsyncSession, update: Update, context: TMitupContext):
     """

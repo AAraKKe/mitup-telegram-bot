@@ -300,6 +300,13 @@ class CommonMessages(MessageBase):
     BOT_BLOCKED_ALERT = (
         "You have blocked me, so I can't send you messages. To use Mitup again, unblock me and send /start."
     )
+    # Answers a tap on a private screen reached from anywhere but the caller's own chat with the
+    # bot. It ships as a plain callback-query alert (max 200 characters), so it must stay
+    # entity-free and leave room for translation.
+    PRIVATE_CHAT_ONLY_ALERT = (
+        "Mitup isn't made for group chats. Open a private chat with me to keep going, and if I was added "
+        "to this chat, please remove me."
+    )
     # Shown when in-memory conversation state was lost (e.g. after a rolling deploy mid-flow)
     CONTEXT_LOST = (
         "<b>Sorry, we lost our place!</b>\n\nThe bot had a quick internal update and forgot where you "

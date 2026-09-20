@@ -11,14 +11,22 @@ from structlog.testing import capture_logs
 from telegram import CallbackQuery, Chat, Message, Update
 from telegram import User as TgUser
 from telegram.error import BadRequest, TimedOut
-from telegram.ext import ApplicationBuilder, ApplicationHandlerStop, CommandHandler, ConversationHandler
+from telegram.ext import (
+    ApplicationBuilder,
+    ApplicationHandlerStop,
+    BaseHandler,
+    CallbackQueryHandler,
+    CommandHandler,
+    ConversationHandler,
+    MessageHandler,
+)
 from telegram.ext.filters import PHOTO, TEXT, BaseFilter
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import build_api
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import Env
-from mitup_bot.custom_context import BOT_CONFIG_KEY
+from mitup_bot.custom_context import BOT_CONFIG_KEY, MitupContext
 from mitup_bot.exceptions import (
     ContextPropertyNotSetError,
     HandlerNotRegistered,
@@ -28,6 +36,8 @@ from mitup_bot.exceptions import (
 from mitup_bot.handler_id import HandlerId
 from mitup_bot.handlers import HandlersRegistry
 from mitup_bot.handlers.edit_settings.enums import ConversationSettingsState
+from mitup_bot.handlers.inline_query.enums import InlineQueryId
+from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.handlers.registry import (
     HandlerWrapper,
     UnhandledHandlerId,
@@ -63,6 +73,7 @@ from tests.helpers.constants import (
     DEFAULT_TG_USER_PARAMS,
     DEFAULT_USER_ID,
 )
+from tests.helpers.fixtures import create_update
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession  # sourcery skip: dont-import-test-modules
 
@@ -605,6 +616,179 @@ async def test_the_stale_notice_follows_the_language_stored_on_the_caller_accoun
         "the assertion below only means anything while the two languages render differently"
     )
     context.api.assert_edit_message_called(update, stale_buttons_screen("es_ES"))
+
+
+# ---------------------------------------------------------------------------
+# Private chat by default
+# ---------------------------------------------------------------------------
+
+PROBE_CALLBACK = CallbackData(action="probe", entity="button")
+
+GROUP_CHAT = Chat(id=DEFAULT_CHAT_ID, type=Chat.GROUP)
+PRIVATE_CHAT = Chat(id=DEFAULT_CHAT_ID, type=Chat.PRIVATE)
+
+# The registrations that answer outside the caller's own chat with the bot, spelled out so a new
+# `private_chat_only=False` cannot join them silently. Every other surface of the bot is private.
+REGISTRATIONS_OUTSIDE_THE_PRIVATE_CHAT = {
+    MeetingHandlerId.JOIN,
+    MeetingHandlerId.LEAVE,
+    MeetingHandlerId.INVITE_USERS_CALLBACK,
+    MeetingHandlerId.ATTACH_TO_CHAT,
+    InlineQueryId.LOAD_CHAT_MEETINGS,
+}
+
+
+def handler_matches(handler: BaseHandler[Update, MitupContext, object], update: Update) -> bool:
+    """PTB's own match test: a handler answering with an empty argument list still matched."""
+    check = handler.check_update(update)
+    return check is not None and check is not False
+
+
+CHAT_MATCHES: list[tuple[Chat, bool, bool]] = [
+    (PRIVATE_CHAT, True, True),
+    (GROUP_CHAT, True, False),
+    (GROUP_CHAT, False, True),
+]
+
+
+@pytest.mark.parametrize("chat, private_chat_only, matches", CHAT_MATCHES, ids=["private", "group", "group_opted_out"])
+def test_a_command_is_matched_only_in_the_private_chat(
+    chat: Chat, private_chat_only: bool, matches: bool, app: StubMitupApp
+):
+    """A command typed in a group reaches the bot whenever it is an administrator there, so the
+    filter is what keeps it from answering: no match means no reply at all."""
+
+    @ClearableRegistry.register_command(
+        HandlerTestId.SOME_COMMAND, command="probe", private_chat_only=private_chat_only
+    )
+    async def command_probe(update: Update, context: StubMitupContext): ...
+
+    update = create_update(UpdateRequest(command="probe"), tg_chat=chat)
+    # PTB resolves a bare command against the bot's own username before matching it.
+    assert update.message is not None
+    update.message.set_bot(app.bot)
+
+    assert handler_matches(ClearableRegistry.handlers[HandlerTestId.SOME_COMMAND].handler, update) is matches
+    ClearableRegistry.clear()
+
+
+@pytest.mark.parametrize("chat, private_chat_only, matches", CHAT_MATCHES, ids=["private", "group", "group_opted_out"])
+def test_a_message_is_matched_only_in_the_private_chat(chat: Chat, private_chat_only: bool, matches: bool):
+    """An administrator bot is handed every message of the group, and the text handlers of the
+    conversations would otherwise read them as answers to a prompt."""
+
+    @ClearableRegistry.register_message(HandlerTestId.BINDABLE, filters=TEXT, private_chat_only=private_chat_only)
+    async def typed_message_handler(update: Update, context: StubMitupContext): ...
+
+    update = create_update(UpdateRequest(message_text="typed in the group"), tg_chat=chat)
+
+    assert handler_matches(ClearableRegistry.handlers[HandlerTestId.BINDABLE].handler, update) is matches
+    ClearableRegistry.clear()
+
+
+async def test_a_callback_query_from_the_private_chat_reaches_the_callback(app: StubMitupApp):
+    """The gate is the default on every button, so the ordinary tap has to go through it untouched."""
+    called = mock.AsyncMock(return_value="RESULT")
+
+    @ClearableRegistry.register_callback_query(HandlerTestId.BINDABLE, callback_data=PROBE_CALLBACK)
+    async def callback_query_probe(update: Update, context: StubMitupContext):
+        return await called(update, context)
+
+    private_tap = create_update(UpdateRequest(callback_query=PROBE_CALLBACK), tg_chat=PRIVATE_CHAT)
+    result = await invoke(HandlerTestId.BINDABLE, private_tap, build_context(private_tap, app))
+
+    called.assert_awaited_once()
+    assert result == "RESULT"
+    ClearableRegistry.clear()
+
+
+OUTSIDE_TAPS: list[tuple[UpdateRequest, Chat | None, str]] = [
+    (UpdateRequest(callback_query=PROBE_CALLBACK), GROUP_CHAT, "shared_chat"),
+    (UpdateRequest(callback_query=PROBE_CALLBACK, from_bot_chat=False), None, "inline_message"),
+]
+
+
+@pytest.mark.parametrize("request_data, chat, reason", OUTSIDE_TAPS, ids=["group_chat", "inline_message"])
+async def test_a_callback_query_from_outside_the_private_chat_is_answered_with_the_alert(
+    request_data: UpdateRequest,
+    chat: Chat | None,
+    reason: str,
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+):
+    """Callback data is client-forgeable and a shared card can be tapped from any chat, so a private
+    screen has to refuse the tap itself. It is a refusal the bot means to make, not a defect: the
+    caller gets the alert, the message they tapped is left standing, and the invocation closes as a
+    completed one.
+
+    `mock_session` backs the language lookup made while building that alert.
+    """
+    called = mock.AsyncMock(return_value="RESULT")
+
+    @ClearableRegistry.register_callback_query(HandlerTestId.BINDABLE, callback_data=PROBE_CALLBACK)
+    async def callback_query_probe(update: Update, context: StubMitupContext):
+        return await called(update, context)
+
+    outside_tap = create_update(request_data, tg_chat=chat)
+    context = build_context(outside_tap, app, metrics=metrics_client)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        result = await invoke(HandlerTestId.BINDABLE, outside_tap, context)
+
+    called.assert_not_awaited()
+    assert result is None
+    context.api.assert_answer_callback_query_called(
+        outside_tap,
+        text=CommonMessages.PRIVATE_CHAT_ONLY_ALERT.text(lang=TranslationEngine.FALLBACK_LANG),
+        show_alert=True,
+    )
+    context.api.assert_method_just_called("edit_message", times=0)
+
+    refusals = [entry for entry in logs if entry["event"] == "Rejected interaction from outside the private chat"]
+    assert len(refusals) == 1
+    assert refusals[0]["log_level"] == "info"
+    assert refusals[0]["reason"] == reason
+    assert refusals[0]["update_id"] == outside_tap.update_id
+    assert [entry for entry in logs if entry["event"] == "An error occurred while handling the update"] == []
+    metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
+    ClearableRegistry.clear()
+
+
+async def test_an_opted_out_callback_query_runs_from_a_group(app: StubMitupApp):
+    """The buttons of a shared card are tapped where the card sits, so the opt-out has to let the
+    callback through with no alert of its own."""
+    called = mock.AsyncMock(return_value="RESULT")
+
+    @ClearableRegistry.register_callback_query(
+        HandlerTestId.BINDABLE, callback_data=PROBE_CALLBACK, private_chat_only=False
+    )
+    async def callback_query_probe(update: Update, context: StubMitupContext):
+        return await called(update, context)
+
+    group_tap = create_update(UpdateRequest(callback_query=PROBE_CALLBACK), tg_chat=GROUP_CHAT)
+    context = build_context(group_tap, app)
+    result = await invoke(HandlerTestId.BINDABLE, group_tap, context)
+
+    called.assert_awaited_once()
+    assert result == "RESULT"
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    ClearableRegistry.clear()
+
+
+def test_the_registrations_that_work_outside_the_private_chat_are_the_shared_surfaces():
+    """Every opt-out is a screen somebody else's chat can see, so the set is pinned rather than
+    trusted: a registration that opts out silently fails here instead of shipping a private screen
+    into a group."""
+    gated_kinds = (CallbackQueryHandler, CommandHandler, MessageHandler)
+    opted_out = {
+        handler_id
+        for handler_id, wrapper in HandlersRegistry.handlers.items()
+        if isinstance(wrapper.handler, gated_kinds) and not wrapper.private_chat_only
+    }
+
+    assert opted_out == REGISTRATIONS_OUTSIDE_THE_PRIVATE_CHAT
 
 
 def test_cannot_register_same_inline_handler_twice():

@@ -17,7 +17,10 @@ log = structlog.get_logger(__name__)
 
 
 @HandlersRegistry.register_callback_query(
-    InlineQueryId.LOAD_CHAT_MEETINGS, callback_data=cb.LOAD_CHAT_MEETINGS, auto_answer=False
+    InlineQueryId.LOAD_CHAT_MEETINGS,
+    callback_data=cb.LOAD_CHAT_MEETINGS,
+    auto_answer=False,
+    private_chat_only=False,
 )
 @with_session
 async def load_chat_meetings(session: AsyncSession, update: Update, context: TMitupContext):

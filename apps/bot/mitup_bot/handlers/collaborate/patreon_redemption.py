@@ -14,7 +14,7 @@ from typing import Any, NoReturn, assert_never
 import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
-from telegram.ext import ApplicationHandlerStop, filters
+from telegram.ext import ApplicationHandlerStop
 
 from mitup_bot import guards, patreon_link
 from mitup_bot.db import with_session
@@ -124,11 +124,7 @@ def language_for(update: Update, user: User | None) -> str:
     CollaborateHandlerId.PATREON_LINK_REDEEM,
     command="start",
     group=PATREON_PAIRING_HANDLERS_GROUP,
-    # Private chats only: the deep link always opens the user's own chat with the bot, so the only
-    # way a pairing command reaches a group is somebody pasting it there — and answering it in the
-    # group would show the confirmation prompt (and the Patreon name on it) to everyone present,
-    # with its buttons tappable by any member.
-    filters=PatreonPairingStartFilter() & filters.ChatType.PRIVATE,
+    filters=PatreonPairingStartFilter(),
 )
 @claim_update
 @with_session
