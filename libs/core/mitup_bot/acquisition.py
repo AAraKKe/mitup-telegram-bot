@@ -24,6 +24,11 @@ INLINE_KIND = "inline"
 # Reserved kind for links that name the place they were published: `src_<token>`.
 CAMPAIGN_KIND = "src"
 
+# The `/start` payloads of the "Built with Mitup" footer: on a card shared into a chat, and on a card
+# read inside the bot's own chat.
+SHARED_CARD_FOOTER_PAYLOAD = "src_footer"
+BOT_CARD_FOOTER_PAYLOAD = "src_botcard"
+
 # Stamped on a row the inline Join button created, where no payload exists but the surface is known.
 # The colon is outside the character set Telegram allows in a payload, which is what keeps a
 # hand-typed `/start` from claiming this surface for itself.
@@ -48,8 +53,9 @@ class AcquisitionSource(StrEnum):
     PATREON = "patreon"
     """`src_patreon`: links we publish on the Patreon campaign page and posts."""
     FOOTER = "footer"
-    """`src_footer`: reserved for the promotional footer on shared meeting cards (rich-messages
-    epic); nothing emits it yet."""
+    """`src_footer`: the "Built with Mitup" footer of a meeting card shared into a chat."""
+    BOT_CARD = "bot_card"
+    """`src_botcard`: the "Built with Mitup" footer of a meeting card read inside the bot's own chat."""
     DIRECTORY = "directory"
     """`src_directory`: bot-directory listings (BotoStore, TeleHunt and the like)."""
     OTHER = "other"
@@ -62,11 +68,15 @@ CAMPAIGN_SOURCES = {
     "web": AcquisitionSource.WEB,
     "patreon": AcquisitionSource.PATREON,
     "footer": AcquisitionSource.FOOTER,
+    "botcard": AcquisitionSource.BOT_CARD,
     "directory": AcquisitionSource.DIRECTORY,
 }
 
 LINK_KIND_SOURCES = {
     INLINE_KIND: AcquisitionSource.INLINE,
+    # The footer payloads that cards already posted in chats carry.
+    "sharedcard": AcquisitionSource.FOOTER,
+    "meetingcard": AcquisitionSource.BOT_CARD,
 }
 
 

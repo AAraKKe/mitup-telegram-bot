@@ -4,6 +4,7 @@ from collections.abc import Callable
 import pytest
 
 from mitup_bot import bot_links
+from mitup_bot.acquisition import BOT_CARD_FOOTER_PAYLOAD, SHARED_CARD_FOOTER_PAYLOAD
 from mitup_bot.emojis import Emojis
 from mitup_bot.images import ImageLayout
 from mitup_bot.keyboards import ButtonConfig, Keyboard
@@ -449,7 +450,7 @@ def test_the_bot_chat_card_closes_on_a_button_back_into_the_bot():
     view = meeting_views.external_view(owned_meeting())
 
     assert (
-        f'<tg-button type="url" url="https://t.me/mitupbot?start={shared_card.BOT_CHAT_SOURCE}">{bot_links.MITUP}</tg-button>'
+        f'<tg-button type="url" url="https://t.me/mitupbot?start={BOT_CARD_FOOTER_PAYLOAD}">{bot_links.MITUP}</tg-button>'
         in (view.message.html)
     )
 
@@ -458,7 +459,7 @@ def test_the_shared_card_attributes_itself_to_the_chat_it_was_shared_into():
     """The two surfaces are different acquisition stories, so the payload counts them apart."""
     view = meeting_views.inline_view(owned_meeting())
 
-    assert f"?start={shared_card.SHARED_CHAT_SOURCE}" in view.message.html
+    assert f"?start={SHARED_CARD_FOOTER_PAYLOAD}" in view.message.html
 
 
 def test_the_closing_footer_is_the_last_thing_on_a_shared_card():
@@ -692,7 +693,7 @@ def test_the_state_line_and_the_link_back_into_the_bot_share_one_quiet_footer(la
 
     assert view.message.html.count("<footer>") == 2
     assert footer.startswith(f"{state}<br/>")
-    assert f"?start={shared_card.SHARED_CHAT_SOURCE}" in footer
+    assert f"?start={SHARED_CARD_FOOTER_PAYLOAD}" in footer
 
 
 def test_the_bot_chat_card_closes_on_the_bot_line_alone(lang: str):

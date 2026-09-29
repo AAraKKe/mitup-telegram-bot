@@ -24,6 +24,7 @@ from telegram.error import BadRequest, Forbidden, NetworkError, TimedOut
 from telegram.ext import ExtBot
 from telegram.warnings import PTBUserWarning
 
+from mitup_bot.acquisition import SHARED_CARD_FOOTER_PAYLOAD
 from mitup_bot.api_wrapper import (
     ANSWER_INLINE_QUERY_ENDPOINT,
     CALLBACK_QUERY_TEXT_LIMIT,
@@ -79,7 +80,6 @@ from mitup_bot.utils.rich_message import (
 )
 from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from mitup_bot.views import meeting as meeting_views
-from mitup_bot.views.meeting import shared_card
 from tests.helpers import (
     MockApi,
     RichCall,
@@ -618,7 +618,7 @@ async def test_update_single_meeting_message_inline_vs_bot_chat_different_views(
 
     assert str(cb.EDIT_MEETING_TITLE.with_id(meeting_bot.db_id)) in bot_chat_html
     assert str(cb.EDIT_MEETING_TITLE.with_id(meeting_inline.db_id)) not in inline_html
-    assert f"?start={shared_card.SHARED_CHAT_SOURCE}" in inline_html
+    assert f"?start={SHARED_CARD_FOOTER_PAYLOAD}" in inline_html
     assert "?start=" not in bot_chat_html
 
 

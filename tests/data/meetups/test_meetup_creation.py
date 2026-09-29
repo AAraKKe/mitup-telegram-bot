@@ -8,6 +8,7 @@ from telegram import Chat, Update
 from telegram import Message as TgMessage
 
 from mitup_bot import supporter
+from mitup_bot.acquisition import SHARED_CARD_FOOTER_PAYLOAD
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.config import LimitsConfig
 from mitup_bot.datetimes import TimeFormat
@@ -473,7 +474,7 @@ def test_inline_view(meeting: Meetup, meeting_language: str | None):
 
     closing = shared_card.closing_footer(
         used_language,
-        shared_card.SHARED_CHAT_SOURCE,
+        SHARED_CARD_FOOTER_PAYLOAD,
         MeetingAttachMessages.STATE_NOT_SEARCHABLE.rich(lang=used_language),
     )
     expected_view = MitupInlineView(
@@ -499,7 +500,7 @@ def test_inline_view_searchable(meeting: Meetup, meeting_language: str | None):
     view = meeting_views.inline_view(meeting, chat_instance="some_chat_instance")
 
     closing = shared_card.closing_footer(
-        used_language, shared_card.SHARED_CHAT_SOURCE, MeetingAttachMessages.STATE_SEARCHABLE.rich(lang=used_language)
+        used_language, SHARED_CARD_FOOTER_PAYLOAD, MeetingAttachMessages.STATE_SEARCHABLE.rich(lang=used_language)
     )
     expected_view = MitupInlineView(
         message=meeting_views.shared_body(meeting).append(horizontal_rule_content()).append(closing),

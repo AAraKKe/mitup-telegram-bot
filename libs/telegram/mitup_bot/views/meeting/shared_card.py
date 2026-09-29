@@ -5,6 +5,7 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from mitup_bot import bot_links
+from mitup_bot.acquisition import BOT_CARD_FOOTER_PAYLOAD, SHARED_CARD_FOOTER_PAYLOAD
 from mitup_bot.keyboards import ButtonConfig, Keyboard
 from mitup_bot.utils import (
     ButtonMessages,
@@ -43,12 +44,6 @@ from mitup_bot.views.sections import card_section, section_header
 
 if TYPE_CHECKING:
     from mitup_bot.models import Meetup
-
-# The `/start` payload the closing footer carries, naming the surface a new reader arrived from.
-# Reading a card in the bot chat and finding one in a chat somebody shared it into are different
-# acquisition stories, so they are counted apart.
-BOT_CHAT_SOURCE = "meetingcard"
-SHARED_CHAT_SOURCE = "sharedcard"
 
 
 def byline(meeting: Meetup) -> RichContent:
@@ -217,7 +212,7 @@ def external_view(meeting: Meetup, back_button: ButtonConfig | None = None) -> M
     body = (
         fitted_shared_body(meeting)
         .append(horizontal_rule_content())
-        .append(closing_footer(meeting.lang, BOT_CHAT_SOURCE))
+        .append(closing_footer(meeting.lang, BOT_CARD_FOOTER_PAYLOAD))
     )
     return MitupView(body, keyboard, photos=meeting_photos(meeting))
 
@@ -278,7 +273,7 @@ def inline_view(meeting: Meetup, *, chat_instance: str | None = None) -> MitupIn
     body = (
         fitted_shared_body(meeting)
         .append(horizontal_rule_content())
-        .append(closing_footer(meeting.lang, SHARED_CHAT_SOURCE, searchable_state))
+        .append(closing_footer(meeting.lang, SHARED_CARD_FOOTER_PAYLOAD, searchable_state))
     )
     return MitupInlineView(
         message=body,

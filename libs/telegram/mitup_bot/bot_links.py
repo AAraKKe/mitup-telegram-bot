@@ -46,7 +46,7 @@ def bot_url() -> str:
 def start_link(source: str) -> str:
     """A link that opens the bot with *source* as its `/start` payload.
 
-    *source* has to be a bare deep-link token (base64url characters, no separator), or the
-    acquisition stamp drops it as hand-typed.
+    *source* has to stay within Telegram's deep-link character set (`A-Z`, `a-z`, `0-9`, `_`, `-`),
+    or the acquisition stamp drops it as hand-typed.
     """
     return f"{bot_url()}?start={source}"
