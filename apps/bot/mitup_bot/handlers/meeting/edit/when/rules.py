@@ -87,7 +87,7 @@ def validate_end_datetime(end_dt: dt.datetime, meeting: Meetup, lang: str) -> st
     if end_dt <= meeting.datetime:
         reject("end_before_start")
         return MeetingEditDurationMessages.END_BEFORE_START.text(lang=lang)
-    if not limits.within_max_duration(meeting.datetime, end_dt):
+    if not limits.within_max_duration(meeting.datetime, end_dt, meeting.timezone):
         reject("exceeds_max_duration")
         return MeetingEditDurationMessages.END_MAX_DURATION.text(lang=lang)
     return None

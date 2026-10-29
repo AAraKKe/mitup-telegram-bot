@@ -1,4 +1,5 @@
 import datetime as dt
+from zoneinfo import ZoneInfo
 
 import pytest
 from freezegun import freeze_time
@@ -172,5 +173,24 @@ def test_within_max_duration_boundary_is_allowed():
     start = dt.datetime(2026, 6, 15, 10, 0, tzinfo=dt.UTC)
     exactly_one_week = start + LifecyclePolicy.get().max_duration
     one_minute_beyond = exactly_one_week + dt.timedelta(minutes=1)
-    assert limits.within_max_duration(start, exactly_one_week) is True
-    assert limits.within_max_duration(start, one_minute_beyond) is False
+    assert limits.within_max_duration(start, exactly_one_week, dt.UTC) is True
+    assert limits.within_max_duration(start, one_minute_beyond, dt.UTC) is False
+
+
+@pytest.mark.parametrize(
+    ("start", "one_local_week_later"),
+    [
+        # 10:00 Madrid on 2026-03-25 to 10:00 Madrid on 2026-04-01: 167 real hours.
+        (dt.datetime(2026, 3, 25, 9, 0, tzinfo=dt.UTC), dt.datetime(2026, 4, 1, 8, 0, tzinfo=dt.UTC)),
+        # 10:00 Madrid on 2026-10-21 to 10:00 Madrid on 2026-10-28: 169 real hours.
+        (dt.datetime(2026, 10, 21, 8, 0, tzinfo=dt.UTC), dt.datetime(2026, 10, 28, 9, 0, tzinfo=dt.UTC)),
+    ],
+    ids=["spring_forward", "fall_back"],
+)
+def test_within_max_duration_measures_a_local_week_across_a_clock_change(
+    start: dt.datetime, one_local_week_later: dt.datetime
+):
+    madrid = ZoneInfo("Europe/Madrid")
+    one_minute_beyond = one_local_week_later + dt.timedelta(minutes=1)
+    assert limits.within_max_duration(start, one_local_week_later, madrid) is True
+    assert limits.within_max_duration(start, one_minute_beyond, madrid) is False

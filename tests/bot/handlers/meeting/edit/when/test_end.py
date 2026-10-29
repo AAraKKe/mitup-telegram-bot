@@ -1004,22 +1004,21 @@ async def test_end_time_that_the_autumn_change_repeats_takes_the_first_one(
 
 
 @pytest.mark.parametrize(
-    ("start", "end", "saved"),
+    ("start", "end"),
     [
-        # 10:00 Madrid on 2026-03-25 to 10:00 Madrid on 2026-04-01: 167 hours.
-        (dt.datetime(2026, 3, 25, 9, 0, tzinfo=dt.UTC), dt.datetime(2026, 4, 1, 8, 0, tzinfo=dt.UTC), True),
-        # 10:00 Madrid on 2026-10-21 to 10:00 Madrid on 2026-10-28: 169 hours.
-        (dt.datetime(2026, 10, 21, 8, 0, tzinfo=dt.UTC), dt.datetime(2026, 10, 28, 9, 0, tzinfo=dt.UTC), False),
+        # 10:00 Madrid on 2026-03-25 to 10:00 Madrid on 2026-04-01: 167 real hours.
+        (dt.datetime(2026, 3, 25, 9, 0, tzinfo=dt.UTC), dt.datetime(2026, 4, 1, 8, 0, tzinfo=dt.UTC)),
+        # 10:00 Madrid on 2026-10-21 to 10:00 Madrid on 2026-10-28: 169 real hours.
+        (dt.datetime(2026, 10, 21, 8, 0, tzinfo=dt.UTC), dt.datetime(2026, 10, 28, 9, 0, tzinfo=dt.UTC)),
     ],
     ids=["spring_forward", "fall_back"],
 )
 @freeze_time("2026-01-01 00:00:00", tz_offset=0)
-async def test_one_local_week_across_a_change_is_measured_in_real_hours(
+async def test_one_local_week_across_a_clock_change_is_accepted(
     mock_session: MockDbSession,
     handler_context: HandlerContext,
     start: dt.datetime,
     end: dt.datetime,
-    saved: bool,
 ):
     handler_context.update = date_time_entity_update(end)
     user, meeting = madrid_owner_with_meeting(meeting_datetime=start)
@@ -1033,7 +1032,7 @@ async def test_one_local_week_across_a_change_is_measured_in_real_hours(
     )
 
     assert user.datetime_in_tz(end) - user.datetime_in_tz(start) == dt.timedelta(days=7)
-    assert meeting.end_datetime == (end if saved else None)
+    assert meeting.end_datetime == end
 
 
 # ---------------------------------------------------------------------------

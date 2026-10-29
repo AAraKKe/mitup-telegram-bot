@@ -127,9 +127,11 @@ def within_scheduling_horizon(user: User, when: dt.datetime) -> bool:
     return picked_date <= latest
 
 
-def within_max_duration(start: dt.datetime, end: dt.datetime) -> bool:
-    """Whether the span from `start` to `end` is at most `LifecyclePolicy.get().max_duration`.
+def within_max_duration(start: dt.datetime, end: dt.datetime, tz: dt.tzinfo) -> bool:
+    """Whether the span from `start` to `end`, read on the wall clocks of `tz`, is at most the cap.
 
-    No tier lifts this cap, so it takes no `User`.
+    The wall clocks keep a local week at exactly a week across a daylight-saving change.
     """
-    return end - start <= LifecyclePolicy.get().max_duration
+    local_start = start.astimezone(tz).replace(tzinfo=None)
+    local_end = end.astimezone(tz).replace(tzinfo=None)
+    return local_end - local_start <= LifecyclePolicy.get().max_duration
