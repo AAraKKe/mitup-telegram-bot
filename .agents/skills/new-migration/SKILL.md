@@ -14,6 +14,7 @@ Steps:
 5. Review and check for:
    - Missing `server_default` for non-nullable columns on existing tables
    - PostgreSQL timestamp trigger columns (`created_time`, `updated_time`) — these are set by DB triggers, not application code
+   - A new datetime column is `sa.DateTime(timezone=True)`, and its model field declares no explicit SQLAlchemy type (see "Datetime columns" in the `database` skill)
    - Nullable changes that may require data backfills
    - `downgrade()` must cleanly reverse everything `upgrade()` does
    - Bulk data mutations (an `UPDATE` or `DELETE` spanning rows) go through `helpers.execute_bulk(revision, "<short-tag>", statement)` instead of `op.execute` — it logs the revision and the affected row count, without which a mass rewrite of user content leaves no record of what it touched

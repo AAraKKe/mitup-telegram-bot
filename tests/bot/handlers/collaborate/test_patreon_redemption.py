@@ -121,9 +121,9 @@ def stored_pending_row(
         patreon_user_id=patreon_user_id,
         patreon_full_name=PATREON_NAME,
         supporter_level=SupporterLevel.HOST_2,
-        expiration=dt.datetime(2026, 7, 5, 12, 0),
+        expiration=dt.datetime(2026, 7, 5, 12, 0, tzinfo=dt.UTC),
         claimed_tg_user_id=claimed_tg_user_id,
-        consumed_time=dt.datetime(2026, 7, 5, 12, 5) if spent else None,
+        consumed_time=dt.datetime(2026, 7, 5, 12, 5, tzinfo=dt.UTC) if spent else None,
     )
 
 
@@ -787,7 +787,9 @@ async def test_a_link_refused_for_pending_deletion_never_renders_as_completed(
 
 
 def chat_start_update(chat_type: str, text: str) -> Update:
-    message = Message(message_id=1, date=dt.datetime(2026, 7, 5, 12, 0), chat=Chat(id=1, type=chat_type), text=text)
+    message = Message(
+        message_id=1, date=dt.datetime(2026, 7, 5, 12, 0, tzinfo=dt.UTC), chat=Chat(id=1, type=chat_type), text=text
+    )
     return Update(update_id=1, message=message)
 
 

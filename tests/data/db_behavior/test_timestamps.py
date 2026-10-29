@@ -1,11 +1,15 @@
 import datetime as dt
 from collections.abc import Awaitable, Callable
+from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
-from sqlmodel import select, text
+from sqlalchemy.exc import StatementError
+from sqlmodel import func, select, text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import db
+from mitup_bot.datetimes import local_to_utc
 from mitup_bot.models import JoinedUsers, Meetup, Settings, User
 
 pytestmark = pytest.mark.db_test
@@ -54,9 +58,9 @@ async def test_timestamps_are_set_on_insert(
 ):
     created_time, updated_time = await get_timestamps(db_session, seed_user, seed_meetup)
     assert created_time is not None
-    assert isinstance(created_time, dt.datetime)
+    assert created_time.utcoffset() == dt.timedelta(0)
     assert updated_time is not None
-    assert isinstance(updated_time, dt.datetime)
+    assert updated_time.utcoffset() == dt.timedelta(0)
 
 
 # --- UPDATE path helpers ---
@@ -101,7 +105,7 @@ async def test_updated_time_is_set_after_update(
 ):
     updated_time = await do_update(db_session, seed_user, seed_meetup)
     assert updated_time is not None
-    assert isinstance(updated_time, dt.datetime)
+    assert updated_time.utcoffset() == dt.timedelta(0)
 
 
 # --- JoinedUsers created_time reflects insert time, not process start (#191) ---
@@ -177,3 +181,115 @@ async def test_joined_users_created_time_is_per_insert():
             await session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
                 text("DELETE FROM users WHERE tg_user_id BETWEEN 997200 AND 997299")
             )
+
+
+# --- Time values round trip as aware UTC ---
+
+MADRID = ZoneInfo("Europe/Madrid")
+
+
+def make_meeting(owner: User, **fields: Any) -> Meetup:
+    return Meetup(
+        title="Round Trip Meeting",
+        waiting_list=False,
+        public=False,
+        allow_invitation=False,
+        incognito=False,
+        owner=owner,
+        **fields,
+    )
+
+
+async def test_written_instants_come_back_in_utc(db_session: AsyncSession):
+    savepoint = await db_session.begin_nested()
+    try:
+        owner = User(first_name="Round Trip Owner", tg_user_id=998_200, settings=Settings())
+        meeting = make_meeting(
+            owner,
+            datetime=dt.datetime(2026, 7, 15, 20, 30, tzinfo=MADRID),
+            expiration_time=dt.datetime(2026, 7, 16, 9, 0, 0, 250_000, tzinfo=MADRID),
+            activated_time=dt.datetime(2026, 1, 10, 8, 15, tzinfo=MADRID),
+        )
+        join = JoinedUsers(user=owner, meetup=meeting, created_time=dt.datetime(2026, 3, 29, 3, 0, tzinfo=MADRID))
+        db_session.add_all([owner, meeting, join])
+        await db_session.flush()
+        await db_session.refresh(meeting)
+        await db_session.refresh(join)
+
+        read_back = [meeting.datetime, meeting.expiration_time, meeting.activated_time, join.created_time]
+        assert read_back == [
+            dt.datetime(2026, 7, 15, 18, 30, tzinfo=dt.UTC),
+            dt.datetime(2026, 7, 16, 7, 0, 0, 250_000, tzinfo=dt.UTC),
+            dt.datetime(2026, 1, 10, 7, 15, tzinfo=dt.UTC),
+            dt.datetime(2026, 3, 29, 1, 0, tzinfo=dt.UTC),
+        ]
+        assert all(value is not None and value.tzinfo is dt.UTC for value in read_back)
+    finally:
+        await savepoint.rollback()
+
+
+async def test_reads_do_not_depend_on_the_session_time_zone(db_session: AsyncSession):
+    show_time_zone = text("SHOW TIME ZONE")
+    time_zone_before = (await db_session.exec(show_time_zone)).scalar_one()  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+    savepoint = await db_session.begin_nested()
+    try:
+        owner = User(first_name="Session Zone Owner", tg_user_id=998_201, settings=Settings())
+        meeting = make_meeting(owner, datetime=dt.datetime(2026, 11, 2, 23, 45, tzinfo=dt.UTC))
+        db_session.add_all([owner, meeting])
+        await db_session.flush()
+        await db_session.exec(text("SET LOCAL TIME ZONE 'America/New_York'"))  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+        assert (await db_session.exec(show_time_zone)).scalar_one() == "America/New_York"  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+
+        await db_session.refresh(meeting)
+
+        start = meeting.datetime
+        assert start == dt.datetime(2026, 11, 2, 23, 45, tzinfo=dt.UTC)
+        assert start is not None and start.tzinfo is dt.UTC
+    finally:
+        await savepoint.rollback()
+    assert (await db_session.exec(show_time_zone)).scalar_one() == time_zone_before  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+
+
+async def test_writing_a_naive_value_is_rejected_before_it_reaches_the_database(
+    db_session: AsyncSession, seed_user: User
+):
+    savepoint = await db_session.begin_nested()
+    try:
+        db_session.add(make_meeting(seed_user, datetime=dt.datetime(2026, 7, 15, 18, 30)))
+        with pytest.raises(StatementError) as rejection:
+            await db_session.flush()
+        assert isinstance(rejection.value.orig, ValueError)
+    finally:
+        await savepoint.rollback()
+    seed_user_rows = select(func.count()).select_from(User).where(User.tg_user_id == 999_001)
+    assert (await db_session.exec(seed_user_rows)).one() == 1
+
+
+@pytest.mark.parametrize(
+    "local_start, stored_start",
+    [
+        (dt.datetime(2026, 7, 15, 20, 30), dt.datetime(2026, 7, 15, 18, 30, tzinfo=dt.UTC)),
+        (dt.datetime(2026, 1, 15, 20, 30), dt.datetime(2026, 1, 15, 19, 30, tzinfo=dt.UTC)),
+    ],
+    ids=["summer", "winter"],
+)
+async def test_meeting_start_keeps_the_owner_wall_clock_across_daylight_saving(
+    db_session: AsyncSession, local_start: dt.datetime, stored_start: dt.datetime
+):
+    savepoint = await db_session.begin_nested()
+    try:
+        owner = User(first_name="Madrid Owner", tg_user_id=998_202, settings=Settings(timezone="Europe/Madrid"))
+        meeting = make_meeting(owner, datetime=local_to_utc(local_start.date(), local_start.time(), MADRID))
+        db_session.add_all([owner, meeting])
+        await db_session.flush()
+        meeting_id = meeting.id
+        db_session.expunge(meeting)
+
+        reloaded = (await db_session.exec(select(Meetup).where(Meetup.id == meeting_id))).one()
+
+        start = reloaded.datetime
+        assert reloaded is not meeting
+        assert start is not None and start == stored_start
+        assert owner.datetime_in_tz(start).replace(tzinfo=None) == local_start
+    finally:
+        await savepoint.rollback()

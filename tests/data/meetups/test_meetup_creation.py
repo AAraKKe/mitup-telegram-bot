@@ -43,7 +43,7 @@ EXAMPLE_MEETING = Meetup(
     owner_id=1,
     title="Test Meeting",
     description="Test Description",
-    datetime=datetime(2001, 1, 1, 12, 12),
+    datetime=datetime(2001, 1, 1, 12, 12, tzinfo=UTC),
     waiting_list=False,
     public=False,
     allow_invitation=False,
@@ -365,7 +365,7 @@ def test_add_message_does_nothing_if_message_exists():
         meetup=meeting,
     )
 
-    update = Update(123, message=TgMessage(message_id=123, date=datetime.now(), chat=Chat(id=123, type="PRIVATE")))
+    update = Update(123, message=TgMessage(message_id=123, date=datetime.now(UTC), chat=Chat(id=123, type="PRIVATE")))
     assert message == meeting.add_message(update, meeting_views.keyboard_for_update(update, meeting, meeting.owner))
     assert len(meeting.messages) == 1
 

@@ -1,7 +1,7 @@
 import datetime as dt
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Column, DateTime, FetchedValue, UniqueConstraint
+from sqlalchemy import FetchedValue, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from .base_model import BaseModel
@@ -22,7 +22,7 @@ class JoinedUsers(BaseModel, SQLModel, table=True):
     user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE")
     meetup_id: int | None = Field(default=None, foreign_key="meetups.id", ondelete="CASCADE")
     invited_by_id: int | None = Field(default=None, foreign_key="users.id", ondelete="SET NULL")
-    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    created_time: dt.datetime | None = Field(default=None, sa_column_kwargs={"server_default": FetchedValue()})
     is_waiting_list: bool = False
     notification_sent: bool = False
 

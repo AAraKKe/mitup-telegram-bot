@@ -8,7 +8,6 @@ from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
-from mitup_bot.datetimes import as_utc
 from mitup_bot.models import JoinedUsers, Meetup
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricsClient
@@ -45,7 +44,7 @@ def minutes_late(meeting_datetime: dt.datetime | None) -> int | None:
     """
     if meeting_datetime is None:
         return None
-    return round((dt.datetime.now(dt.UTC) - as_utc(meeting_datetime)).total_seconds() / 60)
+    return round((dt.datetime.now(dt.UTC) - meeting_datetime).total_seconds() / 60)
 
 
 def split_participants(meeting: Meetup) -> ParticipantSplit:

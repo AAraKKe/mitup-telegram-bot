@@ -3,7 +3,6 @@ from __future__ import annotations
 import datetime as dt
 from typing import TYPE_CHECKING
 
-from mitup_bot.datetimes import as_utc
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.utils import ButtonMessages, MeetingDisplayMessages, NotificationMessages
@@ -77,7 +76,7 @@ def started_view(link: JoinedUsers, *, now: dt.datetime) -> MitupView:
     """A start within the last minute is said to be just now: counting in minutes would round those
     seconds up and claim the meeting began a minute ago."""
     start = link.meetup.datetime
-    if start is not None and abs(as_utc(start) - as_utc(now)) < JUST_NOW:
+    if start is not None and abs(start - now) < JUST_NOW:
         countdown = NotificationMessages.STARTED_JUST_NOW.rich(lang=link.user.lang)
     else:
         countdown = countdown_line(link, NotificationMessages.STARTED_AGO, now=now)

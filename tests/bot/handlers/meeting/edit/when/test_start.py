@@ -1,5 +1,6 @@
 import datetime as dt
 from typing import cast
+from zoneinfo import ZoneInfo
 
 import pytest
 from freezegun import freeze_time
@@ -41,6 +42,7 @@ from tests.helpers import (
 from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
+MADRID = ZoneInfo("Europe/Madrid")
 TEST_MEETING_DATETIME_UTC = dt.datetime(2024, 12, 21, 12, 0, tzinfo=dt.UTC)
 TEST_CURRENT_DATE = dt.date(2024, 11, 15)
 
@@ -1012,37 +1014,6 @@ async def test_set_date_update_to_past_shows_alert_and_stays_on_the_card(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.PICK_START_DATE.with_id(10).with_date(PAST_DATE))],
-    indirect=True,
-)
-@freeze_time(START_PAST_FROZEN_NOW, tz_offset=0)
-async def test_set_date_update_to_past_with_naive_stored_datetime_does_not_raise(
-    mock_session: MockDbSession,
-    update: Update,
-    user_with_settings: User,
-    handler_context: HandlerContext,
-):
-    """The pick tolerates a naive stored meeting.datetime when validating the past start."""
-    naive_existing = dt.datetime(2025, 1, 20, 10, 0)  # naive
-    assert naive_existing.tzinfo is None
-    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=naive_existing)
-    user_with_settings.meetups.append(meeting)
-    mock_session.add_object(meeting)
-    mock_session.add_object(user_with_settings, "tg_user_id")
-
-    context, response = await call_handler(EditMeetingHandlerId.PICK_START_DATE, handler_context=handler_context)
-
-    assert response == ConversationMeetingState.START_DATETIME_CARD
-    assert meeting.datetime == naive_existing  # unchanged, no TypeError raised
-    context.api.assert_answer_callback_query_called(
-        update=update,
-        text=MeetingEditDateTimeMessages.START_IN_PAST.text(lang=meeting.lang),
-        show_alert=True,
-    )
-
-
-@pytest.mark.parametrize(
-    "update",
     # date_time entity at 2025-01-10 10:00 UTC — before the frozen now (2025-01-15).
     [datetime_entity_request(int(dt.datetime(2025, 1, 10, 10, 0, tzinfo=dt.UTC).timestamp()))],
     indirect=True,
@@ -1387,7 +1358,7 @@ async def test_set_date_first_time_today_succeeds_with_2359_default(
 
 
 # ---------------------------------------------------------------------------
-# The pick preserves the owner-LOCAL wall clock across DST and naive storage.
+# Daylight-saving changes, for an owner in Europe/Madrid.
 # ---------------------------------------------------------------------------
 
 
@@ -1434,18 +1405,14 @@ async def test_set_date_update_preserves_local_time_across_dst(
     indirect=True,
 )
 @freeze_time("2026-01-01 00:00:00", tz_offset=0)
-async def test_set_date_update_with_naive_stored_datetime_treats_it_as_utc(
+async def test_set_date_update_reads_a_start_held_on_another_offset(
     mock_session: MockDbSession,
     update: Update,
     user_with_settings: User,
     handler_context: HandlerContext,
 ):
-    """A naive stored meeting.datetime is read as UTC before the local-time preservation, so it is
-    never reinterpreted against the system timezone."""
-    # A naive value reads as 2026-06-20 10:00 UTC.
-    naive_existing = dt.datetime(2026, 6, 20, 10, 0)
-    assert naive_existing.tzinfo is None
-    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=naive_existing)
+    existing = dt.datetime(2026, 6, 20, 12, 0, tzinfo=MADRID)
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=existing)
     user_with_settings.meetups.append(meeting)
     mock_session.add_object(meeting)
     mock_session.add_object(user_with_settings, "tg_user_id")
@@ -1454,8 +1421,132 @@ async def test_set_date_update_with_naive_stored_datetime_treats_it_as_utc(
     context, response = await call_handler(EditMeetingHandlerId.PICK_START_DATE, handler_context=handler_context)
 
     assert response == ConversationMeetingState.START_DATETIME_CARD
-    # 10:00 UTC == 12:00 Madrid (summer, UTC+2); preserved on 2026-06-25 that local 12:00 == 10:00 UTC.
+    # 12:00 Madrid (summer, UTC+2) on the new day.
     assert meeting.datetime == dt.datetime(2026, 6, 25, 10, 0, tzinfo=dt.UTC)
+
+
+@pytest.mark.parametrize(
+    "update",
+    # Madrid falls back on 2026-10-25, between the two dates.
+    [UpdateRequest(callback_query=cb.PICK_START_DATE.with_id(10).with_date(dt.date(2026, 11, 2)))],
+    indirect=True,
+)
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_set_date_update_preserves_local_time_across_the_autumn_change(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    # 10:00 Madrid in summer time (UTC+2).
+    existing = dt.datetime(2026, 10, 20, 8, 0, tzinfo=dt.UTC)
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=existing)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    MeetupMessage(message_id=111, chat_id=111, meetup=meeting)
+
+    context, response = await call_handler(EditMeetingHandlerId.PICK_START_DATE, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.START_DATETIME_CARD
+    # 10:00 Madrid in winter time (UTC+1).
+    expected_start = dt.datetime(2026, 11, 2, 9, 0, tzinfo=dt.UTC)
+    assert meeting.datetime == expected_start
+    assert meeting.owner.datetime_in_tz(expected_start).time() == dt.time(10, 0)
+
+
+@pytest.mark.parametrize(
+    ("update", "expected_start"),
+    [
+        # Spring forward: 23:59 Madrid is summer time (UTC+2) by the end of the day.
+        (
+            UpdateRequest(callback_query=cb.PICK_START_DATE.with_id(10).with_date(dt.date(2026, 3, 29))),
+            dt.datetime(2026, 3, 29, 21, 59, tzinfo=dt.UTC),
+        ),
+        # Fall back: 23:59 Madrid is winter time (UTC+1) by the end of the day.
+        (
+            UpdateRequest(callback_query=cb.PICK_START_DATE.with_id(10).with_date(dt.date(2026, 10, 25))),
+            dt.datetime(2026, 10, 25, 22, 59, tzinfo=dt.UTC),
+        ),
+    ],
+    indirect=["update"],
+    ids=["spring_forward", "fall_back"],
+)
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_set_date_first_time_on_a_change_day_lands_at_2359_local(
+    mock_session: MockDbSession,
+    update: Update,
+    expected_start: dt.datetime,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description")
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    MeetupMessage(message_id=111, chat_id=111, meetup=meeting)
+
+    context, response = await call_handler(EditMeetingHandlerId.PICK_START_DATE, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.START_DATETIME_CARD
+    assert meeting.datetime == expected_start
+    assert meeting.owner.datetime_in_tz(expected_start).time() == dt.time(23, 59)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="02:30")], indirect=["update"])
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_set_time_that_the_spring_change_skips_moves_an_hour_later(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """Madrid clocks jump from 02:00 to 03:00 on 2026-03-29, so 02:30 never happens that day."""
+    meeting = create_meetup(
+        id=10, title="TestMeeting", description="Description", datetime=dt.datetime(2026, 3, 29, 10, 0, tzinfo=dt.UTC)
+    )
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(
+        EditMeetingHandlerId.TYPE_START_TIME,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_START: 10},
+    )
+
+    assert response == ConversationMeetingState.START_DATETIME_CARD
+    # 02:30 read with the winter offset (UTC+1), which the clocks show as 03:30.
+    expected_start = dt.datetime(2026, 3, 29, 1, 30, tzinfo=dt.UTC)
+    assert meeting.datetime == expected_start
+    assert meeting.owner.datetime_in_tz(expected_start).time() == dt.time(3, 30)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="02:30")], indirect=["update"])
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_set_time_that_the_autumn_change_repeats_takes_the_first_one(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """Madrid clocks go back from 03:00 to 02:00 on 2026-10-25, so 02:30 happens twice that day."""
+    meeting = create_meetup(
+        id=10, title="TestMeeting", description="Description", datetime=dt.datetime(2026, 10, 25, 10, 0, tzinfo=dt.UTC)
+    )
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(
+        EditMeetingHandlerId.TYPE_START_TIME,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_START: 10},
+    )
+
+    assert response == ConversationMeetingState.START_DATETIME_CARD
+    # The first 02:30, still on summer time (UTC+2).
+    assert meeting.datetime == dt.datetime(2026, 10, 25, 0, 30, tzinfo=dt.UTC)
 
 
 @pytest.mark.parametrize(

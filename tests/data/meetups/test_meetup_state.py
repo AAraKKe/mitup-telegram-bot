@@ -233,11 +233,6 @@ def test_inline_view_excludes_in_progress_label_when_not_in_progress(user_with_s
 
 
 # ---------------------------------------------------------------------------
-# is_in_progress: naive datetime compatibility (DB round-trip simulation)
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
 # enforce_datetime_ordering — returns False when start < end (line 654)
 # ---------------------------------------------------------------------------
 
@@ -264,23 +259,6 @@ def test_enforce_datetime_ordering_returns_false_when_end_is_none(user_with_sett
     result = meeting.enforce_datetime_ordering()
 
     assert result is False
-
-
-def test_is_in_progress_with_naive_datetimes(user_with_settings: User):
-    """is_in_progress must return True when datetimes are naive (no tzinfo), as returned by the DB.
-
-    In production the DateTime column has no timezone, so SQLAlchemy returns naive datetimes.
-    Tests normally pass because fixtures set tzinfo=UTC in memory and never round-trip through
-    the DB. This test simulates the actual DB behaviour.
-    """
-    meeting = create_meetup(id=1, owner=user_with_settings)
-    # Naive datetimes: started in the past, ends far in the future
-    meeting.datetime = dt.datetime(2024, 1, 1, 10, 0)  # naive, no tzinfo — simulates DB return
-    meeting.end_datetime = dt.datetime(2099, 12, 31, 23, 59)  # naive, far future — meeting still running
-
-    # Before the fix, comparing naive end_datetime with aware now() raised TypeError.
-    # After the fix, naive datetimes are normalised to UTC before comparison.
-    assert meeting.is_in_progress is True
 
 
 # ---------------------------------------------------------------------------

@@ -3,12 +3,12 @@ from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
 from zoneinfo import ZoneInfo
 
 from pydantic.config import ConfigDict
-from sqlalchemy import JSON, BigInteger, Column, DateTime, Enum, FetchedValue
+from sqlalchemy import JSON, BigInteger, Column, Enum, FetchedValue
 from sqlmodel import Field, Relationship, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot import limits
-from mitup_bot.datetimes import DateFormat, TimeFormat, as_utc
+from mitup_bot.datetimes import DateFormat, TimeFormat
 from mitup_bot.exceptions import MeetupNotFound
 from mitup_bot.format_tags import strip_format_tags
 from mitup_bot.images import ImageLayout
@@ -94,10 +94,9 @@ class Meetup(BaseModel, SQLModel, table=True):
         ),
     )
     description: str | None = None
-    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    created_time: dt.datetime | None = Field(default=None, sa_column_kwargs={"server_default": FetchedValue()})
     updated_time: dt.datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+        default=None, sa_column_kwargs={"server_default": FetchedValue(), "server_onupdate": FetchedValue()}
     )
     # Set on creation, re-stamped on reactivation; the dateless deactivation window reads it.
     activated_time: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC), nullable=False)
@@ -177,7 +176,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         """The later of the two gates the deletion sweep applies, or None when neither stamp is set."""
         policy = self.lifecycle_policy
         gates = [
-            as_utc(stamp) + duration
+            stamp + duration
             for stamp, duration in (
                 (self.expiration_time, policy.inactive_retention),
                 (self.warned_time, policy.deletion_warning_lead),
@@ -248,11 +247,11 @@ class Meetup(BaseModel, SQLModel, table=True):
         if self.datetime is None:
             return False
         now = dt.datetime.now(dt.UTC)
-        if now < as_utc(self.datetime):
+        if now < self.datetime:
             return False
         if self.end_datetime is None:
             return True
-        return now < as_utc(self.end_datetime)
+        return now < self.end_datetime
 
     @property
     def attendance_is_open(self) -> bool:
@@ -430,7 +429,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         """Clear end_datetime if it's no longer after datetime. Returns True if cleared."""
         if self.end_datetime is None or self.datetime is None:
             return False
-        if as_utc(self.datetime) >= as_utc(self.end_datetime):
+        if self.datetime >= self.end_datetime:
             self.end_datetime = None
             self.lock_on_start = False
             return True

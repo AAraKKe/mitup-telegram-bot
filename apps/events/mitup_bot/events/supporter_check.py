@@ -25,7 +25,6 @@ from sqlmodel.sql.expression import SelectOfScalar
 from mitup_bot import db, hosts_group, patreon, supporter
 from mitup_bot.api_wrapper import TelegramApiWrapper
 from mitup_bot.config import PatreonConfig
-from mitup_bot.datetimes import as_utc
 from mitup_bot.exceptions import PatreonTokenRevoked
 from mitup_bot.models import SupporterSubscription, User
 from mitup_bot.models.users import UserStatus
@@ -140,7 +139,7 @@ LIVE_LINKED_SUBSCRIPTIONS: SelectOfScalar[SupporterSubscription] = (
 
 def days_until(expiration: dt.datetime) -> float:
     """Whole and fractional days from now until ``expiration`` (negative once expired)."""
-    return (as_utc(expiration) - dt.datetime.now(dt.UTC)).total_seconds() / dt.timedelta(days=1).total_seconds()
+    return (expiration - dt.datetime.now(dt.UTC)).total_seconds() / dt.timedelta(days=1).total_seconds()
 
 
 @dataclass(frozen=True, slots=True)

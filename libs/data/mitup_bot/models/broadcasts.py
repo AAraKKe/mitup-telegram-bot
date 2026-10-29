@@ -1,7 +1,7 @@
 import datetime as dt
 from enum import StrEnum
 
-from sqlalchemy import BigInteger, Column, DateTime, Enum, FetchedValue, Integer, UniqueConstraint
+from sqlalchemy import BigInteger, Column, Enum, FetchedValue, Integer, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 from .base_model import BaseModel
@@ -71,10 +71,9 @@ class Broadcast(BaseModel, SQLModel, table=True):
     # App-set (not trigger-managed): the sender stamps these as the run progresses.
     sending_started_time: dt.datetime | None = None
     completed_time: dt.datetime | None = None
-    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    created_time: dt.datetime | None = Field(default=None, sa_column_kwargs={"server_default": FetchedValue()})
     updated_time: dt.datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+        default=None, sa_column_kwargs={"server_default": FetchedValue(), "server_onupdate": FetchedValue()}
     )
 
     # lazy="selectin": the small per-broadcast language set is traversed in plain Python for
@@ -112,10 +111,9 @@ class BroadcastMessage(BaseModel, SQLModel, table=True):
     failed_count: int = 0
     skipped_count: int = 0
     orphan_count: int = 0
-    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    created_time: dt.datetime | None = Field(default=None, sa_column_kwargs={"server_default": FetchedValue()})
     updated_time: dt.datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+        default=None, sa_column_kwargs={"server_default": FetchedValue(), "server_onupdate": FetchedValue()}
     )
 
     broadcast: Broadcast = Relationship(back_populates="messages", sa_relationship_kwargs={"lazy": "selectin"})

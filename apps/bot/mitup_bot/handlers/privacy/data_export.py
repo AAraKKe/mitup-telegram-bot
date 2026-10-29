@@ -14,17 +14,16 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
-from mitup_bot.datetimes import in_timezone
 from mitup_bot.models import JoinedUsers, Meetup, PatreonPendingLink, Settings, SupporterSubscription, User
 
 EXPORT_BOT_NAME = "Mitup"
 
 
 def iso_utc(value: dt.datetime | None) -> str | None:
-    """ISO 8601 in UTC; naive values are stored as UTC in the database, so the offset is made explicit."""
+    """ISO 8601 in UTC, so every moment in the export carries the same `+00:00` offset."""
     if value is None:
         return None
-    return in_timezone(value, dt.UTC).isoformat()
+    return value.astimezone(dt.UTC).isoformat()
 
 
 def owned_meetings_statement(user: User) -> SelectOfScalar[Meetup]:

@@ -35,8 +35,7 @@ ORGANIZER_LEVEL = SupporterLevel.HOST_3
 
 
 def days_ago(days: int) -> dt.datetime:
-    """A naive UTC timestamp `days` in the past, matching how the timestamp columns are stored."""
-    return dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(days=days)
+    return dt.datetime.now(dt.UTC) - dt.timedelta(days=days)
 
 
 def dateless_days(level: SupporterLevel) -> int:

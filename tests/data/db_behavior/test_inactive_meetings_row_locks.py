@@ -40,7 +40,7 @@ async def provisioned_expired_meeting(tg_base: int, *, users: int = 0) -> AsyncI
     transaction and are invisible to the concurrent ``db.begin()`` sessions these tests race.
     The meeting's ``datetime`` is set far enough in the past that any owner timeout has elapsed.
     """
-    started = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(days=2)
+    started = dt.datetime.now(dt.UTC) - dt.timedelta(days=2)
     async with db.begin() as session:
         owner = User(first_name="Sweep Owner", tg_user_id=tg_base, settings=Settings())
         extras = [
@@ -177,7 +177,7 @@ async def test_reschedule_racing_deactivation_keeps_meeting_active(db_session: A
     deactivation predicate under the lock and skips the no-longer-due meeting. Without the lock
     the job decides on the stale timing and deactivates a meeting that was just moved."""
     tg_base = 997_320
-    future = dt.datetime.now(dt.UTC).replace(tzinfo=None) + dt.timedelta(days=2)
+    future = dt.datetime.now(dt.UTC) + dt.timedelta(days=2)
     async with provisioned_expired_meeting(tg_base) as meetup_id:
         _, deactivated = await race(
             lambda session: reschedule(session, meetup_id, future),

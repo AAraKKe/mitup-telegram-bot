@@ -6,7 +6,6 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     Column,
-    DateTime,
     Enum,
     FetchedValue,
     ForeignKey,
@@ -88,12 +87,11 @@ class SupporterSubscription(BaseModel, SQLModel, table=True):
     # Captured from Patreon's /identity at link time; the join key against the daily bulk
     # member list. Unique so one Patreon account cannot grant support to several TG accounts.
     patreon_user_id: str = Field(sa_column=Column(String, unique=True, nullable=False))
-    support_expiration: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, nullable=True))
+    support_expiration: dt.datetime | None = None
     expiration_notified: bool = Field(default=False, sa_column=Column(Boolean, nullable=False, server_default=false()))
-    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    created_time: dt.datetime | None = Field(default=None, sa_column_kwargs={"server_default": FetchedValue()})
     updated_time: dt.datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+        default=None, sa_column_kwargs={"server_default": FetchedValue(), "server_onupdate": FetchedValue()}
     )
 
 
@@ -143,19 +141,18 @@ class PatreonPendingLink(BaseModel, SQLModel, table=True):
             server_default=SupporterLevel.NONE.value,
         ),
     )
-    expiration: dt.datetime = Field(sa_column=Column(DateTime, nullable=False))
+    expiration: dt.datetime
     # The Telegram account that presented the code. Deliberately not unique: one person can hold
     # several live rows, and a uniqueness error would turn an honest double-start into a failure.
     # The confirm transition matches on it so a code claimed by one account cannot be confirmed by
     # another. BigInteger to match `users.tg_user_id`, which outgrew a 32-bit column.
     claimed_tg_user_id: int | None = Field(default=None, sa_column=Column(BigInteger, nullable=True))
-    claimed_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, nullable=True))
+    claimed_time: dt.datetime | None = None
     # Set when the confirmation goes through; a non-null value makes the row permanently unusable.
-    consumed_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, nullable=True))
-    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    consumed_time: dt.datetime | None = None
+    created_time: dt.datetime | None = Field(default=None, sa_column_kwargs={"server_default": FetchedValue()})
     updated_time: dt.datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+        default=None, sa_column_kwargs={"server_default": FetchedValue(), "server_onupdate": FetchedValue()}
     )
 
 
@@ -165,15 +162,14 @@ class PatreonCreatorToken(BaseModel, SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     access_token: str = Field(sa_column=Column(EncryptedToken, nullable=False))
     refresh_token: str = Field(sa_column=Column(EncryptedToken, nullable=False))
-    token_expiration: dt.datetime = Field(sa_column=Column(DateTime, nullable=False))
+    token_expiration: dt.datetime
     # SHA-256 of the seed access token that initialized (or last reset) this row. The daily job
     # compares it against the configured seed: a mismatch means the operator provided a new seed,
     # so the config pair is adopted (self-service reset via CI variable).
     seed_fingerprint: str = Field(sa_column=Column(String, nullable=False))
-    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    created_time: dt.datetime | None = Field(default=None, sa_column_kwargs={"server_default": FetchedValue()})
     updated_time: dt.datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+        default=None, sa_column_kwargs={"server_default": FetchedValue(), "server_onupdate": FetchedValue()}
     )
 
 
@@ -187,8 +183,7 @@ class PatreonWebhook(BaseModel, SQLModel, table=True):
     uri: str = Field(sa_column=Column(String, nullable=False))
     # HMAC signing secret, Fernet-encrypted at rest exactly like the other token columns.
     secret: str = Field(sa_column=Column(EncryptedToken, nullable=False))
-    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    created_time: dt.datetime | None = Field(default=None, sa_column_kwargs={"server_default": FetchedValue()})
     updated_time: dt.datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+        default=None, sa_column_kwargs={"server_default": FetchedValue(), "server_onupdate": FetchedValue()}
     )

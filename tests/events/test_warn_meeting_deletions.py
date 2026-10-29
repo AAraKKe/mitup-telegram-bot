@@ -136,8 +136,7 @@ async def test_notify_unreachable_owner_marks_the_warning_as_sent(
     caplog.set_level(logging.WARNING)
     meeting = create_meetup(id=1, title="Blocked Owner Meeting")
     owner = create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
-    # Naive UTC, the shape the expiration column reads back with.
-    meeting.expiration_time = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(days=WARNING_DAYS + 2)
+    meeting.expiration_time = dt.datetime.now(dt.UTC) - dt.timedelta(days=WARNING_DAYS + 2)
 
     register_nominated(mock_session, STATEMENT, (meeting,))
     api.mock_method("send_message_to_user").side_effect = InactiveUserInteraction(10, private=True)

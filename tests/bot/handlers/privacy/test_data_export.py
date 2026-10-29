@@ -200,10 +200,9 @@ def test_export_document_filename_carries_the_utc_date():
     assert json.loads(document) == {"bot": "Mitup"}
 
 
-def test_iso_utc_normalizes_every_datetime_shape():
-    naive_utc = dt.datetime(2026, 7, 9, 12, 30)
+def test_iso_utc_writes_every_offset_as_utc():
     madrid = dt.datetime(2026, 7, 9, 14, 30, tzinfo=dt.timezone(dt.timedelta(hours=2)))
 
-    assert data_export.iso_utc(naive_utc) == "2026-07-09T12:30:00+00:00"
+    assert data_export.iso_utc(dt.datetime(2026, 7, 9, 12, 30, tzinfo=dt.UTC)) == "2026-07-09T12:30:00+00:00"
     assert data_export.iso_utc(madrid) == "2026-07-09T12:30:00+00:00"
     assert data_export.iso_utc(None) is None

@@ -144,10 +144,7 @@ async def test_delete_meeting_whose_owner_is_unreachable(
     owner_blocked = create_user(
         id=2, tg_user_id=20, owned_meetings=[meeting_unnotified], settings=create_settings(id=2)
     )
-    # Naive UTC, the shape the expiration column reads back with.
-    meeting_unnotified.expiration_time = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(
-        days=RETENTION_DAYS + 2
-    )
+    meeting_unnotified.expiration_time = dt.datetime.now(dt.UTC) - dt.timedelta(days=RETENTION_DAYS + 2)
 
     # An invited user of the unnotified meeting must be purged with it, exactly as for a notified one.
     outside_user = create_user(id=3, tg_user_id=-1, first_name="Outside")
@@ -278,9 +275,8 @@ async def test_a_meeting_waiting_out_its_lead_is_not_counted_as_overdue(
     caplog.set_level(logging.WARNING)
     meeting = create_meetup(id=1, title="Late Warning Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
-    # Naive UTC, the shape the timestamp columns read back with.
-    meeting.expiration_time = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(days=RETENTION_DAYS + 30)
-    meeting.warned_time = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(days=LEAD_DAYS + 1)
+    meeting.expiration_time = dt.datetime.now(dt.UTC) - dt.timedelta(days=RETENTION_DAYS + 30)
+    meeting.warned_time = dt.datetime.now(dt.UTC) - dt.timedelta(days=LEAD_DAYS + 1)
 
     register_nominated(mock_session, STATEMENT, (meeting,))
     api.mock_method("send_message_to_user").side_effect = InactiveUserInteraction(10, private=True)
@@ -299,9 +295,7 @@ async def test_a_repeatedly_failing_send_escalates_instead_of_warning_daily_fore
     its own: that is what makes the failure counter mean "failing now" rather than "ever failed"."""
     meeting = create_meetup(id=1, title="Stuck Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
-    meeting.expiration_time = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(
-        days=RETENTION_DAYS + STUCK_RESIDUE_DAYS + 2
-    )
+    meeting.expiration_time = dt.datetime.now(dt.UTC) - dt.timedelta(days=RETENTION_DAYS + STUCK_RESIDUE_DAYS + 2)
 
     register_nominated(mock_session, STATEMENT, (meeting,))
     api.mock_method("send_message_to_user").side_effect = BadRequest("Telegram is having a moment")

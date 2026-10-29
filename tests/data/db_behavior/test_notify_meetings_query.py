@@ -41,7 +41,7 @@ def make_meetup(owner: User, *, starts_in_minutes: int) -> Meetup:
         allow_invitation=False,
         incognito=False,
         owner=owner,
-        datetime=dt.datetime.now(dt.UTC).replace(tzinfo=None) + dt.timedelta(minutes=starts_in_minutes),
+        datetime=dt.datetime.now(dt.UTC) + dt.timedelta(minutes=starts_in_minutes),
     )
 
 

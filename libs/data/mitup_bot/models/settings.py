@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 import structlog
-from sqlalchemy import BigInteger, CheckConstraint, Column, DateTime, Enum, FetchedValue
+from sqlalchemy import BigInteger, CheckConstraint, Column, Enum, FetchedValue
 from sqlmodel import Field, Relationship, SQLModel
 from sqlmodel.main import SQLModelConfig
 
@@ -35,10 +35,9 @@ class Settings(BaseModel, SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True, sa_type=BigInteger)
     user_id: int | None = Field(default=None, foreign_key="users.id", ondelete="CASCADE", sa_type=BigInteger)
-    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    created_time: dt.datetime | None = Field(default=None, sa_column_kwargs={"server_default": FetchedValue()})
     updated_time: dt.datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+        default=None, sa_column_kwargs={"server_default": FetchedValue(), "server_onupdate": FetchedValue()}
     )
     language: str = TranslationEngine.FALLBACK_LANG
     timezone: str = "UTC"

@@ -1,9 +1,7 @@
 """Tests for the shared datetime conventions.
 
-Every layer reads stored datetimes through these four helpers, so what a naive value means and how
-a wall clock crosses into UTC are pinned here rather than at each call site. The tests run under a
-non-UTC system timezone where it matters, because reading a naive value as system-local instead of
-UTC is the failure these helpers exist to prevent and it is invisible on a UTC machine.
+The tests run under a non-UTC system timezone where it matters, because a conversion that falls
+back on the process timezone is invisible on a UTC machine.
 """
 
 import datetime as dt
@@ -13,15 +11,13 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from mitup_bot.datetimes import UTC_TIMEZONE, as_utc, in_timezone, local_to_utc, parse_timezone
+from mitup_bot.datetimes import UTC_TIMEZONE, local_to_utc, parse_timezone
 
 MADRID = ZoneInfo("Europe/Madrid")
 AUCKLAND = ZoneInfo("Pacific/Auckland")
 
-# 22:45 in Madrid on a summer date (UTC+2) and the same instant written bare, as the database
-# hands it back.
+# 22:45 in Madrid on a summer date (UTC+2).
 MOMENT = dt.datetime(2027, 7, 17, 20, 45, tzinfo=dt.UTC)
-NAIVE_MOMENT = MOMENT.replace(tzinfo=None)
 
 # The last Sunday in March 2027: the clocks in Madrid jump from 02:00 to 03:00.
 SPRING_FORWARD_DATE = dt.date(2027, 3, 28)
@@ -29,50 +25,12 @@ SPRING_FORWARD_DATE = dt.date(2027, 3, 28)
 
 @pytest.fixture
 def system_timezone_new_york(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Run the test with the process reading local time as New York.
-
-    `astimezone` on a naive value silently uses the process timezone, so a helper that forgets to
-    tag the value passes on a UTC machine and shifts the moment everywhere else.
-    """
+    """Run the test with the process reading local time as New York."""
     monkeypatch.setenv("TZ", "America/New_York")
     time.tzset()
     yield
     monkeypatch.undo()
     time.tzset()
-
-
-def test_as_utc_tags_a_naive_value():
-    assert as_utc(NAIVE_MOMENT) == MOMENT
-
-
-def test_as_utc_leaves_an_aware_value_on_its_own_offset():
-    madrid_value = MOMENT.astimezone(MADRID)
-
-    assert as_utc(madrid_value) is madrid_value
-
-
-@pytest.mark.usefixtures("system_timezone_new_york")
-def test_as_utc_ignores_the_system_timezone():
-    assert as_utc(NAIVE_MOMENT) == MOMENT
-
-
-def test_in_timezone_moves_an_aware_value_onto_the_local_clock():
-    assert in_timezone(MOMENT, MADRID).hour == 22
-
-
-def test_in_timezone_reads_a_naive_value_as_utc():
-    assert in_timezone(NAIVE_MOMENT, MADRID) == in_timezone(MOMENT, MADRID)
-
-
-@pytest.mark.usefixtures("system_timezone_new_york")
-def test_in_timezone_ignores_the_system_timezone():
-    assert in_timezone(NAIVE_MOMENT, MADRID).hour == 22
-
-
-def test_in_timezone_can_cross_the_date_line():
-    """The date a moment falls on is a statement about the zone it is read in."""
-    assert in_timezone(MOMENT, AUCKLAND).date() == dt.date(2027, 7, 18)
-    assert in_timezone(MOMENT, dt.UTC).date() == dt.date(2027, 7, 17)
 
 
 def test_local_to_utc_returns_the_instant_the_local_clocks_show_that_time():
@@ -120,4 +78,3 @@ def test_parse_timezone_returns_none_for_a_zone_the_system_does_not_carry():
 
 def test_utc_timezone_names_utc():
     assert UTC_TIMEZONE.key == "UTC"
-    assert in_timezone(MOMENT, UTC_TIMEZONE) == MOMENT

@@ -36,7 +36,7 @@ def make_expired_meetup(owner: User) -> Meetup:
         allow_invitation=True,
         incognito=False,
         owner=owner,
-        datetime=dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(days=2),
+        datetime=dt.datetime.now(dt.UTC) - dt.timedelta(days=2),
     )
 
 

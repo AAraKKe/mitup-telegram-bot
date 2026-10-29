@@ -9,7 +9,7 @@ from babel import Locale, UnknownLocaleError
 from babel.dates import format_date, format_skeleton, format_timedelta
 from babel.units import format_unit
 
-from mitup_bot.datetimes import DateFormat, TimeFormat, as_utc, in_timezone
+from mitup_bot.datetimes import DateFormat, TimeFormat
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils.entities import EntityDateTime
 from mitup_bot.utils.rich_message import RichContent, date_time_content
@@ -65,7 +65,7 @@ def shows_year(local_value: dt.datetime, created: dt.datetime | None, tz: dt.tzi
     """
     if created is None:
         return False
-    return in_timezone(created, tz).year != local_value.year
+    return created.astimezone(tz).year != local_value.year
 
 
 def date_texts(
@@ -88,7 +88,7 @@ def datetime_pieces(
     """The locale of *lang* and the date, the date without its weekday, the time and the zone texts
     of *value* read in *tz*."""
     locale = locale_for(lang)
-    local_value = in_timezone(value, tz)
+    local_value = value.astimezone(tz)
     date, day = date_texts(local_value, locale=locale, created=created, tz=tz, date_format=time_format.date_format)
     clock = TIME_SKELETON_24H if time_format.clock_24h else TIME_SKELETON_12H
     time = format_skeleton(clock, local_value, locale=locale)
@@ -115,7 +115,7 @@ def localized_date(
 
     The counterpart of `localized_datetime` for a moment whose time of day says nothing.
     """
-    local_value = in_timezone(value, tz)
+    local_value = value.astimezone(tz)
     date, _ = date_texts(local_value, locale=locale_for(lang), created=created, tz=tz, date_format=date_format)
     return date
 
@@ -176,7 +176,7 @@ def datetime_range_content(
     )
     _, end_date, end_day, end_time, _ = datetime_pieces(end, lang=lang, tz=tz, created=created, time_format=time_format)
     times = time_content(start, start_time).append(RANGE_SEPARATOR).append(time_content(end, end_time))
-    if in_timezone(start, tz).date() == in_timezone(end, tz).date():
+    if start.astimezone(tz).date() == end.astimezone(tz).date():
         return placed_content(locale, date_content(start, date, day), times.append(zone))
     first = placed_content(locale, date_content(start, date, day), time_content(start, start_time))
     last = placed_content(locale, date_content(end, end_date, end_day), time_content(end, end_time).append(zone))
@@ -189,7 +189,7 @@ def relative_time_content(moment: dt.datetime, *, now: dt.datetime, lang: str) -
     Plain text, written when the message is sent: the moment itself is on the same card as a
     tappable time, so the distance is not one.
     """
-    gap = as_utc(moment) - as_utc(now)
+    gap = moment - now
     return RichContent(format_timedelta(gap, add_direction=True, granularity="minute", locale=locale_for(lang)))
 
 

@@ -169,9 +169,9 @@ def stored_row(*, claimed_tg_user_id: int | None = None, spent: bool = False) ->
         patreon_user_id="p-9",
         patreon_full_name="Ada L",
         supporter_level=SupporterLevel.HOST_1,
-        expiration=dt.datetime(2026, 7, 5, 12, 0),
+        expiration=dt.datetime(2026, 7, 5, 12, 0, tzinfo=dt.UTC),
         claimed_tg_user_id=claimed_tg_user_id,
-        consumed_time=dt.datetime(2026, 7, 5, 12, 5) if spent else None,
+        consumed_time=dt.datetime(2026, 7, 5, 12, 5, tzinfo=dt.UTC) if spent else None,
     )
 
 

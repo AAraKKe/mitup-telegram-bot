@@ -1,4 +1,5 @@
 import datetime as dt
+from zoneinfo import ZoneInfo
 
 import pytest
 from freezegun import freeze_time
@@ -34,6 +35,8 @@ from tests.helpers import (
     create_user,
 )
 from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_MESSAGE_ID, DEFAULT_TEST_DATE, DEFAULT_TG_USER_PARAMS
+
+MADRID = ZoneInfo("Europe/Madrid")
 
 
 def date_time_entity_update(unix_dt: dt.datetime) -> Update:
@@ -802,38 +805,8 @@ async def test_end_exactly_now_is_rejected(
     )
 
 
-@freeze_time("2026-06-15 12:00:00", tz_offset=0)
-async def test_past_end_with_naive_stored_start_does_not_raise(
-    mock_session: MockDbSession,
-    handler_context: HandlerContext,
-):
-    """A naive stored meeting.datetime must not raise TypeError when comparing against the aware end."""
-    naive_start = dt.datetime(2026, 6, 15, 8, 0)  # naive
-    assert naive_start.tzinfo is None
-    past_end = dt.datetime(2026, 6, 15, 11, 0, tzinfo=dt.UTC)  # before now (12:00)
-    handler_context.update = date_time_entity_update(past_end)
-
-    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=naive_start)
-    mock_session.add_object(user, query_field="tg_user_id")
-    mock_session.add_object(meeting)
-
-    context, state = await call_handler(
-        EditMeetingHandlerId.TYPE_END_DATETIME,
-        handler_context=handler_context,
-        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
-    )
-
-    assert meeting.end_datetime is None
-    assert state == ConversationMeetingState.END_DATETIME_CARD
-    context.api.assert_send_message_called(
-        handler_context.update,
-        expected_card(meeting, user.lang, error=MeetingEditDurationMessages.END_IN_PAST.rich(lang=user.lang)),
-    )
-
-
 # ---------------------------------------------------------------------------
-# callback_query_pick_end_date — "end already set" branch is DST-safe:
-# changing only the date preserves the owner-LOCAL wall clock of the end time.
+# Daylight-saving changes, for an owner in Europe/Madrid.
 # ---------------------------------------------------------------------------
 
 
@@ -892,26 +865,175 @@ async def test_update_existing_end_date_preserves_local_time_across_dst(
     indirect=True,
 )
 @freeze_time("2026-01-01 00:00:00", tz_offset=0)
-async def test_update_existing_end_date_with_naive_stored_datetime_treats_it_as_utc(
+async def test_update_existing_end_date_reads_an_end_held_on_another_offset(
     mock_session: MockDbSession,
     update: Update,
     handler_context: HandlerContext,
 ):
-    """A naive stored meeting.end_datetime is read as UTC before the local-time preservation, so it
-    is not reinterpreted against the system timezone."""
     start = dt.datetime(2026, 6, 20, 8, 0, tzinfo=dt.UTC)
-    # A naive end value reads as 2026-06-20 10:00 UTC.
-    naive_end = dt.datetime(2026, 6, 20, 10, 0)
-    assert naive_end.tzinfo is None
-    user, meeting = madrid_owner_with_meeting(meeting_datetime=start, end_datetime=naive_end)
+    existing_end = dt.datetime(2026, 6, 20, 12, 0, tzinfo=MADRID)
+    user, meeting = madrid_owner_with_meeting(meeting_datetime=start, end_datetime=existing_end)
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
     context, state = await call_handler(EditMeetingHandlerId.PICK_END_DATE, handler_context=handler_context)
 
     assert state == ConversationMeetingState.END_DATETIME_CARD
-    # 10:00 UTC == 12:00 Madrid (summer, UTC+2); preserved on 2026-06-25 that local 12:00 == 10:00 UTC.
+    # 12:00 Madrid (summer, UTC+2) on the new day.
     assert meeting.end_datetime == dt.datetime(2026, 6, 25, 10, 0, tzinfo=dt.UTC)
+
+
+@pytest.mark.parametrize(
+    "update",
+    # Madrid falls back on 2026-10-25; the new day stays within a week of the start.
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 10, 26)))],
+    indirect=True,
+)
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_update_existing_end_date_preserves_local_time_across_the_autumn_change(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+):
+    # 08:00 and 10:00 Madrid in summer time (UTC+2).
+    start = dt.datetime(2026, 10, 20, 6, 0, tzinfo=dt.UTC)
+    existing_end = dt.datetime(2026, 10, 20, 8, 0, tzinfo=dt.UTC)
+    user, meeting = madrid_owner_with_meeting(meeting_datetime=start, end_datetime=existing_end)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(EditMeetingHandlerId.PICK_END_DATE, handler_context=handler_context)
+
+    assert state == ConversationMeetingState.END_DATETIME_CARD
+    # 10:00 Madrid in winter time (UTC+1).
+    expected_end = dt.datetime(2026, 10, 26, 9, 0, tzinfo=dt.UTC)
+    assert meeting.end_datetime == expected_end
+    assert user.datetime_in_tz(expected_end).time() == dt.time(10, 0)
+
+
+@pytest.mark.parametrize(
+    ("update", "start", "expected_end"),
+    [
+        # Spring forward: 23:59 Madrid is summer time (UTC+2) by the end of the day.
+        (
+            UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 3, 29))),
+            dt.datetime(2026, 3, 29, 8, 0, tzinfo=dt.UTC),
+            dt.datetime(2026, 3, 29, 21, 59, tzinfo=dt.UTC),
+        ),
+        # Fall back: 23:59 Madrid is winter time (UTC+1) by the end of the day.
+        (
+            UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 10, 25))),
+            dt.datetime(2026, 10, 25, 8, 0, tzinfo=dt.UTC),
+            dt.datetime(2026, 10, 25, 22, 59, tzinfo=dt.UTC),
+        ),
+    ],
+    indirect=["update"],
+    ids=["spring_forward", "fall_back"],
+)
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_first_end_date_on_a_change_day_lands_at_2359_local(
+    mock_session: MockDbSession,
+    update: Update,
+    start: dt.datetime,
+    expected_end: dt.datetime,
+    handler_context: HandlerContext,
+):
+    user, meeting = madrid_owner_with_meeting(meeting_datetime=start)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(EditMeetingHandlerId.PICK_END_DATE, handler_context=handler_context)
+
+    assert state == ConversationMeetingState.END_DATETIME_CARD
+    assert meeting.end_datetime == expected_end
+    assert user.datetime_in_tz(expected_end).time() == dt.time(23, 59)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="02:30")], indirect=True)
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_end_time_that_the_spring_change_skips_moves_an_hour_later(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+):
+    """Madrid clocks jump from 02:00 to 03:00 on 2026-03-29, so 02:30 never happens that day."""
+    # 23:00 Madrid the day before, and 12:00 Madrid on the day.
+    start = dt.datetime(2026, 3, 28, 22, 0, tzinfo=dt.UTC)
+    existing_end = dt.datetime(2026, 3, 29, 10, 0, tzinfo=dt.UTC)
+    user, meeting = madrid_owner_with_meeting(meeting_datetime=start, end_datetime=existing_end)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.TYPE_END_TIME,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
+    )
+
+    assert state == ConversationMeetingState.END_DATETIME_CARD
+    # 02:30 read with the winter offset (UTC+1), which the clocks show as 03:30.
+    expected_end = dt.datetime(2026, 3, 29, 1, 30, tzinfo=dt.UTC)
+    assert meeting.end_datetime == expected_end
+    assert user.datetime_in_tz(expected_end).time() == dt.time(3, 30)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="02:30")], indirect=True)
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_end_time_that_the_autumn_change_repeats_takes_the_first_one(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+):
+    """Madrid clocks go back from 03:00 to 02:00 on 2026-10-25, so 02:30 happens twice that day."""
+    # 22:00 Madrid the day before, and 12:00 Madrid on the day.
+    start = dt.datetime(2026, 10, 24, 20, 0, tzinfo=dt.UTC)
+    existing_end = dt.datetime(2026, 10, 25, 11, 0, tzinfo=dt.UTC)
+    user, meeting = madrid_owner_with_meeting(meeting_datetime=start, end_datetime=existing_end)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.TYPE_END_TIME,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
+    )
+
+    assert state == ConversationMeetingState.END_DATETIME_CARD
+    # The first 02:30, still on summer time (UTC+2).
+    assert meeting.end_datetime == dt.datetime(2026, 10, 25, 0, 30, tzinfo=dt.UTC)
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "saved"),
+    [
+        # 10:00 Madrid on 2026-03-25 to 10:00 Madrid on 2026-04-01: 167 hours.
+        (dt.datetime(2026, 3, 25, 9, 0, tzinfo=dt.UTC), dt.datetime(2026, 4, 1, 8, 0, tzinfo=dt.UTC), True),
+        # 10:00 Madrid on 2026-10-21 to 10:00 Madrid on 2026-10-28: 169 hours.
+        (dt.datetime(2026, 10, 21, 8, 0, tzinfo=dt.UTC), dt.datetime(2026, 10, 28, 9, 0, tzinfo=dt.UTC), False),
+    ],
+    ids=["spring_forward", "fall_back"],
+)
+@freeze_time("2026-01-01 00:00:00", tz_offset=0)
+async def test_one_local_week_across_a_change_is_measured_in_real_hours(
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    start: dt.datetime,
+    end: dt.datetime,
+    saved: bool,
+):
+    handler_context.update = date_time_entity_update(end)
+    user, meeting = madrid_owner_with_meeting(meeting_datetime=start)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    await call_handler(
+        EditMeetingHandlerId.TYPE_END_DATETIME,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
+    )
+
+    assert user.datetime_in_tz(end) - user.datetime_in_tz(start) == dt.timedelta(days=7)
+    assert meeting.end_datetime == (end if saved else None)
 
 
 # ---------------------------------------------------------------------------

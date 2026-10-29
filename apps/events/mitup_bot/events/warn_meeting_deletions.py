@@ -10,7 +10,6 @@ from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
-from mitup_bot.datetimes import as_utc
 from mitup_bot.lifecycle import LifecyclePolicy
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
@@ -74,7 +73,7 @@ def window_days(meetup: Meetup, duration_of: Callable[[LifecyclePolicy], dt.time
 def warning_due_time(meetup: Meetup) -> dt.datetime | None:
     """When the warning became due, or None when the meetup never expired."""
     expiration = meetup.expiration_time
-    return None if expiration is None else as_utc(expiration) + meetup.lifecycle_policy.deletion_warning_delay
+    return None if expiration is None else expiration + meetup.lifecycle_policy.deletion_warning_delay
 
 
 def record_warning(meetup: Meetup, delivery: WarningDelivery):

@@ -1,7 +1,6 @@
 import datetime as dt
 from typing import cast
 
-from mitup_bot.datetimes import as_utc
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
 from mitup_bot.translations import TranslationEngine
@@ -32,11 +31,11 @@ def search_chat_meetings_button(*, lang: str, chat_instance: str) -> ButtonConfi
 
 
 def start_key(meeting: Meetup) -> dt.datetime:
-    return as_utc(cast(dt.datetime, meeting.datetime))
+    return cast(dt.datetime, meeting.datetime)
 
 
 def creation_key(meeting: Meetup) -> dt.datetime:
-    return as_utc(cast(dt.datetime, meeting.created_time))
+    return cast(dt.datetime, meeting.created_time)
 
 
 def sort_meetings(meetings: list[Meetup]) -> list[Meetup]:

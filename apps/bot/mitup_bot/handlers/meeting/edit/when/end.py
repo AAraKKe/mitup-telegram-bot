@@ -9,7 +9,7 @@ from telegram.ext import ConversationHandler, filters
 
 from mitup_bot import guards
 from mitup_bot.custom_context import ContextId
-from mitup_bot.datetimes import in_timezone, local_to_utc
+from mitup_bot.datetimes import local_to_utc
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.mitup_types import TMitupContext
@@ -258,7 +258,7 @@ async def callback_query_pick_end_date(
         proposed_end = local_to_utc(callback_data.date, dt.time(23, 59), meeting.timezone)
         input_source = "calendar_first_pick"
     else:
-        local_end_time = in_timezone(meeting.end_datetime, meeting.timezone).time()
+        local_end_time = meeting.end_datetime.astimezone(meeting.timezone).time()
         proposed_end = local_to_utc(callback_data.date, local_end_time, meeting.timezone)
         input_source = "calendar_update"
 

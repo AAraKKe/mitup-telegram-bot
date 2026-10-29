@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
 import structlog
-from sqlalchemy import BigInteger, Column, DateTime, Enum, FetchedValue, String, func
+from sqlalchemy import BigInteger, Column, Enum, FetchedValue, String, func
 from sqlalchemy.orm import QueryableAttribute, selectinload
 from sqlalchemy.orm.interfaces import LoaderOption
 from sqlmodel import Field, Relationship, SQLModel, col, select
@@ -14,7 +14,6 @@ from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import supporter
 from mitup_bot.acquisition import ACQUISITION_SOURCE_MAX_LENGTH
-from mitup_bot.datetimes import in_timezone
 from mitup_bot.exceptions import UserNotFound
 from mitup_bot.supporter import SupporterLevel
 
@@ -75,10 +74,9 @@ class User(BaseModel, SQLModel, table=True):
     first_name: str
     tg_user_id: int = Field(sa_type=BigInteger)
     id: int | None = Field(default=None, primary_key=True, sa_type=BigInteger)
-    created_time: dt.datetime | None = Field(default=None, sa_column=Column(DateTime, server_default=FetchedValue()))
+    created_time: dt.datetime | None = Field(default=None, sa_column_kwargs={"server_default": FetchedValue()})
     updated_time: dt.datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime, server_default=FetchedValue(), server_onupdate=FetchedValue()),
+        default=None, sa_column_kwargs={"server_default": FetchedValue(), "server_onupdate": FetchedValue()}
     )
     # native_enum=False keeps the column a plain VARCHAR(32) while coercing loaded rows back to
     # UserStatus: a bare String column returns plain strs, silently failing `status is UserStatus.X`
@@ -311,7 +309,7 @@ class User(BaseModel, SQLModel, table=True):
         return next((meetup for meetup in self.meetups if meetup.db_id == meeting_id), None)
 
     def datetime_in_tz(self, datetime: dt.datetime) -> dt.datetime:
-        return in_timezone(datetime, self.settings.tz)
+        return datetime.astimezone(self.settings.tz)
 
     def now_in_tz(self) -> dt.datetime:
         return self.datetime_in_tz(dt.datetime.now(dt.UTC))

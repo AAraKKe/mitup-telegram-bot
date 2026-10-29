@@ -16,7 +16,6 @@ import datetime as dt
 from typing import TYPE_CHECKING
 
 from mitup_bot import supporter
-from mitup_bot.datetimes import as_utc
 from mitup_bot.lifecycle import LifecyclePolicy
 
 if TYPE_CHECKING:
@@ -118,8 +117,7 @@ def within_scheduling_horizon(user: User, when: dt.datetime) -> bool:
     """Whether `when` falls on or before the user's furthest schedulable date.
 
     An uncapped (Organizer) horizon admits any date. The picked date is compared in the user's
-    timezone, and the horizon boundary itself is allowed. A naive datetime is read as UTC, matching
-    how meeting datetimes are persisted.
+    timezone, and the horizon boundary itself is allowed.
     """
     days = scheduling_horizon_days(user)
     if days is None:
@@ -134,4 +132,4 @@ def within_max_duration(start: dt.datetime, end: dt.datetime) -> bool:
 
     No tier lifts this cap, so it takes no `User`.
     """
-    return as_utc(end) - as_utc(start) <= LifecyclePolicy.get().max_duration
+    return end - start <= LifecyclePolicy.get().max_duration

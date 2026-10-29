@@ -69,3 +69,5 @@ uv run mb db migrate validate  # check the migration graph
 ```
 
 When a model change needs a migration, run the `/new-migration` skill. It scaffolds the revision, walks you through writing both directions by hand, and flags the things that bite: a missing `server_default` on a new non-nullable column, the trigger-managed `created_time` and `updated_time` columns that application code never sets, and a `downgrade()` that has to reverse everything `upgrade()` did. The [new-migration skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/new-migration/SKILL.md) owns that walkthrough.
+
+Every datetime column stores UTC with its time zone. Create a new one as `sa.DateTime(timezone=True)`, and declare its model field without an explicit SQLAlchemy type so it only accepts and returns timezone-aware values.

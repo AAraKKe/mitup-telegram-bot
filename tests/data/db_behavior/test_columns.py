@@ -132,3 +132,56 @@ async def test_column_is_json(db_session: AsyncSession, table_name: str, column_
         )
     ).scalar_one()
     assert data_type == "json"
+
+
+TIME_COLUMNS = {
+    ("users", "created_time"),
+    ("users", "updated_time"),
+    ("users", "left_time"),
+    ("users", "member_time"),
+    ("settings", "created_time"),
+    ("settings", "updated_time"),
+    ("meetups", "created_time"),
+    ("meetups", "updated_time"),
+    ("meetups", "expiration_time"),
+    ("meetups", "end_datetime"),
+    ("meetups", "activated_time"),
+    ("meetups", "warned_time"),
+    ("meetups", "datetime"),
+    ("joined_users", "created_time"),
+    ("supporter_subscriptions", "support_expiration"),
+    ("supporter_subscriptions", "created_time"),
+    ("supporter_subscriptions", "updated_time"),
+    ("patreon_creator_tokens", "token_expiration"),
+    ("patreon_creator_tokens", "created_time"),
+    ("patreon_creator_tokens", "updated_time"),
+    ("broadcasts", "sending_started_time"),
+    ("broadcasts", "completed_time"),
+    ("broadcasts", "created_time"),
+    ("broadcasts", "updated_time"),
+    ("broadcast_messages", "created_time"),
+    ("broadcast_messages", "updated_time"),
+    ("broadcast_deliveries", "sent_time"),
+    ("broadcast_deliveries", "next_attempt_time"),
+    ("patreon_webhooks", "created_time"),
+    ("patreon_webhooks", "updated_time"),
+    ("patreon_pending_links", "expiration"),
+    ("patreon_pending_links", "claimed_time"),
+    ("patreon_pending_links", "consumed_time"),
+    ("patreon_pending_links", "created_time"),
+    ("patreon_pending_links", "updated_time"),
+    ("migration_audit", "created_at"),
+}
+
+
+async def test_every_time_column_stores_its_time_zone(db_session: AsyncSession):
+    rows = (
+        await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+            text(
+                "SELECT table_name, column_name, data_type FROM information_schema.columns"
+                " WHERE table_schema = 'public' AND data_type LIKE 'timestamp%'"
+            )
+        )
+    ).all()
+    assert {(table, column) for table, column, _ in rows} == TIME_COLUMNS
+    assert {(table, column) for table, column, data_type in rows if data_type != "timestamp with time zone"} == set()

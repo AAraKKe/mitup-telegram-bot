@@ -5,7 +5,7 @@ description = "AWS Lambda that runs Alembic upgrades/downgrades against RDS. PTB
 requires-python = ">=3.14"
 dependencies = [
     "alembic==1.20.0",
-    "psycopg[binary]==3.3.5",
+    "psycopg[binary]==3.3.6",
     "mitup-core",
     "mitup-data",
 ]

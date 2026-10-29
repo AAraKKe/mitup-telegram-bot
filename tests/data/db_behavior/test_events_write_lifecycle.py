@@ -57,7 +57,7 @@ async def provisioned_started_meeting(tg_base: int, *, with_message: bool = Fals
     ``datetime`` is set far enough in the past that it is due for both the started
     notification and (any owner timeout having elapsed) the expiration sweep.
     """
-    started = dt.datetime.now(dt.UTC).replace(tzinfo=None) - dt.timedelta(days=2)
+    started = dt.datetime.now(dt.UTC) - dt.timedelta(days=2)
     async with db.begin() as session:
         owner = User(first_name="Lifecycle Owner", tg_user_id=tg_base, settings=Settings())
         participant = User(first_name="Lifecycle Participant", tg_user_id=tg_base + 1, settings=Settings())

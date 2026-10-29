@@ -184,13 +184,12 @@ def test_the_year_is_decided_in_the_display_timezone():
     assert "2027" in localized_datetime(value, lang="es_ES", tz=UTC, created=created, time_format=CLOCK_24H)
 
 
-def test_localized_datetime_reads_naive_values_as_utc():
-    """Meeting datetimes and creation timestamps both come out of the database without a tzinfo."""
+def test_localized_datetime_reads_values_on_any_offset_in_the_display_timezone():
     rendered = localized_datetime(
-        MOMENT.replace(tzinfo=None),
+        MOMENT.astimezone(AUCKLAND),
         lang="es_ES",
         tz=MADRID,
-        created=CREATED_YEAR_BEFORE.replace(tzinfo=None),
+        created=CREATED_YEAR_BEFORE.astimezone(AUCKLAND),
         time_format=WITH_TIMEZONE,
     )
 
@@ -448,14 +447,6 @@ def test_relative_time_is_plain_text_rather_than_a_time_chip():
     html = relative_time_content(MOMENT, now=NOW, lang="en").html
 
     assert html == "in 1 hour"
-
-
-def test_relative_time_reads_a_stored_moment_and_a_stored_clock_as_utc():
-    """Datetimes come out of the database naive, so a distance between two of them is the same one
-    an aware pair gives."""
-    naive = relative_time_content(MOMENT.replace(tzinfo=None), now=NOW.replace(tzinfo=None), lang="en")
-
-    assert naive.text == relative_time_content(MOMENT, now=NOW, lang="en").text
 
 
 def test_relative_time_falls_back_to_english_for_a_language_babel_does_not_know():

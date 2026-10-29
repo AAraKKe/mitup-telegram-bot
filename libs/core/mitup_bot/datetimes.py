@@ -1,11 +1,8 @@
 """The datetime conventions every layer shares.
 
-Meeting datetimes and every timestamp column are persisted as UTC in columns that carry no
-timezone, so a value read back from the database is naive and means UTC. These helpers are the one
-place that convention is applied: `as_utc` tags a bare value so it can be compared or subtracted,
-`in_timezone` reads one as a wall clock somewhere, and `local_to_utc` turns a wall clock someone
-typed back into the instant that gets stored. Writing a moment out for a reader is a separate
-concern and lives in `mitup_bot.views.datetime_format`, which formats what these return.
+Every moment is an aware datetime and is stored as UTC. `local_to_utc` turns a wall clock someone
+typed into the instant that gets stored; writing a moment out for a reader lives in
+`mitup_bot.views.datetime_format`.
 """
 
 import datetime as dt
@@ -31,21 +28,6 @@ class TimeFormat:
     show_timezone: bool
     clock_24h: bool
     date_format: DateFormat
-
-
-def as_utc(value: dt.datetime) -> dt.datetime:
-    """*value* as an aware datetime, reading a naive one as UTC the way datetimes are stored.
-
-    An already-aware value keeps the offset it arrived with: it names the same instant either way,
-    which is all a comparison or a subtraction asks of it. Use `in_timezone(value, dt.UTC)` when the
-    UTC wall clock itself is what matters, as it does when the value is written out.
-    """
-    return value if value.tzinfo else value.replace(tzinfo=dt.UTC)
-
-
-def in_timezone(value: dt.datetime, tz: dt.tzinfo) -> dt.datetime:
-    """*value* as a wall clock in *tz*, reading a naive value as UTC."""
-    return as_utc(value).astimezone(tz)
 
 
 def local_to_utc(date: dt.date, time: dt.time, tz: dt.tzinfo) -> dt.datetime:

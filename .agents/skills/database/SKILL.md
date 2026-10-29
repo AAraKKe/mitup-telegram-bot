@@ -128,8 +128,21 @@ The bot and the recurrent-events services share **one** database. A schema or da
 
 Breaking changes must be split across separate releases — **expand → migrate → contract**: add the new (nullable) shape, backfill, and dual-write first; switch reads/writes in a later release; drop or rename only once nothing references the old shape. Never drop or rename a column in the same release that stops using it.
 
+## Datetime columns
+
+Every datetime column is `timestamptz` holding UTC, and code only ever handles timezone-aware datetimes. A model datetime field never names a SQLAlchemy type (no `sa_column=Column(DateTime, ...)`, no `sa_type`), so SQLModel infers `UTCDateTime`, which rejects naive values and reads back aware UTC; column options go through `Field(nullable=..., sa_column_kwargs={...})`. A migration creates the column as `sa.DateTime(timezone=True)`. `tests/data/test_datetime_columns.py` fails on any datetime field with an explicit type.
+
 ## Automatic timestamps
 
-PostgreSQL triggers (`set_created_time()`, `set_updated_time()`) defined in migration `65b4c46d9141` set `CURRENT_TIMESTAMP` on insert and update respectively. Application code never assigns these fields.
+The triggers `set_created_time()` and `set_updated_time()` (current bodies in migration `b10eabbea399`) set `CURRENT_TIMESTAMP` on `created_time` at insert and on `updated_time` at insert and every update, keeping a value an insert supplies explicitly. Application code never assigns these fields.
 
-Model classes declare them as `dt.datetime | None = None` because Python cannot know about DB-level triggers at import time. In production every persisted row has non-`None` values. Test fixtures (e.g., `create_meetup`) supply a default `created_time` to mirror this invariant.
+Models declare them with a `FetchedValue()` server default so the database owns the value:
+
+```python
+created_time: dt.datetime | None = Field(default=None, sa_column_kwargs={"server_default": FetchedValue()})
+updated_time: dt.datetime | None = Field(
+    default=None, sa_column_kwargs={"server_default": FetchedValue(), "server_onupdate": FetchedValue()}
+)
+```
+
+In production every persisted row has non-`None` values. Test fixtures (e.g., `create_meetup`) supply a default `created_time` to mirror this invariant.

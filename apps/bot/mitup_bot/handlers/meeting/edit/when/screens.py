@@ -1,7 +1,6 @@
 import datetime as dt
 
 from mitup_bot.callback_data import BackOrigin, BackTarget, CallbackData, DateCallbackData
-from mitup_bot.datetimes import in_timezone
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup
 from mitup_bot.utils import Emojis
@@ -75,7 +74,7 @@ def datetime_card(
         time_line = render_rich(t"{Emojis.CLOCK} {select_first}")
     else:
         edit_chip = ButtonConfig(text=ButtonMessages.EDIT.text(lang=lang), callback_data=time_callback)
-        local_time = in_timezone(value, meeting.timezone).strftime("%H:%M")
+        local_time = value.astimezone(meeting.timezone).strftime("%H:%M")
         time_line = MeetingEditDateTimeMessages.CURRENT_TIME.rich(lang=lang, time=local_time, button_edit=edit_chip)
 
     description = explanation.append(calendar_part).append(horizontal_rule_content()).append(time_line)

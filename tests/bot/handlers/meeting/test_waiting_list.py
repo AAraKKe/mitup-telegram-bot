@@ -148,7 +148,7 @@ async def test_user_leaves_and_first_waiting_list_user_promoted(
         meetup_id=full_meeting.id,
         user_id=first_waiting_user.id,
         is_waiting_list=True,
-        created_time=dt.datetime.now(),
+        created_time=dt.datetime.now(dt.UTC),
     )
     JoinedUsers(
         user=second_waiting_user,
@@ -156,7 +156,7 @@ async def test_user_leaves_and_first_waiting_list_user_promoted(
         meetup_id=full_meeting.id,
         user_id=second_waiting_user.id,
         is_waiting_list=True,
-        created_time=dt.datetime.now() - dt.timedelta(hours=1),
+        created_time=dt.datetime.now(dt.UTC) - dt.timedelta(hours=1),
     )
 
     mock_session.add_object(user_with_settings, query_field="tg_user_id")

@@ -145,11 +145,8 @@ def test_seed_fingerprint_is_sha256_of_access_seed(config: PatreonConfig):
     assert supporter_check.seed_fingerprint(config) == expected
 
 
-@pytest.mark.parametrize("aware", [True, False], ids=["aware", "naive"])
-def test_days_until_handles_aware_and_naive(aware: bool):
+def test_days_until_counts_fractional_days_to_the_expiration():
     expiration = dt.datetime.now(dt.UTC) + dt.timedelta(days=10)
-    if not aware:
-        expiration = expiration.replace(tzinfo=None)
     assert supporter_check.days_until(expiration) == pytest.approx(10, abs=0.01)
 
 
