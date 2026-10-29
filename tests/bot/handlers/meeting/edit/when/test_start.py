@@ -107,6 +107,33 @@ async def test_open_start_editor_shows_the_card_on_the_meeting_month(
     [(UpdateRequest(callback_query=cb.OPEN_START_EDITOR.with_id(10)))],
     indirect=True,
 )
+async def test_open_start_editor_opens_on_the_owner_local_month(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    user_with_settings.settings.timezone = "Europe/Madrid"
+    # 00:30 Madrid on 1 November 2026, which is still 31 October in UTC.
+    start = dt.datetime(2026, 10, 31, 23, 30, tzinfo=dt.UTC)
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=start)
+    user_with_settings.meetups.append(meeting)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, _ = await call_handler(EditMeetingHandlerId.OPEN_START_EDITOR, handler_context=handler_context)
+
+    context.api.assert_edit_message_called(
+        update,
+        expected_card(meeting, user_with_settings.lang, month=dt.date(2026, 11, 1)),
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [(UpdateRequest(callback_query=cb.OPEN_START_EDITOR.with_id(10)))],
+    indirect=True,
+)
 async def test_open_start_editor_without_datetime_opens_on_the_current_month(
     mock_session: MockDbSession,
     update: Update,

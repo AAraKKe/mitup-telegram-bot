@@ -21,15 +21,15 @@ def is_in_past(candidate: dt.datetime, meeting: Meetup) -> bool:
 
 
 def safe_anchor_date(reference_datetime: dt.datetime | None, user_now: dt.datetime) -> dt.date:
-    """Return the anchor date for a calendar view.
+    """Return the date a calendar opens on, read in the zone of *user_now*.
 
-    If the reference datetime is set and in the future, use its date.
-    Otherwise use the current date.
+    The reference's date when it is today or later, otherwise today.
     """
+    today = user_now.date()
     if reference_datetime:
-        reference_date = dt.date(reference_datetime.year, reference_datetime.month, reference_datetime.day)
-        return reference_date if reference_date >= user_now.date() else user_now.date()
-    return user_now.date()
+        reference_date = reference_datetime.astimezone(user_now.tzinfo).date()
+        return reference_date if reference_date >= today else today
+    return today
 
 
 def validate_start_datetime(start_dt: dt.datetime, meeting: Meetup, lang: str) -> str | None:
