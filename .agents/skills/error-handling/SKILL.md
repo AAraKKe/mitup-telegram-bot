@@ -27,10 +27,11 @@ The two planes divide the failures rather than overlapping on them. A fault that
 splits them on the wire format of the data.
 
 A payload minted by the bot Mitup replaced is **answered, not failed**. That bot built every button's
-callback data as a JSON object of exactly `{"c": <controller>, "d": "<action>:<data>"}`, and used the
-bare string `nothing` for its calendar's blank cells. Neither shape is reachable from `CallbackData`
+callback data as a JSON object of exactly `{"c": <controller>, "d": "<action>:<data>"}`, or
+`{"controller": <controller>, "data": "<action>:<data>"}` on its oldest messages, and used the bare
+string `nothing` for its calendar's blank cells. No such shape is reachable from `CallbackData`
 (`{action};{entity}:{id}`), so `legacy_callbacks.is_legacy_callback_data` recognises them
-unambiguously; the key set is matched **exactly**, so a near-miss object stays a fault. Users are
+unambiguously; each key set is matched **exactly**, so a near-miss object stays a fault. Users are
 still holding messages that bot sent, so the tap gets `CommonMessages.OLD_VERSION_MESSAGE`:
 
 | Where the tap came from | Answer |

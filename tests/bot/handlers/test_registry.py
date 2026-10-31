@@ -316,13 +316,16 @@ def test_bind_registers_fallback_through_metrics_wrapper():
 # Buttons rendered by the bot Mitup replaced
 # ---------------------------------------------------------------------------
 
-# The two payload shapes the previous bot put on a button: a JSON object of exactly
-# {"c": controller, "d": "action:data"}, and the bare marker its calendar used for blank cells.
+# The payload shapes the previous bot put on a button: a JSON object of exactly
+# {"c": controller, "d": "action:data"} or {"controller": controller, "data": "action:data"}, and the
+# bare marker its calendar used for blank cells.
 LEGACY_MENU_BUTTON = '{"c": "mm", "d": "main_menu:data"}'
+OLDEST_LEGACY_MENU_BUTTON = '{"controller":"main_menu","data":"show_meetups:0"}'
 LEGACY_BLANK_CALENDAR_CELL = "nothing"
 
 LEGACY_PAYLOADS = [
-    pytest.param(LEGACY_MENU_BUTTON, id="controller_payload"),
+    pytest.param(LEGACY_MENU_BUTTON, id="short_keys_payload"),
+    pytest.param(OLDEST_LEGACY_MENU_BUTTON, id="long_keys_payload"),
     pytest.param(LEGACY_BLANK_CALENDAR_CELL, id="blank_calendar_cell"),
 ]
 
@@ -331,6 +334,10 @@ NON_LEGACY_PAYLOADS = [
     pytest.param('{"c": "mm", "d": "main_menu:data", "x": "1"}', id="one_key_too_many"),
     pytest.param('{"c": "mm"}', id="one_key_too_few"),
     pytest.param('{"c": "mm", "d": 3}', id="value_that_is_not_a_string"),
+    pytest.param('{"controller": "main_menu", "data": "show_meetups:0", "x": "1"}', id="long_keys_one_too_many"),
+    pytest.param('{"controller": "main_menu"}', id="long_keys_one_too_few"),
+    pytest.param('{"controller": "main_menu", "data": 0}', id="long_keys_value_that_is_not_a_string"),
+    pytest.param('{"controller": "main_menu", "d": "show_meetups:0"}', id="keys_mixed_from_both_shapes"),
     pytest.param('["c", "d"]', id="json_that_is_not_an_object"),
     pytest.param("nothing at all", id="near_miss_on_the_blank_cell_marker"),
     pytest.param(str(UNBOUND_CALLBACK.with_id(3)), id="current_format_bound_to_no_handler"),

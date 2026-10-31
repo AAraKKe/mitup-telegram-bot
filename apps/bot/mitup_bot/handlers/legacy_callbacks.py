@@ -15,19 +15,18 @@ log = structlog.get_logger(__name__)
 
 LEGACY_CALLBACK_EVENT = "Answered a legacy bot callback"
 
-# The two shapes the bot Mitup replaced put on a button. Every one of its buttons carried a JSON
-# object of exactly `{"c": <controller shortname>, "d": "<action>:<data>"}`; the blank cells of its
-# calendar carried the bare string below instead.
-LEGACY_CALLBACK_KEYS = frozenset({"c", "d"})
+# The bot Mitup replaced put a JSON object on each button: exactly `{"c": <controller shortname>,
+# "d": "<action>:<data>"}`, or `{"controller": <controller>, "data": "<action>:<data>"}` on its oldest
+# messages. The blank cells of its calendar carried the bare string below instead.
+LEGACY_CALLBACK_KEY_SETS = frozenset({frozenset({"c", "d"}), frozenset({"controller", "data"})})
 LEGACY_BLANK_CELL = "nothing"
 
 
 def is_legacy_callback_data(data: str | None) -> bool:
     """Whether `data` came off a button rendered by the bot this one replaced.
 
-    Neither legacy shape is reachable from `CallbackData`, whose wire format is
-    `{action};{entity}:{id}`, so recognising one is unambiguous. The key set is matched exactly:
-    anything else, JSON or not, is data no button of ours minted, and stays a fault.
+    No legacy shape is reachable from `CallbackData`, whose wire format is `{action};{entity}:{id}`,
+    and key sets are matched exactly, so anything else stays a fault.
     """
     if data is None:
         return False
@@ -39,7 +38,7 @@ def is_legacy_callback_data(data: str | None) -> bool:
         return False
     return (
         isinstance(parsed, dict)
-        and parsed.keys() == LEGACY_CALLBACK_KEYS
+        and frozenset(parsed) in LEGACY_CALLBACK_KEY_SETS
         and all(isinstance(value, str) for value in parsed.values())
     )
 
