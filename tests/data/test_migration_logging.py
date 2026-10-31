@@ -13,7 +13,6 @@ from alembic.script import ScriptDirectory
 from mitup_bot.config import Env
 from mitup_bot.logging_config import Component, configure_logging
 from mitup_bot.migrations.logging_setup import ALEMBIC_LOGGER_NAME, configure_migration_logging
-from tests.helpers import drop_cached_logger_binds
 
 ALEMBIC_INI = "alembic.ini"
 
@@ -34,7 +33,6 @@ def restore_logging_state() -> Generator[None]:
         root.handlers[:] = saved_root_handlers
         root.setLevel(saved_root_level)
         logging.getLogger(ALEMBIC_LOGGER_NAME).setLevel(saved_alembic_level)
-        drop_cached_logger_binds()
 
 
 @pytest.fixture(autouse=True)

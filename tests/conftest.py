@@ -2,7 +2,7 @@ import datetime as dt
 import os
 import warnings
 from collections.abc import Generator, Mapping
-from typing import cast
+from typing import Any, cast
 from unittest import mock
 
 import pytest
@@ -117,37 +117,38 @@ def deterministic_structlog() -> Generator[None]:
     """Route structlog through the stdlib logging machinery so pytest's `caplog` deterministically
     captures handler/model log output as clean LogRecords.
 
-    Why this is needed
-    ------------------
-    Production `configure_logging` reconfigures structlog globally to hand off to a
-    ProcessorFormatter (output goes to a stdout StreamHandler, and the LogRecord message becomes a
-    wrapped blob rather than the plain event string). structlog config is process-global and
-    `cache_logger_on_first_use=True`, so once any test calls `configure_logging` the new pipeline
-    leaks into every later test on the same xdist worker — making `caplog` see either a rendered
-    dict or nothing, depending on test order.
-
-    This autouse fixture re-establishes a deterministic, caplog-friendly pipeline before every test:
     `render_to_log_kwargs` makes the event string the LogRecord message and turns bound key/values
     (including merge_contextvars fields) into record attributes, with `exc_info` forwarded so
     exception assertions via `caplog.text` keep working. `stringify_non_primitive_values` runs just
     before it so no captured record carries a non-serializable object across xdist's execnet channel.
-    Being function-scoped and autouse, it runs after any per-test `configure_logging` call's
-    teardown, guaranteeing order-independence.
+
+    Production `configure_logging` sets `cache_logger_on_first_use=True`, which freezes every
+    module-level logger it touches onto its pipeline for the rest of the process. Those loggers
+    would then bypass this fixture in every later test on the same xdist worker, so caching is
+    switched off for every `structlog.configure` a test reaches.
     """
-    structlog.configure(
-        processors=[
-            structlog.contextvars.merge_contextvars,
-            structlog.stdlib.add_log_level,
-            structlog.stdlib.add_logger_name,
-            stringify_non_primitive_values,
-            structlog.stdlib.render_to_log_kwargs,
-        ],
-        wrapper_class=structlog.stdlib.BoundLogger,
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        # Don't cache: each test rebinds the pipeline, and a cached logger would pin a stale one.
-        cache_logger_on_first_use=False,
-    )
-    yield
+    configure = structlog.configure
+
+    def configure_without_logger_cache(**settings: Any):
+        settings["cache_logger_on_first_use"] = False
+        configure(**settings)
+
+    # Its own patcher: requesting `monkeypatch` here would set it up ahead of every other fixture,
+    # so `setenv` in a test would outlive the teardown of those fixtures.
+    with pytest.MonkeyPatch.context() as patcher:
+        patcher.setattr(structlog, "configure", configure_without_logger_cache)
+        structlog.configure(
+            processors=[
+                structlog.contextvars.merge_contextvars,
+                structlog.stdlib.add_log_level,
+                structlog.stdlib.add_logger_name,
+                stringify_non_primitive_values,
+                structlog.stdlib.render_to_log_kwargs,
+            ],
+            wrapper_class=structlog.stdlib.BoundLogger,
+            logger_factory=structlog.stdlib.LoggerFactory(),
+        )
+        yield
     structlog.reset_defaults()
 
 

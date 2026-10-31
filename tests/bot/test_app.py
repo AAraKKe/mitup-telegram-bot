@@ -1,6 +1,5 @@
 import contextlib
 import dataclasses
-import gc
 import io
 import json
 import logging
@@ -11,7 +10,6 @@ from unittest import mock
 import pytest
 import structlog
 from pydantic import SecretStr
-from structlog._config import BoundLoggerLazyProxy
 
 from mitup_bot.app import MitupRuntime
 from mitup_bot.config import (
@@ -387,21 +385,9 @@ def test_bind_called_with_built_app(patch_runtime_deps: RuntimeDeps):
 
 
 @pytest.fixture
-def real_configure_logging() -> Generator[None]:
+def real_configure_logging():
     """Opt the requesting test out of `patch_runtime_deps`'s `configure_logging` stub so it
-    exercises the production logging setup (it must also request `restore_root_logging`).
-
-    Production `configure_logging` runs `structlog.configure(cache_logger_on_first_use=True)`, so
-    the first log emitted while building the runtime freezes each module-level
-    `structlog.get_logger(__name__)` proxy onto the production `wrap_for_formatter` pipeline by
-    caching its `bind`. That cache survives the deterministic reconfigure in `deterministic_structlog`,
-    so a later test reusing a frozen proxy would emit a record carrying a live
-    `_FixedFindCallerLogger` and crash xdist's report serialization. On teardown we drop every cached
-    `bind` so each proxy re-binds against whatever pipeline is configured next.
-    """
-    yield
-    for proxy in (obj for obj in gc.get_objects() if isinstance(obj, BoundLoggerLazyProxy)):
-        proxy.__dict__.pop("bind", None)
+    exercises the production logging setup (it must also request `restore_root_logging`)."""
 
 
 @pytest.fixture

@@ -40,7 +40,6 @@ __all__ = [
     "assert_locked_meetup_select",
     "assert_context_lost_logged",
     "assert_meeting_rejection_logged",
-    "drop_cached_logger_binds",
     "log_record",
     "RichCall",
     "rich_call",
@@ -72,7 +71,7 @@ from .fixtures import (
 )
 from .stub_db import MockDbSession, Result
 from .locking import assert_locked_meetup_select
-from .logs import assert_context_lost_logged, assert_meeting_rejection_logged, drop_cached_logger_binds, log_record
+from .logs import assert_context_lost_logged, assert_meeting_rejection_logged, log_record
 from .rich_transport import RichCall, only_rich_call, rich_call, rich_calls
 from .db_errors import integrity_error
 from .filesystem import MITUP_DIR

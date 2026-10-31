@@ -934,8 +934,6 @@ def test_cli_narrates_every_subsystem_it_wired():
     with (
         patch("mitup_bot.events.service.load_config") as mock_load_config,
         patch("mitup_bot.events.service.configure_logging"),
-        # The module logger rather than capture_logs: the sibling CLI tests run the real
-        # configure_logging, which caches this module's bound logger past any later processor swap.
         patch("mitup_bot.events.service.log") as mock_log,
         patch("mitup_bot.events.service.db"),
         patch("mitup_bot.events.service.configure_emf_backend"),
@@ -977,8 +975,6 @@ def test_cli_configures_logging_before_wiring_subsystems():
         patch(
             "mitup_bot.events.service.configure_logging", side_effect=lambda *_a, **_kw: call_order.append("logging")
         ),
-        # The module logger rather than capture_logs: the sibling CLI tests run the real
-        # configure_logging, which caches this module's bound logger past any later processor swap.
         patch("mitup_bot.events.service.log") as mock_log,
         patch("mitup_bot.events.service.db") as mock_db,
         patch("mitup_bot.events.service.configure_emf_backend", side_effect=lambda *_a: call_order.append("emf")),

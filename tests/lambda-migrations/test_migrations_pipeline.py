@@ -12,7 +12,6 @@ from alembic.script import ScriptDirectory
 
 from mitup_bot.config import MITUP_ENV_VAR, Env
 from mitup_bot.lambdas.migrations import APP_DB_PASSWORD_ENV, APP_DB_USERNAME_ENV, run_migrations
-from tests.helpers import drop_cached_logger_binds
 
 UPGRADE_EVENT = {"action": "upgrade", "revision": "head"}
 
@@ -30,7 +29,6 @@ def restore_logging_state() -> Generator[None]:
     finally:
         root.handlers[:] = saved_handlers
         root.setLevel(saved_level)
-        drop_cached_logger_binds()
 
 
 @pytest.fixture(autouse=True)

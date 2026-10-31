@@ -1,8 +1,6 @@
-import gc
 import logging
 
 import pytest
-from structlog._config import BoundLoggerLazyProxy
 from structlog.typing import EventDict
 
 from mitup_bot.custom_context import ContextId
@@ -37,20 +35,6 @@ def assert_meeting_rejection_logged(caplog: pytest.LogCaptureFixture, action: st
     assert rejections[0].levelname == "WARNING"
     assert getattr(rejections[0], "reason", None) == reason
     assert getattr(rejections[0], "action", None) == action
-
-
-def drop_cached_logger_binds():
-    """Reset every lazy structlog proxy so it re-binds against whatever pipeline is configured next.
-
-    The production `configure_logging` sets `cache_logger_on_first_use=True`, so the first line a
-    module-level `structlog.get_logger(__name__)` emits under it freezes that proxy onto the
-    `wrap_for_formatter` pipeline. That cache outlives a later `structlog.configure`, so a test
-    reusing the same module's logger would capture nothing and would ship a live, non-serializable
-    logger object across xdist's channel. Call this on teardown of any test that runs the production
-    logging setup.
-    """
-    for proxy in (obj for obj in gc.get_objects() if isinstance(obj, BoundLoggerLazyProxy)):
-        proxy.__dict__.pop("bind", None)
 
 
 def log_record(caplog: pytest.LogCaptureFixture, event: str) -> logging.LogRecord:

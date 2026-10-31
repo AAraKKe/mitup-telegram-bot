@@ -9,7 +9,6 @@ import structlog
 
 from mitup_bot.config import Env
 from mitup_bot.logging_config import UNKNOWN_RELEASE, Component, configure_logging
-from tests.helpers.logs import drop_cached_logger_binds
 
 
 @pytest.fixture(autouse=True)
@@ -41,6 +40,14 @@ def final_renderer(handler: logging.Handler) -> structlog.typing.Processor:
     formatter = handler.formatter
     assert isinstance(formatter, structlog.stdlib.ProcessorFormatter)
     return formatter.processors[-1]
+
+
+def test_the_suite_never_freezes_a_logger_onto_the_production_pipeline():
+    """A logger cached here would keep the production pipeline in every later test on this worker,
+    and that test's `caplog` would lose its lines."""
+    configure_logging(Env.PROD, Component.BOT)
+
+    assert structlog.get_config()["cache_logger_on_first_use"] is False
 
 
 def test_applies_requested_level_to_root():
@@ -143,10 +150,6 @@ def self_description(capsys: pytest.CaptureFixture[str], level: str = "INFO") ->
     pytest had already replaced — so its own lines are read back off the captured stream rather
     than through a redirect that can only be installed after the call returns.
     """
-    # The module logger those lines go through caches its bound chain on first use, and a sibling
-    # test in this module has usually already frozen it onto an earlier configuration. A process
-    # calls `configure_logging` once, so only a test needs this.
-    drop_cached_logger_binds()
     configure_logging(Env.PROD, Component.BOT, level, release="ci-9f3a1c2")
     logging.getLogger().handlers[0].flush()
     lines = [json.loads(line) for line in capsys.readouterr().err.splitlines() if line]
