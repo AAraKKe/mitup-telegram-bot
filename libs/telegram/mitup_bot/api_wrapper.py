@@ -29,6 +29,7 @@ from telegram.error import BadRequest, Forbidden, NetworkError, TelegramError
 from telegram.ext import ExtBot
 from telegram.warnings import PTBUserWarning
 
+from mitup_bot.callback_data import CodeCallbackData
 from mitup_bot.exceptions import (
     AnswerInlineQueryError,
     CallbackQueryTextTooLong,
@@ -42,6 +43,7 @@ from mitup_bot.models.joined_users import JoinedUsers
 from mitup_bot.models.users import InactiveReason
 from mitup_bot.monitoring import MetricKey
 from mitup_bot.monitoring.client import MetricsClient
+from mitup_bot.monitoring.outbound import qualified_type
 from mitup_bot.monitoring.units import MetricUnit
 from mitup_bot.protocols import ContextOrBotAdapter
 from mitup_bot.utils import MeetingDisplayMessages, MeetingJoinMessages
@@ -59,12 +61,13 @@ from mitup_bot.views import InlineResultsButton, MitupInlineView, MitupView
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.meeting_text import title_content
 
+CHAT_NOT_FOUND_ERROR_PATTERN = re.compile(r"Chat not found", re.IGNORECASE)
 MESSAGE_NOT_FOUND_ERROR_PATTERNS = [
     re.compile(r"Message_id_invalid"),
     re.compile(r"Message to edit not found"),
     # The whole chat is unknown to the bot (private chat deleted, bot kicked from the group):
     # the stored message can never be edited again, so it gets the same dead-message treatment.
-    re.compile(r"Chat not found"),
+    CHAT_NOT_FOUND_ERROR_PATTERN,
 ]
 EDIT_MESSAGE_ERRORS_TO_IGNORE_PATTERNS = [re.compile(r"Message is not modified")]
 # A message Telegram will not remove: already gone, or past the window a bot may delete its
@@ -498,17 +501,14 @@ async def retry_without_custom_emoji[T](
 
 
 def view_log_payload(view: MitupView) -> dict[str, Any]:
-    """Loggable snapshot of a rendered view: the full text, its button rows, and the file it
-    carries, named by size rather than content.
+    """Loggable facts about a rendered view for failure lines: sizes and callback data only.
 
-    Attached only to failure logs: happy-path log and metric lines stay lean, but when a send
-    fails the log must show everything the call tried to deliver (log retention owns the PII
-    lifecycle).
+    The text, the button labels and the filename can hold what users wrote, so none reaches the logs.
     """
-    payload = {"text": view.message.text, "markup": keyboard_log_payload(view.menu)}
+    payload = {"text_len": view.message.text_length} | keyboard_log_payload(view.menu)
     if view.document is None:
         return payload
-    return payload | {"document_filename": view.document.filename, "document_bytes": len(view.document.content)}
+    return payload | {"document_bytes": len(view.document.content)}
 
 
 def edit_target_log_payload(target: EditTarget) -> dict[str, Any]:
@@ -517,39 +517,68 @@ def edit_target_log_payload(target: EditTarget) -> dict[str, Any]:
     return {"chat_id": chat_id, "message_id": message_id, "inline_message_id": inline_message_id}
 
 
-def keyboard_log_payload(keyboard: Keyboard | None) -> list[list[dict[str, Any]]]:
-    """Loggable form of a keyboard: its button rows as plain data.
+def keyboard_log_payload(keyboard: Keyboard | None) -> dict[str, Any]:
+    """Loggable facts about a keyboard: its size and the callback data the bot minted.
 
-    A button names only the fields it sets, so the row reads as what was built rather than as the
-    whole schema repeated once per button.
+    Labels, links and inline queries stay out: a label can be a meeting title and a link can carry signed state.
     """
-    return [[button.model_dump(mode="json", exclude_defaults=True) for button in row] for row in keyboard or []]
-
-
-def meeting_edit_log_payload(edit: MeetingMessageEdit) -> dict[str, Any]:
-    """Loggable snapshot of a rendered meeting-message edit for failure diagnostics."""
+    buttons = [button for row in keyboard or [] for button in row]
+    callback_data = [button.callback_data for button in buttons if button.callback_data is not None]
     return {
-        "chat_id": edit.chat_id,
-        "message_id": edit.message_id,
-        "inline_message_id": edit.inline_message_id,
-        "text": edit.content.text,
-        "markup": keyboard_log_payload(edit.keyboard),
+        "button_rows": len(keyboard or []),
+        "button_count": len(buttons),
+        # A code is a secret the presser must hold, so only the action and entity around it are logged.
+        "callback_data": [
+            str(data.derive(code=None) if isinstance(data, CodeCallbackData) else data) for data in callback_data
+        ],
     }
 
 
 def meeting_edit_log_facts(edit: MeetingMessageEdit) -> dict[str, Any]:
-    """Loggable identifiers of a meeting-message edit, describing the card by size only.
+    """Loggable identifiers of a meeting-message edit, describing the card by its size and buttons.
 
-    A background refresh fans one meeting out over every card tracking it, so an outage multiplies
-    whatever a failure line carries by the number of cards; the rendered card is the title, the
-    description and the participants the users wrote, which is why its size stands in for it here.
+    The rendered card is the title, the description and the participants the users wrote.
     """
     return {
         "chat_id": edit.chat_id,
         "message_id": edit.message_id,
         "inline_message_id": edit.inline_message_id,
         "text_len": edit.content.text_length,
-    }
+    } | keyboard_log_payload(edit.keyboard)
+
+
+class UnreachableCallerReason(StrEnum):
+    """Why a send into the caller's own chat was refused, split by the evidence the error carries."""
+
+    BOT_BLOCKED_BY_USER = auto()
+    CALLER_CHAT_GONE = auto()
+
+
+def unreachable_caller_reason(error: Exception) -> UnreachableCallerReason | None:
+    """Classify `error` as a refused send into the caller's own chat, or None when it is not one.
+
+    A block answers Forbidden and a gone account answers BadRequest naming the chat; the other
+    "not found" variants (a message to edit or delete) are not about the caller and keep faulting.
+    """
+    if isinstance(error, Forbidden):
+        return UnreachableCallerReason.BOT_BLOCKED_BY_USER
+    if isinstance(error, BadRequest) and CHAT_NOT_FOUND_ERROR_PATTERN.search(error.message):
+        return UnreachableCallerReason.CALLER_CHAT_GONE
+    return None
+
+
+def log_telegram_failure(event: str, error: Exception, payload: dict[str, Any], **fields: Any):
+    """Log a failed Telegram call: a refused private chat is a warning, anything else an error.
+
+    Group and channel ids are negative, and an inline message names no chat: a refusal from either
+    means the bot wrote somewhere it no longer belongs.
+    """
+    chat_id = payload.get("chat_id")
+    reason = unreachable_caller_reason(error) if chat_id is not None and chat_id > 0 else None
+    if reason is None:
+        log.error(event, exc_info=error, error_type=qualified_type(error), payload=payload, **fields)
+    else:
+        log.warning(event, reason=reason.value, payload=payload, **fields)
 
 
 def resolve_view(view: MitupView | RichContent | str, api_method: str) -> MitupView:
@@ -637,8 +666,6 @@ def ambient_update_id() -> int | None:
 
 
 class TelegramApiWrapper(Protocol):
-    # Whether a failed meeting-card edit reports the rendered card or only its size.
-    log_card_text: bool
     # The process's card-refresh queue, attached where the api is built for a handler and left
     # None everywhere else — a CLI job, a recurrent event, and the worker's own api, which is what
     # keeps a background job from handing its fan-out back to the queue running it.
@@ -768,10 +795,6 @@ class TelegramApi:
     # Class-level default so subclasses that skip __init__ (the test MockApi) still start
     # in immediate mode.
     _outbox: ApiOutbox | None = None
-    # A handler edits the few cards of the meeting in front of it, and a failure there has to show
-    # what it tried to deliver. A background fanout multiplies that same line by every card tracking
-    # the meeting, so the queue turns this off on the api it owns and the size fields stand in.
-    log_card_text: bool = True
     # Attached at construction by whoever builds an api for a handler; see the protocol.
     refresh_queue: RefreshQueue | None = None
 
@@ -900,12 +923,7 @@ class TelegramApi:
                 await sleep(QUEUED_CALL_RETRY_BACKOFF_SECONDS * 2 ** (attempt - 1))
 
     def _record_queued_failure(self, queued: QueuedApiCall, exc: Exception):
-        log.exception(
-            "Queued Telegram call failed after commit",
-            queued_call=queued.name,
-            payload=queued.payload,
-            exc_info=exc,
-        )
+        log_telegram_failure("Queued Telegram call failed after commit", exc, queued.payload, queued_call=queued.name)
         # The aggregate `Fault` belongs to the invocation, which is still on its way to completing
         # normally — emitting it here would append a second value to the same EMF datapoint. The
         # per-failure detail rides on the log line above, where a drain with several failures keeps
@@ -946,15 +964,15 @@ class TelegramApi:
         invoke: Callable[[], Coroutine[Any, Any, T]],
         payload: dict[str, Any] | None,
     ) -> T:
-        """Await the call, logging the attempted payload on failure so a raised Telegram error
-        always shows what it tried to send. ``InactiveUserInteraction`` stays silent here — it
-        is an expected business signal already logged at its raise site."""
+        """Await the call, logging its payload on failure so a raised Telegram error always shows
+        what it tried to send. ``InactiveUserInteraction`` stays silent here: it is an expected
+        business signal already logged at its raise site."""
         try:
             return await invoke()
         except InactiveUserInteraction:
             raise
-        except Exception:
-            log.exception("Telegram call failed", telegram_call=name, payload=payload or {})
+        except Exception as error:
+            log_telegram_failure("Telegram call failed", error, payload or {}, telegram_call=name)
             raise
 
     # -- Public api -------------------------------------------------------------------------
@@ -1250,16 +1268,15 @@ class TelegramApi:
         )
         await self._call_or_enqueue(
             "answer_inline_query",
-            partial(self._answer_inline_query_now, query.id, query.query, inline_results, results_button, cache_time),
+            partial(self._answer_inline_query_now, query.id, inline_results, results_button, cache_time),
             None,
-            {"query_id": query.id, "query": query.query, "result_count": len(inline_results)},
+            {"query_id": query.id, "query_len": len(query.query), "result_count": len(inline_results)},
             idempotent=True,
         )
 
     async def _answer_inline_query_now(
         self,
         query_id: str,
-        query_text: str,
         inline_results: list[dict[str, Any]],
         results_button: dict[str, Any] | None,
         cache_time: int,
@@ -1278,7 +1295,7 @@ class TelegramApi:
             api_kwargs["button"] = results_button
         if await self.adapter.bot.do_api_request(ANSWER_INLINE_QUERY_ENDPOINT, api_kwargs=api_kwargs):
             return
-        raise AnswerInlineQueryError(query_text)
+        raise AnswerInlineQueryError(query_id)
 
     async def answer_callback_query(self, update: Update, text: str | FormattedText, show_alert: bool):
         if isinstance(text, FormattedText) and text.entities:
@@ -1293,7 +1310,7 @@ class TelegramApi:
             "answer_callback_query",
             partial(self._answer_callback_query_now, query.id, _text, show_alert),
             None,
-            {"query_id": query.id, "text": _text, "show_alert": show_alert},
+            {"query_id": query.id, "text_len": len(_text), "show_alert": show_alert},
             idempotent=True,
         )
 
@@ -1424,7 +1441,7 @@ class TelegramApi:
         counts against the bot-wide flood limit. Immediate mode edits unconditionally.
         """
         edit = self._render_meeting_message_edit(message, meeting, was_deleted, has_finished)
-        payload = meeting_edit_log_payload(edit) if self.log_card_text else meeting_edit_log_facts(edit)
+        payload = meeting_edit_log_facts(edit)
         if self._outbox is not None:
             if edit.digest != message.render_digest:
                 self._enqueue(

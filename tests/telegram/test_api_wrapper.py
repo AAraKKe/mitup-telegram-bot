@@ -40,17 +40,20 @@ from mitup_bot.api_wrapper import (
     OutboxStrategy,
     QueuedApiCall,
     TelegramApi,
+    UnreachableCallerReason,
     build_api,
     chat_member_is_admin,
     chat_member_is_banned,
     chat_member_is_present,
     handle_edit_errors,
+    keyboard_log_payload,
     meeting_job_key,
     message_is_deletable,
     modelled_endpoint_advisory,
     replace_message,
     screen_replacement_strategy,
     silence_modelled_endpoint_advisory,
+    unreachable_caller_reason,
 )
 from mitup_bot.card_refresh import RefreshQueue
 from mitup_bot.exceptions import (
@@ -1000,11 +1003,17 @@ async def test_a_shared_card_edits_into_the_same_content_it_was_sent_as(telegram
 
 
 async def test_answer_inline_query_raises_on_api_failure(telegram_api: TelegramApi, bot: AsyncMock):
+    """The error renders into the failure line's traceback, so it names the query by id and never
+    repeats what the user typed."""
     update = MagicMock(spec=Update)
+    update.inline_query.id = "query-7"
+    update.inline_query.query = "dinner at ana's"
     bot.do_api_request.return_value = False
 
-    with pytest.raises(AnswerInlineQueryError):
+    with pytest.raises(AnswerInlineQueryError) as raised:
         await telegram_api.answer_inline_query(update, [])
+
+    assert str(raised.value) == "Error when answering inline query: query-7"
 
 
 # ---------------------------------------------------------------------------
@@ -2261,23 +2270,131 @@ async def test_is_chat_banned_degrades_to_false_on_error(telegram_api: TelegramA
 # ---------------------------------------------------------------------------
 
 
-async def test_send_message_failure_logs_the_attempted_payload(telegram_api: TelegramApi, bot: AsyncMock):
-    update = MagicMock(spec=Update)
-    update.effective_chat.id = 42
-    view = MitupView(message=RichContent("hello there"), menu=[[ButtonConfig(text="Go", callback_data="cb")]])
-    bot.do_api_request.side_effect = BadRequest("Chat not found")
+async def test_an_unclassified_failure_is_an_error_describing_the_call_by_size(
+    telegram_api: TelegramApi, bot: AsyncMock
+):
+    """The rendered text and the button labels can hold what users wrote, so the whole payload is
+    pinned: anything added to it has to be allowed on the log plane."""
+    view = MitupView(
+        message=RichContent("Dinner at Ana's"),
+        menu=[
+            [
+                ButtonConfig(text="Dinner at Ana's", callback_data="show;meet:7"),
+                ButtonConfig(text="Go", url="https://example.com"),
+            ]
+        ],
+    )
+    bot.do_api_request.side_effect = BadRequest("Button_data_invalid")
 
     with capture_logs() as logs:
         with pytest.raises(BadRequest):
-            await telegram_api.send_message(update, view)
+            await telegram_api.send_message(chat_update(42), view)
 
-    failure_logs = [entry for entry in logs if entry["event"] == "Telegram call failed"]
-    assert len(failure_logs) == 1
-    assert failure_logs[0]["telegram_call"] == "send_message"
-    payload = failure_logs[0]["payload"]
-    assert payload["chat_id"] == 42
-    assert payload["text"] == "hello there"
-    assert payload["markup"] == [[{"text": "Go", "callback_data": "cb"}]]
+    failure = next(entry for entry in logs if entry["event"] == "Telegram call failed")
+    assert failure["log_level"] == "error"
+    assert failure["error_type"] == "telegram.error.BadRequest"
+    assert isinstance(failure["exc_info"], BadRequest)
+    assert failure["telegram_call"] == "send_message"
+    assert failure["payload"] == {
+        "chat_id": 42,
+        "text_len": len("Dinner at Ana's"),
+        "button_rows": 1,
+        "button_count": 2,
+        "callback_data": ["show;meet:7"],
+    }
+
+
+@pytest.mark.parametrize(
+    "error, reason",
+    [
+        (Forbidden("bot was blocked by the user"), UnreachableCallerReason.BOT_BLOCKED_BY_USER),
+        (BadRequest("Chat not found"), UnreachableCallerReason.CALLER_CHAT_GONE),
+        (BadRequest("chat not found"), UnreachableCallerReason.CALLER_CHAT_GONE),
+        (BadRequest("Message to delete not found"), None),
+        (ValueError("boom"), None),
+    ],
+    ids=["blocked", "chat_gone", "chat_gone_lowercase", "message_not_found", "unrelated"],
+)
+def test_unreachable_caller_reasons_match_the_exact_evidence(error: Exception, reason: UnreachableCallerReason | None):
+    """Only the two caller-scoped errors classify; other "not found" BadRequests are about a
+    message, not the caller, and must keep faulting."""
+    assert unreachable_caller_reason(error) is reason
+
+
+@pytest.mark.parametrize(
+    "error, reason",
+    [
+        (Forbidden("Forbidden: bot was blocked by the user"), "bot_blocked_by_user"),
+        (BadRequest("Chat not found"), "caller_chat_gone"),
+    ],
+    ids=["blocked", "chat_gone"],
+)
+async def test_a_refused_private_chat_is_a_warning_with_its_reason(
+    telegram_api: TelegramApi, bot: AsyncMock, error: Exception, reason: str
+):
+    bot.do_api_request.side_effect = error
+
+    with capture_logs() as logs:
+        with pytest.raises(type(error)):
+            await telegram_api.send_message(chat_update(42), "hello")
+
+    failure = next(entry for entry in logs if entry["event"] == "Telegram call failed")
+    assert failure["log_level"] == "warning"
+    assert failure["reason"] == reason
+    assert failure["payload"] == {
+        "chat_id": 42,
+        "text_len": 5,
+        "button_rows": 0,
+        "button_count": 0,
+        "callback_data": [],
+    }
+    assert "exc_info" not in failure
+    assert "error_type" not in failure
+
+
+async def test_a_refused_group_stays_an_error(telegram_api: TelegramApi, bot: AsyncMock):
+    """Outside a private chat the same answer means the bot wrote into a chat it no longer belongs
+    to, which the error handler keeps as a fault."""
+    bot.do_api_request.side_effect = Forbidden("Forbidden: bot was kicked from the group chat")
+
+    with capture_logs() as logs:
+        with pytest.raises(Forbidden):
+            await telegram_api.send_message(chat_update(-100), "hello")
+
+    failure = next(entry for entry in logs if entry["event"] == "Telegram call failed")
+    assert failure["log_level"] == "error"
+    assert "reason" not in failure
+
+
+def test_a_keyboard_payload_leaves_out_everything_but_its_size_and_callback_data():
+    keyboard: Keyboard = [
+        [ButtonConfig(text="Share", switch_inline_query="share")],
+        [ButtonConfig(text="Confirm", callback_data=cb.CONFIRM_PATREON_LINK.with_code("pairing-secret"))],
+    ]
+
+    # The pairing code is the secret the presser has to hold, so its button is logged without it.
+    assert keyboard_log_payload(keyboard) == {
+        "button_rows": 2,
+        "button_count": 2,
+        "callback_data": ["confirm;pl:;code:"],
+    }
+
+
+async def test_query_answers_are_described_by_size(telegram_api: TelegramApi):
+    update = MagicMock(spec=Update)
+    update.inline_query.id = "inline-query"
+    update.inline_query.query = "dinner at ana's"
+    update.callback_query.id = "callback-query"
+    outbox = telegram_api.begin_capture()
+
+    await telegram_api.answer_inline_query(update, [])
+    await telegram_api.answer_callback_query(update, "Ana already joined", show_alert=True)
+
+    telegram_api.end_capture()
+    assert [call.payload for call in outbox.calls] == [
+        {"query_id": "inline-query", "query_len": len("dinner at ana's"), "result_count": 0},
+        {"query_id": "callback-query", "text_len": len("Ana already joined"), "show_alert": True},
+    ]
 
 
 async def test_blocked_user_send_is_not_logged_as_telegram_call_failure(telegram_api: TelegramApi, bot: AsyncMock):
@@ -2291,27 +2408,23 @@ async def test_blocked_user_send_is_not_logged_as_telegram_call_failure(telegram
     assert not [entry for entry in logs if entry["event"] == "Telegram call failed"]
 
 
-@pytest.mark.parametrize(
-    "log_card_text, card_fields",
-    [(True, {"text", "markup"}), (False, {"text_len"})],
-    ids=["handler_api", "background_api"],
-)
-async def test_a_meeting_card_payload_carries_its_text_only_where_it_is_wanted(
-    telegram_api: TelegramApi, log_card_text: bool, card_fields: set[str]
-):
-    """A handler edits the few cards of the meeting in front of it and its failure line has to
-    show what it tried to deliver. A background fanout repeats that line for every card tracking
-    the meeting, and the card is prose its users wrote, so the api the refresh queue owns
-    describes it by size instead."""
+async def test_a_meeting_card_payload_describes_the_card_by_size(telegram_api: TelegramApi):
     meeting, card = make_bot_chat_meeting()
-    telegram_api.log_card_text = log_card_text
     outbox = telegram_api.begin_capture()
 
     await telegram_api.update_single_meeting_message(card, meeting)
 
     telegram_api.end_capture()
     payload = outbox.calls[0].payload
-    assert set(payload) == {"chat_id", "message_id", "inline_message_id"} | card_fields
+    assert set(payload) == {
+        "chat_id",
+        "message_id",
+        "inline_message_id",
+        "text_len",
+        "button_rows",
+        "button_count",
+        "callback_data",
+    }
 
 
 async def test_capture_mode_enqueues_the_payload_snapshot(telegram_api: TelegramApi):
@@ -2323,21 +2436,30 @@ async def test_capture_mode_enqueues_the_payload_snapshot(telegram_api: Telegram
 
     telegram_api.end_capture()
     assert outbox.calls[0].payload["chat_id"] == 42
-    assert outbox.calls[0].payload["text"] == "hello"
+    assert outbox.calls[0].payload["text_len"] == len("hello")
 
 
-async def test_execute_queued_failure_logs_the_attempted_payload(telegram_api: TelegramApi):
+@pytest.mark.parametrize(
+    "error, level",
+    [(BadRequest("Chat not found"), "warning"), (BadRequest("Button_data_invalid"), "error")],
+    ids=["refused_private_chat", "unclassified"],
+)
+async def test_execute_queued_failure_logs_the_attempted_payload(
+    telegram_api: TelegramApi, error: Exception, level: str
+):
     async def boom():
-        raise BadRequest("Chat not found")
+        raise error
 
-    attempted = {"chat_id": 7, "text": "queued text", "markup": None}
-    outbox = ApiOutbox(calls=[QueuedApiCall("send_message_to_user", boom, attempted)])
+    attempted = {"chat_id": 7, "text_len": 11}
+    outbox = ApiOutbox(calls=[QueuedApiCall("send_message", boom, attempted)])
 
     with capture_logs() as logs:
         await telegram_api.execute_queued(outbox)
 
     failure_logs = [entry for entry in logs if entry["event"] == "Queued Telegram call failed after commit"]
     assert len(failure_logs) == 1
+    assert failure_logs[0]["log_level"] == level
+    assert failure_logs[0]["queued_call"] == "send_message"
     assert failure_logs[0]["payload"] == attempted
 
 
@@ -2495,7 +2617,9 @@ async def test_an_edit_carrying_a_file_uploads_it_beside_the_rich_message(telegr
     assert (upload.filename, upload.input_file_content) == ("export.json", b"{}")
 
 
-async def test_a_failed_send_reports_the_file_it_tried_to_deliver(telegram_api: TelegramApi, bot: AsyncMock):
+async def test_a_failed_send_reports_the_size_of_the_file_it_tried_to_deliver(
+    telegram_api: TelegramApi, bot: AsyncMock
+):
     bot.do_api_request.side_effect = BadRequest("Chat not found")
 
     with capture_logs() as logs:
@@ -2503,8 +2627,8 @@ async def test_a_failed_send_reports_the_file_it_tried_to_deliver(telegram_api: 
             await telegram_api.send_message(chat_update(42), export_view())
 
     payload = next(entry for entry in logs if entry["event"] == "Telegram call failed")["payload"]
-    assert payload["document_filename"] == "export.json"
     assert payload["document_bytes"] == 2
+    assert "document_filename" not in payload
 
 
 # --- Editing ---

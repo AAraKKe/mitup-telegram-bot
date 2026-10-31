@@ -146,7 +146,7 @@ The `private` flag distinguishes private chat errors (where we should mark inact
 
 The same two Telegram answers can also reach the error handler **raw**, from a send an update-driven
 handler made into the caller's own chat (the wrapper conversion above covers only the proactive-DM
-methods). `unreachable_caller_reason()` classifies them — `Forbidden` → `bot_blocked_by_user`,
+methods). `unreachable_caller_reason()`, in `api_wrapper.py` because the wrapper's failure lines read it too, classifies them: `Forbidden` → `bot_blocked_by_user`,
 `BadRequest` whose message names "chat not found" → `caller_chat_gone` (an account deleted or banned
 mid-interaction; the match is on the exact chat wording so a "message to … not found" BadRequest
 keeps faulting) — and `handle_unreachable_user()` answers, gated on `in_bot_chat()`: one warning

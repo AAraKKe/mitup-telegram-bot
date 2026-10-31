@@ -7,9 +7,10 @@ from rich.console import Console
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
-from telegram.error import BadRequest, Forbidden
+from telegram.error import BadRequest
 
 from mitup_bot import db, guards
+from mitup_bot.api_wrapper import UnreachableCallerReason, unreachable_caller_reason
 from mitup_bot.config import Env
 from mitup_bot.custom_context import fault_fields_from_update
 from mitup_bot.exceptions import (
@@ -211,28 +212,6 @@ async def handle_user_not_found(context: TMitupContext, update: Update):
             exc_info=True,
             reason="account_notice_undeliverable",
         )
-
-
-class UnreachableCallerReason(StrEnum):
-    """Why a send into the caller's own chat was refused, split by the evidence the error carries."""
-
-    BOT_BLOCKED_BY_USER = auto()
-    CALLER_CHAT_GONE = auto()
-
-
-def unreachable_caller_reason(error: Exception) -> UnreachableCallerReason | None:
-    """Classify `error` as a refused send into the caller's own chat, or None when it is not one.
-
-    The split mirrors the one `_send_user_message_now` makes for proactive DMs: a block answers
-    Forbidden, an account that no longer exists answers BadRequest naming a chat that does not
-    resolve. The BadRequest match stays on the exact chat wording, since other "not found"
-    variants (a message to edit or delete) are not about the caller and must keep faulting.
-    """
-    if isinstance(error, Forbidden):
-        return UnreachableCallerReason.BOT_BLOCKED_BY_USER
-    if isinstance(error, BadRequest) and "chat not found" in error.message.lower():
-        return UnreachableCallerReason.CALLER_CHAT_GONE
-    return None
 
 
 async def handle_unreachable_user(context: TMitupContext, update: Update, reason: UnreachableCallerReason):

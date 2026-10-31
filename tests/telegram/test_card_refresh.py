@@ -401,16 +401,13 @@ async def test_a_job_draws_its_own_cards_rather_than_queueing_the_meeting_again(
     assert queue.pending == {}
 
 
-async def test_a_failed_card_edit_reports_the_card_by_size(
+async def test_a_failed_card_edit_reports_the_card_by_size_and_keeps_the_error(
     queue: RefreshQueue,
     mock_session: MockDbSession,
     registered_reconciler: None,
     bot: mock.AsyncMock,
     meeting_with_two_cards: Meetup,
 ):
-    """A fanout multiplies a failure line by every card tracking the meeting, and a card is the
-    title, description and participants its users wrote: the queue's api reports how big the card
-    was and never what it said."""
     mock_session.add_object(meeting_with_two_cards)
     bot.do_api_request.side_effect = BadRequest("Bad Request: message can't be edited")
 
@@ -420,7 +417,9 @@ async def test_a_failed_card_edit_reports_the_card_by_size(
     failures = [entry for entry in logs if entry["event"] == "Queued Telegram call failed after commit"]
     assert len(failures) == 2
     payload = failures[0]["payload"]
-    assert set(payload) == {"chat_id", "message_id", "inline_message_id", "text_len"}
+    assert failures[0]["log_level"] == "error"
+    assert "text" not in payload
+    assert "markup" not in payload
     assert payload["text_len"] > 0
 
 
@@ -1016,9 +1015,7 @@ def test_configure_worker_gives_the_queue_an_api_and_a_client_of_its_own(
     assert configured.metrics is not metrics_client
     assert configured.job_timeout == 7.5
     assert configured.drain_deadline == 3.5
-    # The queue takes the card text off its own lines, which it may only do to an api nobody shares.
-    assert configured.api.log_card_text is False
-    # And that api is handed no queue, which is what keeps a job's fan-out off the queue running it.
+    # That api is handed no queue, which is what keeps a job's fan-out off the queue running it.
     assert configured.api.refresh_queue is None
 
 

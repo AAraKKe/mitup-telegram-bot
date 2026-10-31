@@ -103,7 +103,7 @@ Use the registry below; do not invent a synonym for a field that already exists.
 | `previous_status`, `status`, `supporter_level`, `window_days` | state-transition and lifecycle facts |
 | `api_method`, `duration_ms`, `status_code` | outbound-call facts |
 | `stage`, `step`, `state`, `field`, `setting`, `list`, `check` | facets of a shared event name |
-| `callback_data`, `command` | what the user pressed or typed, on the bot's handler lines only — see [The interaction-input carve-out](#the-interaction-input-carve-out) |
+| `callback_data`, `command` | what the user pressed or typed, on the bot's handler lines, plus the `callback_data` a failed Telegram call tried to render. See [The interaction-input carve-out](#the-interaction-input-carve-out) |
 
 Order: ids first, then decision inputs, then `reason`/`outcome`.
 
@@ -131,8 +131,8 @@ Never bind a raw PTB `Update` or a config object — it renders as an unfilterab
 Without the input, an operator reading a callback interaction cannot tell which button was pressed
 and a command interaction cannot be told from any other. `handler_entry_fields`
 (`apps/bot/mitup_bot/handlers/registry.py`) is the single producer of the two fields that answer
-that, and they ride the bot's handler entry and exit lines only. What admits them is that each is
-bounded by a contract we do not own:
+that, and on the inbound side they ride the bot's handler entry and exit lines only. What admits
+them is that each is bounded by a contract we do not own:
 
 - **`callback_data`** is the payload of the pressed button, capped at 64 bytes by the Telegram Bot
   API. On a handler that registered a pattern, the payload also had to satisfy that pattern to get
@@ -147,6 +147,11 @@ They ride the **exit** line because prod runs INFO — carried by the entry DEBU
 not exist in production. Putting them on the line that already closes every invocation buys the
 input for zero extra log volume; promoting the entry line instead would double every invocation's
 line count for the same fact.
+
+`callback_data` also rides the two failed-call lines in `api_wrapper.py` (`Telegram call failed`,
+`Queued Telegram call failed after commit`), inside `payload`: there it is the data the bot itself
+rendered onto its buttons, so it is the same 64-byte vocabulary. A `CodeCallbackData` code is a secret
+and is blanked first. Button labels, links and inline queries never ride with it.
 
 Nothing generalises from this beyond those two fields. A value earns a place here only by being
 capped by an external contract *and* constrained to a vocabulary the bot itself minted.

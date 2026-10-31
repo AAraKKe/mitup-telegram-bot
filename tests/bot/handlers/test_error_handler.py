@@ -336,17 +336,6 @@ UNREACHABLE_ERRORS = [
 ]
 
 
-def test_unreachable_caller_reasons_match_the_exact_evidence():
-    """Only the two caller-scoped errors classify; other "not found" BadRequests are about a
-    message, not the caller, and must keep faulting."""
-    blocked = error_handler.unreachable_caller_reason(Forbidden("bot was blocked by the user"))
-    assert blocked is error_handler.UnreachableCallerReason.BOT_BLOCKED_BY_USER
-    gone = error_handler.unreachable_caller_reason(BadRequest("Chat not found"))
-    assert gone is error_handler.UnreachableCallerReason.CALLER_CHAT_GONE
-    assert error_handler.unreachable_caller_reason(BadRequest("Message to delete not found")) is None
-    assert error_handler.unreachable_caller_reason(ValueError("boom")) is None
-
-
 @pytest.mark.parametrize("error, reason", UNREACHABLE_ERRORS)
 async def test_unreachable_user_tap_is_answered_with_the_alert_and_no_fault(
     error: Exception,

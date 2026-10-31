@@ -305,7 +305,6 @@ class RefreshQueue:
         accepts_fanout: bool = True,
     ):
         self.api = api
-        self.api.log_card_text = False
         self.metrics = metrics
         self.max_pending = max_pending
         self.report_interval = report_interval
