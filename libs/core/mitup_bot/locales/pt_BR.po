@@ -1172,6 +1172,9 @@ msgstr "As fotos no evento são uma das vantagens de Host. Torne-se Host do Mitu
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "Este evento já chegou ao limite de ${limit} fotos. Remova uma para abrir espaço para outra."
 
+msgid "MeetingImagesMessages.ALREADY_ON_MEETING"
+msgstr "Você enviou uma foto que já está neste evento. Envie uma diferente."
+
 msgid "MeetingImagesMessages.SEND_AS_PHOTO"
 msgstr "Isso chegou como arquivo. Envie a imagem como foto para ela aparecer no evento."
 

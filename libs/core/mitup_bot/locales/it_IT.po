@@ -1163,6 +1163,9 @@ msgstr "Le foto sull'incontro sono uno degli extra riservati agli Host. Diventa 
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "Questo incontro contiene già le sue ${limit} foto. Rimuovine una per fare spazio a un'altra."
 
+msgid "MeetingImagesMessages.ALREADY_ON_MEETING"
+msgstr "Hai inviato una foto che questo incontro contiene già. Inviane una diversa."
+
 msgid "MeetingImagesMessages.SEND_AS_PHOTO"
 msgstr "Questa è arrivata come file. Inviala come foto per metterla sull'incontro."
 

@@ -1172,6 +1172,9 @@ msgstr "Poner fotos en la quedada es una de las ventajas de ser Host. Hazte Host
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "Esta quedada ya tiene sus ${limit} fotos. Elimina una para hacer hueco a otra."
 
+msgid "MeetingImagesMessages.ALREADY_ON_MEETING"
+msgstr "Me has enviado una foto que ya está en esta quedada. Envíame otra distinta."
+
 msgid "MeetingImagesMessages.SEND_AS_PHOTO"
 msgstr "Eso me ha llegado como archivo. Envíalo como foto para que se vea en la quedada."
 

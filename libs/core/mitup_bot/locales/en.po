@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-10-29 23:12\n"
+"PO-Revision-Date: 2026-10-31 15:46\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -877,6 +877,11 @@ msgstr "Photos on a meeting are one of the extras Hosts get. Become a Mitup Host
 
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "This meeting already holds its ${limit} photos. Remove one to make room for another."
+
+#. Notice on the Images screen when a photo sent alone or in an album is one the meeting already shows.
+#. It appears while adding or replacing a photo, so keep it neutral about which; "one" means a photo.
+msgid "MeetingImagesMessages.ALREADY_ON_MEETING"
+msgstr "You sent a photo this meeting already holds. Send a different one instead."
 
 #. Prompt after tapping Remove beside photo ${number} on the Images screen.
 msgid "MeetingImagesMessages.REMOVE_CONFIRMATION"

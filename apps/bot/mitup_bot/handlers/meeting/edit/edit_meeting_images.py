@@ -22,7 +22,9 @@ How the pieces fit together:
 
 - Replace. Tapping Replace on photo N stores N in `ContextId.REPLACE_MEETING_IMAGE`; the next photo
   overwrites that row instead of being appended, and the slot is cleared by that photo or by any
-  other chip.
+  other chip. A photo the meeting already holds elsewhere is refused, because a card cannot show
+  the same photo twice, and the slot stays so the retry lands there. Sending the photo already in
+  the slot changes nothing and clears it.
 
 - After every change, `redraw_after_change` logs it, shows the screen the owner may use, and
   refreshes every card of the meeting through `update_meeting_messages`.
@@ -64,6 +66,7 @@ log = structlog.get_logger(__name__)
 IMAGES_ACCESS_DENIED_EVENT = "Meeting photos access denied"
 IMAGES_CHANGED_EVENT = "Meeting photos changed"
 IMAGES_INPUT_REJECTED_EVENT = "Meeting photo input rejected"
+IMAGES_UNCHANGED_EVENT = "Meeting photos left unchanged"
 REMOVE_IMAGE_ACTION = "remove_image"
 REMOVE_IMAGES_ACTION = "remove_images"
 
@@ -82,6 +85,7 @@ class ImageChange(StrEnum):
 
 class InputRefusal(StrEnum):
     LIMIT_REACHED = auto()
+    ALREADY_ON_MEETING = auto()
     SENT_AS_FILE = auto()
     NOT_A_PHOTO = auto()
 
@@ -452,18 +456,31 @@ async def images_photo_message_handler(
             await context.api.send_draft(update, draft, draft_id=zlib.crc32(message.media_group_id.encode()) or 1)
 
         replacing = context.pending_position(ContextId.REPLACE_MEETING_IMAGE)
-        context.clean_user_data([ContextId.REPLACE_MEETING_IMAGE])
         # A position past the photos the meeting holds now came from a stale screen; the photo is
         # appended instead.
         if replacing is not None and not 0 <= replacing < len(meeting.images):
+            context.clean_user_data([ContextId.REPLACE_MEETING_IMAGE])
             replacing = None
+
+        # Telegram sends a photo in several sizes, smallest first; the card uses the largest.
+        photo = message.photo[-1]
+        held_at = {image.file_unique_id: image.position for image in meeting.images}.get(photo.file_unique_id)
+
+        if held_at is not None and held_at != replacing:
+            notice = MeetingImagesMessages.ALREADY_ON_MEETING.rich(lang=user.lang)
+            return await reject_message(context, update, meeting, user, InputRefusal.ALREADY_ON_MEETING, notice)
+
+        context.clean_user_data([ContextId.REPLACE_MEETING_IMAGE])
+
+        if held_at is not None:
+            log.info(IMAGES_UNCHANGED_EVENT, user_id=user.db_id, image_count=len(meeting.images), reason="same_photo")
+            return await show_images_screen(context, update, meeting, as_reply=True)
 
         if replacing is None and len(meeting.images) >= limits.MEETING_IMAGES_MAX:
             notice = MeetingImagesMessages.LIMIT_REACHED.rich(lang=user.lang, limit=limits.MEETING_IMAGES_MAX)
             return await reject_message(context, update, meeting, user, InputRefusal.LIMIT_REACHED, notice)
 
-        # Telegram sends a photo in several sizes, smallest first; the card uses the largest.
-        change = store_photo(meeting, message.photo[-1], replacing)
+        change = store_photo(meeting, photo, replacing)
         return await redraw_after_change(context, update, meeting, user, change, as_reply=True)
 
 

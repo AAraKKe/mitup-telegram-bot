@@ -1163,6 +1163,9 @@ msgstr "Fotos im Treffen gehören zu den Extras für Hosts. Werde Mitup-Host auf
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "Dieses Treffen hat bereits seine ${limit} Fotos. Entferne eins, um Platz für ein weiteres zu schaffen."
 
+msgid "MeetingImagesMessages.ALREADY_ON_MEETING"
+msgstr "Du hast ein Foto gesendet, das bereits in diesem Treffen ist. Sende stattdessen ein anderes."
+
 msgid "MeetingImagesMessages.SEND_AS_PHOTO"
 msgstr "Das ist als Datei angekommen. Sende es als Foto, damit es ins Treffen kommt."
 

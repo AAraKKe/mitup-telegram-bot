@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Sequence
 from enum import Enum
 
 import pytest
@@ -15,15 +16,18 @@ from mitup_bot.handlers.meeting.edit.edit_meeting_images import (
     IMAGES_ACCESS_DENIED_EVENT,
     IMAGES_CHANGED_EVENT,
     IMAGES_INPUT_REJECTED_EVENT,
+    IMAGES_UNCHANGED_EVENT,
 )
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.images import ImageLayout
 from mitup_bot.models import MeetingImage, Meetup, User
+from mitup_bot.monitoring import Feature, MetricKey, MetricsClient
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import MeetingImagesMessages
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.context import RenderContext
+from mitup_bot.views.mitup_view import MitupView
 from tests.helpers import (
     HandlerContext,
     StubMitupApp,
@@ -36,6 +40,7 @@ from tests.helpers import (
 )
 from tests.helpers.constants import DEFAULT_CHAT_ID
 from tests.helpers.fixtures import create_update
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.stub_db import MockDbSession
 
 THUMBNAIL = PhotoSize(file_id="thumb-file", file_unique_id="thumb-unique", width=90, height=60)
@@ -62,8 +67,24 @@ def with_photos(meeting: Meetup, count: int) -> Meetup:
     return meeting
 
 
+def held_photo(position: int) -> PhotoSize:
+    """The photo `with_photos` stored at *position*, delivered again."""
+    return PhotoSize(
+        file_id=f"stored-file-{position}", file_unique_id=f"stored-unique-{position}", width=800, height=600
+    )
+
+
 def file_ids(meeting: Meetup) -> list[str]:
     return [image.file_id for image in meeting.images]
+
+
+def file_unique_ids(meeting: Meetup) -> list[str]:
+    return [image.file_unique_id for image in meeting.images]
+
+
+def repeat_refused_screen(meeting: Meetup, owner: User, *, replacing: int | None = None) -> MitupView:
+    notice = MeetingImagesMessages.ALREADY_ON_MEETING.rich(lang=owner.lang)
+    return meeting_views.images_view(meeting, replacing=replacing).with_context(notice)
 
 
 def seed_owner_and_meeting(mock_session: MockDbSession, owner: User, meeting: Meetup):
@@ -81,10 +102,16 @@ async def tap_chip(
 
 
 async def send_to_editor(
-    app: StubMitupApp, handler_id: HandlerId, request: UpdateRequest, meeting: Meetup
+    app: StubMitupApp,
+    handler_id: HandlerId,
+    request: UpdateRequest,
+    meeting: Meetup,
+    metrics_client: MetricsClient | None = None,
 ) -> tuple[StubMitupContext, Enum | None]:
     """Send one message to the photo editor, sharing the user data of *app* with the earlier calls."""
-    handler_context = HandlerContext(update=create_update(request), app=app, metrics_client=make_test_metrics_client())
+    handler_context = HandlerContext(
+        update=create_update(request), app=app, metrics_client=metrics_client or make_test_metrics_client()
+    )
     return await call_handler(
         handler_id, handler_context=handler_context, with_meeting_id={ContextId.EDIT_MEETING_IMAGES: meeting.db_id}
     )
@@ -267,16 +294,23 @@ async def test_a_photo_is_appended_at_the_end_of_the_banner(
     assert record.__dict__["image_count"] == 2
 
 
-async def send_album(app: StubMitupApp, meeting: Meetup, photos: int) -> list[StubMitupContext]:
-    """Send an album of *photos* photos the way Telegram delivers it: one message per photo, all
-    with the same media group id."""
+def album_photo(index: int) -> PhotoSize:
+    return PhotoSize(file_id=f"album-{index}", file_unique_id=f"album-unique-{index}", width=800, height=600)
+
+
+async def send_as_album(app: StubMitupApp, meeting: Meetup, photos: Sequence[PhotoSize]) -> list[StubMitupContext]:
+    """Send *photos* the way Telegram delivers an album: one message per photo, all with the same
+    media group id."""
     contexts = []
-    for index in range(photos):
-        photo = PhotoSize(file_id=f"album-{index}", file_unique_id=f"album-unique-{index}", width=800, height=600)
+    for photo in photos:
         request = UpdateRequest(photo=(photo,), media_group_id=ALBUM_ID)
         context, _ = await send_to_editor(app, EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE, request, meeting)
         contexts.append(context)
     return contexts
+
+
+async def send_album(app: StubMitupApp, meeting: Meetup, photos: int) -> list[StubMitupContext]:
+    return await send_as_album(app, meeting, [album_photo(index) for index in range(photos)])
 
 
 def sent_strategies(contexts: list[StubMitupContext], method: str) -> list[OutboxStrategy]:
@@ -529,6 +563,312 @@ async def test_a_chip_pressed_after_replace_drops_the_waiting_slot(
     )
 
     assert context.pending_position(ContextId.REPLACE_MEETING_IMAGE) is None
+
+
+# --- Repeated photos ---
+
+
+@pytest.mark.parametrize(
+    "repeat",
+    [
+        held_photo(0),
+        PhotoSize(file_id="resent-file", file_unique_id="stored-unique-0", width=800, height=600),
+    ],
+    ids=["same_file_id", "new_file_id"],
+)
+async def test_a_photo_the_meeting_already_holds_is_refused(
+    mock_session: MockDbSession,
+    host: User,
+    app: StubMitupApp,
+    repeat: PhotoSize,
+    caplog: pytest.LogCaptureFixture,
+):
+    caplog.set_level(logging.INFO)
+    meeting = with_photos(host.meetups[0], 2)
+    seed_owner_and_meeting(mock_session, host, meeting)
+
+    context, state = await send_to_editor(
+        app, EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE, UpdateRequest(photo=(repeat,)), meeting
+    )
+
+    assert file_ids(meeting) == ["stored-file-0", "stored-file-1"]
+    assert file_unique_ids(meeting) == ["stored-unique-0", "stored-unique-1"]
+    context.api.assert_send_message_called(context.get_update(), repeat_refused_screen(meeting, host))
+    context.api.assert_update_meeting_messages_not_called()
+    assert state == ConversationMeetingState.EDIT_IMAGES
+    assert log_record(caplog, IMAGES_INPUT_REJECTED_EVENT).__dict__["reason"] == "already_on_meeting"
+
+
+async def test_a_new_photo_sharing_only_the_file_id_of_a_stored_one_is_added(
+    mock_session: MockDbSession,
+    host: User,
+    app: StubMitupApp,
+):
+    meeting = with_photos(host.meetups[0], 1)
+    seed_owner_and_meeting(mock_session, host, meeting)
+    photo = PhotoSize(file_id="stored-file-0", file_unique_id="new-unique", width=800, height=600)
+
+    context, _ = await send_to_editor(
+        app, EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE, UpdateRequest(photo=(photo,)), meeting
+    )
+
+    assert file_unique_ids(meeting) == ["stored-unique-0", "new-unique"]
+    context.api.assert_send_message_called(context.get_update(), meeting_views.images_view(meeting))
+    context.api.assert_update_meeting_messages_called(meeting=meeting)
+
+
+async def test_a_photo_held_by_another_slot_cannot_replace_this_one(
+    mock_session: MockDbSession,
+    host: User,
+    meeting_with_photos: Meetup,
+    app: StubMitupApp,
+):
+    seed_owner_and_meeting(mock_session, host, meeting_with_photos)
+    await tap_chip(app, EditMeetingHandlerId.REPLACE_IMAGE_CALLBACK, cb.REPLACE_MEETING_IMAGE.with_ids(1, 0))
+
+    context, state = await send_to_editor(
+        app, EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE, UpdateRequest(photo=(held_photo(2),)), meeting_with_photos
+    )
+
+    assert file_ids(meeting_with_photos) == ["stored-file-0", "stored-file-1", "stored-file-2"]
+    assert file_unique_ids(meeting_with_photos) == ["stored-unique-0", "stored-unique-1", "stored-unique-2"]
+    assert context.pending_position(ContextId.REPLACE_MEETING_IMAGE) == 0
+    context.api.assert_send_message_called(
+        context.get_update(), repeat_refused_screen(meeting_with_photos, host, replacing=0)
+    )
+    context.api.assert_update_meeting_messages_not_called()
+    assert state == ConversationMeetingState.EDIT_IMAGES
+
+
+def test_the_refusal_keeps_the_replace_prompt_on_the_screen(host: User, meeting_with_photos: Meetup):
+    screen = repeat_refused_screen(meeting_with_photos, host, replacing=0).message.html
+    prompt = MeetingImagesMessages.REPLACING.rich(lang=host.lang, number=1).html
+    notice = MeetingImagesMessages.ALREADY_ON_MEETING.rich(lang=host.lang).html
+
+    assert screen.index(notice) < screen.index(prompt)
+
+
+async def test_the_photo_after_a_refused_repeat_lands_in_the_kept_slot(
+    mock_session: MockDbSession,
+    host: User,
+    meeting_with_photos: Meetup,
+    app: StubMitupApp,
+):
+    seed_owner_and_meeting(mock_session, host, meeting_with_photos)
+    await tap_chip(app, EditMeetingHandlerId.REPLACE_IMAGE_CALLBACK, cb.REPLACE_MEETING_IMAGE.with_ids(1, 0))
+    await send_to_editor(
+        app, EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE, UpdateRequest(photo=(held_photo(2),)), meeting_with_photos
+    )
+
+    context, _ = await send_to_editor(
+        app, EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE, PHOTO_MESSAGE, meeting_with_photos
+    )
+
+    assert file_ids(meeting_with_photos) == ["sent-file", "stored-file-1", "stored-file-2"]
+    assert context.pending_position(ContextId.REPLACE_MEETING_IMAGE) is None
+
+
+async def test_the_retry_after_a_refused_repeat_is_not_stopped_by_the_photo_limit(
+    mock_session: MockDbSession,
+    host: User,
+    app: StubMitupApp,
+):
+    meeting = with_photos(host.meetups[0], limits.MEETING_IMAGES_MAX)
+    seed_owner_and_meeting(mock_session, host, meeting)
+    await tap_chip(app, EditMeetingHandlerId.REPLACE_IMAGE_CALLBACK, cb.REPLACE_MEETING_IMAGE.with_ids(1, 1))
+    await send_to_editor(app, EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE, UpdateRequest(photo=(held_photo(0),)), meeting)
+
+    await send_to_editor(app, EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE, PHOTO_MESSAGE, meeting)
+
+    assert len(meeting.images) == limits.MEETING_IMAGES_MAX
+    assert meeting.images[1].file_id == "sent-file"
+
+
+async def test_replacing_a_slot_with_the_photo_already_there_changes_nothing(
+    mock_session: MockDbSession,
+    host: User,
+    meeting_with_photos: Meetup,
+    app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+    caplog: pytest.LogCaptureFixture,
+):
+    caplog.set_level(logging.INFO)
+    seed_owner_and_meeting(mock_session, host, meeting_with_photos)
+    await tap_chip(app, EditMeetingHandlerId.REPLACE_IMAGE_CALLBACK, cb.REPLACE_MEETING_IMAGE.with_ids(1, 1))
+    same_photo = PhotoSize(file_id="resent-file", file_unique_id="stored-unique-1", width=800, height=600)
+
+    context, state = await send_to_editor(
+        app,
+        EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE,
+        UpdateRequest(photo=(same_photo,)),
+        meeting_with_photos,
+        metrics_client,
+    )
+    await context.flush_metrics()
+
+    assert file_ids(meeting_with_photos) == ["stored-file-0", "stored-file-1", "stored-file-2"]
+    assert context.pending_position(ContextId.REPLACE_MEETING_IMAGE) is None
+    context.api.assert_send_message_called(context.get_update(), meeting_views.images_view(meeting_with_photos))
+    context.api.assert_update_meeting_messages_not_called()
+    assert state == ConversationMeetingState.EDIT_IMAGES
+
+    record = log_record(caplog, IMAGES_UNCHANGED_EVENT)
+    assert record.levelno == logging.INFO
+    assert record.__dict__["reason"] == "same_photo"
+    assert caplog.messages.count(IMAGES_UNCHANGED_EVENT) == 1
+    assert IMAGES_INPUT_REJECTED_EVENT not in caplog.messages
+    assert IMAGES_CHANGED_EVENT not in caplog.messages
+    metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.EDIT_MEETING)})
+
+
+async def test_a_replaced_photo_counts_as_a_meeting_edit(
+    mock_session: MockDbSession,
+    host: User,
+    meeting_with_photos: Meetup,
+    app: StubMitupApp,
+    metrics_client: MetricsClient,
+    metrics: MetricAssertions,
+):
+    seed_owner_and_meeting(mock_session, host, meeting_with_photos)
+    await tap_chip(app, EditMeetingHandlerId.REPLACE_IMAGE_CALLBACK, cb.REPLACE_MEETING_IMAGE.with_ids(1, 1))
+
+    context, _ = await send_to_editor(
+        app, EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE, PHOTO_MESSAGE, meeting_with_photos, metrics_client
+    )
+    await context.flush_metrics()
+
+    metrics.assert_emitted(
+        name=MetricKey.COUNT, dimensions={"Feature": str(Feature.EDIT_MEETING)}, properties={"EditedField": "images"}
+    )
+
+
+async def test_a_repeat_at_the_photo_limit_gets_the_repeat_notice(
+    mock_session: MockDbSession,
+    host: User,
+    app: StubMitupApp,
+):
+    meeting = with_photos(host.meetups[0], limits.MEETING_IMAGES_MAX)
+    stored = file_ids(meeting)
+    seed_owner_and_meeting(mock_session, host, meeting)
+
+    context, _ = await send_to_editor(
+        app, EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE, UpdateRequest(photo=(held_photo(2),)), meeting
+    )
+
+    assert file_ids(meeting) == stored
+    context.api.assert_send_message_called(context.get_update(), repeat_refused_screen(meeting, host))
+
+
+async def test_a_repeat_sent_to_a_slot_gone_from_the_meeting_is_refused(
+    mock_session: MockDbSession,
+    host: User,
+    meeting_with_photos: Meetup,
+    app: StubMitupApp,
+):
+    seed_owner_and_meeting(mock_session, host, meeting_with_photos)
+    await tap_chip(app, EditMeetingHandlerId.REPLACE_IMAGE_CALLBACK, cb.REPLACE_MEETING_IMAGE.with_ids(1, 2))
+    meeting_with_photos.images.pop()
+
+    context, state = await send_to_editor(
+        app, EditMeetingHandlerId.IMAGES_PHOTO_MESSAGE, UpdateRequest(photo=(held_photo(0),)), meeting_with_photos
+    )
+
+    assert file_ids(meeting_with_photos) == ["stored-file-0", "stored-file-1"]
+    assert context.pending_position(ContextId.REPLACE_MEETING_IMAGE) is None
+    context.api.assert_send_message_called(context.get_update(), repeat_refused_screen(meeting_with_photos, host))
+    context.api.assert_update_meeting_messages_not_called()
+    assert state == ConversationMeetingState.EDIT_IMAGES
+
+
+async def test_a_repeat_inside_an_album_is_left_out_and_the_screen_shows_the_final_state(
+    mock_session: MockDbSession,
+    host: User,
+    app: StubMitupApp,
+):
+    """The worker sends only the last screen of an album, so a repeat in the middle leaves no notice."""
+    meeting = with_photos(host.meetups[0], 1)
+    seed_owner_and_meeting(mock_session, host, meeting)
+
+    contexts = await send_as_album(app, meeting, [album_photo(0), held_photo(0), album_photo(1)])
+    first_photo, repeat, last_photo = contexts
+
+    assert file_unique_ids(meeting) == ["stored-unique-0", "album-unique-0", "album-unique-1"]
+    assert [image.position for image in meeting.images] == [0, 1, 2]
+    assert sent_strategies(contexts, "send_message") == [ALBUM_STRATEGY] * 3
+    last_photo.api.assert_send_message_called(
+        last_photo.get_update(), meeting_views.images_view(meeting), strategy=ALBUM_STRATEGY
+    )
+    repeat.api.assert_update_meeting_messages_not_called()
+    assert (
+        sent_strategies([first_photo, last_photo], "update_meeting_messages")
+        == [OutboxStrategy(meeting_job_key(meeting.db_id), hold_seconds=ALBUM_HOLD_SECONDS)] * 2
+    )
+
+
+async def test_a_photo_sent_twice_in_one_album_lands_once(
+    mock_session: MockDbSession,
+    host: User,
+    app: StubMitupApp,
+):
+    meeting = with_photos(host.meetups[0], 0)
+    seed_owner_and_meeting(mock_session, host, meeting)
+
+    contexts = await send_as_album(app, meeting, [album_photo(0), album_photo(0)])
+
+    assert file_unique_ids(meeting) == ["album-unique-0"]
+    assert sent_strategies(contexts, "send_message") == [ALBUM_STRATEGY] * 2
+
+
+async def test_the_notice_survives_on_the_screen_of_an_album_ending_on_a_repeat(
+    mock_session: MockDbSession,
+    host: User,
+    app: StubMitupApp,
+):
+    meeting = with_photos(host.meetups[0], 1)
+    seed_owner_and_meeting(mock_session, host, meeting)
+
+    contexts = await send_as_album(app, meeting, [album_photo(0), held_photo(0)])
+
+    assert file_unique_ids(meeting) == ["stored-unique-0", "album-unique-0"]
+    assert sent_strategies(contexts, "send_message") == [ALBUM_STRATEGY] * 2
+    contexts[-1].api.assert_send_message_called(
+        contexts[-1].get_update(), repeat_refused_screen(meeting, host), strategy=ALBUM_STRATEGY
+    )
+
+
+async def test_an_album_made_only_of_repeats_changes_nothing_and_says_so_once(
+    mock_session: MockDbSession,
+    host: User,
+    app: StubMitupApp,
+):
+    meeting = with_photos(host.meetups[0], 2)
+    seed_owner_and_meeting(mock_session, host, meeting)
+
+    contexts = await send_as_album(app, meeting, [held_photo(1), held_photo(0)])
+
+    assert file_unique_ids(meeting) == ["stored-unique-0", "stored-unique-1"]
+    assert sent_strategies(contexts, "send_message") == [ALBUM_STRATEGY] * 2
+    contexts[-1].api.assert_send_message_called(
+        contexts[-1].get_update(), repeat_refused_screen(meeting, host), strategy=ALBUM_STRATEGY
+    )
+    for context in contexts:
+        context.api.assert_update_meeting_messages_not_called()
+
+
+async def test_an_album_sent_after_replace_puts_its_first_new_photo_in_the_slot(
+    mock_session: MockDbSession,
+    host: User,
+    meeting_with_photos: Meetup,
+    app: StubMitupApp,
+):
+    seed_owner_and_meeting(mock_session, host, meeting_with_photos)
+    await tap_chip(app, EditMeetingHandlerId.REPLACE_IMAGE_CALLBACK, cb.REPLACE_MEETING_IMAGE.with_ids(1, 0))
+
+    contexts = await send_as_album(app, meeting_with_photos, [held_photo(2), album_photo(0)])
+
+    assert file_unique_ids(meeting_with_photos) == ["album-unique-0", "stored-unique-1", "stored-unique-2"]
+    assert contexts[-1].pending_position(ContextId.REPLACE_MEETING_IMAGE) is None
 
 
 # --- Removing photos ---

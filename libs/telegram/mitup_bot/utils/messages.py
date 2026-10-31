@@ -838,6 +838,9 @@ class MeetingImagesMessages(MessageBase):
         "Patreon to bring them to your meetings. Collaborate below has all the details."
     )
     LIMIT_REACHED = "This meeting already holds its ${limit} photos. Remove one to make room for another."
+    # TRANSLATORS: Notice on the Images screen when a photo sent alone or in an album is one the meeting already shows.
+    # TRANSLATORS: It appears while adding or replacing a photo, so keep it neutral about which; "one" means a photo.
+    ALREADY_ON_MEETING = "You sent a photo this meeting already holds. Send a different one instead."
     # TRANSLATORS: Prompt after tapping Remove beside photo ${number} on the Images screen.
     REMOVE_CONFIRMATION = "This removes image ${number} from the meeting. Are you sure?"
     # TRANSLATORS: Prompt after tapping Remove all on the Images screen.

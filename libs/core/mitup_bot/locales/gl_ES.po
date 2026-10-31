@@ -1163,6 +1163,9 @@ msgstr "As fotos na quedada son unha das vantaxes de Host. Faite Host de Mitup e
 msgid "MeetingImagesMessages.LIMIT_REACHED"
 msgstr "Esta quedada xa ten as súas ${limit} fotos. Elimina unha para facer sitio a outra."
 
+msgid "MeetingImagesMessages.ALREADY_ON_MEETING"
+msgstr "Enviaches unha foto que esta quedada xa ten. Envía outra diferente."
+
 msgid "MeetingImagesMessages.SEND_AS_PHOTO"
 msgstr "Iso chegou como ficheiro. Envíao como foto para poñelo na quedada."
 
