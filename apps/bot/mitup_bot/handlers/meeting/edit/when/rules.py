@@ -33,26 +33,28 @@ def safe_anchor_date(reference_datetime: dt.datetime | None, user_now: dt.dateti
 
 
 def validate_start_datetime(start_dt: dt.datetime, meeting: Meetup, lang: str) -> str | None:
-    """Return an error message string if start_dt is invalid, or None if valid.
+    """Return an error message if start_dt is in the past or stretches the meeting beyond the duration cap.
 
-    The scheduling horizon is not checked here: call sites check it separately so the rejection can
-    carry the Collaborate upsell, and time-only edits skip it entirely so a grandfathered far-future
-    meeting can still have its time adjusted.
-
-    All four start-datetime paths reach this, and the owner only ever sees the message, so the
-    rejection is recorded here. The owner's own clock sits next to what they proposed: whether a
-    datetime is in the past is a statement about their timezone, and a timezone-boundary bug is
-    otherwise indistinguishable from a user mistake.
+    The scheduling horizon is left to the call sites, so its rejection can carry the Collaborate upsell and
+    time-only edits can skip it.
     """
-    if is_in_past(start_dt, meeting):
+
+    def reject(reason: str, **decision_inputs: dt.datetime) -> None:
         log.info(
             "Meeting start datetime rejected",
             user_id=meeting.owner.db_id,
-            reason="start_in_past",
             proposed_datetime=start_dt,
-            owner_now=meeting.owner.now_in_tz(),
+            **decision_inputs,
+            reason=reason,
         )
+
+    if is_in_past(start_dt, meeting):
+        reject("start_in_past", owner_now=meeting.owner.now_in_tz())
         return MeetingEditDateTimeMessages.START_IN_PAST.text(lang=lang)
+    end_dt = meeting.end_datetime
+    if end_dt is not None and not limits.within_max_duration(start_dt, end_dt, meeting.timezone):
+        reject("exceeds_max_duration", meeting_end_datetime=end_dt)
+        return MeetingEditDateTimeMessages.START_MAX_DURATION.text(lang=lang)
     return None
 
 

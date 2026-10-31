@@ -746,6 +746,9 @@ msgstr "A nova hora de inicio é posterior á hora de remate, polo que a hora de
 msgid "MeetingEditDateTimeMessages.START_IN_PAST"
 msgstr "A hora de inicio non pode estar no pasado."
 
+msgid "MeetingEditDateTimeMessages.START_MAX_DURATION"
+msgstr "Unha quedada pode durar como máximo unha semana. Axusta un inicio dentro da semana anterior ao remate, ou elimina primeiro a hora de remate."
+
 msgid "MeetingEditWhenMessages.REMOVE_TIMES_CONFIRMATION"
 msgstr "Isto elimina a hora de inicio da quedada, e con ela a hora de remate. Seguro que queres continuar?"
 

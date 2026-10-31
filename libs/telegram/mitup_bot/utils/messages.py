@@ -867,6 +867,10 @@ class MeetingEditDateTimeMessages(MessageBase):
     )
     END_CLEARED_BY_START = "The new start time is after the end time, so the end time has been cleared."
     START_IN_PAST = "The start time must be in the future."
+    # TRANSLATORS: Start editor alert for a meeting over a week; "remove" means the Remove button beside the end time.
+    START_MAX_DURATION = (
+        "A meeting can last a week at most. Set a start within a week of the end, or remove the end time first."
+    )
 
 
 # --- Meeting edit: start/end time removal ---

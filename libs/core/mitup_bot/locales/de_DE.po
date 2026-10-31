@@ -746,6 +746,9 @@ msgstr "Die neue Startzeit liegt nach der Endzeit, daher wurde die Endzeit gelö
 msgid "MeetingEditDateTimeMessages.START_IN_PAST"
 msgstr "Die Startzeit muss in der Zukunft liegen."
 
+msgid "MeetingEditDateTimeMessages.START_MAX_DURATION"
+msgstr "Ein Treffen kann maximal eine Woche dauern. Wähle eine Startzeit innerhalb einer Woche vor dem Ende oder entferne zuerst die Endzeit."
+
 msgid "MeetingEditWhenMessages.REMOVE_TIMES_CONFIRMATION"
 msgstr "Damit wird die Startzeit des Treffens entfernt und die Endzeit gleich mit. Bist du sicher?"
 

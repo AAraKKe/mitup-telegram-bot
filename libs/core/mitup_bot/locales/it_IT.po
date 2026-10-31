@@ -746,6 +746,9 @@ msgstr "Il nuovo orario di inizio è dopo l'orario di fine, quindi l'orario di f
 msgid "MeetingEditDateTimeMessages.START_IN_PAST"
 msgstr "L'orario di inizio deve essere nel futuro."
 
+msgid "MeetingEditDateTimeMessages.START_MAX_DURATION"
+msgstr "Un incontro può durare una settimana al massimo. Imposta l'inizio entro una settimana dalla fine, oppure rimuovi prima l'orario di fine."
+
 msgid "MeetingEditWhenMessages.REMOVE_TIMES_CONFIRMATION"
 msgstr "Questo rimuove l'orario di inizio dell'incontro, e con esso quello di fine. Confermi?"
 

@@ -746,6 +746,9 @@ msgstr "La nueva hora de inicio es posterior a la hora de finalización, así qu
 msgid "MeetingEditDateTimeMessages.START_IN_PAST"
 msgstr "La hora de inicio no puede estar en el pasado."
 
+msgid "MeetingEditDateTimeMessages.START_MAX_DURATION"
+msgstr "Una quedada puede durar una semana como máximo. Establece una hora de inicio como máximo una semana antes de la finalización, o elimina primero la hora de finalización."
+
 msgid "MeetingEditWhenMessages.REMOVE_TIMES_CONFIRMATION"
 msgstr "Esto elimina la hora de inicio de la quedada, y con ella la de finalización. ¿Quieres continuar?"
 

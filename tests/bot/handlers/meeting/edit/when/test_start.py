@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from freezegun import freeze_time
+from structlog.testing import capture_logs
 from telegram import CallbackQuery, Location, MessageEntity, Update
 from telegram import User as TgUser
 from telegram.ext import ConversationHandler
@@ -12,7 +13,7 @@ from mitup_bot import supporter
 from mitup_bot.config import LimitsConfig
 from mitup_bot.custom_context import ContextId
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
-from mitup_bot.handlers.meeting.edit.when import screens
+from mitup_bot.handlers.meeting.edit.when import rules, screens
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, User
 from mitup_bot.models import Message as MeetupMessage
@@ -1160,6 +1161,110 @@ async def test_set_time_in_past_sends_error_and_stays_on_the_card(
             error=MeetingEditDateTimeMessages.START_IN_PAST.rich(lang=user_with_settings.lang),
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# validate_start_datetime: moving the start earlier may not stretch the meeting past one week.
+# The owner is Europe/Madrid (user_with_settings); every date is after the frozen 2024-11-15.
+# ---------------------------------------------------------------------------
+
+
+CAPPED_MEETING_START = dt.datetime(2025, 11, 10, 10, 0, tzinfo=MADRID)
+CAPPED_MEETING_END = dt.datetime(2025, 11, 16, 10, 0, tzinfo=MADRID)
+
+
+def meeting_with_an_end(user: User, start: dt.datetime, end: dt.datetime) -> Meetup:
+    meeting = create_meetup(id=10, title="TestMeeting", description="Description", datetime=start)
+    meeting.end_datetime = end
+    user.meetups.append(meeting)
+    return meeting
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.PICK_START_DATE.with_id(10).with_date(dt.date(2025, 11, 9)))],
+    indirect=True,
+)
+async def test_start_moved_to_exactly_one_week_before_the_end_is_saved(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting = meeting_with_an_end(user_with_settings, CAPPED_MEETING_START, CAPPED_MEETING_END)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    context, response = await call_handler(EditMeetingHandlerId.PICK_START_DATE, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.START_DATETIME_CARD
+    assert meeting.datetime == dt.datetime(2025, 11, 9, 10, 0, tzinfo=MADRID)
+    assert meeting.end_datetime == CAPPED_MEETING_END
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    context.api.assert_edit_message_called(update, expected_card(meeting, meeting.lang, month=dt.date(2025, 11, 9)))
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.PICK_START_DATE.with_id(10).with_date(dt.date(2025, 11, 3)))],
+    indirect=True,
+)
+async def test_start_moved_more_than_a_week_before_the_end_is_rejected(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting = meeting_with_an_end(user_with_settings, CAPPED_MEETING_START, CAPPED_MEETING_END)
+    mock_session.add_object(meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+
+    with capture_logs() as logs:
+        context, response = await call_handler(EditMeetingHandlerId.PICK_START_DATE, handler_context=handler_context)
+
+    assert response == ConversationMeetingState.START_DATETIME_CARD
+    assert meeting.datetime == CAPPED_MEETING_START
+    assert meeting.end_datetime == CAPPED_MEETING_END
+    mock_session.assert_not_flushed()
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=MeetingEditDateTimeMessages.START_MAX_DURATION.text(lang=meeting.lang),
+        show_alert=True,
+    )
+
+    [rejection] = [entry for entry in logs if entry["event"] == "Meeting start datetime rejected"]
+    assert rejection["log_level"] == "info"
+    assert rejection["reason"] == "exceeds_max_duration"
+    assert rejection["proposed_datetime"] == dt.datetime(2025, 11, 3, 10, 0, tzinfo=MADRID)
+    assert rejection["meeting_end_datetime"] == CAPPED_MEETING_END
+
+
+@pytest.mark.parametrize(
+    ("proposed_start", "accepted"),
+    [
+        # 10:00 Madrid on 2027-10-28, summer time: Madrid falls back on 2027-10-31, so the week to the
+        # end lasts 7 days and 1 hour.
+        (dt.datetime(2027, 10, 28, 8, 0, tzinfo=dt.UTC), True),
+        (dt.datetime(2027, 10, 28, 7, 59, tzinfo=dt.UTC), False),
+    ],
+    ids=["one_local_week", "one_minute_beyond"],
+)
+def test_start_cap_counts_a_local_week_across_the_autumn_change(
+    user_with_settings: User,
+    proposed_start: dt.datetime,
+    accepted: bool,
+):
+    meeting = meeting_with_an_end(
+        user_with_settings,
+        dt.datetime(2027, 11, 1, 9, 0, tzinfo=dt.UTC),
+        # 10:00 Madrid, winter time.
+        dt.datetime(2027, 11, 4, 9, 0, tzinfo=dt.UTC),
+    )
+    lang = user_with_settings.lang
+
+    error = rules.validate_start_datetime(proposed_start, meeting, lang)
+
+    assert error == (None if accepted else MeetingEditDateTimeMessages.START_MAX_DURATION.text(lang=lang))
 
 
 # ---------------------------------------------------------------------------
