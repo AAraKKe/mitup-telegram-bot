@@ -1,13 +1,16 @@
 from unittest import mock
 
+import httpx
 import pytest
 from pydantic import SecretStr
 from structlog.testing import capture_logs
 from telegram.error import TimedOut
+from telegram.ext import ExtBot
 from telegram.request import HTTPXRequest, RequestData
 
 from mitup_bot.config import BotConfig
 from mitup_bot.monitoring import MetricsClient, MetricUnit, bound_metrics_client
+from mitup_bot.rate_limiter import MitupRateLimiter
 from mitup_bot.request import InstrumentedHTTPXRequest, api_method_from_url, build_telegram_request, request_ids
 from tests.helpers import AnyFloat
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
@@ -105,3 +108,15 @@ async def test_the_per_call_line_can_be_switched_off_by_config(client: MetricsCl
 
     assert logs == []
     metrics.assert_emitted(name="TelegramApiTime", value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
+
+
+async def test_a_read_timeout_keeps_its_httpx_cause_through_the_stack():
+    """The drain tells a slow edit from a dead network by this cause alone."""
+    transport = httpx.MockTransport(mock.Mock(side_effect=httpx.ReadTimeout("read")))
+    request = InstrumentedHTTPXRequest(httpx_kwargs={"transport": transport})
+    bot = ExtBot(token=BOT_TOKEN, rate_limiter=MitupRateLimiter(), request=request)
+
+    with pytest.raises(TimedOut) as raised:
+        await bot.do_api_request("anyEndpoint", api_kwargs={"text": "x"})
+
+    assert isinstance(raised.value.__cause__, httpx.ReadTimeout)

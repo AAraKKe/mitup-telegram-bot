@@ -28,9 +28,12 @@ from mitup_bot.acquisition import SHARED_CARD_FOOTER_PAYLOAD
 from mitup_bot.api_wrapper import (
     ANSWER_INLINE_QUERY_ENDPOINT,
     CALLBACK_QUERY_TEXT_LIMIT,
+    DRAIN_INLINE_EDIT_TIMEOUT_LIMIT,
+    DRAIN_NETWORK_FAILURE_LIMIT,
     EDIT_MESSAGE_TEXT_ENDPOINT,
     MESSAGE_DELETION_WINDOW,
     QUEUED_CALL_ATTEMPTS,
+    QUEUED_CALL_RETRY_BACKOFF_SECONDS,
     SEND_RICH_MESSAGE_ENDPOINT,
     ApiOutbox,
     BotAdapter,
@@ -55,7 +58,8 @@ from mitup_bot.api_wrapper import (
     silence_modelled_endpoint_advisory,
     unreachable_caller_reason,
 )
-from mitup_bot.card_refresh import RefreshQueue
+from mitup_bot.card_refresh import JOB_TIMEOUT_SECONDS, RefreshQueue
+from mitup_bot.config import BotConfig
 from mitup_bot.exceptions import (
     AnswerInlineQueryError,
     CallbackQueryTextTooLong,
@@ -2912,3 +2916,152 @@ async def test_a_fanout_strategy_naming_another_meeting_is_refused(
 
     with pytest.raises(AssertionError):
         await run_fanout(telegram_api, meeting, current_message=current, strategy=OutboxStrategy(meeting_job_key(11)))
+
+
+# ---------------------------------------------------------------------------
+# Slow inline edits
+# ---------------------------------------------------------------------------
+
+
+SKIPPED_INLINE_EDITS_EVENT = "Post-commit drain skipped inline edits"
+
+
+def read_timeout() -> TimedOut:
+    return with_cause(TimedOut(), httpx.ReadTimeout("read"))
+
+
+def make_drain_call(name: str, attempted: list[str], error: Exception | None = None, inline: bool = False):
+    async def invoke():
+        attempted.append(name)
+        if error is not None:
+            raise error
+
+    return QueuedApiCall(name, invoke, idempotent=True, inline_message_id=name if inline else None)
+
+
+def test_exhausted_inline_edits_fit_inside_the_job_timeout():
+    """A job past its timeout is cancelled and counted as failed, taking the cards behind it along."""
+    per_edit = QUEUED_CALL_ATTEMPTS * BotConfig.model_fields[
+        "api_read_timeout"
+    ].default + QUEUED_CALL_RETRY_BACKOFF_SECONDS * (2 ** (QUEUED_CALL_ATTEMPTS - 1) - 1)
+
+    assert DRAIN_INLINE_EDIT_TIMEOUT_LIMIT * per_edit < JOB_TIMEOUT_SECONDS
+
+
+async def test_inline_read_timeouts_do_not_abandon_unrelated_calls(
+    telegram_api: TelegramApi, no_retry_backoff: AsyncMock
+):
+    """One slow shared card says nothing about the network, so the calls behind it still run."""
+    attempted: list[str] = []
+    calls = [
+        make_drain_call(f"slow_{index}", attempted, read_timeout(), inline=True)
+        for index in range(DRAIN_NETWORK_FAILURE_LIMIT)
+    ]
+    outbox = ApiOutbox(calls=[*calls, make_drain_call("answer_callback_query", attempted)])
+
+    await telegram_api.execute_queued(outbox)
+
+    assert attempted[-1] == "answer_callback_query"
+
+
+async def test_an_inline_read_timeout_leaves_the_network_count_running(
+    telegram_api: TelegramApi, no_retry_backoff: AsyncMock
+):
+    """It proves nothing either way, so it must not clear failures a dead network already counted."""
+    attempted: list[str] = []
+    outbox = ApiOutbox(
+        calls=[
+            make_drain_call("first", attempted, TimedOut()),
+            make_drain_call("second", attempted, TimedOut()),
+            make_drain_call("slow_inline", attempted, read_timeout(), inline=True),
+            make_drain_call("third", attempted, TimedOut()),
+            make_drain_call("never_attempted", attempted),
+        ]
+    )
+
+    await telegram_api.execute_queued(outbox)
+
+    assert "never_attempted" not in attempted
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        with_cause(TimedOut(), httpx.ConnectTimeout("connect")),
+        with_cause(TimedOut(), httpx.WriteTimeout("write")),
+        with_cause(TimedOut(), httpx.PoolTimeout("pool")),
+    ],
+    ids=["connect_timeout", "write_timeout", "pool_timeout"],
+)
+async def test_other_timeouts_on_an_inline_edit_still_count_against_the_network(
+    telegram_api: TelegramApi, no_retry_backoff: AsyncMock, error: Exception
+):
+    """Read as a slow edit, each of these would spare the network count and let the last call run."""
+    attempted: list[str] = []
+    calls = [
+        make_drain_call(f"inline_{index}", attempted, error, inline=True)
+        for index in range(DRAIN_NETWORK_FAILURE_LIMIT)
+    ]
+    outbox = ApiOutbox(calls=[*calls, make_drain_call("abandoned", attempted)])
+
+    await telegram_api.execute_queued(outbox)
+
+    assert len(attempted) == DRAIN_NETWORK_FAILURE_LIMIT * QUEUED_CALL_ATTEMPTS
+    assert "abandoned" not in attempted
+
+
+async def test_the_inline_limit_skips_only_the_remaining_inline_edits(
+    telegram_api: TelegramApi, no_retry_backoff: AsyncMock
+):
+    """The limit keeps a stalled drain bounded while every other delivery still goes out."""
+    attempted: list[str] = []
+    slow = [
+        make_drain_call(f"slow_{index}", attempted, read_timeout(), inline=True)
+        for index in range(DRAIN_INLINE_EDIT_TIMEOUT_LIMIT)
+    ]
+    outbox = ApiOutbox(
+        calls=[*slow, make_drain_call("skipped", attempted, inline=True), make_drain_call("delivered", attempted)]
+    )
+
+    with capture_logs() as logs:
+        await telegram_api.execute_queued(outbox)
+
+    assert "skipped" not in attempted
+    assert attempted[-1] == "delivered"
+    finished = next(entry for entry in logs if entry["event"] == "Post-commit drain finished")
+    assert finished["log_level"] == "info"
+    assert finished["inline_edit_timeouts"] == DRAIN_INLINE_EDIT_TIMEOUT_LIMIT
+    assert finished["skipped_inline_edits"] == 1
+    assert finished["abandoned"] == 0
+    (skip_line,) = [entry for entry in logs if entry["event"] == SKIPPED_INLINE_EDITS_EVENT]
+    assert skip_line["log_level"] == "warning"
+    assert skip_line["reason"] == "inline_edit_timeout_limit"
+    assert skip_line["skipped_inline_message_ids"] == ["skipped"]
+
+
+async def test_the_unreachable_line_names_only_what_the_dead_network_cut_off(
+    telegram_api: TelegramApi, no_retry_backoff: AsyncMock
+):
+    """A card skipped for being slow says nothing about the network, so each line keeps its own list."""
+    attempted: list[str] = []
+    slow = [
+        make_drain_call(f"slow_{index}", attempted, read_timeout(), inline=True)
+        for index in range(DRAIN_INLINE_EDIT_TIMEOUT_LIMIT)
+    ]
+    failing = [make_drain_call(f"down_{index}", attempted, TimedOut()) for index in range(DRAIN_NETWORK_FAILURE_LIMIT)]
+    outbox = ApiOutbox(
+        calls=[
+            *slow,
+            make_drain_call("skipped", attempted, inline=True),
+            *failing,
+            make_drain_call("cut_off", attempted),
+        ]
+    )
+
+    with capture_logs() as logs:
+        await telegram_api.execute_queued(outbox)
+
+    (abort_line,) = [entry for entry in logs if entry["event"] == "Post-commit drain abandoned: Telegram unreachable"]
+    (skip_line,) = [entry for entry in logs if entry["event"] == SKIPPED_INLINE_EDITS_EVENT]
+    assert abort_line["abandoned_calls"] == ["cut_off"]
+    assert skip_line["skipped_inline_message_ids"] == ["skipped"]

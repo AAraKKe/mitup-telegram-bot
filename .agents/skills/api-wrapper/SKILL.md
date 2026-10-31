@@ -58,7 +58,7 @@ By the time the drain runs, the DB state is committed and correct — a failing 
 - `InactiveUserInteraction` (blocked bot / deleted account) → the tg user id is recorded on the outbox; the lifecycle's reconcile transaction marks the user inactive (emitting `INACTIVE_USER_SET`). The drain continues.
 - BadRequest "message is not modified" → success (two updates can render identical content under concurrency).
 - Any other per-call exception, network ones included → logged with the queued call name and its payload (sizes, ids and callback data, never rendered text or labels), plus a `PostCommitApiFault` metric via the adapter, and the drain continues: the remaining entries are independent deliveries to other chats. `log_telegram_failure` writes that line and `Telegram call failed`: `warning` with a `reason` and no traceback for a raw refusal from a private chat (`unreachable_caller_reason`), `error` with its traceback for everything else, a group's refusal included. It never emits the aggregate `Fault`: that is the invocation outcome, the handler is still on its way to completing normally, and a second writer on the shared EMF logger turns the datapoint into an array (see the `monitoring` skill).
-- The drain logs its outcome once (`queued` / `sent` / `failed` / `abandoned`).
+- The drain logs its outcome once (`queued` / `sent` / `failed` / `abandoned` / `skipped_inline_edits` / `inline_edit_timeouts`).
 
 #### The retry policy
 
@@ -74,6 +74,12 @@ A read timeout on a send is therefore **never** retried: Telegram may have deliv
 With short timeouts and a widely-shared meeting, a dead network would otherwise cost one timeout per remaining delivery inside the handler. After `DRAIN_NETWORK_FAILURE_LIMIT` **consecutive** network failures the drain abandons the rest of the queue and logs the abandoned call names. Any non-network outcome (including an unreachable user or an unchanged message — both reached Telegram) resets the counter. The reconcile fix-ups collected before the abort are still applied.
 
 New api methods that enqueue must pass `idempotent=True` only when repeating the call cannot deliver anything twice; the default is the safe answer.
+
+#### Slow inline edits
+
+Telegram can take far longer to edit an inline message than to answer anything else, so one slow shared card says nothing about the network. An inline edit (`QueuedApiCall.inline_message_id` is set) that runs out of attempts on read timeouts neither adds to nor clears the consecutive-failure count. After `DRAIN_INLINE_EDIT_TIMEOUT_LIMIT` of them in one drain, the remaining inline edits are skipped and every other call still runs. The skipped edits go on their own warning line by `inline_message_id`, because `abandoned` names only what a dead network cut off. Connect, write and pool timeouts count as network failures as usual; only `__cause__` tells them apart.
+
+The two limits add up: inline edits that use all their attempts, then network failures, can run a drain past `background_job_timeout_seconds`, and the job is then cancelled and counted as failed. The next render repairs the cards it missed.
 
 ### The reconcile transaction
 

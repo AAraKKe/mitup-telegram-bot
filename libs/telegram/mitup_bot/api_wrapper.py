@@ -90,6 +90,10 @@ CALLBACK_QUERY_TEXT_LIMIT = 200
 QUEUED_CALL_ATTEMPTS = 3
 QUEUED_CALL_RETRY_BACKOFF_SECONDS = 0.25
 DRAIN_NETWORK_FAILURE_LIMIT = 3
+# Telegram can be slow on one inline message while answering everything else, so an inline edit that
+# runs out of attempts on read timeouts leaves the network count alone. After this many the drain
+# skips its remaining inline edits and still runs every other call.
+DRAIN_INLINE_EDIT_TIMEOUT_LIMIT = 3
 
 # httpx failures raised before any byte of the request left this process. PTB wraps every httpx
 # transport error in NetworkError (or TimedOut) and keeps the original as __cause__, which is the
@@ -200,12 +204,15 @@ class QueuedApiCall:
     have been applied: an edit repeats harmlessly ("message is not modified" is swallowed), a
     send would post the message a second time. The closure is opaque by drain time, so only the
     enqueue site can answer this — it defaults to the safe answer.
+
+    ``inline_message_id`` is set on an edit addressed that way, which the drain limits on its own.
     """
 
     name: str
     invoke: Callable[[], Coroutine[Any, Any, object]]
     payload: dict[str, Any] = field(default_factory=dict)
     idempotent: bool = False
+    inline_message_id: str | None = None
 
 
 # Submits with equal keys merge into one background job.
@@ -330,6 +337,7 @@ class DrainOutcome(Enum):
     SENT = auto()
     FAILED = auto()
     NETWORK_FAILED = auto()
+    INLINE_EDIT_TIMED_OUT = auto()
 
 
 @dataclass
@@ -340,13 +348,18 @@ class DrainReport:
     sent: int = 0
     failed: int = 0
     consecutive_network_failures: int = 0
+    inline_edit_timeouts: int = 0
     abandoned: list[str] = field(default_factory=list)
+    skipped_inline_message_ids: list[str] = field(default_factory=list)
 
     def record(self, outcome: DrainOutcome):
         if outcome is DrainOutcome.SENT:
             self.sent += 1
         else:
             self.failed += 1
+        if outcome is DrainOutcome.INLINE_EDIT_TIMED_OUT:
+            self.inline_edit_timeouts += 1
+            return
         self.consecutive_network_failures = (
             self.consecutive_network_failures + 1 if outcome is DrainOutcome.NETWORK_FAILED else 0
         )
@@ -354,6 +367,10 @@ class DrainReport:
     @property
     def network_is_dead(self) -> bool:
         return self.consecutive_network_failures >= DRAIN_NETWORK_FAILURE_LIMIT
+
+    @property
+    def inline_edits_are_stalled(self) -> bool:
+        return self.inline_edit_timeouts >= DRAIN_INLINE_EDIT_TIMEOUT_LIMIT
 
 
 def failure_never_reached_telegram(error: BaseException) -> bool:
@@ -369,6 +386,14 @@ def queued_call_is_retryable(queued: QueuedApiCall, error: NetworkError) -> bool
     """Whether repeating *queued* after *error* is safe: either Telegram never received the
     first attempt, or a second delivery of this call is harmless."""
     return failure_never_reached_telegram(error) or queued.idempotent
+
+
+def network_failure_outcome(queued: QueuedApiCall, error: NetworkError) -> DrainOutcome:
+    """Name the failure the drain counts. PTB raises `TimedOut` for the connect, write and pool
+    timeouts as well, and only `__cause__` tells a read timeout apart."""
+    if queued.inline_message_id is not None and isinstance(error.__cause__, httpx.ReadTimeout):
+        return DrainOutcome.INLINE_EDIT_TIMED_OUT
+    return DrainOutcome.NETWORK_FAILED
 
 
 @dataclass(frozen=True)
@@ -852,14 +877,17 @@ class TelegramApi:
         """Execute the queued calls in order, after the handler's transaction committed.
 
         The action the user took has already landed, so nothing here is reported back to them:
-        every call is attempted, its failure recorded, and the drain never raises. The one bound
-        is the network — after ``DRAIN_NETWORK_FAILURE_LIMIT`` consecutive network failures the
-        rest of the queue is abandoned rather than spending a timeout on each remaining delivery.
+        every call is attempted, its failure recorded, and the drain never raises. Two bounds apply:
+        ``DRAIN_NETWORK_FAILURE_LIMIT`` consecutive network failures abandon the rest of the queue,
+        and ``DRAIN_INLINE_EDIT_TIMEOUT_LIMIT`` slow inline edits skip the inline edits still queued.
         """
         if not outbox.calls:
             return
         report = DrainReport(queued=len(outbox.calls))
         for index, queued in enumerate(outbox.calls):
+            if queued.inline_message_id is not None and report.inline_edits_are_stalled:
+                report.skipped_inline_message_ids.append(queued.inline_message_id)
+                continue
             report.record(await self._drain_queued_call(queued, outbox))
             if report.network_is_dead:
                 report.abandoned = [call.name for call in outbox.calls[index + 1 :]]
@@ -869,12 +897,21 @@ class TelegramApi:
                     abandoned_calls=report.abandoned,
                 )
                 break
+        if report.skipped_inline_message_ids:
+            log.warning(
+                "Post-commit drain skipped inline edits",
+                skipped_inline_message_ids=report.skipped_inline_message_ids,
+                inline_edit_timeouts=report.inline_edit_timeouts,
+                reason="inline_edit_timeout_limit",
+            )
         log.info(
             "Post-commit drain finished",
             queued=report.queued,
             sent=report.sent,
             failed=report.failed,
             abandoned=len(report.abandoned),
+            skipped_inline_edits=len(report.skipped_inline_message_ids),
+            inline_edit_timeouts=report.inline_edit_timeouts,
         )
 
     async def _drain_queued_call(self, queued: QueuedApiCall, outbox: ApiOutbox) -> DrainOutcome:
@@ -894,7 +931,7 @@ class TelegramApi:
             return DrainOutcome.FAILED
         except NetworkError as exc:
             self._record_queued_failure(queued, exc)
-            return DrainOutcome.NETWORK_FAILED
+            return network_failure_outcome(queued, exc)
         except Exception as exc:
             self._record_queued_failure(queued, exc)
             return DrainOutcome.FAILED
@@ -936,9 +973,10 @@ class TelegramApi:
         invoke: Callable[[], Coroutine[Any, Any, object]],
         payload: dict[str, Any] | None = None,
         idempotent: bool = False,
+        inline_message_id: str | None = None,
     ):
         assert self._outbox is not None
-        self._outbox.calls.append(QueuedApiCall(name, invoke, payload or {}, idempotent))
+        self._outbox.calls.append(QueuedApiCall(name, invoke, payload or {}, idempotent, inline_message_id))
 
     async def _call_or_enqueue[T](
         self,
@@ -947,14 +985,15 @@ class TelegramApi:
         default_result: T,
         payload: dict[str, Any] | None = None,
         idempotent: bool = False,
+        inline_message_id: str | None = None,
     ) -> T:
         """Shared mode branch for the public api methods: execute ``invoke`` immediately, or
         under capture enqueue it and return ``default_result``. Callers prepare ``invoke``
         beforehand so validation and view rendering always happen at enqueue time; ``payload``
         is the loggable snapshot of what the call sends, reported when it fails, and
-        ``idempotent`` tells the post-commit drain whether the call may be retried."""
+        ``idempotent`` and ``inline_message_id`` tell the post-commit drain how to treat a failure."""
         if self._outbox is not None:
-            self._enqueue(name, invoke, payload, idempotent)
+            self._enqueue(name, invoke, payload, idempotent, inline_message_id)
             return default_result
         return await self._invoke_logging_failure(name, invoke, payload)
 
@@ -1179,6 +1218,7 @@ class TelegramApi:
             cast("Message | bool", False),
             edit_target_log_payload(target) | view_log_payload(resolved),
             idempotent=True,
+            inline_message_id=target[2],
         )
 
     async def _edit_rich_text_now(self, target: EditTarget, message: RichMessagePayload) -> Message | bool:
@@ -1449,6 +1489,7 @@ class TelegramApi:
                     partial(self._queued_meeting_message_edit, edit, self._outbox),
                     payload,
                     idempotent=True,
+                    inline_message_id=edit.inline_message_id,
                 )
             else:
                 log.info(
