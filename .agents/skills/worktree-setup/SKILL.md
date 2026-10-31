@@ -55,7 +55,7 @@ After it finishes, print a reminder of the non-automatic steps (below) so the us
 
 These steps need external services — running them automatically from the skill creates a failure surface the skill can't recover from (Docker not running, Postgres not started). The skill reports them as next steps and stops.
 
-- **Start the local database.** Run `uv run mb db up` to start the Postgres container and wait for it to be healthy. Credentials are hardcoded in `docker-compose.yaml` for the container, and in the just-copied `dev.toml` for host runs.
+- **Start the local database.** Run `uv run mb db up` to start the Postgres container and wait for it to be healthy. Credentials are hardcoded in `docker-compose.yaml` for the container, and in the just-copied `dev.toml` for host runs. Docker publishes each checkout's Postgres on a free host port, so worktrees never collide; `uv run mb db port` prints it. Never copy `docker-compose.override.yaml` into a worktree: it pins the main checkout's fixed port.
 
 - **Apply pending migrations.** Once Postgres is reachable:
 

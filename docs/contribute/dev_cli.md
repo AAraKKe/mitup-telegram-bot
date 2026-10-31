@@ -33,6 +33,7 @@ Three groups drive the local stack: the database, the apps, and the docker compo
 
 ```bash
 uv run mb db up             # start Postgres and wait until it's healthy
+uv run mb db port           # print the port it runs on, for a database client
 uv run mb db migrate up     # apply pending migrations
 uv run mb db migrate down   # roll back one migration
 uv run mb db migrate new "add reminder column"   # scaffold an empty revision

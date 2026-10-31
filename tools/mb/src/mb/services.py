@@ -38,8 +38,8 @@ def bot(
         compose.ensure_uv_cache_volume()
         service = "debug" if debug else "mitup"
         raise typer.Exit(runner.run_command(["docker", "compose", "up", service]))
-    exit_code = runner.uv(*DEBUGPY_ARGS) if debug else runner.uv("python", "-m", BOT_MODULE, "launch")
-    raise typer.Exit(exit_code)
+    launch_args = DEBUGPY_ARGS if debug else ["python", "-m", BOT_MODULE, "launch"]
+    raise typer.Exit(runner.uv(*launch_args, extra_env=compose.host_database_env()))
 
 
 @run_app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -51,7 +51,8 @@ def events(
     if docker:
         compose.ensure_uv_cache_volume()
         raise typer.Exit(runner.run_command(["docker", "compose", "up", "events"]))
-    raise typer.Exit(runner.uv("python", "-m", EVENTS_MODULE, "recurrent-events", *ctx.args))
+    worker_args = ["python", "-m", EVENTS_MODULE, "recurrent-events", *ctx.args]
+    raise typer.Exit(runner.uv(*worker_args, extra_env=compose.host_database_env()))
 
 
 @docker_app.command()

@@ -164,9 +164,8 @@ class DbConfig(BaseModel):
         str,
         Sample(
             "postgres",
-            comment='"postgres" works when the bot runs inside docker compose. To run the bot on the host '
-            'instead, use url = "localhost" and port = 5444 (docker-compose.yaml maps host port 5444 to '
-            "the container's 5432).",
+            comment='"postgres" works when the bot runs inside docker compose. `uv run mb run bot` on the '
+            "host replaces it with the address of this checkout's Postgres when that is running.",
         ),
     ]
     database: Annotated[str, Sample("mitup")]

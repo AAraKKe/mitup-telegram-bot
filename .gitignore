@@ -24,6 +24,10 @@ report.xml
 # Database files
 postgres-data
 
+# Local compose overrides, such as a fixed Postgres port for a database client
+compose.override.y*ml
+docker-compose.override.y*ml
+
 # Ignroe idea folder
 .idea
 

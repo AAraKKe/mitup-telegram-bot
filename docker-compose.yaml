@@ -41,13 +41,14 @@ services:
 
   postgres:
     image: postgres:18.4
-    restart: always
     environment:
       POSTGRES_USER: mitupbot
       POSTGRES_PASSWORD: 12345pass
       POSTGRES_DB: mitup
     ports:
-      - 5444:5432
+      # Port 0 lets Docker pick a free host port, so every checkout can run its own database.
+      # `uv run mb db port` prints it; a docker-compose.override.yaml can pin a fixed one.
+      - "127.0.0.1:0:5432"
     volumes:
       - ./postgres-data:/var/lib/postgresql
     healthcheck:

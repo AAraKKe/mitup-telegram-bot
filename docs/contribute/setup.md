@@ -72,7 +72,18 @@ uv run mb db up
 uv run mb db migrate up
 ```
 
-`mb db up` starts the Postgres container and waits until it reports healthy. `mb db migrate up` runs every pending migration. The container keeps its data in a local `./postgres-data` volume, so the schema and rows survive restarts.
+`mb db up` starts the Postgres container and waits until it reports healthy. `mb db migrate up` runs every pending migration. The container keeps its data in a local `./postgres-data` volume, so the schema and rows survive restarts. Postgres stays stopped after Docker restarts, so run `mb db up` again to bring it back.
+
+Docker gives each checkout's Postgres a free port on your machine, so several worktrees can each run their own database. `uv run mb db port` prints it, and `mb run` finds it for you. It changes whenever the container restarts, so a database client works better with a fixed port. Pin one in a `docker-compose.override.yaml` next to `docker-compose.yaml`. Git ignores the override file:
+
+```yaml
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:5444:5432"
+```
+
+Only one checkout can hold a fixed port at a time, so keep this file in the checkout you test from.
 
 ## Launch Mitup
 

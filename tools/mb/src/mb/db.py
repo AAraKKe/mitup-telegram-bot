@@ -2,7 +2,7 @@ from typing import Annotated
 
 import typer
 
-from . import compose, migrate_ops, runner
+from . import compose, console, migrate_ops, runner
 
 app = typer.Typer(no_args_is_help=True, help="Local database lifecycle.")
 migrate_app = typer.Typer(no_args_is_help=True, help="Alembic migrations.")
@@ -30,6 +30,16 @@ def up():
     """Start the local Postgres container and wait until it is healthy."""
     start_command = ["docker", "compose", "up", "-d", "--wait", "postgres"]
     raise typer.Exit(runner.run_step("Starting Postgres (docker compose)", start_command))
+
+
+@app.command()
+def port():
+    """Print the host port of this checkout's Postgres."""
+    host_port = compose.postgres_host_port()
+    if host_port is None:
+        console.error("Postgres is not running in this checkout. Start it with `uv run mb db up`.")
+        raise typer.Exit(1)
+    console.raw(str(host_port))
 
 
 @app.command()

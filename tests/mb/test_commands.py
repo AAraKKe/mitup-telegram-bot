@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,11 @@ from typer.testing import CliRunner
 from mb import console, runner
 
 cli = CliRunner()
+
+
+@pytest.fixture
+def docker_on_path(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(shutil, "which", lambda command: f"/usr/bin/{command}")
 
 
 def test_help_hides_the_ci_group(recorder: CommandRecorder):
@@ -77,6 +83,7 @@ def test_migrate_down_defaults_to_one_step(recorder: CommandRecorder):
 
 
 COMPOSE_MIGRATIONS_RUN = ["docker", "compose", "run", "--rm", "migrations-upgrade"]
+COMPOSE_POSTGRES_PORT = ["docker", "compose", "port", "postgres", "5432"]
 UV_CACHE_VOLUME_CREATE = ["docker", "volume", "create", "mitup-bot-uv-cache"]
 
 
@@ -96,6 +103,40 @@ def test_migrate_up_defaults_to_head(recorder: CommandRecorder):
         UV_CACHE_VOLUME_CREATE,
         [*COMPOSE_MIGRATIONS_RUN, "uv", "run", "alembic", "upgrade", "head"],
     ]
+
+
+def test_db_port_prints_the_published_port(recorder: CommandRecorder, docker_on_path: None):
+    recorder.captured_outputs["compose port postgres 5432"] = "127.0.0.1:55000\n"
+
+    result = cli.invoke(app, ["db", "port"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == "55000"
+    assert recorder.commands == [COMPOSE_POSTGRES_PORT]
+
+
+def test_db_port_ignores_compose_warnings_in_the_captured_output(recorder: CommandRecorder, docker_on_path: None):
+    recorder.captured_outputs["compose port postgres 5432"] = "127.0.0.1:55000\nWARN[0000] a compose warning\n"
+
+    result = cli.invoke(app, ["db", "port"])
+
+    assert result.output.strip() == "55000"
+
+
+def test_db_port_fails_when_postgres_is_not_running(recorder: CommandRecorder, docker_on_path: None):
+    recorder.exit_codes["compose port postgres 5432"] = 1
+    recorder.captured_outputs["compose port postgres 5432"] = 'service "postgres" is not running'
+
+    result = cli.invoke(app, ["db", "port"])
+
+    assert result.exit_code == 1
+
+
+def test_db_port_fails_without_docker(recorder: CommandRecorder):
+    result = cli.invoke(app, ["db", "port"])
+
+    assert result.exit_code == 1
+    assert recorder.commands == []
 
 
 def test_db_reset_drops_schema_then_migrates(recorder: CommandRecorder):
@@ -133,10 +174,32 @@ def test_db_up_waits_for_health(recorder: CommandRecorder):
     assert recorder.commands == [["docker", "compose", "up", "-d", "--wait", "postgres"]]
 
 
-def test_run_bot_local(recorder: CommandRecorder):
+@pytest.mark.parametrize("app_command", ["bot", "events"])
+def test_host_run_targets_the_postgres_of_this_checkout(
+    app_command: str, recorder: CommandRecorder, docker_on_path: None
+):
+    recorder.captured_outputs["compose port postgres 5432"] = "127.0.0.1:55000\n"
+
+    cli.invoke(app, ["run", app_command])
+
+    assert recorder.calls[-1].extra_env == {"MITUPBOT__DB__URL": "127.0.0.1", "MITUPBOT__DB__PORT": "55000"}
+
+
+def test_host_run_keeps_the_configured_database_when_postgres_is_not_running(
+    recorder: CommandRecorder, docker_on_path: None
+):
+    recorder.exit_codes["compose port postgres 5432"] = 1
+
+    cli.invoke(app, ["run", "bot"])
+
+    assert recorder.calls[-1].extra_env is None
+
+
+def test_run_inside_a_container_keeps_the_configured_database(recorder: CommandRecorder):
     cli.invoke(app, ["run", "bot"])
 
     assert recorder.commands == [["uv", "run", "python", "-m", "mitup_bot.bot_cli", "launch"]]
+    assert recorder.calls[-1].extra_env is None
 
 
 def test_run_bot_debug_uses_debugpy(recorder: CommandRecorder):
