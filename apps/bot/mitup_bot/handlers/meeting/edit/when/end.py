@@ -52,6 +52,17 @@ def card_month(meeting: Meetup) -> dt.date:
     return rules.safe_anchor_date(meeting.end_datetime or meeting.datetime, meeting.owner.now_in_tz())
 
 
+def store_end_flow(context: TMitupContext, meeting: Meetup, lang: str):
+    """Keep what the typed-input steps read: the meeting, and the notice an interrupted flow shows."""
+    context.store_meeting_id(ContextId.EDIT_MEETING_END, meeting.db_id)
+    context.store_on_exit(
+        ContextId.EDIT_MEETING_END,
+        MeetingEditDurationMessages.ON_EXIT,
+        cb.CANCEL_END_EDIT.with_id(meeting.db_id),
+        lang=lang,
+    )
+
+
 async def show_end_card(
     context: TMitupContext,
     update: Update,
@@ -65,13 +76,7 @@ async def show_end_card(
     """Draw the card and register the flow's context, which the typed-input handlers read the
     meeting from. ``as_reply`` sends a fresh card instead of editing, for the paths answering a
     typed message, where the bot's screen must land below the user's text."""
-    context.store_meeting_id(ContextId.EDIT_MEETING_END, meeting.db_id)
-    context.store_on_exit(
-        ContextId.EDIT_MEETING_END,
-        MeetingEditDurationMessages.ON_EXIT,
-        cb.CANCEL_END_EDIT.with_id(meeting.db_id),
-        lang=lang,
-    )
+    store_end_flow(context, meeting, lang)
     view = screens.end_datetime_card(meeting, lang, month=month or card_month(meeting), error=error)
     if as_reply:
         await context.api.send_message(update=update, view=view)
@@ -253,6 +258,9 @@ async def callback_query_pick_end_date(
     if await refuse_without_start_time(context, update, user, meeting):
         return ConversationHandler.END
 
+    # This tap may be what revives the flow, and a refused date stays in it.
+    store_end_flow(context, meeting, user.lang)
+
     lang = user.lang
     if meeting.end_datetime is None:
         proposed_end = local_to_utc(callback_data.date, dt.time(23, 59), meeting.timezone)
@@ -307,13 +315,7 @@ async def callback_query_open_end_time_prompt(
         return ConversationHandler.END
 
     lang = meeting.lang
-    context.store_meeting_id(ContextId.EDIT_MEETING_END, meeting.db_id)
-    context.store_on_exit(
-        ContextId.EDIT_MEETING_END,
-        MeetingEditDurationMessages.ON_EXIT,
-        cb.CANCEL_END_EDIT.with_id(meeting.db_id),
-        lang=lang,
-    )
+    store_end_flow(context, meeting, lang)
     await context.api.edit_message(
         update=update, view=screens.time_prompt_view(lang, cb.REOPEN_END_EDITOR.with_id(meeting.db_id))
     )

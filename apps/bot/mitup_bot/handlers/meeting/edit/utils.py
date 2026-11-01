@@ -62,6 +62,7 @@ def cleanup_states(context: TMitupContext):
             ContextId.REPLACE_MEETING_IMAGE,
         ]
     )
+    context.end_conversations()
 
 
 # One event name covers every tap on a navigation button no current screen renders, so a single

@@ -44,6 +44,9 @@ async def existing_user_start(
     Every branch reads `user.lang` and nothing that traverses the meetups/joined_links collections,
     so the user is loaded without them.
     """
+    # Reached only when no live conversation's fallback claimed the command, so any flow ends here.
+    context.clean_all_user_data(reason="command_navigation")
+
     user = await guards.current_user(update, session)
     ctx = guards.render_context(user, update, context)
 

@@ -342,7 +342,7 @@ msgid "CommonMessages.PRIVATE_CHAT_ONLY_ALERT"
 msgstr "Mitup non está feito para chats de grupo. Abre un chat privado comigo para continuar e, se me engadiron a este chat, sácame, por favor."
 
 msgid "CommonMessages.CONTEXT_LOST"
-msgstr "<b>Vaia, perdemos o fío!</b>\n\nO bot tivo unha actualización interna rápida e esqueceu en que punto do proceso estabas. Todo o que gardaches está a salvo. Por favor, comeza de novo o que estabas a facer desde o menú de abaixo."
+msgstr "<b>Vaia, perdemos o fío!</b>\n\nNon podo continuar desde onde o deixaches. Todo o que gardaches está a salvo, pero o que non remataches non se gardou, así que, por favor, comézao de novo desde o menú de abaixo."
 
 msgid "CommonMessages.OLD_VERSION_MESSAGE"
 msgstr "Esta mensaxe é dunha versión antiga de Mitup, así que os seus botóns xa non funcionan. A túa conta e as túas quedadas están seguras. Abre o menú principal para continuar."

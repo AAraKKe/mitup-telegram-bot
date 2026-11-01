@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum, StrEnum, auto
 from time import perf_counter
+from typing import Any
 from warnings import filterwarnings
 
 import structlog
@@ -307,6 +308,26 @@ class HandlerWrapper:
 
     def is_conversation(self) -> bool:
         return isinstance(self.handler, ConversationHandler)
+
+
+class SoleConversationHandler(ConversationHandler[MitupContext]):
+    """A conversation that ends the person's default-group conversations whenever it is left live.
+
+    PTB gives an update to the first match in a group, so a second live conversation would take this
+    one's text; ending them after the handler ran keeps the current flow when this one refuses to open.
+    """
+
+    __slots__ = ()
+
+    async def handle_update(
+        self, update: Update, application: Application, check_result: Any, context: MitupContext
+    ) -> object | None:
+        # Onboarding claims its updates with ApplicationHandlerStop, raised after PTB applied the state.
+        try:
+            return await super().handle_update(update, application, check_result, context)
+        finally:
+            if self._get_key(update) in self._conversations:
+                context.end_conversations(keep=self)
 
 
 class UnhandledHandlerId(HandlerId):
@@ -625,7 +646,7 @@ class HandlersRegistry:
             raise HandlerNotRegistered(missing_handlers)
 
         cls.handlers[handler_id] = HandlerWrapper(
-            ConversationHandler(
+            SoleConversationHandler(
                 entry_points=[cls.handlers[name].handler for name in entry_points_handler_names],
                 states={
                     state: [cls.handlers[name].handler for name in state_handlers]

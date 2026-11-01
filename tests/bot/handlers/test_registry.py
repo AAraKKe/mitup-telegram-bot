@@ -679,6 +679,45 @@ def test_a_command_is_matched_only_in_the_private_chat(
     ClearableRegistry.clear()
 
 
+def test_no_conversation_state_takes_a_command_as_its_input():
+    """A state handler that matched a command would save it as the value the step asks for, and the
+    conversation's fallback would never answer it."""
+    command = create_update(UpdateRequest(command="start"))
+
+    takes_a_command = [
+        handler.callback
+        for wrapper in HandlersRegistry.handlers.values()
+        if wrapper.is_conversation()
+        for state_handlers in cast(ConversationHandler, wrapper.handler).states.values()
+        for handler in state_handlers
+        if isinstance(handler, MessageHandler) and handler.check_update(command)
+    ]
+
+    assert takes_a_command == []
+
+
+def test_every_conversation_has_a_key_end_conversations_can_build():
+    """`end_conversations` builds the key from the user alone, which holds while a per-chat
+    conversation can only open in the person's private chat."""
+    conversations = {
+        handler_id: cast(ConversationHandler, wrapper.handler)
+        for handler_id, wrapper in HandlersRegistry.handlers.items()
+        if wrapper.is_conversation()
+    }
+
+    assert all(conversation.per_user and not conversation.per_message for conversation in conversations.values())
+    assert {handler_id for handler_id, conversation in conversations.items() if not conversation.per_chat} == {
+        MeetingHandlerId.INVITE_USERS_CONVERSATION
+    }
+    assert all(
+        wrapper.private_chat_only
+        for conversation in conversations.values()
+        if conversation.per_chat
+        for wrapper in HandlersRegistry.handlers.values()
+        if wrapper.handler in conversation.entry_points
+    )
+
+
 @pytest.mark.parametrize("chat, private_chat_only, matches", CHAT_MATCHES, ids=["private", "group", "group_opted_out"])
 def test_a_message_is_matched_only_in_the_private_chat(chat: Chat, private_chat_only: bool, matches: bool):
     """An administrator bot is handed every message of the group, and the text handlers of the

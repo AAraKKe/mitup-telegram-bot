@@ -244,7 +244,7 @@ may emit it.
 *Exactly* once, because `MitupCriticalFaultRate` uses `Fault`'s **SampleCount as its request
 denominator** and both ECS `deployment_alarms` blocks read it. An exit path that returns without
 emitting does not report "no fault" — it removes the invocation from the denominator and inflates
-the rate, and the benign classifications (a suppressed Telegram error, a lost conversation context)
+the rate, and the benign classifications (a suppressed Telegram error, a meeting-guard rejection)
 arrive in a burst during exactly the rolling deploy that is reading the alarm. So the error handler
 **returns** a `FaultOutcome` classification and the registry emits the one sample.
 

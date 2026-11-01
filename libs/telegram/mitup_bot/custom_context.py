@@ -6,7 +6,7 @@ from typing import Any, Generic, TypeVar
 
 import structlog
 from telegram import Update
-from telegram.ext import Application, CallbackContext, ExtBot
+from telegram.ext import Application, CallbackContext, ConversationHandler, ExtBot
 
 from mitup_bot import card_refresh
 from mitup_bot.api_wrapper import TelegramApi, TelegramApiWrapper
@@ -322,7 +322,7 @@ class MitupContext(
             self.log.debug("User data context cleaned", context_id=context.value)
 
     def clean_all_user_data(self, reason: str):
-        """Drop every stored conversation context, naming what prompted it.
+        """Drop all stored conversation context and end the conversations reading it, naming what prompted it.
 
         This discards state the user is in the middle of, so it is the first thing to check when
         someone reports that the bot forgot what they were doing. `reason` is required because the
@@ -336,6 +336,34 @@ class MitupContext(
         self.user_data.registry.clear()
         self.user_data.active_context = None
         self.log.info("User conversation data cleared", contexts_cleared=contexts_cleared, reason=reason)
+        self.end_conversations()
+
+    def end_conversations(self, *, keep: ConversationHandler | None = None):
+        """End this person's conversations in the default handler group, except `keep`.
+
+        Conversations run in the person's private chat, whose id is their user id, so the key holds
+        for an update from a group or from an inline message, which names no chat.
+        """
+        user = self.get_update().effective_user
+        assert user is not None, "only an update from a person can reach a conversation"
+
+        conversations_ended = []
+        # PTB's default group is 0 and it has no public name. Onboarding binds outside it, so ending
+        # conversations leaves onboarding live.
+        for handler in self.application.handlers.get(0, []):
+            if not isinstance(handler, ConversationHandler) or handler is keep:
+                continue
+            key = (user.id, user.id) if handler.per_chat else (user.id,)
+            # PTB has no public way to end a conversation from outside it.
+            if handler._conversations.pop(key, None) is not None:
+                conversations_ended.append(handler.name)
+
+        if conversations_ended:
+            self.log.info(
+                "Conversations ended",
+                conversations_ended=conversations_ended,
+                reason="another_conversation_entered" if keep else "context_cleared",
+            )
 
     def prepare_handler_metrics(
         self,

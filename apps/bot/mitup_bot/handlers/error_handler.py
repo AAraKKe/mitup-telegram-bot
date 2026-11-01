@@ -519,10 +519,9 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
         await handle_meeting_access_error(context, error)
         return HANDLED_OUTCOME
 
-    # Context loss is an expected consequence of holding conversation state in memory (a rolling
-    # deploy wipes user_data mid-flow, or flow-shaped input arrives with no active flow), not a code
-    # fault. It gets its own metric and bypasses the fault alarms; the user is redirected to the
-    # main menu with a friendly note explaining their saved data is safe.
+    # A step's stored context is missing while its conversation is live. A restart cannot cause
+    # this, as conversation state and user data sit in memory and go together; the backstop has its
+    # own metric, bypasses the fault alarms and leaves the user on the main menu.
     if isinstance(error, ContextPropertyNotSetError):
         log.warning(CONTEXT_LOST_EVENT, exc_info=error, reason=RecoveryReason.CONVERSATION_CONTEXT_MISSING.value)
         context.emit_metric(MetricKey.CONTEXT_LOST, 1)

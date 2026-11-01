@@ -203,7 +203,7 @@ async def show(session: AsyncSession, update: Update, context: TMitupContext):
     # ... proceed with meeting
 ```
 
-A rejection aborts the handler mid-body, so anything that must happen regardless of the outcome — clearing conversation state, for instance — runs **before** the guard. A conversation handler that is aborted this way returns no state, which leaves the user in the state they were already in; that is what every other guard exception does too.
+A rejection aborts the handler mid-body, so anything that must happen regardless of the outcome, such as clearing conversation state, runs **before** the guard. A conversation handler aborted this way ends its conversation: the registry answers every handled error with `ConversationHandler.END`, because the screen it leaves the user on navigates elsewhere. A conversation entry that is refused this way never goes live, so any other flow the user has open stays as it was.
 
 ## Failure mode registration
 

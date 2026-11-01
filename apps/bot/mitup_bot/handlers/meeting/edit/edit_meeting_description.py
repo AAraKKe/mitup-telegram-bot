@@ -108,7 +108,9 @@ async def callback_query_edit_meeting_description(session: AsyncSession, update:
     return ConversationMeetingState.EDIT_DESCRIPTION
 
 
-@HandlersRegistry.register_message(EditMeetingHandlerId.DESCRIPTION_MESSAGE, filters.TEXT, bindable=False)
+@HandlersRegistry.register_message(
+    EditMeetingHandlerId.DESCRIPTION_MESSAGE, filters.TEXT & ~filters.COMMAND, bindable=False
+)
 @with_session(write=True)
 async def edit_description_meeting_message_handler(session: AsyncSession, update: Update, context: TMitupContext):
     message = guards.message(update)

@@ -64,12 +64,9 @@ async def recover_from_lost_context(
 ) -> int:
     """Close the flow whose stored state is gone and leave the user on the main menu.
 
-    In-memory conversation state does not survive a rolling deploy, so a flow that no longer finds
-    its stored id is an expected state the handler recovers from, not a code fault: it is logged at
-    the level and under the event name the central error handler uses for the losses that reach it,
-    and it feeds the same `CONTEXT_LOST` series so the metric counts the condition wherever it is
-    caught. The id the flow was looking for is the missing one, so the line carries the context slot
-    that was empty instead.
+    This is the backstop for a step whose stored context is missing while its conversation is live;
+    a restart cannot cause it, as conversation state and user data sit in memory and go together. It
+    is logged and counted like the losses that reach the central error handler, naming the empty slot.
     """
     log.warning(
         CONTEXT_LOST_EVENT,

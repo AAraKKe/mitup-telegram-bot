@@ -40,6 +40,17 @@ def card_month(meeting: Meetup) -> dt.date:
     return rules.safe_anchor_date(meeting.datetime, meeting.owner.now_in_tz())
 
 
+def store_start_flow(context: TMitupContext, meeting: Meetup, lang: str):
+    """Keep what the typed-input steps read: the meeting, and the notice an interrupted flow shows."""
+    context.store_meeting_id(ContextId.EDIT_MEETING_START, meeting.db_id)
+    context.store_on_exit(
+        ContextId.EDIT_MEETING_START,
+        MeetingEditDateTimeMessages.ON_EXIT,
+        cb.CANCEL_START_EDIT.with_id(meeting.db_id),
+        lang=lang,
+    )
+
+
 async def show_start_card(
     context: TMitupContext,
     update: Update,
@@ -53,13 +64,7 @@ async def show_start_card(
     """Draw the card and register the flow's context, which the typed-input handlers read the
     meeting from. ``as_reply`` sends a fresh card instead of editing, for the paths answering a
     typed message, where the bot's screen must land below the user's text."""
-    context.store_meeting_id(ContextId.EDIT_MEETING_START, meeting.db_id)
-    context.store_on_exit(
-        ContextId.EDIT_MEETING_START,
-        MeetingEditDateTimeMessages.ON_EXIT,
-        cb.CANCEL_START_EDIT.with_id(meeting.db_id),
-        lang=lang,
-    )
+    store_start_flow(context, meeting, lang)
     view = screens.start_datetime_card(meeting, lang, month=month or card_month(meeting), error=error)
     if as_reply:
         await context.api.send_message(update=update, view=view)
@@ -209,6 +214,9 @@ async def callback_query_pick_start_date(
     meeting = await guards.meeting(session, user, callback_data.id, "pick_start_date", context)
     lang = meeting.lang
 
+    # This tap may be what revives the flow, and a refused date stays in it.
+    store_start_flow(context, meeting, lang)
+
     if meeting.datetime is None:
         proposed_start = local_to_utc(callback_data.date, dt.time(23, 59), meeting.timezone)
         input_source = "calendar_first_pick"
@@ -265,13 +273,7 @@ async def callback_query_open_start_time_prompt(
     meeting = await guards.meeting(session, user, callback_data.id, "open_start_time_prompt", context)
     lang = meeting.lang
 
-    context.store_meeting_id(ContextId.EDIT_MEETING_START, meeting.db_id)
-    context.store_on_exit(
-        ContextId.EDIT_MEETING_START,
-        MeetingEditDateTimeMessages.ON_EXIT,
-        cb.CANCEL_START_EDIT.with_id(meeting.db_id),
-        lang=lang,
-    )
+    store_start_flow(context, meeting, lang)
     await context.api.edit_message(
         update=update, view=screens.time_prompt_view(lang, cb.REOPEN_START_EDITOR.with_id(meeting.db_id))
     )

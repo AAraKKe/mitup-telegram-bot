@@ -342,7 +342,7 @@ msgid "CommonMessages.PRIVATE_CHAT_ONLY_ALERT"
 msgstr "Mitup ist nicht für Gruppenchats gemacht. Öffne einen privaten Chat mit mir, um weiterzumachen, und wenn ich zu diesem Chat hinzugefügt wurde, entferne mich bitte."
 
 msgid "CommonMessages.CONTEXT_LOST"
-msgstr "<b>Entschuldigung, wir haben den Faden verloren!</b>\n\nDer Bot hatte ein kurzes internes Update und hat vergessen, wo du gerade warst. Alles, was du gespeichert hast, ist sicher. Bitte starte über das Menü unten noch einmal das, was du gerade gemacht hast."
+msgstr "<b>Entschuldigung, wir haben den Faden verloren!</b>\n\nIch kann nicht dort weitermachen, wo du aufgehört hast. Alles, was du gespeichert hast, ist sicher, aber was noch nicht fertig war, wurde nicht gespeichert. Starte es also bitte über das Menü unten noch einmal."
 
 msgid "CommonMessages.OLD_VERSION_MESSAGE"
 msgstr "Diese Nachricht stammt aus einer älteren Version von Mitup, deshalb funktionieren ihre Buttons nicht mehr. Dein Konto und deine Treffen sind sicher. Öffne das Hauptmenü, um weiterzumachen."

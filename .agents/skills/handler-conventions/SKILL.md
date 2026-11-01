@@ -68,6 +68,22 @@ async def show(session: AsyncSession, update: Update, context: MitupContext):
   <rule>Wrong-input catch-all handlers (where both TEXT and ~TEXT variants call the same fallback) SHOULD use a single handler with `~filters.COMMAND` instead of two separate handlers. This still excludes commands so they fall through to the conversation fallback. Place the catch-all last in the state handler list.</rule>
 </critical_rules>
 
+### One live conversation per person
+
+Every conversation except onboarding shares the default handler group and PTB gives an update to the first one that matches, so a live conversation claims text ahead of any conversation bound after it. Two rules keep that from mattering:
+
+- **A person has one live conversation.** When a handler leaves a conversation live, every other conversation of that person ends. This happens after the handler ran, so an entry that refuses (a reached cap, a guard rejection) leaves any other flow the person has open intact. Updates are serialized per person and chat, so a tap in a group can interleave with a private-chat update of the same person; the rule does not cover that race.
+- **A state never outlives its context.** Whatever clears conversation context also ends conversations: `clean_all_user_data` and `cleanup_states` both do. A handler that clears context from inside a conversation returns `ConversationHandler.END`, or stores everything the state it returns reads, because the state it returns is what PTB applies last.
+
+Onboarding binds in `REGISTRATION_HANDLERS_GROUP`, ahead of the default group, and claims its updates. Entering it ends the person's other conversations, and `end_conversations` walks the default group only, so clearing context leaves onboarding live; only onboarding's own handlers end it. A conversation opened while onboarding is live does not end it: onboarding keeps claiming the person's messages, and its next update that stays live ends that conversation.
+
+To end conversations from anywhere else, call `context.end_conversations()`. Its `keep` argument is for the registry. It does not cancel PTB timeout jobs, so a conversation that sets `conversation_timeout` has to handle that.
+
+<critical_rules>
+  <rule>A button that must keep working once its conversation has ended or another one has started is an entry point, not a state handler. A dead state-only button is answered by `answer_stale_conversation_button`, or by `stale_cancel` for `action="cancel"`, which means it stops working.</rule>
+  <rule>Every path that returns a live state stores the context that state's handlers read before it returns, entry points included. An entry point can run with nothing stored, on a tap from an old message.</rule>
+</critical_rules>
+
 ## Filters
 
 Handlers accept PTB `BaseFilter` instances to narrow which updates they process. Custom filters are in `personal_filters.py` (e.g., `PositiveNumberFilter`).

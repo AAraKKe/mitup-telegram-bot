@@ -313,11 +313,11 @@ class CommonMessages(MessageBase):
         "Mitup isn't made for group chats. Open a private chat with me to keep going, and if I was added "
         "to this chat, please remove me."
     )
-    # Shown when in-memory conversation state was lost (e.g. after a rolling deploy mid-flow)
+    # Shown above the main menu when a flow step finds its stored data missing while its conversation
+    # is live. The flow ends there, so the copy promises only what was saved, not what was typed into it.
     CONTEXT_LOST = (
-        "<b>Sorry, we lost our place!</b>\n\nThe bot had a quick internal update and forgot where you "
-        "were in the process. Everything you saved is safe. Please start what you were doing again from "
-        "the menu below."
+        "<b>Sorry, we lost our place!</b>\n\nI can't pick up where you left off. Everything you saved is safe, but "
+        "anything you hadn't finished wasn't saved, so please start it again from the menu below."
     )
     # Answers a tap on a button rendered by the bot Mitup replaced. It is shown both as a screen
     # (with a main-menu button under it) and as a plain callback-query alert, so it must stay
