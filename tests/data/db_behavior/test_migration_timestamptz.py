@@ -1,5 +1,4 @@
 import importlib.util
-from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -34,7 +33,6 @@ MIGRATION = load_migration()
 CONVERTED_COLUMNS = {(table, column) for table, columns in MIGRATION.TIMESTAMP_COLUMNS.items() for column in columns}
 ALREADY_ZONED_COLUMNS = {("meetups", "datetime"), ("migration_audit", "created_at")}
 
-SCRATCH_DATABASE = "timestamptz_migration_probe"
 # Clocks in Pacific/Auckland skip 02:00-03:00 on 2026-09-27 and repeat 02:00-03:00 on 2026-04-05.
 DAYLIGHT_SAVING_GAP = "2026-09-27 02:30:00.000000"
 DAYLIGHT_SAVING_FOLD = "2026-04-05 02:30:00.000000"
@@ -81,29 +79,6 @@ INSERT_PROBE_ROWS = [
 ]
 
 
-@pytest.fixture
-def scratch_database(live_db_config: DbConfig, monkeypatch: pytest.MonkeyPatch) -> Generator[DbConfig]:
-    """A throwaway database in the suite's container, with Alembic pointed at it."""
-    admin_engine = create_engine(build_db_url(live_db_config), isolation_level="AUTOCOMMIT")
-    with admin_engine.connect() as admin:
-        admin.execute(text(f"CREATE DATABASE {SCRATCH_DATABASE}"))
-    scratch_config = live_db_config.model_copy(update={"database": SCRATCH_DATABASE})
-    for name, value in {
-        "MITUPBOT__DB__USERNAME": scratch_config.username,
-        "MITUPBOT__DB__PASSWORD": scratch_config.password.get_secret_value(),
-        "MITUPBOT__DB__URL": scratch_config.url,
-        "MITUPBOT__DB__DATABASE": scratch_config.database,
-        "MITUPBOT__DB__PORT": str(scratch_config.port),
-    }.items():
-        monkeypatch.setenv(name, value)
-    try:
-        yield scratch_config
-    finally:
-        with admin_engine.connect() as admin:
-            admin.execute(text(f"DROP DATABASE IF EXISTS {SCRATCH_DATABASE} WITH (FORCE)"))
-        admin_engine.dispose()
-
-
 def read_wall_clocks(connection: Connection, rendering: str) -> dict[tuple[str, str], str | None]:
     """Each probed column's value as PostgreSQL renders it through *rendering*, a template on `{column}`."""
     return {
@@ -140,7 +115,7 @@ def test_conversion_keeps_every_instant_when_the_database_runs_in_another_zone(s
     engine = create_engine(build_db_url(scratch_database), poolclass=NullPool)
     try:
         with engine.begin() as connection:
-            connection.execute(text(f"ALTER DATABASE {SCRATCH_DATABASE} SET timezone = 'Pacific/Auckland'"))
+            connection.execute(text(f"ALTER DATABASE {scratch_database.database} SET timezone = 'Pacific/Auckland'"))
         with engine.begin() as connection:
             assert connection.execute(text("SHOW TIME ZONE")).scalar_one() == "Pacific/Auckland"
             values = {f"{table}_{column}": value for (table, column), value in STORED_WALL_CLOCKS.items()}

@@ -124,6 +124,8 @@ A migration that mutates data in bulk uses `helpers.execute_bulk(revision, "<sho
 
 Migrations run (`alembic upgrade head`, via the migrations Lambda) **before** the new app images roll, against the still-running previous code — and a rolled-back ECS deploy does **not** undo them, so it runs the *previous* image against the *new* schema. Every migration must therefore be backward-compatible with the currently-deployed image.
 
+Each revision commits in its own transaction (`transaction_per_migration` in `env.py`), so the locks it takes end with it. A failed `upgrade` leaves the revisions before the failure applied and a retry resumes from there, so each revision must be safe to stop after.
+
 The bot and the recurrent-events services share **one** database. A schema or data change must be safe for **both** at once, not just the service you happen to be editing.
 
 Breaking changes must be split across separate releases — **expand → migrate → contract**: add the new (nullable) shape, backfill, and dual-write first; switch reads/writes in a later release; drop or rename only once nothing references the old shape. Never drop or rename a column in the same release that stops using it.

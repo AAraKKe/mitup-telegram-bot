@@ -9,6 +9,7 @@ import pytest_asyncio
 from alembic import command
 from alembic.config import Config as AlembicConfig
 from pydantic import SecretStr
+from sqlalchemy import create_engine, text
 from sqlmodel.ext.asyncio.session import AsyncSession
 from testcontainers.postgres import PostgresContainer
 
@@ -22,6 +23,7 @@ from tests.helpers import make_test_metrics_client
 
 USERNAME = "mitupbot"
 PASSWORD = "12345pass"
+SCRATCH_DATABASE = "migration_probe"
 
 
 def read_postgres_image() -> str:
@@ -107,6 +109,29 @@ def migrated_db(live_db_config: DbConfig) -> Generator[DbConfig]:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = original_value
+
+
+@pytest.fixture
+def scratch_database(live_db_config: DbConfig, monkeypatch: pytest.MonkeyPatch) -> Generator[DbConfig]:
+    """A throwaway database in the suite's container, with Alembic pointed at it."""
+    admin_engine = create_engine(db.build_db_url(live_db_config), isolation_level="AUTOCOMMIT")
+    with admin_engine.connect() as admin:
+        admin.execute(text(f"CREATE DATABASE {SCRATCH_DATABASE}"))
+    scratch_config = live_db_config.model_copy(update={"database": SCRATCH_DATABASE})
+    for name, value in {
+        "MITUPBOT__DB__USERNAME": scratch_config.username,
+        "MITUPBOT__DB__PASSWORD": scratch_config.password.get_secret_value(),
+        "MITUPBOT__DB__URL": scratch_config.url,
+        "MITUPBOT__DB__DATABASE": scratch_config.database,
+        "MITUPBOT__DB__PORT": str(scratch_config.port),
+    }.items():
+        monkeypatch.setenv(name, value)
+    try:
+        yield scratch_config
+    finally:
+        with admin_engine.connect() as admin:
+            admin.execute(text(f"DROP DATABASE IF EXISTS {SCRATCH_DATABASE} WITH (FORCE)"))
+        admin_engine.dispose()
 
 
 @pytest.fixture(scope="session")
