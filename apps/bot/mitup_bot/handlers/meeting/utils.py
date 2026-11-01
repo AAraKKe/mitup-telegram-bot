@@ -26,7 +26,7 @@ def log_waiting_list_promotions(meeting: Meetup, promoted_links: list[JoinedUser
     """Record who a freed spot promoted, and what freed it.
 
     Promotion DMs the recipient without them having done anything, and nothing on the receiving end
-    says which departure caused it. Promoting nobody is not an event, so an empty list writes
+    says which change caused it. Promoting nobody is not an event, so an empty list writes
     nothing and the line's presence means someone moved.
 
     Read through the nullable `id` rather than `db_id`: the promoted rows are reached off the

@@ -102,7 +102,7 @@ async def test_every_way_a_join_can_end_is_named(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("reason", ["participant_left", "participant_kicked_out"])
+@pytest.mark.parametrize("reason", ["participant_left", "participant_kicked_out", "limit_changed"])
 def test_a_promotion_names_what_freed_the_spot(reason: str):
     meeting = create_meetup(id=1, max_members=2, waiting_list=True, owner=create_user(id=99))
     promoted = create_joined_link(user=create_user(id=7, tg_user_id=7), meetup=meeting)
@@ -115,7 +115,7 @@ def test_a_promotion_names_what_freed_the_spot(reason: str):
 
 
 def test_promoting_nobody_is_not_an_event():
-    """Every leave and kick-out calls this; only the ones that moved the queue may write a line."""
+    """Every leave, kick-out and limit change calls this; only the ones that moved the queue may write a line."""
     meeting = create_meetup(id=1, owner=create_user(id=99))
 
     with capture_logs() as logs:

@@ -220,7 +220,7 @@ class Meetup(BaseModel, SQLModel, table=True):
         """`max_members` tightened by the owner's participant cap, or None (unlimited) which is
         only reachable for uncapped (Patron/Organizer) owners.
 
-        Every capacity read — `full`, waiting-list promotion, and the capacity displays — resolves
+        Every capacity read (`full`, waiting-list promotion, and the capacity displays) resolves
         through this, so a capped owner's meeting never exceeds the cap whether they set a higher
         limit or none at all. A meeting already over the cap (owner dropped a tier, or pre-cap data)
         keeps its participants and simply reads as full until it drops back under the cap.
@@ -293,15 +293,9 @@ class Meetup(BaseModel, SQLModel, table=True):
         return any(link.invited_by is not None and link.invited_by.id == user_id for link in self.joined_links)
 
     def remove_participant(self, participant: JoinedUsers) -> list[JoinedUsers]:
-        """
-        Remove a participant from the meeting. If there are users in the waiting list, they will be promoted to the
-        joined list.
-
-        If the action of removing the participant makes anyone promote, the list of promoted participants is returned.
-        """
+        """Remove a participant and move the waiting list up into any place that frees, returning who moved."""
         self.joined_links.remove(participant)
-        # Check if someone in the waiting list can be promoted to the joined list
-        return [] if self.full else self.promote_from_waiting_list()
+        return self.promote_from_waiting_list()
 
     def add_participant(self, user: User, invited_by: User | None = None) -> JoinedUsers | None:
         """
@@ -329,15 +323,13 @@ class Meetup(BaseModel, SQLModel, table=True):
         return joined_link
 
     def promote_from_waiting_list(self) -> list[JoinedUsers]:
-        """
-        Handle promotions from the waiting list to the joined list for the given meeting.
+        """Move people from the waiting list to the joined list, longest-waiting first, up to the free places.
 
-        If the meeting is not full and waiting list is enabled, users will be promoted from the waiting list
-        to the joined based on the order they joined the waiting list.
+        Reads no waiting list setting: people already queued still move up once the owner has switched it off.
         """
         if waiting_links := self.waiting_links():
             cap = self.effective_max_members
-            to_promote = self.n_waiting if cap is None else min(self.n_waiting, cap - self.n_participants)
+            to_promote = self.n_waiting if cap is None else max(min(self.n_waiting, cap - self.n_participants), 0)
             promoted = []
 
             for link in waiting_links[:to_promote]:

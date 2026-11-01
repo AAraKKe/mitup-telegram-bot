@@ -79,7 +79,7 @@ Keeps the names off the shared card; only the count shows. You still see everyon
 
 ### Lock on start
 
-Freezes the guest list once the meeting starts, so nobody joins or leaves while it runs. With an end time the freeze lifts at the end; without one it holds until you turn the lock off or the meeting goes inactive. It needs a start time.
+Freezes the guest list once the meeting starts, so nobody joins or leaves on their own while it runs. With an end time the freeze lifts at the end; without one it holds until you turn the lock off or the meeting goes inactive. It needs a start time. You can still kick someone out or change the limit, and the waiting list moves into any spot that opens.
 
 ## Time format
 

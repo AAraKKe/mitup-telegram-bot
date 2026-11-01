@@ -173,8 +173,8 @@ class MockApi(TelegramApi):
 
     def register_on_method(self, name: str, *, return_value: Any = UNSET, side_effect: Any = UNSET) -> mock.AsyncMock:
         """Register a canned return value and/or side effect on a mocked api method, so a test can
-        control what a query method (``is_chat_member``, ``is_chat_admin``, ``is_chat_banned``) answers
-        without monkeypatching the class. Returns the underlying mock so the caller can assert on it."""
+        control what it answers or observe the moment it is called without monkeypatching the class.
+        Returns the underlying mock so the caller can assert on it."""
         mocked = self.mock_method(name)
         if return_value is not UNSET:
             mocked.return_value = return_value

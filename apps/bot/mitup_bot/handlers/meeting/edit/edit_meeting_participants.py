@@ -10,7 +10,7 @@ from mitup_bot.callback_data import BackOrigin, BackTarget
 from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_session
 from mitup_bot.exceptions import ContextPropertyNotSetError
-from mitup_bot.handlers.meeting.utils import participant_capacity_rejection
+from mitup_bot.handlers.meeting.utils import log_waiting_list_promotions, participant_capacity_rejection
 from mitup_bot.handlers.personal_filters import PositiveNumberFilter
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.handlers.utils import recover_from_lost_context
@@ -51,6 +51,22 @@ def log_capacity_change(meeting: Meetup, user: User, old_max_members: int | None
         n_waiting=meeting.n_waiting,
         reason=reason,
     )
+
+
+async def set_participant_limit(
+    meeting: Meetup, user: User, context: TMitupContext, *, new_max_members: int | None, reason: str
+):
+    """Write the limit and move up whoever it makes room for.
+
+    The capacity line goes first so it keeps the counts the new limit was judged against.
+    """
+    old_max_members = meeting.max_members
+    meeting.max_members = new_max_members
+    log_capacity_change(meeting, user, old_max_members, reason=reason)
+
+    promoted_links = meeting.promote_from_waiting_list()
+    log_waiting_list_promotions(meeting, promoted_links, reason="limit_changed")
+    await context.api.notify_users_promoted_from_waiting_list(joined_users=promoted_links, meeting=meeting)
 
 
 @HandlersRegistry.register_callback_query(
@@ -137,9 +153,7 @@ async def callback_edit_meeting_no_limit_participants(session: AsyncSession, upd
     )
 
     log_stale_navigation(user, "edit_meeting_no_limit_participants")
-    old_max_members = meeting.max_members
-    meeting.max_members = None
-    log_capacity_change(meeting, user, old_max_members, reason="cleared_to_plan_default")
+    await set_participant_limit(meeting, user, context, new_max_members=None, reason="cleared_to_plan_default")
 
     # A capped owner's cleared limit resolves to the plan's cap (Meetup.effective_max_members),
     # so the banner states that number rather than claiming no limit: the value the owner sees on
@@ -224,9 +238,7 @@ async def edit_meeting_max_participants(session: AsyncSession, update: Update, c
         await context.api.send_message(update=update, view=view.with_context(rejection))
         return ConversationMeetingState.EDIT_MAX_PARTICIPANTS
 
-    old_max_members = meeting.max_members
-    meeting.max_members = requested_max
-    log_capacity_change(meeting, user, old_max_members, reason="owner_set_limit")
+    await set_participant_limit(meeting, user, context, new_max_members=requested_max, reason="owner_set_limit")
 
     await context.api.send_message(update=update, view=meeting_views.owner_view(meeting))
     await context.api.update_meeting_messages(meeting=meeting)
@@ -302,9 +314,7 @@ async def callback_query_remove_limit(session: AsyncSession, update: Update, con
         # under the per-meeting row lock.
         meeting = await guards.meeting(session, user, callback_data.id, "remove_limit", context, lock=True)
 
-        old_max_members = meeting.max_members
-        meeting.max_members = None
-        log_capacity_change(meeting, user, old_max_members, reason="owner_removed_limit")
+        await set_participant_limit(meeting, user, context, new_max_members=None, reason="owner_removed_limit")
 
         await context.api.edit_message(update=update, view=meeting_views.owner_view(meeting))
         await context.api.update_meeting_messages(
@@ -347,9 +357,7 @@ async def callback_query_confirm_remove_limit(session: AsyncSession, update: Upd
     # the per-meeting row lock.
     meeting = await guards.meeting(session, user, callback_data.id, "confirm_remove_limit", context, lock=True)
 
-    old_max_members = meeting.max_members
-    meeting.max_members = None
-    log_capacity_change(meeting, user, old_max_members, reason="cleared_to_plan_default")
+    await set_participant_limit(meeting, user, context, new_max_members=None, reason="cleared_to_plan_default")
 
     await context.api.edit_message(update=update, view=meeting_views.owner_view(meeting))
     await context.api.update_meeting_messages(

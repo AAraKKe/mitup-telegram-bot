@@ -75,7 +75,7 @@ Two things can stop a join. If the meeting is full and has no [waiting list](mee
 
 The owner can cap how many people fit and turn on a [waiting list](meeting_settings.md#waiting-list) for the overflow. With it on, a join on a full meeting lands you in the queue, which shows under its own line on the card. The count on the Participants line covers both, so a full meeting with people waiting reads as bigger than its cap.
 
-The queue moves on its own, in the order people joined. When a confirmed participant leaves, the freed spot goes to whoever has waited longest, and the bot messages them to say so. If several spots open at once, that many people move up in one pass.
+The queue moves on its own, in the order people joined. When a confirmed participant leaves or is kicked out, or the owner raises or removes the limit, the open spot goes to whoever has waited longest, and the bot messages them to say so. Guests invited by name, and anyone who has never opened the bot, move up the same way but get no message. If several spots open at once, that many people move up in one pass.
 
 ## Inviting a guest
 

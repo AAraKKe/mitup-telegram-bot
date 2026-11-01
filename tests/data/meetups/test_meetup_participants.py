@@ -385,6 +385,27 @@ def test_promote_from_waiting_list_respects_order():
     assert link3.is_waiting_list
 
 
+@pytest.mark.parametrize(
+    "n_participants, max_members, n_waiting",
+    [(2, 2, 2), (3, 2, 2), (5, 2, 4)],
+    ids=["at_the_limit", "one_over_the_limit", "three_over_the_limit"],
+)
+def test_promote_from_waiting_list_promotes_nobody_without_a_free_place(
+    n_participants: int, max_members: int, n_waiting: int
+):
+    """A meeting at or over its limit has no free place, whatever the queue length."""
+    meeting = create_meetup(id=1, owner=create_user(id=1, first_name="John"), max_members=max_members)
+    for position in range(n_participants):
+        meeting.create_joined_link(create_user(id=10 + position), is_waiting_list=False)
+    waiting_links = [
+        meeting.create_joined_link(create_user(id=20 + position), is_waiting_list=True) for position in range(n_waiting)
+    ]
+
+    assert meeting.promote_from_waiting_list() == []
+    assert all(link.is_waiting_list for link in waiting_links)
+    assert meeting.n_participants == n_participants
+
+
 def test_the_attendee_list_leaves_the_waiting_list_out():
     """The waiting list is a counted line of its own on the card: nobody on it is attending, so it
     never lands among the names."""

@@ -1,3 +1,4 @@
+import datetime as dt
 import logging
 
 import pytest
@@ -13,7 +14,7 @@ from mitup_bot.exceptions import MalformedCallbackData, UserNotFound
 from mitup_bot.handlers.meeting.edit.enums import ConversationMeetingState, EditMeetingHandlerId
 from mitup_bot.handlers.meeting.edit.views import edit_max_participants_view
 from mitup_bot.keyboards import ButtonConfig
-from mitup_bot.models import MeetingCounts, Message, User
+from mitup_bot.models import JoinedUsers, MeetingCounts, Meetup, Message, User
 from mitup_bot.monitoring import MetricKey, MetricsClient, MetricUnit
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
@@ -21,19 +22,23 @@ from mitup_bot.utils.messages import (
     ButtonMessages,
     CommonMessages,
     MeetingEditParticipantsMessages,
+    MeetingJoinMessages,
     SupporterMessages,
 )
+from mitup_bot.utils.rich_message import RichContent
 from mitup_bot.views import RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.collaborate import collaborate_button
 from tests.helpers import (
     AnyFloat,
     HandlerContext,
+    MockApi,
     UpdateRequest,
     assert_context_lost_logged,
     assert_locked_meetup_select,
     assert_meeting_rejection_logged,
     call_handler,
+    create_joined_link,
     create_meetup,
     create_member,
     owner_with_meeting,
@@ -1053,3 +1058,292 @@ async def test_decline_remove_limit_keeps_it(
     mock_session.assert_not_added()
     mock_session.assert_not_flushed()
     context.api.assert_edit_message_called(update, meeting_views.owner_view(meeting))
+
+
+# ---------------------------------------------------------------------------
+# A changed limit moves the waiting list
+# ---------------------------------------------------------------------------
+
+MAX_PARTICIPANTS_PROMPT_MEETING = {ContextId.EDIT_MEETING_MAX_PARTICIPANTS: 1}
+
+# Every way an owner changes the limit: the update, its handler, the limit stored afterwards, the
+# api method carrying the owner's card, and the plan that reaches that path.
+LIMIT_CHANGES = [
+    pytest.param(
+        UpdateRequest(callback_query=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(1)),
+        EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK,
+        None,
+        "send_message",
+        SupporterLevel.NONE,
+        id="no_limit_button",
+    ),
+    pytest.param(
+        UpdateRequest(message_text="2"),
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        2,
+        "send_message",
+        SupporterLevel.NONE,
+        id="number_message",
+    ),
+    pytest.param(
+        UpdateRequest(callback_query=cb.DELETE_MEETING_LIMIT.with_id(1)),
+        EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_CALLBACK,
+        None,
+        "edit_message",
+        SupporterLevel.HOST_2,
+        id="remove_limit_uncapped",
+    ),
+    pytest.param(
+        UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_LIMIT.with_id(1)),
+        EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_CONFIRM_CALLBACK,
+        None,
+        "edit_message",
+        SupporterLevel.NONE,
+        id="remove_limit_confirmed",
+    ),
+]
+
+CLEARED_LIMITS_FOR_A_CAPPED_OWNER = [
+    pytest.param(
+        UpdateRequest(callback_query=cb.EDIT_MEETING_NO_LIMIT_PARTICIPANTS.with_id(1)),
+        EditMeetingHandlerId.PARTICIPANTS_NO_LIMIT_CALLBACK,
+        id="no_limit_button",
+    ),
+    pytest.param(
+        UpdateRequest(callback_query=cb.CONFIRM_DELETE_MEETING_LIMIT.with_id(1)),
+        EditMeetingHandlerId.PARTICIPANTS_REMOVE_LIMIT_CONFIRM_CALLBACK,
+        id="remove_limit_confirmed",
+    ),
+]
+
+
+def seed_queued_meeting(
+    mock_session: MockDbSession,
+    owner: User,
+    *,
+    max_members: int,
+    n_confirmed: int = 1,
+    n_waiting: int = 1,
+) -> tuple[Meetup, list[JoinedUsers]]:
+    """Seed the owner's first meeting and return it with its queue, longest-waiting first.
+
+    The queue is inserted newest first, so promotion order cannot come from insertion order.
+    """
+    meeting = owner.meetups[0]
+    meeting.max_members = max_members
+    meeting.waiting_list = True
+    for position in range(n_confirmed):
+        create_joined_link(user=create_member(id=10 + position, tg_user_id=1000 + position), meetup=meeting)
+    queue_start = dt.datetime.now(dt.UTC)
+    newest_first = [
+        create_joined_link(
+            user=create_member(id=20 + position, tg_user_id=2000 + position),
+            meetup=meeting,
+            is_waiting_list=True,
+            created_time=queue_start + dt.timedelta(minutes=position),
+        )
+        for position in reversed(range(n_waiting))
+    ]
+    mock_session.add_object(owner, "tg_user_id")
+    mock_session.add_object(meeting)
+    return meeting, newest_first[::-1]
+
+
+def promotion_dm(link: JoinedUsers, meeting: Meetup) -> RichContent:
+    return MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.rich(lang=link.user.lang, meeting_title=meeting.title)
+
+
+@pytest.mark.parametrize(
+    "update, handler_id, stored_limit, owner_card_sent_with, owner_level", LIMIT_CHANGES, indirect=["update"]
+)
+async def test_changing_the_limit_promotes_the_waiting_person(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    handler_id: EditMeetingHandlerId,
+    stored_limit: int | None,
+    owner_card_sent_with: str,
+    owner_level: SupporterLevel,
+):
+    """The card the owner gets and the fan-out both have to show the person already moved, so the
+    waiting count is read at the moment the fan-out is queued."""
+    user_with_settings.supporter_level = owner_level
+    meeting, [waiting_link] = seed_queued_meeting(mock_session, user_with_settings, max_members=1)
+    api = MockApi()
+    waiting_counts_at_fan_out: list[int] = []
+    api.register_on_method(
+        "update_meeting_messages",
+        side_effect=lambda **kwargs: waiting_counts_at_fan_out.append(kwargs["meeting"].n_waiting),
+    )
+
+    context, _ = await call_handler(
+        handler_id, handler_context=handler_context, with_meeting_id=MAX_PARTICIPANTS_PROMPT_MEETING, api=api
+    )
+
+    assert meeting.max_members == stored_limit
+    assert meeting.participant(waiting_link.user.db_id) is waiting_link
+    assert meeting.n_waiting == 0
+    context.api.assert_send_message_to_user_called(user=waiting_link.user, view=promotion_dm(waiting_link, meeting))
+    owner_card = context.api.call_args(owner_card_sent_with).kwargs["view"]
+    assert meeting_views.owner_view(meeting).message.text in owner_card.message.text
+    assert waiting_counts_at_fan_out == [0]
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="2")], indirect=True)
+async def test_a_limit_raised_by_one_moves_only_the_longest_waiting_person(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting, [longest_waiting, next_in_line] = seed_queued_meeting(
+        mock_session, user_with_settings, max_members=1, n_waiting=2
+    )
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id=MAX_PARTICIPANTS_PROMPT_MEETING,
+    )
+
+    assert not longest_waiting.is_waiting_list
+    assert next_in_line.is_waiting_list
+    context.api.assert_send_message_to_user_called(
+        user=longest_waiting.user, view=promotion_dm(longest_waiting, meeting)
+    )
+
+
+@pytest.mark.parametrize("update, handler_id", CLEARED_LIMITS_FOR_A_CAPPED_OWNER, indirect=["update"])
+async def test_a_capped_owner_clearing_the_limit_promotes_up_to_the_plan_cap(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    handler_id: EditMeetingHandlerId,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(supporter.PolicyState, "config", LimitsConfig(free_participant_capacity=3))
+    meeting, [first, second, third] = seed_queued_meeting(mock_session, user_with_settings, max_members=1, n_waiting=3)
+
+    context, _ = await call_handler(handler_id, handler_context=handler_context)
+
+    assert meeting.max_members is None
+    assert (first.is_waiting_list, second.is_waiting_list, third.is_waiting_list) == (False, False, True)
+    for promoted in (first, second):
+        context.api.assert_send_message_to_user_called(
+            user=promoted.user, view=promotion_dm(promoted, meeting), times=2
+        )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="2")], indirect=True)
+@pytest.mark.parametrize(
+    "max_members, n_confirmed, n_waiting",
+    [(1, 2, 2), (3, 3, 2), (5, 5, 4)],
+    ids=["at_the_new_limit", "one_over_the_new_limit", "three_over_the_new_limit"],
+)
+async def test_a_limit_with_no_free_place_promotes_nobody(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+    max_members: int,
+    n_confirmed: int,
+    n_waiting: int,
+):
+    meeting, _ = seed_queued_meeting(
+        mock_session, user_with_settings, max_members=max_members, n_confirmed=n_confirmed, n_waiting=n_waiting
+    )
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id=MAX_PARTICIPANTS_PROMPT_MEETING,
+    )
+
+    assert meeting.max_members == 2
+    assert (meeting.n_participants, meeting.n_waiting) == (n_confirmed, n_waiting)
+    context.api.assert_method_just_called("send_message_to_user", times=0)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="2")], indirect=True)
+async def test_a_locked_running_meeting_moves_its_queue_as_a_kick_out_does(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """The lock stops people joining and leaving by themselves; the owner's own changes still move the queue."""
+    meeting, [waiting_link] = seed_queued_meeting(mock_session, user_with_settings, max_members=1)
+    now = dt.datetime.now(dt.UTC)
+    meeting.datetime = now - dt.timedelta(minutes=5)
+    meeting.end_datetime = now + dt.timedelta(minutes=85)
+    meeting.lock_on_start = True
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id=MAX_PARTICIPANTS_PROMPT_MEETING,
+    )
+
+    assert not waiting_link.is_waiting_list
+    context.api.assert_send_message_to_user_called(user=waiting_link.user, view=promotion_dm(waiting_link, meeting))
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="2")], indirect=True)
+async def test_people_queued_before_the_waiting_list_was_switched_off_still_move_up(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting, [waiting_link] = seed_queued_meeting(mock_session, user_with_settings, max_members=1)
+    meeting.waiting_list = False
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id=MAX_PARTICIPANTS_PROMPT_MEETING,
+    )
+
+    assert not waiting_link.is_waiting_list
+    context.api.assert_send_message_to_user_called(user=waiting_link.user, view=promotion_dm(waiting_link, meeting))
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="2")], indirect=True)
+async def test_an_invited_guest_moves_up_without_a_message(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    meeting, [waiting_link] = seed_queued_meeting(mock_session, user_with_settings, max_members=1)
+    waiting_link.invited_by = user_with_settings
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+        handler_context=handler_context,
+        with_meeting_id=MAX_PARTICIPANTS_PROMPT_MEETING,
+    )
+
+    assert meeting.participant(waiting_link.user.db_id) is waiting_link
+    context.api.assert_method_just_called("send_message_to_user", times=0)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="2")], indirect=True)
+async def test_a_raised_limit_records_the_promotion_beside_the_capacity_change(
+    mock_session: MockDbSession,
+    user_with_settings: User,
+    handler_context: HandlerContext,
+):
+    """The capacity line keeps the counts the new limit was judged against, from before anyone moved."""
+    _, [waiting_link] = seed_queued_meeting(mock_session, user_with_settings, max_members=1)
+
+    with capture_logs() as logs:
+        await call_handler(
+            EditMeetingHandlerId.PARTICIPANTS_MAXIMUM_MESSAGE,
+            handler_context=handler_context,
+            with_meeting_id=MAX_PARTICIPANTS_PROMPT_MEETING,
+        )
+
+    [promotion] = [entry for entry in logs if entry["event"] == "Waiting list promoted"]
+    assert promotion["log_level"] == "info"
+    assert promotion["reason"] == "limit_changed"
+    assert promotion["promoted_user_ids"] == [waiting_link.user.db_id]
+
+    [capacity_change] = [entry for entry in logs if entry["event"] == "Meeting capacity changed"]
+    assert capacity_change["reason"] == "owner_set_limit"
+    assert (capacity_change["n_participants"], capacity_change["n_waiting"]) == (1, 1)
