@@ -50,6 +50,52 @@ name = "idna"
 version = "3.7"
 """
 
+GRAPH_LOCK = """
+[manifest]
+members = ["bot", "core"]
+
+[manifest.dependency-groups]
+dev = [{ name = "docs-tool" }]
+
+[[package]]
+name = "bot"
+version = "0.0.1"
+dependencies = [{ name = "core" }, { name = "web" }]
+
+[[package]]
+name = "core"
+version = "0.0.1"
+dependencies = [{ name = "anyio" }]
+
+[package.dev-dependencies]
+test = [{ name = "pytest" }]
+
+[[package]]
+name = "web"
+version = "1.0.0"
+dependencies = [{ name = "anyio" }]
+
+[package.optional-dependencies]
+speedups = [{ name = "fastparser" }]
+
+[[package]]
+name = "docs-tool"
+version = "2.0.0"
+dependencies = [{ name = "anyio" }]
+
+[[package]]
+name = "anyio"
+version = "4.3.0"
+
+[[package]]
+name = "fastparser"
+version = "1.0.0"
+
+[[package]]
+name = "pytest"
+version = "8.0.0"
+"""
+
 
 @pytest.fixture(autouse=True)
 def plain_console(monkeypatch: pytest.MonkeyPatch):
@@ -106,30 +152,156 @@ def test_declared_dependencies_covers_all_member_sections(tmp_path: Path):
     assert declared == {"httpx", "typing-extensions", "ruff", "structlog"}
 
 
-# --- diff and rendering ---
+# --- dependency paths ---
 
 
-def test_diff_lines_reports_changed_added_and_removed():
-    old_versions = lock_diff.package_versions(OLD_LOCK)
-    new_versions = lock_diff.package_versions(NEW_LOCK)
+def test_lock_graph_collects_every_kind_of_requirer():
+    graph = lock_diff.lock_graph(GRAPH_LOCK)
 
-    lines = lock_diff.diff_lines(old_versions, new_versions, declared={"httpx"})
+    assert graph.workspace_members == {"bot", "core"}
+    assert graph.requirers == {
+        "core": {"bot"},
+        "web": {"bot"},
+        "anyio": {"core", "web", "docs-tool"},
+        "pytest": {"core"},
+        "fastparser": {"web"},
+        "docs-tool": {"dev group"},
+    }
 
-    assert lines == [
-        "| `httpx` | 0.27.0 | 0.27.2 | changed | direct |",
-        "| `idna` | — | 3.7 | added | transitive |",
-        "| `sniffio` | 1.3.0 | — | removed | transitive |",
+
+def test_links_to_stops_at_workspace_members():
+    links = lock_diff.lock_graph(GRAPH_LOCK).links_to("anyio")
+
+    assert links == {
+        ("core", "anyio"),
+        ("web", "anyio"),
+        ("bot", "web"),
+        ("docs-tool", "anyio"),
+        ("dev group", "docs-tool"),
+    }
+
+
+def test_links_to_terminates_on_a_dependency_cycle():
+    graph = lock_diff.LockGraph(requirers={"first": {"second"}, "second": {"first"}}, workspace_members=set())
+
+    assert graph.links_to("first") == {("second", "first"), ("first", "second")}
+
+
+def test_package_changes_reads_removed_packages_from_the_old_lock():
+    old_graph = lock_diff.LockGraph(requirers={"sniffio": {"bot"}}, workspace_members={"bot"})
+    new_graph = lock_diff.LockGraph(requirers={"idna": {"bot"}}, workspace_members={"bot"})
+
+    changes = lock_diff.package_changes({"sniffio": "1.3.0"}, {"idna": "3.7"}, old_graph, new_graph)
+
+    assert changes == [
+        lock_diff.PackageChange("idna", None, "3.7", frozenset({("bot", "idna")})),
+        lock_diff.PackageChange("sniffio", "1.3.0", None, frozenset({("bot", "sniffio")})),
     ]
 
 
-def test_diff_lines_normalizes_names_against_declared():
-    lines = lock_diff.diff_lines({}, {"typing-extensions": "4.12.0"}, declared={"typing-extensions"})
+@pytest.mark.parametrize(
+    ("links", "expected"),
+    [
+        ([], "-"),
+        ([("core", "pkg")], "`core`"),
+        ([("dev group", "tool"), ("tool", "pkg")], "`dev group` via `tool`"),
+        ([("bot", "pkg"), ("bot", "web"), ("web", "pkg")], "`bot` via `web`"),
+        (
+            [("bot", "first"), ("bot", "second"), ("first", "pkg"), ("second", "pkg")],
+            "`bot` via `first`, `second`",
+        ),
+        (
+            [("core", name) for name in "abcde"] + [(name, "pkg") for name in "abcde"],
+            "`core` via `a`, `b`, `c` and 2 more",
+        ),
+    ],
+)
+def test_comes_from_names_origins_and_the_packages_in_between(links: list[lock_diff.Link], expected: str):
+    change = lock_diff.PackageChange("pkg", "1.0.0", "2.0.0", frozenset(links))
 
-    assert lines == ["| `typing-extensions` | — | 4.12.0 | added | direct |"]
+    assert lock_diff.comes_from(change) == expected
+
+
+# --- diff and rendering ---
+
+
+def test_render_comment_lists_changed_added_and_removed_packages():
+    empty_graph = lock_diff.lock_graph("")
+    changes = lock_diff.package_changes(
+        lock_diff.package_versions(OLD_LOCK), lock_diff.package_versions(NEW_LOCK), empty_graph, empty_graph
+    )
+
+    body = lock_diff.render_comment(changes, declared={"httpx"})
+
+    assert body.splitlines()[-3:] == [
+        "| `httpx` | 0.27.0 | 0.27.2 | changed | direct | - |",
+        "| `idna` | - | 3.7 | added | transitive | - |",
+        "| `sniffio` | 1.3.0 | - | removed | transitive | - |",
+    ]
+
+
+def test_table_row_normalizes_names_against_declared():
+    change = lock_diff.PackageChange("Typing_Extensions", None, "4.12.0", frozenset())
+
+    row = lock_diff.table_row(change, declared={"typing-extensions"})
+
+    assert row == "| `Typing_Extensions` | - | 4.12.0 | added | direct | - |"
+
+
+def test_mermaid_graph_styles_changed_packages_and_origins():
+    changes = [
+        lock_diff.PackageChange("anyio", "4.3.0", "4.4.0", frozenset({("web", "anyio"), ("bot", "web")})),
+        lock_diff.PackageChange("idna", None, "3.7", frozenset({("dev group", "idna")})),
+        lock_diff.PackageChange("sniffio", "1.3.0", None, frozenset({("bot", "sniffio")})),
+    ]
+    links = sorted({link for change in changes for link in change.links})
+
+    graph = lock_diff.mermaid_graph(changes, links).splitlines()
+
+    assert graph[0] == "flowchart LR"
+    assert graph[1 + len(lock_diff.GRAPH_STYLES) :] == [
+        'n0["anyio 4.3.0 → 4.4.0"]:::changed',
+        'n1["bot"]:::root',
+        'n2["dev group"]:::root',
+        'n3["idna 3.7 (added)"]:::added',
+        'n4["sniffio 1.3.0 (removed)"]:::removed',
+        'n5["web"]:::between',
+        "n1 --> n4",
+        "n1 --> n5",
+        "n2 --> n3",
+        "n5 --> n0",
+    ]
+
+
+def chain_of_links(count: int) -> frozenset[lock_diff.Link]:
+    return frozenset((f"package{index}", f"package{index + 1}") for index in range(count))
+
+
+def test_graph_section_is_empty_without_links():
+    assert lock_diff.graph_section([lock_diff.PackageChange("pkg", "1", "2", frozenset())]) == ""
+
+
+def test_graph_section_stays_open_up_to_the_threshold():
+    change = lock_diff.PackageChange("pkg", "1", "2", chain_of_links(lock_diff.COLLAPSE_GRAPH_ABOVE_LINKS))
+
+    section = lock_diff.graph_section([change])
+
+    assert section.startswith("\n\n```mermaid\n")
+    assert "<details>" not in section
+
+
+def test_graph_section_collapses_above_the_threshold():
+    link_count = lock_diff.COLLAPSE_GRAPH_ABOVE_LINKS + 1
+    change = lock_diff.PackageChange("pkg", "1", "2", chain_of_links(link_count))
+
+    section = lock_diff.graph_section([change])
+
+    assert section.startswith(f"\n\n<details><summary>Dependency graph ({link_count} links)</summary>\n\n```mermaid\n")
+    assert section.endswith("```\n\n</details>")
 
 
 def test_render_comment_without_changes_still_carries_marker():
-    body = lock_diff.render_comment([])
+    body = lock_diff.render_comment([], declared=set())
 
     assert body.startswith(lock_diff.MARKER)
     assert "No package changes" in body
@@ -239,9 +411,25 @@ def test_comment_lock_diff_posts_the_delta(
     assert lock_diff.comment_lock_diff() == 0
 
     assert api.body is not None
-    assert "| `httpx` | 0.27.0 | 0.27.2 | changed | direct |" in api.body
+    assert "| `httpx` | 0.27.0 | 0.27.2 | changed | direct | - |" in api.body
     assert "3 packages" in api.body
     assert "3 changed package(s)" in combined(capsys)
+
+
+def test_comment_lock_diff_shows_where_a_transitive_package_comes_from(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    set_ci_env(monkeypatch)
+    monkeypatch.setattr(runner, "repo_root", lambda: tmp_path)
+    write_workspace(tmp_path, [])
+    (tmp_path / "uv.lock").write_text(GRAPH_LOCK.replace('version = "2.0.0"', 'version = "2.1.0"'))
+    install_git(monkeypatch, GRAPH_LOCK)
+    api = install_notes_api(monkeypatch, [[]])
+
+    assert lock_diff.comment_lock_diff() == 0
+
+    assert api.body is not None
+    assert "| `docs-tool` | 2.0.0 | 2.1.0 | changed | transitive | `dev group` |" in api.body
+    assert '"docs-tool 2.0.0 → 2.1.0"' in api.body
+    assert "```mermaid" in api.body
 
 
 def test_comment_lock_diff_treats_missing_base_lock_as_all_added(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -255,7 +443,7 @@ def test_comment_lock_diff_treats_missing_base_lock_as_all_added(monkeypatch: py
     assert lock_diff.comment_lock_diff() == 0
 
     assert api.body is not None
-    assert "| `httpx` | — | 0.27.2 | added | transitive |" in api.body
+    assert "| `httpx` | - | 0.27.2 | added | transitive | - |" in api.body
 
 
 def test_comment_lock_diff_requires_the_ci_environment(
