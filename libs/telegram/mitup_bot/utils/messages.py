@@ -899,6 +899,12 @@ class MeetingEditDurationMessages(MessageBase):
     END_BEFORE_START = "The end time must be after the start time."
     END_IN_PAST = "The end time must be in the future."
     END_MAX_DURATION = "A meeting can last a week at most. Set an end within a week of the start."
+    # TRANSLATORS: Alert of at most 200 characters, shown on tapping the date a week after the start on the end-time
+    # TRANSLATORS: calendar. The owner may never have chosen a time.
+    END_CAPPED_AT_MAX_DURATION = (
+        "A meeting can't last longer than a week. "
+        "That date is a week after the start, so the end time is the latest allowed."
+    )
     END_STALE_ALERT = "The start time was cleared. Set it again before choosing an end time."
     ON_EXIT = (
         "<i>You were in the middle of setting the end time.</i>\n"

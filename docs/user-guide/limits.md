@@ -52,7 +52,7 @@ An inactive meeting sits in *💾 Past*{.button-like} for 90 days, or a year on 
 
 ## How long one meeting can last
 
-A meeting can span a week at most, from its start to its end. That one is the same on every account, Commissioners included. Set an end further out and the bot asks for a closer one. For an all-weekend trip or a three-day tournament, one meeting covers it. For something that runs longer, make a meeting per session.
+A meeting can span a week at most, from its start to its end. That one is the same on every account, Commissioners included. The day a week after the start still counts, up to the start's time of day; tap that day on the calendar and the bot caps the end at that time. Set an end further out and the bot asks for a closer one. For an all-weekend trip or a three-day tournament, one meeting covers it. For something that runs longer, make a meeting per session.
 
 ## The timeout grace period
 

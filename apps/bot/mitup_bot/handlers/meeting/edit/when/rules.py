@@ -95,6 +95,20 @@ def validate_end_datetime(end_dt: dt.datetime, meeting: Meetup, lang: str) -> st
     return None
 
 
+def end_on_picked_date(requested_end: dt.datetime, tapped_date: dt.date, meeting: Meetup) -> dt.datetime:
+    """The end a calendar tap proposes: *requested_end*, or the duration cap when that passes it.
+
+    The cap only stands in while it is still ahead and reads on *tapped_date*; otherwise the over-long
+    request comes back for `validate_end_datetime` to refuse.
+    """
+    assert meeting.datetime is not None
+    if limits.within_max_duration(meeting.datetime, requested_end, meeting.timezone):
+        return requested_end
+    latest_end = limits.latest_end(meeting.datetime, meeting.timezone)
+    cap_reads_on_tapped_date = latest_end.astimezone(meeting.timezone).date() == tapped_date
+    return latest_end if cap_reads_on_tapped_date and not is_in_past(latest_end, meeting) else requested_end
+
+
 def start_beyond_horizon(meeting: Meetup, start_dt: dt.datetime) -> str | None:
     """The upsell body when start_dt is past the owner's scheduling horizon, else None."""
     return scheduling_horizon_rejection(meeting.owner, start_dt, field="start")
@@ -134,7 +148,7 @@ def apply_start_datetime(meeting: Meetup, start_dt: dt.datetime, *, input_source
     return end_cleared
 
 
-def apply_end_datetime(meeting: Meetup, end_dt: dt.datetime, *, input_source: str):
+def apply_end_datetime(meeting: Meetup, end_dt: dt.datetime, *, input_source: str, held_to_max_duration: bool = False):
     """Set the meeting's end time, naming where the value came from and the span it produces.
 
     The single write point for `meeting.end_datetime` across all three input paths. The resulting
@@ -152,4 +166,5 @@ def apply_end_datetime(meeting: Meetup, end_dt: dt.datetime, *, input_source: st
         new_end_datetime=end_dt,
         duration_minutes=int((end_dt - meeting.datetime).total_seconds() // 60),
         input_source=input_source,
+        held_to_max_duration=held_to_max_duration,
     )

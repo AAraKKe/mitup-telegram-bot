@@ -176,6 +176,24 @@ def test_an_end_time_reports_the_span_it_produces():
         None,
         "datetime_entity",
     )
+    assert written["held_to_max_duration"] is False
+
+
+def test_an_end_held_to_the_cap_says_so_on_the_same_line():
+    """The owner gets an alert for this, so the record has to tell it apart from an end they chose."""
+    start = dt.datetime(2030, 6, 1, 10, tzinfo=dt.UTC)
+    meeting = create_meetup(id=1, owner=create_user(id=5), datetime=start)
+
+    with capture_logs() as logs:
+        apply_end_datetime(
+            meeting,
+            dt.datetime(2030, 6, 8, 10, tzinfo=dt.UTC),
+            input_source="calendar_first_pick",
+            held_to_max_duration=True,
+        )
+
+    written = only(logs, "Meeting end datetime set")
+    assert (written["held_to_max_duration"], written["input_source"]) == (True, "calendar_first_pick")
 
 
 # ---------------------------------------------------------------------------

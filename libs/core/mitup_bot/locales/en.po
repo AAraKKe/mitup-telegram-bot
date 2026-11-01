@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-11-01 05:21\n"
+"PO-Revision-Date: 2026-11-01 11:33\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -941,6 +941,11 @@ msgstr "The end time must be in the future."
 
 msgid "MeetingEditDurationMessages.END_MAX_DURATION"
 msgstr "A meeting can last a week at most. Set an end within a week of the start."
+
+#. Alert of at most 200 characters, shown on tapping the date a week after the start on the end-time
+#. calendar. The owner may never have chosen a time.
+msgid "MeetingEditDurationMessages.END_CAPPED_AT_MAX_DURATION"
+msgstr "A meeting can't last longer than a week. That date is a week after the start, so the end time is the latest allowed."
 
 msgid "MeetingEditDurationMessages.END_STALE_ALERT"
 msgstr "The start time was cleared. Set it again before choosing an end time."

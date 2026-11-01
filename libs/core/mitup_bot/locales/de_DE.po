@@ -1275,3 +1275,6 @@ msgstr "Hallo und tschüss!"
 
 msgid "GroupFarewellMessages.BODY"
 msgstr "Danke, dass ihr mich hier hinzugefügt habt. Ich arbeite mit jeder Person einzeln im privaten Chat, deshalb bleibe ich nicht in Gruppen. Ich mache mich also gleich wieder auf den Weg.\n\nTreffen könnt ihr trotzdem in diesen Chat holen. Schreibt <code>${bot_handle}</code> ins Nachrichtenfeld, wählt eines eurer Treffen aus, und es erscheint direkt hier. Dafür braucht es keinen Bot in der Gruppe.\n\nNoch ein kleiner Tipp zum Abschied: Holt nur Bots in eine Gruppe, denen ihr vertraut. Das gilt besonders, bevor ihr einen davon zum Administrator macht.\n\nDanke, dass ihr Mitup ausprobiert habt."
+
+msgid "MeetingEditDurationMessages.END_CAPPED_AT_MAX_DURATION"
+msgstr "Ein Treffen kann maximal eine Woche dauern. Dieses Datum liegt eine Woche nach dem Start, deshalb gilt die spätestmögliche Endzeit."

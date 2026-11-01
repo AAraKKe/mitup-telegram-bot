@@ -14,6 +14,7 @@ from tests.helpers import create_meetup
 # Europe/Madrid is UTC+1 in winter; the user_with_settings owner uses that zone, so a frozen
 # winter instant keeps the horizon maths free of DST ambiguity.
 FROZEN_NOW = "2025-01-15 12:00:00"  # UTC
+MADRID = ZoneInfo("Europe/Madrid")
 
 
 @pytest.fixture
@@ -190,7 +191,28 @@ def test_within_max_duration_boundary_is_allowed():
 def test_within_max_duration_measures_a_local_week_across_a_clock_change(
     start: dt.datetime, one_local_week_later: dt.datetime
 ):
-    madrid = ZoneInfo("Europe/Madrid")
     one_minute_beyond = one_local_week_later + dt.timedelta(minutes=1)
-    assert limits.within_max_duration(start, one_local_week_later, madrid) is True
-    assert limits.within_max_duration(start, one_minute_beyond, madrid) is False
+    assert limits.within_max_duration(start, one_local_week_later, MADRID) is True
+    assert limits.within_max_duration(start, one_minute_beyond, MADRID) is False
+
+
+@pytest.mark.parametrize(
+    ("start", "tz", "expected_end"),
+    [
+        (dt.datetime(2026, 6, 15, 10, 0, tzinfo=dt.UTC), dt.UTC, dt.datetime(2026, 6, 22, 10, 0, tzinfo=dt.UTC)),
+        # 10:00 Madrid on 2027-03-24 to 10:00 Madrid on 2027-03-31: 167 real hours.
+        (dt.datetime(2027, 3, 24, 9, 0, tzinfo=dt.UTC), MADRID, dt.datetime(2027, 3, 31, 8, 0, tzinfo=dt.UTC)),
+        # 10:00 Madrid on 2027-10-27 to 10:00 Madrid on 2027-11-03: 169 real hours.
+        (dt.datetime(2027, 10, 27, 8, 0, tzinfo=dt.UTC), MADRID, dt.datetime(2027, 11, 3, 9, 0, tzinfo=dt.UTC)),
+        # 02:30 Madrid on 2027-03-21; 02:30 never happens on 2027-03-28, so the end reads 01:30.
+        (dt.datetime(2027, 3, 21, 1, 30, tzinfo=dt.UTC), MADRID, dt.datetime(2027, 3, 28, 0, 30, tzinfo=dt.UTC)),
+        # 02:30 Madrid on 2027-10-24; 02:30 happens twice on 2027-10-31, so the end is the first one.
+        (dt.datetime(2027, 10, 24, 0, 30, tzinfo=dt.UTC), MADRID, dt.datetime(2027, 10, 31, 0, 30, tzinfo=dt.UTC)),
+    ],
+    ids=["utc", "spring_forward", "fall_back", "skipped_wall_clock", "repeated_wall_clock"],
+)
+def test_latest_end_is_one_local_week_after_the_start(start: dt.datetime, tz: dt.tzinfo, expected_end: dt.datetime):
+    latest_end = limits.latest_end(start, tz)
+    assert latest_end == expected_end
+    assert latest_end.tzinfo is dt.UTC
+    assert limits.within_max_duration(start, latest_end, tz) is True

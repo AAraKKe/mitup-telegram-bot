@@ -246,8 +246,8 @@ async def callback_query_pick_end_date(
 ) -> ConversationMeetingState | int:
     """Set or move the end onto the tapped day, and redraw the card showing it.
 
-    A first pick lands at 23:59 local, the value the time row then offers to replace; a later
-    pick keeps the wall-clock time the end already had.
+    A first pick lands at 23:59 local and a later pick keeps the end's wall-clock time; when the
+    duration cap stands in for that time, an alert tells the owner.
     """
     callback_data = guards.valid_date_callback_data(
         cb.PICK_END_DATE.parse(context.match), EditMeetingHandlerId.PICK_END_DATE
@@ -263,12 +263,13 @@ async def callback_query_pick_end_date(
 
     lang = user.lang
     if meeting.end_datetime is None:
-        proposed_end = local_to_utc(callback_data.date, dt.time(23, 59), meeting.timezone)
+        local_end_time = dt.time(23, 59)
         input_source = "calendar_first_pick"
     else:
         local_end_time = meeting.end_datetime.astimezone(meeting.timezone).time()
-        proposed_end = local_to_utc(callback_data.date, local_end_time, meeting.timezone)
         input_source = "calendar_update"
+    requested_end = local_to_utc(callback_data.date, local_end_time, meeting.timezone)
+    proposed_end = rules.end_on_picked_date(requested_end, callback_data.date, meeting)
 
     if error := rules.validate_end_datetime(proposed_end, meeting, lang):
         await context.api.answer_callback_query(update, text=error, show_alert=True)
@@ -276,7 +277,14 @@ async def callback_query_pick_end_date(
     if await reject_end_beyond_horizon(context, update, meeting, proposed_end):
         return ConversationMeetingState.END_DATETIME_CARD
 
-    rules.apply_end_datetime(meeting, proposed_end, input_source=input_source)
+    capped = proposed_end != requested_end
+    rules.apply_end_datetime(meeting, proposed_end, input_source=input_source, held_to_max_duration=capped)
+    if capped:
+        await context.api.answer_callback_query(
+            update,
+            text=MeetingEditDurationMessages.END_CAPPED_AT_MAX_DURATION.text(lang=lang),
+            show_alert=True,
+        )
 
     state = await show_end_card(context, update, meeting, lang, month=callback_data.date)
     await context.api.update_meeting_messages(

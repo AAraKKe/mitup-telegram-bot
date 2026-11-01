@@ -1275,3 +1275,6 @@ msgstr "Ola e adeus!"
 
 msgid "GroupFarewellMessages.BODY"
 msgstr "Grazas por engadirme acó. Traballo desde o chat privado de cada persoa, así que non me quedo nos grupos. Xa vou marchando.\n\nAínda así, podes traer quedadas a este chat. Escribe <code>${bot_handle}</code> na caixa de mensaxes, escolle unha das túas quedadas e publícase acó mesmo. Non fai falta ter ningún bot no grupo.\n\nUn pequeno consello antes de marchar: engade a un grupo só os bots nos que confíes, sobre todo antes de facer administrador a algún deles.\n\nGrazas por probar Mitup."
+
+msgid "MeetingEditDurationMessages.END_CAPPED_AT_MAX_DURATION"
+msgstr "Unha quedada pode durar como máximo unha semana. Esa data cae unha semana despois do inicio, así que a hora de remate é a última permitida."

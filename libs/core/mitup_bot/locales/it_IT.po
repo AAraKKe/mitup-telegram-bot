@@ -1275,3 +1275,6 @@ msgstr "Ciao a tutti, e arrivederci!"
 
 msgid "GroupFarewellMessages.BODY"
 msgstr "Grazie per avermi aggiunto qui. Io lavoro nella chat privata di ciascuno, quindi non resto nei gruppi. Ora vi saluto.\n\nPotete comunque portare i vostri incontri in questa chat: scrivete <code>${bot_handle}</code> nel campo del messaggio, scegliete uno dei vostri incontri e compare direttamente qui. Non serve nessun bot nel gruppo.\n\nUn piccolo consiglio prima di andare: aggiungete a un gruppo solo i bot di cui vi fidate, soprattutto prima di renderne uno amministratore.\n\nGrazie per aver provato Mitup."
+
+msgid "MeetingEditDurationMessages.END_CAPPED_AT_MAX_DURATION"
+msgstr "Un incontro può durare una settimana al massimo. Quella data cade una settimana dopo l'inizio, quindi l'orario di fine è l'ultimo consentito."

@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from freezegun import freeze_time
+from structlog.testing import capture_logs
 from telegram import Chat, Message, MessageEntity, Update
 from telegram import User as TgUser
 from telegram.ext import ConversationHandler
@@ -806,7 +807,7 @@ async def test_end_exactly_now_is_rejected(
 
 
 # ---------------------------------------------------------------------------
-# Daylight-saving changes, for an owner in Europe/Madrid.
+# Daylight-saving changes
 # ---------------------------------------------------------------------------
 
 
@@ -1035,6 +1036,96 @@ async def test_one_local_week_across_a_clock_change_is_accepted(
     assert meeting.end_datetime == end
 
 
+@pytest.mark.parametrize(
+    ("update", "start", "expected_end"),
+    [
+        # 10:00 Madrid on 2027-03-24 to 10:00 Madrid on 2027-03-31: 167 real hours.
+        (
+            UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2027, 3, 31))),
+            dt.datetime(2027, 3, 24, 9, 0, tzinfo=dt.UTC),
+            dt.datetime(2027, 3, 31, 8, 0, tzinfo=dt.UTC),
+        ),
+        # 10:00 Madrid on 2027-10-27 to 10:00 Madrid on 2027-11-03: 169 real hours.
+        (
+            UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2027, 11, 3))),
+            dt.datetime(2027, 10, 27, 8, 0, tzinfo=dt.UTC),
+            dt.datetime(2027, 11, 3, 9, 0, tzinfo=dt.UTC),
+        ),
+        # 02:30 Madrid on 2027-03-21; 02:30 never happens on 2027-03-28, so the end reads 01:30.
+        (
+            UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2027, 3, 28))),
+            dt.datetime(2027, 3, 21, 1, 30, tzinfo=dt.UTC),
+            dt.datetime(2027, 3, 28, 0, 30, tzinfo=dt.UTC),
+        ),
+        # 02:30 Madrid on 2027-10-24; 02:30 happens twice on 2027-10-31, so the end is the first one.
+        (
+            UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2027, 10, 31))),
+            dt.datetime(2027, 10, 24, 0, 30, tzinfo=dt.UTC),
+            dt.datetime(2027, 10, 31, 0, 30, tzinfo=dt.UTC),
+        ),
+    ],
+    indirect=["update"],
+    ids=["spring_forward", "fall_back", "skipped_wall_clock", "repeated_wall_clock"],
+)
+@freeze_time("2027-01-01 00:00:00", tz_offset=0)
+async def test_first_pick_on_the_cap_date_lands_on_one_local_week(
+    mock_session: MockDbSession,
+    update: Update,
+    start: dt.datetime,
+    expected_end: dt.datetime,
+    handler_context: HandlerContext,
+):
+    user, meeting = madrid_owner_with_meeting(meeting_datetime=start)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(EditMeetingHandlerId.PICK_END_DATE, handler_context=handler_context)
+
+    assert state == ConversationMeetingState.END_DATETIME_CARD
+    assert meeting.end_datetime == expected_end
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=MeetingEditDurationMessages.END_CAPPED_AT_MAX_DURATION.text(lang=user.lang),
+        show_alert=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2027, 3, 14)))],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "existing_end",
+    [None, dt.datetime(2027, 3, 13, 17, 0, tzinfo=dt.UTC)],
+    ids=["first_pick", "later_pick"],
+)
+@freeze_time("2027-01-01 00:00:00", tz_offset=0)
+async def test_pick_on_a_date_whose_cap_the_clocks_skip_is_refused(
+    mock_session: MockDbSession,
+    update: Update,
+    existing_end: dt.datetime | None,
+    handler_context: HandlerContext,
+):
+    """Havana clocks jump from 00:00 to 01:00 on 2027-03-14, so the cap of a 00:30 start reads on the 13th."""
+    start = dt.datetime(2027, 3, 7, 5, 30, tzinfo=dt.UTC)
+    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start, end_datetime=existing_end)
+    user.settings.timezone = "America/Havana"
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(EditMeetingHandlerId.PICK_END_DATE, handler_context=handler_context)
+
+    assert state == ConversationMeetingState.END_DATETIME_CARD
+    assert meeting.end_datetime == existing_end
+    mock_session.assert_not_flushed()
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=MeetingEditDurationMessages.END_MAX_DURATION.text(lang=user.lang),
+        show_alert=True,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Maximum-duration cap: end - start must be at most one week. No tier lifts it.
 # The owner is UTC (Settings(id=1)) and the default 90-day horizon is wide enough
@@ -1043,6 +1134,7 @@ async def test_one_local_week_across_a_clock_change_is_accepted(
 
 
 DURATION_CAP_START = dt.datetime(2026, 6, 15, 10, 0, tzinfo=dt.UTC)
+DURATION_CAP_END = DURATION_CAP_START + dt.timedelta(days=7)
 
 
 @freeze_time("2026-06-15 08:00:00", tz_offset=0)
@@ -1124,6 +1216,138 @@ async def test_organizer_still_hits_the_one_week_duration_cap(
     )
 
 
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(DURATION_CAP_END.date()))],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    ("existing_end", "expected_end", "cap_stood_in"),
+    [
+        (None, DURATION_CAP_END, True),
+        (dt.datetime(2026, 6, 21, 23, 59, tzinfo=dt.UTC), DURATION_CAP_END, True),
+        (dt.datetime(2026, 6, 21, 9, 15, tzinfo=dt.UTC), dt.datetime(2026, 6, 22, 9, 15, tzinfo=dt.UTC), False),
+    ],
+    ids=["first_pick", "end_time_past_the_cap", "end_time_before_the_cap"],
+)
+@freeze_time("2026-06-15 08:00:00", tz_offset=0)
+async def test_pick_on_the_cap_date_never_passes_the_cap(
+    mock_session: MockDbSession,
+    update: Update,
+    existing_end: dt.datetime | None,
+    expected_end: dt.datetime,
+    cap_stood_in: bool,
+    handler_context: HandlerContext,
+):
+    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=DURATION_CAP_START, end_datetime=existing_end)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    with capture_logs() as logs:
+        context, state = await call_handler(EditMeetingHandlerId.PICK_END_DATE, handler_context=handler_context)
+
+    assert state == ConversationMeetingState.END_DATETIME_CARD
+    assert meeting.end_datetime == expected_end
+    [written] = [entry for entry in logs if entry["event"] == "Meeting end datetime set"]
+    assert written["held_to_max_duration"] is cap_stood_in
+    if cap_stood_in:
+        context.api.assert_answer_callback_query_called(
+            update=update,
+            text=MeetingEditDurationMessages.END_CAPPED_AT_MAX_DURATION.text(lang=user.lang),
+            show_alert=True,
+        )
+    else:
+        context.api.assert_method_just_called("answer_callback_query", times=0)
+    context.api.assert_edit_message_called(update, expected_card(meeting, user.lang, month=DURATION_CAP_END.date()))
+    context.api.assert_update_meeting_messages_called(meeting, None, True)
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 6, 23)))],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "existing_end",
+    [None, dt.datetime(2026, 6, 21, 9, 15, tzinfo=dt.UTC)],
+    ids=["first_pick", "later_pick"],
+)
+@freeze_time("2026-06-15 08:00:00", tz_offset=0)
+async def test_pick_after_the_cap_date_is_refused(
+    mock_session: MockDbSession,
+    update: Update,
+    existing_end: dt.datetime | None,
+    handler_context: HandlerContext,
+):
+    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=DURATION_CAP_START, end_datetime=existing_end)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(EditMeetingHandlerId.PICK_END_DATE, handler_context=handler_context)
+
+    assert state == ConversationMeetingState.END_DATETIME_CARD
+    assert meeting.end_datetime == existing_end
+    mock_session.assert_not_flushed()
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=MeetingEditDurationMessages.END_MAX_DURATION.text(lang=user.lang),
+        show_alert=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(DURATION_CAP_END.date()))],
+    indirect=True,
+)
+@freeze_time("2026-06-22 11:00:00", tz_offset=0)
+async def test_pick_on_the_cap_date_once_the_cap_has_passed_is_refused(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+):
+    existing_end = dt.datetime(2026, 6, 21, 12, 0, tzinfo=dt.UTC)
+    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=DURATION_CAP_START, end_datetime=existing_end)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(EditMeetingHandlerId.PICK_END_DATE, handler_context=handler_context)
+
+    assert state == ConversationMeetingState.END_DATETIME_CARD
+    assert meeting.end_datetime == existing_end
+    mock_session.assert_not_flushed()
+    context.api.assert_answer_callback_query_called(
+        update=update,
+        text=MeetingEditDurationMessages.END_MAX_DURATION.text(lang=user.lang),
+        show_alert=True,
+    )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(message_text="10:01")], indirect=True)
+@freeze_time("2026-06-15 08:00:00", tz_offset=0)
+async def test_end_time_one_minute_past_an_end_on_the_cap_is_refused(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+):
+    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=DURATION_CAP_START, end_datetime=DURATION_CAP_END)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(
+        EditMeetingHandlerId.TYPE_END_TIME,
+        handler_context=handler_context,
+        with_meeting_id={ContextId.EDIT_MEETING_END: 1},
+    )
+
+    assert state == ConversationMeetingState.END_DATETIME_CARD
+    assert meeting.end_datetime == DURATION_CAP_END
+    context.api.assert_send_message_called(
+        update,
+        expected_card(meeting, user.lang, error=MeetingEditDurationMessages.END_MAX_DURATION.rich(lang=user.lang)),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Scheduling horizon on the end: an end within the duration cap but beyond the
 # owner's horizon is rejected with the Collaborate upsell, mirroring the start
@@ -1182,6 +1406,41 @@ async def test_set_end_date_beyond_horizon_shows_upsell_in_place(
     )
 
     assert meeting.end_datetime is None  # not saved
+    assert state == ConversationMeetingState.END_DATETIME_CARD
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    calendar_button = ButtonConfig(
+        text=ButtonMessages.END_DATE_TIME.back(lang=user.lang),
+        callback_data=cb.NAVIGATE_END_CALENDAR.with_id(1).with_date(dt.date(2026, 6, 15)),
+    )
+    context.api.assert_edit_message_called(
+        update,
+        supporter_upsell_view(
+            SupporterMessages.SCHEDULING_HORIZON.rich(lang=user.lang, days=5),
+            user.lang,
+        ).with_context_menu([[calendar_button]]),
+    )
+
+
+@pytest.mark.parametrize(
+    "update",
+    # A first pick on Jun 22 falls back to the cap, which is still past the 5-day horizon.
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2026, 6, 22)))],
+    indirect=True,
+)
+@freeze_time(HORIZON_FROZEN_NOW, tz_offset=0)
+async def test_capped_end_beyond_horizon_shows_the_upsell_without_the_cap_alert(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    narrow_horizon: None,
+):
+    user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=HORIZON_START)
+    mock_session.add_object(user, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, state = await call_handler(EditMeetingHandlerId.PICK_END_DATE, handler_context=handler_context)
+
+    assert meeting.end_datetime is None
     assert state == ConversationMeetingState.END_DATETIME_CARD
     context.api.assert_method_just_called("answer_callback_query", times=0)
     calendar_button = ButtonConfig(

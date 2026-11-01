@@ -135,3 +135,13 @@ def within_max_duration(start: dt.datetime, end: dt.datetime, tz: dt.tzinfo) -> 
     local_start = start.astimezone(tz).replace(tzinfo=None)
     local_end = end.astimezone(tz).replace(tzinfo=None)
     return local_end - local_start <= LifecyclePolicy.get().max_duration
+
+
+def latest_end(start: dt.datetime, tz: dt.tzinfo) -> dt.datetime:
+    """The end one full cap after `start` on the wall clocks of `tz`, as UTC.
+
+    The earlier of the two fold readings always passes `within_max_duration`: a wall clock the
+    clocks repeat reads as its first pass, and one they skip reads before the gap.
+    """
+    cap_wall_clock = start.astimezone(tz) + LifecyclePolicy.get().max_duration
+    return min(cap_wall_clock.replace(fold=fold).astimezone(dt.UTC) for fold in (0, 1))
