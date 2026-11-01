@@ -41,7 +41,8 @@ in `inactive_meetings`, which is how the system converges). A user held here by 
 link is bounded by the grace period instead: `demote_stale_left_users` moves them to JOINED_ONLY.
 
 JOINED_ONLY users are intentionally excluded — they are cleaned up exclusively
-by `inactive_meetings` once none of their meetings remain active.
+by `inactive_meetings` once they own no meeting and none they joined remains active. ONBOARDING
+users are cleaned up there too.
 Invited users (tg_user_id == -1) are handled by `inactive_meetings` too.
 """
 

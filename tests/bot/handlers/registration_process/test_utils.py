@@ -93,10 +93,9 @@ async def test_completing_onboarding_stamps_member_time(
     update: Update,
     mock_session: MockDbSession,
 ):
-    """The promotion at the end of the funnel is the moment being recorded, and it has to record it
-    for a brand-new user too — one who is already MEMBER by model default."""
     new_user, _ = await get_or_create_onboarding_user(mock_session, update, None)
 
     promote_onboarded_user(new_user)
 
+    assert new_user.status is UserStatus.MEMBER
     assert new_user.member_time is not None

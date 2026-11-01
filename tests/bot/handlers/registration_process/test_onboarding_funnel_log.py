@@ -34,7 +34,7 @@ async def test_first_start_opens_the_funnel_for_a_brand_new_user(
 
     created = log_record(caplog, "Onboarding user created")
     assert created.__dict__["reason"] == "no_existing_row"
-    assert created.__dict__["status"] == UserStatus.MEMBER.value
+    assert created.__dict__["status"] == UserStatus.ONBOARDING.value
 
     shown = log_record(caplog, "Onboarding step shown")
     assert shown.__dict__["step"] == "timezone_prompt"
@@ -78,6 +78,7 @@ async def test_start_by_a_returning_left_user_reuses_the_row(
     assert log_record(caplog, "Onboarding step shown").__dict__["is_new_user"] is False
 
 
+@pytest.mark.parametrize("prior_status", [UserStatus.LEFT, UserStatus.ONBOARDING], ids=lambda status: status.value)
 @pytest.mark.parametrize("update", [UpdateRequest(message_text="Madrid")], indirect=True)
 async def test_completing_the_funnel_records_the_write_the_promotion_and_the_finish(
     update: Update,
@@ -85,11 +86,12 @@ async def test_completing_the_funnel_records_the_write_the_promotion_and_the_fin
     mock_session: MockDbSession,
     get_timezone_from_api: mock.MagicMock,
     caplog: pytest.LogCaptureFixture,
+    prior_status: UserStatus,
 ):
     caplog.set_level(logging.INFO)
-    returning_user = create_user(id=5, tg_user_id=123, status=UserStatus.LEFT)
-    old_timezone = returning_user.settings.timezone
-    mock_session.add_object(returning_user, "tg_user_id")
+    onboarding_user = create_user(id=5, tg_user_id=123, status=prior_status)
+    old_timezone = onboarding_user.settings.timezone
+    mock_session.add_object(onboarding_user, "tg_user_id")
     get_timezone_from_api.return_value = "Europe/Madrid"
 
     await claimed_state(registration_timezone_text_message_handler(update, context))
@@ -101,26 +103,7 @@ async def test_completing_the_funnel_records_the_write_the_promotion_and_the_fin
     assert written.__dict__["input_method"] == "message"
 
     promoted = log_record(caplog, "User promoted to member")
-    assert promoted.__dict__["prior_status"] == UserStatus.LEFT.value
+    assert promoted.__dict__["prior_status"] == prior_status.value
     assert promoted.__dict__["reason"] == "onboarding_completed"
 
     assert log_record(caplog, "Onboarding completed").__dict__["timezone"] == "Europe/Madrid"
-
-
-@pytest.mark.parametrize("update", [UpdateRequest(message_text="Madrid")], indirect=True)
-async def test_an_already_member_user_writes_no_promotion_line(
-    update: Update,
-    context: StubMitupContext,
-    mock_session: MockDbSession,
-    get_timezone_from_api: mock.MagicMock,
-    caplog: pytest.LogCaptureFixture,
-):
-    """`set_status` is a no-op for a MEMBER, so a transition line there would be a lie."""
-    caplog.set_level(logging.INFO)
-    mock_session.add_object(create_user(id=5, tg_user_id=123, status=UserStatus.MEMBER), "tg_user_id")
-    get_timezone_from_api.return_value = "Europe/Madrid"
-
-    await claimed_state(registration_timezone_text_message_handler(update, context))
-
-    assert "User promoted to member" not in {record.message for record in caplog.records}
-    assert log_record(caplog, "Onboarding completed") is not None

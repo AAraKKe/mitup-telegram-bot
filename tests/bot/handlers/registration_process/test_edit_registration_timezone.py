@@ -352,32 +352,22 @@ async def test_joined_only_user_stays_joined_only_when_location_not_recognized(
 
 
 # ---------------------------------------------------------------------------
-# Brand-new user (no row) onboarding → ends up MEMBER
-#
-# `command_start_with_new_user` creates the row through
-# `get_or_create_onboarding_user`. The default status from the model is
-# MEMBER, and the success-path write re-confirms it.
+# Brand-new user (no row) onboarding → ONBOARDING until the timezone is answered
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(command="start")], indirect=True)
-async def test_brand_new_user_starts_with_member_status(
+async def test_brand_new_user_starts_onboarding(
     update: Update,
     context: StubMitupContext,
     mock_session: MockDbSession,
 ):
-    """A brand-new user (no row) hitting /start gets a freshly-created row with MEMBER status.
-
-    No prior User row → `get_or_create_onboarding_user` constructs a new one. The
-    `status` column defaults to MEMBER from the model — there is no JOINED_ONLY
-    intermediate state here.
-    """
     await claimed_state(command_start_with_new_user(update, context))
 
-    # Exactly one User object was added to the session — and its status is MEMBER (the model default).
     added_users = [obj for obj in mock_session.objects_added if isinstance(obj, User)]
     assert len(added_users) == 1
-    assert added_users[0].status is UserStatus.MEMBER
+    assert added_users[0].status is UserStatus.ONBOARDING
+    assert added_users[0].member_time is None
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(command="start", language_code="es-ES")], indirect=True)
@@ -405,15 +395,7 @@ async def test_brand_new_user_completes_conversation_with_member_status(
     get_timezone_from_api: mock.MagicMock,
     lang: str,
 ):
-    """A brand-new row coming out of the conversation has status MEMBER.
-
-    The write at the end of the success path is a no-op for brand-new rows (already
-    MEMBER from the model default), but the assertion guards against accidental
-    regressions (e.g. flipping the default to JOINED_ONLY without updating the
-    success-path write).
-    """
-    # The user was just created — model default applies, but we go through the same flow.
-    brand_new_user = create_user(id=99, tg_user_id=123, status=UserStatus.MEMBER)
+    brand_new_user = create_user(id=99, tg_user_id=123, status=UserStatus.ONBOARDING)
     brand_new_user.settings.language = lang
     mock_session.add_object(brand_new_user, "tg_user_id")
     assert update.effective_message is not None
@@ -422,4 +404,5 @@ async def test_brand_new_user_completes_conversation_with_member_status(
     result = await claimed_state(registration_timezone_text_message_handler(update, context))
 
     assert brand_new_user.status is UserStatus.MEMBER
+    assert brand_new_user.member_time is not None
     assert result == ConversationHandler.END

@@ -118,8 +118,8 @@ async def record_block(session: AsyncSession, update: Update):
 
     tg_user_id = update.effective_user.id
     user = await User.by_tg_user_id(session, tg_user_id)
-    # The block itself, separately from the demotion it may cause: a block by a user who is already
-    # LEFT, or who has no row at all, moves no status and would otherwise leave no trace.
+    # The block itself, separately from the demotion it may cause: a block by a user who is not a
+    # MEMBER, or who has no row at all, moves no status and would otherwise leave no trace.
     demoted = user is not None and user.mark_inactive(InactiveReason.BLOCKED_BOT)
     old_status, new_status = block_status_change(update) or ("unknown", "unknown")
     log.info(

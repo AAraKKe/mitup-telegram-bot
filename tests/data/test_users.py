@@ -177,17 +177,14 @@ def test_writing_the_status_a_user_already_has_changes_and_records_nothing():
     assert not [entry for entry in logs if entry["event"] == "User status changed"]
 
 
-def test_becoming_a_member_stamps_member_time_even_when_the_status_does_not_change():
-    """A row is MEMBER from the model default, so the promotion that ends onboarding asks for the
-    status it already holds — and that call is the moment being recorded. Were the stamp behind the
-    no-op check, every user who onboarded from scratch would have none."""
+def test_a_member_asked_to_be_a_member_keeps_the_time_they_became_one():
+    stamped = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
     user = create_user(id=9, tg_user_id=990, status=UserStatus.MEMBER)
-    before = dt.datetime.now(dt.UTC)
+    user.member_time = stamped
 
     user.set_status(UserStatus.MEMBER)
 
-    assert user.member_time is not None
-    assert before <= user.member_time <= dt.datetime.now(dt.UTC)
+    assert user.member_time == stamped
 
 
 def test_re_onboarding_restamps_member_time():

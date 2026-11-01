@@ -57,8 +57,8 @@ async def member_user(update: Update, session: AsyncSession) -> User | None:
     """Return the effective user's `User` row only when their status is MEMBER, else None.
 
     Gates `/start` between the existing-member flow and the new/joined-only re-onboarding
-    flow. JOINED_ONLY and LEFT users intentionally get None so they fall through to the
-    re-onboarding conversation.
+    flow. ONBOARDING, JOINED_ONLY and LEFT users intentionally get None so they fall through to
+    the re-onboarding conversation.
     """
     if update.effective_user is None:
         return None

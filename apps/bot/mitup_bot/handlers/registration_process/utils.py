@@ -55,12 +55,12 @@ async def get_or_create_onboarding_user(
 ) -> tuple[User, bool]:
     """Return the `User` for the update and whether this call created it.
 
-    The /start re-onboarding flow must serve three cases under one entry
-    point: brand-new (no row), JOINED_ONLY (inline-joined, never DM-ed), and
-    LEFT (re-onboarding). For the existing-row cases we reuse the row and its
-    attached Settings — the timezone conversation will then reset state and
-    promote the user to MEMBER on success. The caller cannot tell the three
-    apart afterwards, so the fork is named on the way out.
+    The /start re-onboarding flow must serve four cases under one entry
+    point: brand-new (no row), ONBOARDING (a question still unanswered),
+    JOINED_ONLY (inline-joined, never DM-ed), and LEFT (re-onboarding). For the
+    existing-row cases we reuse the row and its attached Settings: the timezone
+    conversation will then reset state and promote the user to MEMBER on success.
+    The caller cannot tell them apart afterwards, so the fork is named on the way out.
 
     `acquisition_source` reaches only the created row: an existing one already records where its
     owner first arrived, and this `/start` is a return visit rather than an arrival.
@@ -84,6 +84,7 @@ async def get_or_create_onboarding_user(
         tg_user_id=update.effective_user.id,
         last_name=update.effective_user.last_name,
         username=update.effective_user.username,
+        status=UserStatus.ONBOARDING,
         acquisition_source=acquisition_source,
         settings=Settings(language=language),
     )
@@ -119,16 +120,9 @@ def registration_complete_view(user: User, update: Update, context: TMitupContex
 
 
 def promote_onboarded_user(user: User):
-    """Move the user to MEMBER, the only legitimate JOINED_ONLY/LEFT → MEMBER transition site.
-
-    Brand-new users are already MEMBER (model default), so this is a no-op for them and the
-    transition line is written only for a status that really changed.
-    """
+    """Move the user to MEMBER, the only legitimate transition into MEMBER."""
     prior_status = user.status
     user.set_status(UserStatus.MEMBER)
-    if prior_status is UserStatus.MEMBER:
-        return
-
     log.info(
         "User promoted to member",
         user_id=user.db_id,

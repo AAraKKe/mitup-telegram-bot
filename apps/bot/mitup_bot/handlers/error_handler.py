@@ -127,7 +127,7 @@ async def handle_inactive_user(session: AsyncSession, tg_user_id: int):
     """Flip the user who just proved unreachable from MEMBER to LEFT.
 
     The transition is what the purge job later acts on, so all three outcomes are recorded: the
-    flip itself, a row the lookup could not find, and a user who was already past MEMBER. The
+    flip itself, a row the lookup could not find, and a user who was not a MEMBER. The
     event name is shared with every other producer of MEMBER→LEFT so one filter finds them all.
     """
     # InactiveUserInteraction carries the TELEGRAM user id (see the api_wrapper raise sites);

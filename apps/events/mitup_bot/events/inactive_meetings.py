@@ -25,6 +25,8 @@ from .telemetry import error_type_name, supporter_level_counts
 log = structlog.get_logger(__name__)
 
 LEFT_OWNER_DATELESS_LIFETIME = LifecyclePolicy.get().left_owner_dateless_lifetime
+# How long an unanswered onboarding question keeps its account.
+ONBOARDING_ANSWER_WINDOW = dt.timedelta(days=7)
 DATELESS_WINDOWS = resolved_windows(lambda policy: policy.dateless_lifetime)
 
 
@@ -92,23 +94,31 @@ DUE_MEETING_FACTS_STATEMENT = (
     .where(DUE_FOR_DEACTIVATION)
 )
 
-JOINED_ONLY_WITHOUT_ACTIVE_LINKS_STATEMENT: SelectOfScalar[int] | SelectOfScalar[None] = select(User.id).where(
-    and_(
-        User.status == UserStatus.JOINED_ONLY,
-        ~exists(
-            select(1)
-            .select_from(JoinedUsers)
-            .join(Meetup)
-            .where(and_(JoinedUsers.user_id == User.id, Meetup.active == true()))
-        ),
-    )
+# Deleting a user cascades to the meetings they own, so owning one keeps the row.
+OWNS_NO_MEETING: ColumnElement[bool] = ~exists(select(1).select_from(Meetup).where(Meetup.owner_id == User.id))
+HAS_NO_ACTIVE_LINK: ColumnElement[bool] = ~exists(
+    select(1).select_from(JoinedUsers).join(Meetup).where(and_(JoinedUsers.user_id == User.id, Meetup.active == true()))
 )
-"""Selects the ids of JOINED_ONLY users who have no remaining active-meeting links.
+
+JOINED_ONLY_WITHOUT_ACTIVE_LINKS_STATEMENT: SelectOfScalar[int] | SelectOfScalar[None] = select(User.id).where(
+    and_(User.status == UserStatus.JOINED_ONLY, OWNS_NO_MEETING, HAS_NO_ACTIVE_LINK)
+)
+"""Selects the ids of JOINED_ONLY users who own no meeting and have no remaining active-meeting links.
 
 These users were only ever reachable through the inline-join flow and have no further meetings to
 attend, so retaining them wastes space and pollutes user-count metrics. Ids rather than a bare
 `DELETE`: nothing downstream can name a hard-deleted account, so the purge records who it took.
 """
+
+ABANDONED_ONBOARDING_STATEMENT: SelectOfScalar[int] | SelectOfScalar[None] = select(User.id).where(
+    and_(
+        User.status == UserStatus.ONBOARDING,
+        col(User.created_time) + sql_interval(ONBOARDING_ANSWER_WINDOW) < func.now(),
+        OWNS_NO_MEETING,
+        HAS_NO_ACTIVE_LINK,
+    )
+)
+"""Selects the ids of ONBOARDING users past the answer window with nothing else keeping them."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -291,18 +301,40 @@ async def deactivate_meeting(due: DueMeeting, api: TelegramApiWrapper) -> bool:
             return await deactivate_meeting_locked(session, due, api)
 
 
+async def delete_users_still_in_status(session: AsyncSession, user_ids: list[int], status: UserStatus) -> list[int]:
+    """Delete `user_ids` and return the ids taken, skipping anyone who finished onboarding after the select."""
+    if not user_ids:
+        return []
+    statement = delete(User).where(col(User.id).in_(user_ids), col(User.status) == status).returning(col(User.id))
+    return [row[0] for row in (await session.exec(statement)).all()]
+
+
 @db.with_session
 async def delete_joined_only_users(session: AsyncSession) -> int:
-    """Purge the JOINED_ONLY users with no remaining active-meeting links; returns how many."""
-    user_ids = list((await session.exec(JOINED_ONLY_WITHOUT_ACTIVE_LINKS_STATEMENT)).all())
-    if user_ids:
-        await session.exec(delete(User).where(col(User.id).in_(user_ids)))
+    """Purge the JOINED_ONLY users who own no meeting and have no active-meeting links; returns how many."""
+    nominated = list((await session.exec(JOINED_ONLY_WITHOUT_ACTIVE_LINKS_STATEMENT)).all())
+    user_ids = await delete_users_still_in_status(session, nominated, UserStatus.JOINED_ONLY)
 
     log.info(
         "Delete joined-only users without active links",
         user_ids=user_ids,
         count=len(user_ids),
         reason="joined_only_without_active_meeting_links",
+    )
+    return len(user_ids)
+
+
+@db.with_session
+async def delete_abandoned_onboarding_users(session: AsyncSession) -> int:
+    """Purge the ONBOARDING users who never answered and have nothing else; returns how many."""
+    nominated = list((await session.exec(ABANDONED_ONBOARDING_STATEMENT)).all())
+    user_ids = await delete_users_still_in_status(session, nominated, UserStatus.ONBOARDING)
+
+    log.info(
+        "Delete abandoned onboarding users",
+        user_ids=user_ids,
+        count=len(user_ids),
+        reason="onboarding_window_elapsed",
     )
     return len(user_ids)
 
@@ -337,6 +369,7 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
             )
 
     joined_only_deleted = await delete_joined_only_users()
+    abandoned_onboarding_deleted = await delete_abandoned_onboarding_users()
 
     log.info(
         "Deactivation sweep complete",
@@ -345,6 +378,7 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
         skipped=skipped,
         failed=failed,
         joined_only_users_deleted=joined_only_deleted,
+        abandoned_onboarding_users_deleted=abandoned_onboarding_deleted,
         reasons=dict(Counter(due.reason.value for due in deactivated)),
         windows=dict(Counter(due.window_days for due in deactivated)),
         # The retention windows are per tier, so a destruction count nobody can split by tier cannot

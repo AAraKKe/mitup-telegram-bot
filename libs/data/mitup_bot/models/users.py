@@ -29,7 +29,8 @@ log = structlog.get_logger(__name__)
 class UserStatus(StrEnum):
     """Lifecycle state of a `User` row.
 
-    MEMBER users have engaged via DM and are reachable; JOINED_ONLY users joined a
+    MEMBER users have engaged via DM and are reachable; ONBOARDING users started the
+    bot and become MEMBERs only when setup is finished; JOINED_ONLY users joined a
     meeting via inline button and are not reachable until they `/start`; LEFT users
     were MEMBERs who blocked or deleted the bot; DELETION_REQUESTED users asked for
     their data to be wiped and every interaction is rejected until the cleanup run
@@ -37,6 +38,7 @@ class UserStatus(StrEnum):
     """
 
     MEMBER = "member"
+    ONBOARDING = "onboarding"
     JOINED_ONLY = "joined_only"
     LEFT = "left"
     DELETION_REQUESTED = "deletion_requested"
@@ -93,8 +95,9 @@ class User(BaseModel, SQLModel, table=True):
     # LEFT grace period against it, so `set_status` owns the value rather than each caller.
     left_time: dt.datetime | None = None
     # When the user last became a MEMBER, which is the moment onboarding completed rather than the
-    # moment the row appeared. NULL for a row whose owner never finished onboarding, and for every
-    # row that predates the column. `set_status` owns the value, as it does for `left_time`.
+    # moment the row appeared. A value equal to `created_time` means the moment was never recorded,
+    # and NULL means no record of ever being a MEMBER. `set_status` owns the value, as it does for
+    # `left_time`.
     member_time: dt.datetime | None = None
     last_name: str | None = None
     username: str | None = None
@@ -260,25 +263,23 @@ class User(BaseModel, SQLModel, table=True):
         is no longer in. A write that changes nothing is dropped, so re-detecting a departure
         cannot restart a grace period that is already running.
 
-        `member_time` is stamped by every write asking for MEMBER, dropped or not: a row starts out
-        MEMBER by model default, so the promotion that ends onboarding asks for the status it
-        already holds, and that call is the moment the user became one. Latest wins, so a returning
-        user who onboards again re-stamps it, the way `left_time` records the latest departure.
+        `member_time` is stamped by the write that makes the user a MEMBER. Latest wins, so a
+        returning user who onboards again re-stamps it, the way `left_time` records the latest
+        departure.
 
         This is also the one place a from/to transition and the grace stamp are both in hand, so
         it is where the transition is recorded — its callers otherwise spell the same event four
         different ways, or say nothing at all. `reason` names the path that detected a departure,
         so one `stats count() by reason` over this event splits every way a user can leave.
         """
-        if status is UserStatus.MEMBER:
-            self.member_time = dt.datetime.now(dt.UTC)
-
         if status is self.status:
             return
 
         previous_status = self.status
         self.status = status
         self.left_time = dt.datetime.now(dt.UTC) if status is UserStatus.LEFT else None
+        if status is UserStatus.MEMBER:
+            self.member_time = dt.datetime.now(dt.UTC)
         log.info(
             "User status changed",
             user_id=self.id,
@@ -292,7 +293,7 @@ class User(BaseModel, SQLModel, table=True):
     def mark_inactive(self, reason: InactiveReason) -> bool:
         """Transition a MEMBER user to LEFT, recording which path detected the departure.
 
-        Returns `True` iff a real transition happened. JOINED_ONLY and LEFT users are no-ops so
+        Returns `True` iff a real transition happened. Every other status is a no-op so
         callers only react on genuine member departures — and a LEFT user's grace period keeps
         running from the first detection instead of restarting on every failed delivery.
         """

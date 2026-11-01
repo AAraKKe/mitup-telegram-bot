@@ -2,6 +2,7 @@ import datetime as dt
 
 import pytest
 from sqlalchemy.dialects import postgresql
+from sqlmodel import col, delete
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
@@ -13,7 +14,8 @@ from mitup_bot.events.inactive_meetings import (
 )
 from mitup_bot.events.service import EventType
 from mitup_bot.lifecycle import LifecyclePolicy
-from mitup_bot.models import Meetup
+from mitup_bot.models import Meetup, User
+from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricsClient
 from mitup_bot.supporter import SupporterLevel
 from tests.helpers import (
@@ -329,6 +331,12 @@ async def test_skip_names_the_owner_upgrade_that_stopped_the_window(
     assert record["nominated_reason"] == DeactivationReason.DATELESS_WINDOW_ELAPSED.value
 
 
+def register_purge(mock_session: MockDbSession, user_ids: tuple[int, ...], status: UserStatus):
+    """The delete hands back only the rows still in `status`, so registering it pins that filter."""
+    statement = delete(User).where(col(User.id).in_(user_ids), col(User.status) == status).returning(col(User.id))
+    mock_session.add_objects_with_statement(statement, tuple((user_id,) for user_id in user_ids))
+
+
 async def test_joined_only_purge_names_the_accounts_it_took(
     mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
 ):
@@ -336,13 +344,29 @@ async def test_joined_only_purge_names_the_accounts_it_took(
     can name an account that is already gone, and a rowcount alone names nobody."""
     register_due_meetings(mock_session)
     mock_session.add_objects_with_statement(inactive_meetings.JOINED_ONLY_WITHOUT_ACTIVE_LINKS_STATEMENT, (41, 77))
+    register_purge(mock_session, (41, 77), UserStatus.JOINED_ONLY)
 
     with capture_logs(processors=[merge_contextvars]) as logs:
         await inactive_meetings.run(api, metrics_client)
 
     record = next(entry for entry in logs if entry["event"] == "Delete joined-only users without active links")
     assert (record["user_ids"], record["count"]) == ([41, 77], 2)
-    assert "DELETE FROM users WHERE users.id IN (41, 77)" in mock_session.queries_executed
+
+
+async def test_abandoned_onboarding_purge_names_the_accounts_it_took(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    register_due_meetings(mock_session)
+    mock_session.add_objects_with_statement(inactive_meetings.ABANDONED_ONBOARDING_STATEMENT, (52,))
+    register_purge(mock_session, (52,), UserStatus.ONBOARDING)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        await inactive_meetings.run(api, metrics_client)
+
+    record = next(entry for entry in logs if entry["event"] == "Delete abandoned onboarding users")
+    assert (record["user_ids"], record["count"], record["reason"]) == ([52], 1, "onboarding_window_elapsed")
+    summary = next(entry for entry in logs if entry["event"] == "Deactivation sweep complete")
+    assert summary["abandoned_onboarding_users_deleted"] == 1
 
 
 async def test_sweep_summary_reports_the_run_by_reason_and_window(

@@ -46,7 +46,7 @@ async def test_users_has_acquisition_source_column(db_session: AsyncSession):
 
 
 async def test_users_status_check_constraint_exists(db_session: AsyncSession):
-    """The `users_status_valid` CHECK constraint must be present and enforce the 4 enum values."""
+    """The `users_status_valid` CHECK constraint must be present and enforce the enum values."""
     constraint = (
         await db_session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
             text(
@@ -61,13 +61,14 @@ async def test_users_status_check_constraint_exists(db_session: AsyncSession):
     assert "'joined_only'" in constraint
     assert "'left'" in constraint
     assert "'deletion_requested'" in constraint
+    assert "'onboarding'" in constraint
 
 
-@pytest.mark.parametrize("status_value", ["member", "joined_only", "left", "deletion_requested"])
+@pytest.mark.parametrize("status_value", ["member", "joined_only", "left", "deletion_requested", "onboarding"])
 async def test_users_status_accepts_valid_values(db_session: AsyncSession, status_value: str):
     """Each enum value defined in `UserStatus` must satisfy the CHECK constraint."""
     # Use the 998 throwaway range to avoid colliding with session-scoped seed users.
-    tg_user_id = 998_100 + ["member", "joined_only", "left", "deletion_requested"].index(status_value)
+    tg_user_id = 998_100 + ["member", "joined_only", "left", "deletion_requested", "onboarding"].index(status_value)
     # Savepoint isolates the insert from the session-scoped outer transaction.
     savepoint = await db_session.begin_nested()
     try:

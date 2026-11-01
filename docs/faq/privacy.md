@@ -230,6 +230,8 @@ For the GDPR-minded, the legal bases are the boring ones:
 
 If you joined a meeting via someone else's group message without ever opening the bot directly, your record exists only for the lifetime of those meetings and is removed when they end.
 
+If you open the bot for the first time and never answer the timezone question, your record is removed a week after it was created, unless you own a meeting or joined an active one.
+
 **Meetings you've joined** (RSVPs): when the meeting is deleted or you leave it, your RSVP is removed. A guest someone added by name is a placeholder entry on the meeting, never linked to any Telegram account, and disappears with the meeting.
 
 **Meetings you own:** when a meeting becomes inactive, how long it's kept afterward, and when it's permanently deleted are covered on the [Meeting lifecycle](../user-guide/meeting_lifecycle.md#how-long-an-inactive-meeting-is-kept) page.
