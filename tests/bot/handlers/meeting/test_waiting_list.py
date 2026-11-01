@@ -4,8 +4,10 @@ import pytest
 
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.models import JoinedUsers, Meetup, User
+from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import MeetingJoinMessages
+from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -15,6 +17,7 @@ from tests.helpers import (
     create_meetup,
     create_user,
 )
+from tests.helpers.monitoring import MetricAssertions
 from tests.helpers.types import ClaimSharedCard
 
 
@@ -99,9 +102,6 @@ async def test_user_leaves_and_waiting_list_promotes(
     assert full_meeting.n_participants == 2
     assert full_meeting.n_waiting == 1
 
-    # Ensure that when the link is deleted it disappears from the meeting
-    mock_session.delete.side_effect = lambda link: full_meeting.joined_links.remove(link)
-
     # Call the handler for the user leaving
     context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
 
@@ -165,9 +165,6 @@ async def test_user_leaves_and_first_waiting_list_user_promoted(
     # Before calling the handler, the meeting has two users joined and two in the waiting list
     assert full_meeting.n_participants == 2
     assert full_meeting.n_waiting == 2
-
-    # Ensure that when the link is deleted it disappears from the meeting
-    mock_session.delete.side_effect = lambda link: full_meeting.joined_links.remove(link)
 
     # Call the handler for the user leaving
     context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
@@ -250,3 +247,120 @@ async def test_user_leaves_and_multiple_waiting_list_users_promoted(
         ),
         times=2,
     )
+
+
+# from_bot_chat=False: the group card is what the person on the waiting list pressed Join on.
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.LEAVE.with_id(123), from_bot_chat=False)], indirect=True
+)
+async def test_user_on_the_waiting_list_leaves_from_a_shared_card(
+    full_meeting: Meetup,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+    claim_shared_card: ClaimSharedCard,
+):
+    create_joined_link(user=user_with_settings, meetup=full_meeting, is_waiting_list=True)
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(full_meeting)
+    claim_shared_card(full_meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
+
+    assert not full_meeting.has_participant(user_with_settings.db_id)
+    assert full_meeting.n_participants == 1
+    assert full_meeting.n_waiting == 0
+    metrics.assert_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.LEAVE_MEETING)})
+    context.api.assert_answer_callback_query_called(
+        update=handler_context.update,
+        text=MeetingJoinMessages.LEAVE_SUCCESS.text(lang=user_with_settings.lang),
+        show_alert=False,
+    )
+    context.api.assert_update_meeting_messages_called(
+        meeting=full_meeting,
+        current_message=full_meeting.message_from_update(handler_context.update),
+        skip_current=False,
+    )
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.LEAVE.with_id(123))], indirect=True)
+async def test_user_on_the_waiting_list_leaves_from_the_bot_chat(
+    full_meeting: Meetup,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    create_joined_link(user=user_with_settings, meetup=full_meeting, is_waiting_list=True)
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(full_meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
+
+    assert not full_meeting.has_participant(user_with_settings.db_id)
+    context.api.assert_answer_callback_query_called(
+        update=handler_context.update,
+        text=MeetingJoinMessages.LEAVE_SUCCESS.text(lang=user_with_settings.lang),
+        show_alert=False,
+    )
+    context.api.assert_edit_message_called(
+        update=handler_context.update,
+        view=meeting_views.left_view(full_meeting, user_with_settings.lang),
+    )
+    context.api.assert_update_meeting_messages_called(meeting=full_meeting, current_message=None, skip_current=True)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.LEAVE.with_id(123))], indirect=True)
+async def test_leaving_the_waiting_list_promotes_nobody_while_the_meeting_is_full(
+    full_meeting: Meetup,
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    next_in_line = create_user(id=2, first_name="NextInLine", tg_user_id=2, settings=user_with_settings.settings)
+    create_joined_link(
+        user=user_with_settings,
+        meetup=full_meeting,
+        is_waiting_list=True,
+        created_time=dt.datetime.now(dt.UTC) - dt.timedelta(hours=1),
+    )
+    next_link = create_joined_link(user=next_in_line, meetup=full_meeting, is_waiting_list=True)
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(full_meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
+
+    assert full_meeting.waiting_links() == [next_link]
+    assert full_meeting.n_participants == 1
+    context.api.assert_method_just_called("send_message_to_user", times=0)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.LEAVE.with_id(1))], indirect=True)
+async def test_owner_leaves_their_own_waiting_list_and_keeps_their_card(
+    user_with_settings: User,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+):
+    meeting = user_with_settings.meetups[0]
+    meeting.max_members = 1
+    meeting.waiting_list = True
+    guest = create_user(id=2, first_name="Guest", tg_user_id=2, settings=user_with_settings.settings)
+    create_joined_link(user=guest, meetup=meeting)
+    create_joined_link(user=user_with_settings, meetup=meeting, is_waiting_list=True)
+    mock_session.add_object(user_with_settings, query_field="tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
+
+    assert not meeting.has_participant(user_with_settings.db_id)
+    assert meeting.n_participants == 1
+    context.api.assert_answer_callback_query_called(
+        update=handler_context.update,
+        text=MeetingJoinMessages.LEAVE_SUCCESS.text(lang=user_with_settings.lang),
+        show_alert=False,
+    )
+    context.api.assert_edit_message_called(
+        update=handler_context.update,
+        view=meeting_views.view_for(meeting, user_with_settings),
+    )
+    context.api.assert_update_meeting_messages_called(meeting=meeting, current_message=None, skip_current=True)

@@ -156,7 +156,7 @@ async def user_leaves_meeting(
     session: AsyncSession, update: Update, context: TMitupContext, user: User, with_notification: bool = True
 ):
     async def leave_operation(meeting: Meetup, user: User) -> MeetingJoinMessages:
-        if joined_link := meeting.participant(user.db_id):
+        if joined_link := user.joined_meeting(meeting.db_id):
             was_waiting_list = joined_link.is_waiting_list
             promoted_links = meeting.remove_participant(joined_link)
             context.put_feature_metric(Feature.LEAVE_MEETING)

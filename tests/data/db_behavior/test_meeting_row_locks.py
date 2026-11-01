@@ -104,9 +104,23 @@ async def join_meeting(session: AsyncSession, meetup_id: int, tg_user_id: int) -
     return joined_link is not None
 
 
-async def remove_participant(session: AsyncSession, meetup_id: int, tg_user_id: int) -> list[int]:
-    """The leave/kick-out critical section: lock, find the membership, remove it (which promotes
-    from the waiting list) and flush. Returns the tg ids of the promoted users."""
+async def leave_meeting(session: AsyncSession, meetup_id: int, tg_user_id: int) -> list[int]:
+    """The leave critical section, flushing where the handler commits: lock, find the membership through
+    the user and remove it (which promotes from the waiting list). Returns the tg ids of the promoted users."""
+    user = (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).one()
+    meeting = await Meetup.by_id(session, meetup_id, for_update=True)
+    assert meeting is not None
+    await session.refresh(user, ["meetups", "joined_links"])
+    joined_link = user.joined_meeting(meetup_id)
+    assert joined_link is not None
+    promoted = meeting.remove_participant(joined_link)
+    await session.flush()
+    return [link.user.tg_user_id for link in promoted]
+
+
+async def kick_out_participant(session: AsyncSession, meetup_id: int, tg_user_id: int) -> list[int]:
+    """The kick-out critical section, flushing where the handler commits: lock, find the confirmed
+    participant through the meeting and remove them. Returns the tg ids of the promoted users."""
     user = (await session.exec(select(User).where(User.tg_user_id == tg_user_id))).one()
     meeting = await Meetup.by_id(session, meetup_id, for_update=True)
     assert meeting is not None
@@ -177,7 +191,7 @@ async def test_leave_racing_join_promotes_exactly_once(db_session: AsyncSession)
         tg_base, max_members=1, waiting_list=True, users=3, participants=(1,), waiting=(2,)
     ) as meetup_id:
         promoted_tgs, join_result = await race(
-            lambda session: remove_participant(session, meetup_id, tg_base + 1),
+            lambda session: leave_meeting(session, meetup_id, tg_base + 1),
             lambda session: join_meeting(session, meetup_id, tg_base + 3),
         )
 
@@ -186,6 +200,21 @@ async def test_leave_racing_join_promotes_exactly_once(db_session: AsyncSession)
 
         participant_tgs, waiting_tgs = await committed_state(meetup_id)
         assert participant_tgs == {tg_base + 2}
+        assert waiting_tgs == {tg_base + 3}
+
+
+async def test_leaving_the_waiting_list_removes_only_that_row(db_session: AsyncSession):
+    """Leave as the handler runs it on a full meeting: the row of the person leaving the waiting
+    list is deleted, and the person queued behind them stays queued."""
+    tg_base = 997_080
+    async with provisioned_meeting(
+        tg_base, max_members=1, waiting_list=True, users=3, participants=(1,), waiting=(2, 3)
+    ) as meetup_id:
+        async with asyncio.timeout(RACE_TIMEOUT), db.begin() as session:
+            assert await leave_meeting(session, meetup_id, tg_base + 2) == []
+
+        participant_tgs, waiting_tgs = await committed_state(meetup_id)
+        assert participant_tgs == {tg_base + 1}
         assert waiting_tgs == {tg_base + 3}
 
 
@@ -199,7 +228,7 @@ async def test_kickout_racing_join_stays_consistent(db_session: AsyncSession):
     ) as meetup_id:
         join_result, promoted_tgs = await race(
             lambda session: join_meeting(session, meetup_id, tg_base + 3),
-            lambda session: remove_participant(session, meetup_id, tg_base + 1),
+            lambda session: kick_out_participant(session, meetup_id, tg_base + 1),
         )
 
         assert join_result is True
