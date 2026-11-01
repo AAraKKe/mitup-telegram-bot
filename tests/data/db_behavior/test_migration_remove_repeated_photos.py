@@ -6,7 +6,7 @@ whole-table statements until the suite ends.
 
 import contextlib
 import importlib.util
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -66,7 +66,7 @@ async def run_sql(session: AsyncSession, statement: str, **params: object):
 
 
 @contextlib.asynccontextmanager
-async def committed_meetings(*banners: dict[int, str]) -> AsyncIterator[list[int]]:
+async def committed_meetings(*banners: dict[int, str]) -> AsyncGenerator[list[int]]:
     """Commit one meeting per banner, a map of position to `file_unique_id` inserted in the given
     order, and delete everything afterwards."""
     async with db.begin() as session:

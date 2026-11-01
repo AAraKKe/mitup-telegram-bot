@@ -12,7 +12,7 @@ range; this file claims the 997_6xx sub-range.
 import asyncio
 import contextlib
 import datetime as dt
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncGenerator, Iterator
 from typing import Any, cast
 
 import pytest
@@ -83,7 +83,7 @@ def make_api(bot: RecordingBot) -> TelegramApi:
 
 
 @contextlib.asynccontextmanager
-async def committed_user(tg_user_id: int) -> AsyncIterator[int]:
+async def committed_user(tg_user_id: int) -> AsyncGenerator[int]:
     async with db.begin() as session:
         user = User(first_name="Linking User", tg_user_id=tg_user_id, settings=Settings())
         session.add(user)
@@ -119,7 +119,7 @@ async def committed_pending_link(
     level: SupporterLevel = SupporterLevel.HOST_2,
     *,
     expires_in: dt.timedelta = LIVE_WINDOW,
-) -> AsyncIterator[str]:
+) -> AsyncGenerator[str]:
     """Stage a pending link as the OAuth callback does, and yield its pairing code.
 
     The one departure from ``stage_pending_link`` is deliberate: the deadline is measured from the

@@ -21,7 +21,7 @@ route (a trailing-slash Patreon callback) would otherwise capture a live OAuth c
 
 import asyncio
 from collections import Counter
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 
@@ -134,7 +134,7 @@ async def report_unrouted_requests(unrouted: UnroutedRequests, metrics_client: M
 
 
 @asynccontextmanager
-async def unrouted_request_reporting(unrouted: UnroutedRequests, metrics_client: MetricsClient) -> AsyncIterator[None]:
+async def unrouted_request_reporting(unrouted: UnroutedRequests, metrics_client: MetricsClient) -> AsyncGenerator[None]:
     """Publish *unrouted* on an interval for the duration of the block, draining it on the way out.
 
     The accounting standing when the app stops belongs to a partial interval that the reporter will

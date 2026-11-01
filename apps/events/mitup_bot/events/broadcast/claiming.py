@@ -4,7 +4,7 @@ package docstring in `__init__.py`."""
 
 import datetime as dt
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import cast
 
 import structlog
 from sqlalchemy import Row
@@ -249,7 +249,9 @@ async def claim_pending_batch(session: AsyncSession, broadcast_id: int) -> list[
     return await resolve_claimed_recipients(session, claimed)
 
 
-async def resolve_claimed_recipients(session: AsyncSession, claimed: Sequence[Row[Any]]) -> list[PendingDelivery]:
+async def resolve_claimed_recipients(
+    session: AsyncSession, claimed: Sequence[Row[int, int, str, int]]
+) -> list[PendingDelivery]:
     """Load the full `User` row for each just-claimed delivery — `send_message_to_user` sends
     through the ORM object, not a bare tg id. Read-only: no lock is needed, the claim already
     secured exclusive ownership of the delivery rows themselves.
@@ -260,17 +262,17 @@ async def resolve_claimed_recipients(session: AsyncSession, claimed: Sequence[Ro
     flood trigger so its attempt count grows monotonically, and makes a flood halt release the
     highest-id remainder deterministically.
     """
-    claimed = sorted(claimed, key=lambda row: cast(int, row[0]))
-    user_ids = [cast(int, user_id) for _, user_id, _, _ in claimed]
+    claimed = sorted(claimed, key=lambda row: row[0])
+    user_ids = [user_id for _, user_id, _, _ in claimed]
     users_by_id = {
         user.db_id: user for user in (await session.exec(select(User).where(col(User.id).in_(user_ids)))).all()
     }
     return [
         PendingDelivery(
-            delivery_id=cast(int, delivery_id),
-            user=users_by_id[cast(int, user_id)],
+            delivery_id=delivery_id,
+            user=users_by_id[user_id],
             language_sent=language,
-            attempt_count=cast(int, attempt_count),
+            attempt_count=attempt_count,
         )
         for delivery_id, user_id, language, attempt_count in claimed
     ]

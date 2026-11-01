@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from functools import partial
 from typing import assert_never
@@ -65,7 +65,7 @@ def build_webhook_lifespan(
     accepts_fanout: bool,
 ) -> Lifespan:
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
         log.info("Starting the bot application", run_mode=RunModes.WEBHOOK.value)
         try:
             await ptb_app.initialize()
@@ -131,7 +131,7 @@ def build_polling_lifespan(
     accepts_fanout: bool,
 ) -> Lifespan:
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
         log.info("Starting the bot application", run_mode=RunModes.POLLING.value)
         try:
             await ptb_app.initialize()

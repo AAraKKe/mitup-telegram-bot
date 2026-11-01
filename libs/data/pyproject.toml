@@ -4,13 +4,13 @@ version = "0.0.1"
 description = "Persistence layer for mitup-telegram-bot: SQLModel tables, the async engine and session lifecycle, and the Alembic migrations tree"
 requires-python = ">=3.14"
 dependencies = [
-    "sqlmodel==0.0.46",
-    "sqlalchemy[asyncio]==2.0.54",
+    "sqlmodel==0.0.48",
+    "sqlalchemy[asyncio]==2.1.6",
     "psycopg[binary]==3.3.6",
-    "alembic==1.20.0",
-    "pydantic==2.13.5",
+    "alembic==1.20.1",
+    "pydantic==2.14.1",
     "structlog==26.1.0",
-    "cryptography==50.0.1",
+    "cryptography==50.0.2",
     "mitup-core",
     "mitup-monitoring",
 ]

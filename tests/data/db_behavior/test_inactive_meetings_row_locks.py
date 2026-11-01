@@ -12,7 +12,7 @@ claims the 997_3xx sub-range (997_0xx: test_meeting_row_locks, 997_1xx: test_com
 
 import contextlib
 import datetime as dt
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 
 import pytest
 from sqlalchemy import text
@@ -33,7 +33,7 @@ pytestmark = pytest.mark.db_test
 
 
 @contextlib.asynccontextmanager
-async def provisioned_expired_meeting(tg_base: int, *, users: int = 0) -> AsyncIterator[int]:
+async def provisioned_expired_meeting(tg_base: int, *, users: int = 0) -> AsyncGenerator[int]:
     """Provision a committed meeting that is due for deactivation and tear it down afterwards.
 
     Committed data is required here: the conftest seeds live in the session fixture's open

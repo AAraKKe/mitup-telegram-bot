@@ -11,7 +11,7 @@ seeds are invisible to them, and every test that provisions data does so in a co
 
 import contextlib
 import datetime as dt
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -127,7 +127,7 @@ async def provisioned_broadcast(
     status: BroadcastStatus = BroadcastStatus.QUEUED,
     attempts: int = 0,
     deliveries: list[SeedDelivery] | None = None,
-) -> AsyncIterator[Provisioned]:
+) -> AsyncGenerator[Provisioned]:
     async with db.begin() as session:
         broadcast = Broadcast(
             name="Integration Broadcast",

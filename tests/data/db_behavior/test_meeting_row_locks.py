@@ -7,7 +7,7 @@ Each actor runs the same critical section the handlers run — lock the meetup r
 
 import asyncio
 import contextlib
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 
 import pytest
 from sqlalchemy import text
@@ -31,7 +31,7 @@ async def provisioned_meeting(
     users: int = 0,
     participants: tuple[int, ...] = (),
     waiting: tuple[int, ...] = (),
-) -> AsyncIterator[int]:
+) -> AsyncGenerator[int]:
     """Provision a meeting committed to the database and tear it down afterwards.
 
     Committed data is required here: the conftest seeds live in the session fixture's open

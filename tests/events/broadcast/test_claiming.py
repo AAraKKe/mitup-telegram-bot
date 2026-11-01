@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import cast
 from unittest import mock
 
 import pytest
@@ -41,7 +41,7 @@ async def test_resolve_claimed_recipients_pairs_users_to_deliveries(mock_session
     second = create_member(2, 12, "es_ES")
     script_exec(mock_session, Result(results=(first, second)))
 
-    claimed = cast(Sequence[Row[Any]], [(101, 1, "en", 1), (102, 2, "es_ES", 3)])
+    claimed = cast(Sequence[Row[int, int, str, int]], [(101, 1, "en", 1), (102, 2, "es_ES", 3)])
     pending = await claiming.resolve_claimed_recipients(mock_session, claimed)
 
     assert [(item.delivery_id, item.user.db_id, item.language_sent, item.attempt_count) for item in pending] == [
@@ -62,7 +62,7 @@ async def test_resolve_claimed_recipients_orders_batch_by_delivery_id_even_when_
     script_exec(mock_session, Result(results=(first, second, third)))
 
     # RETURNING hands them back out of id order, as real Postgres may.
-    claimed = cast(Sequence[Row[Any]], [(103, 3, "en", 1), (101, 1, "en", 2), (102, 2, "en", 3)])
+    claimed = cast(Sequence[Row[int, int, str, int]], [(103, 3, "en", 1), (101, 1, "en", 2), (102, 2, "en", 3)])
     pending = await claiming.resolve_claimed_recipients(mock_session, claimed)
 
     assert [item.delivery_id for item in pending] == [101, 102, 103]

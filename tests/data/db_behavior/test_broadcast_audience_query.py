@@ -8,7 +8,7 @@ file claims the 997_62x tg range.
 """
 
 import contextlib
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 
 import pytest
 from sqlalchemy import text
@@ -25,7 +25,7 @@ ANONYMOUS_INVITEE_TG_ID = -1
 
 
 @contextlib.asynccontextmanager
-async def committed_audience(tg_base: int) -> AsyncIterator[None]:
+async def committed_audience(tg_base: int) -> AsyncGenerator[None]:
     """Commit a mixed population and tear it down: two es_ES members, one de_DE member, a LEFT
     member (gl_ES) and the anonymous-invitee sentinel (-1, JOINED_ONLY, pt_BR) — the last two
     are non-members and must never be counted."""

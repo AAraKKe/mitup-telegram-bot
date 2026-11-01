@@ -1,5 +1,5 @@
 import datetime as dt
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import replace
 from typing import Protocol
@@ -84,7 +84,7 @@ def leave_chip(meeting: Meetup, lang: str) -> ButtonConfig:
 
 
 @contextmanager
-def participant_list_unloaded() -> Iterator[None]:
+def participant_list_unloaded() -> Generator[None]:
     """Make the roster raise the way an unloaded relationship does under the async engine.
 
     The starting-soon nomination loads the meeting and its owner but not `meetup.joined_links`, so a

@@ -1,7 +1,7 @@
 import contextlib
 import datetime as dt
 import re
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncGenerator, Iterator
 from unittest.mock import MagicMock
 
 import httpx
@@ -47,7 +47,7 @@ def staging_session(monkeypatch: pytest.MonkeyPatch) -> MockDbSession:
     session = MockDbSession()
 
     @contextlib.asynccontextmanager
-    async def fake_begin() -> AsyncIterator[MockDbSession]:
+    async def fake_begin() -> AsyncGenerator[MockDbSession]:
         yield session
 
     monkeypatch.setattr("mitup_bot.db.begin", fake_begin)

@@ -16,7 +16,7 @@ test_inactive_meetings_row_locks).
 import asyncio
 import contextlib
 import datetime as dt
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from typing import cast
 
 import pytest
@@ -48,7 +48,7 @@ def make_probe_api(probe: object) -> TelegramApi:
 
 
 @contextlib.asynccontextmanager
-async def provisioned_started_meeting(tg_base: int, *, with_message: bool = False) -> AsyncIterator[int]:
+async def provisioned_started_meeting(tg_base: int, *, with_message: bool = False) -> AsyncGenerator[int]:
     """Provision a committed meeting whose scheduled time has passed, owned by ``tg_base``
     with the MEMBER participant ``tg_base + 1``, and tear it down afterwards.
 
@@ -183,7 +183,7 @@ async def test_deactivation_releases_row_lock_before_the_drain(db_session: Async
 
 
 @contextlib.asynccontextmanager
-async def provisioned_marked_user(tg_user_id: int) -> AsyncIterator[None]:
+async def provisioned_marked_user(tg_user_id: int) -> AsyncGenerator[None]:
     """Provision a committed DELETION_REQUESTED user (with a Settings row) and tear down
     whatever the purge under test may have left behind."""
     async with db.begin() as session:

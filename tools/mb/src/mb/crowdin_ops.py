@@ -11,7 +11,7 @@ back into the per-language catalogs.
 
 import asyncio
 import os
-from collections.abc import AsyncIterator, Coroutine
+from collections.abc import AsyncGenerator, Coroutine
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
@@ -214,7 +214,7 @@ class CrowdinClient:
 
 
 @asynccontextmanager
-async def crowdin_client(token: str) -> AsyncIterator[CrowdinClient]:
+async def crowdin_client(token: str) -> AsyncGenerator[CrowdinClient]:
     headers = {"Authorization": f"Bearer {token}"}
     async with (
         httpx.AsyncClient(base_url=API_BASE_URL, headers=headers, timeout=REQUEST_TIMEOUT_S) as api,

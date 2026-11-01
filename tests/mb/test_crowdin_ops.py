@@ -1,5 +1,5 @@
 import json
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from pathlib import Path
 from typing import cast
@@ -71,7 +71,7 @@ class FakeCrowdinClient:
 @asynccontextmanager
 async def mock_transport_client(
     api_handler: RequestHandler, downloads_handler: RequestHandler | None = None
-) -> AsyncIterator[crowdin_ops.CrowdinClient]:
+) -> AsyncGenerator[crowdin_ops.CrowdinClient]:
     """Build a real CrowdinClient whose two httpx clients are backed by MockTransports."""
 
     def refuse(request: httpx.Request) -> httpx.Response:
@@ -88,7 +88,7 @@ def yielding(client: FakeCrowdinClient) -> Callable[[str], AbstractAsyncContextM
     """A crowdin_client replacement that hands orchestration the recording fake."""
 
     @asynccontextmanager
-    async def factory(token: str) -> AsyncIterator[FakeCrowdinClient]:
+    async def factory(token: str) -> AsyncGenerator[FakeCrowdinClient]:
         yield client
 
     return factory

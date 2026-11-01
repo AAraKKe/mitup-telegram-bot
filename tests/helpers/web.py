@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock
 
@@ -94,7 +94,7 @@ def build_web_client(web_app: FastAPI, *, raise_app_exceptions: bool = True) -> 
 
 
 @asynccontextmanager
-async def lifespan_runner(web_app: FastAPI) -> AsyncIterator[LifespanManager]:
+async def lifespan_runner(web_app: FastAPI) -> AsyncGenerator[LifespanManager]:
     """Async context manager wrapping asgi_lifespan.LifespanManager."""
     async with LifespanManager(web_app) as manager:
         yield manager

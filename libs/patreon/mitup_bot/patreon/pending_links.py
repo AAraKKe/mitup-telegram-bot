@@ -80,7 +80,7 @@ def live_row_predicate(code: str) -> tuple[ColumnElement[bool], ColumnElement[bo
     )
 
 
-def claim_statement(code: str, tg_user_id: int) -> ReturningUpdate[tuple[str, str | None, SupporterLevel]]:
+def claim_statement(code: str, tg_user_id: int) -> ReturningUpdate[str, str | None, SupporterLevel]:
     """The conditional UPDATE that binds a pending link to the account presenting the code.
 
     Claiming records an owner without spending the row, so the confirm step has something to check
@@ -113,7 +113,7 @@ def claim_statement(code: str, tg_user_id: int) -> ReturningUpdate[tuple[str, st
     )
 
 
-def consume_statement(code: str, tg_user_id: int) -> ReturningUpdate[tuple[str, str | None, SupporterLevel]]:
+def consume_statement(code: str, tg_user_id: int) -> ReturningUpdate[str, str | None, SupporterLevel]:
     """The conditional UPDATE that spends a pending link once its claimer confirms.
 
     Expiry is re-checked here, not just at claim time: a prompt opened seconds before the deadline
@@ -137,7 +137,7 @@ def consume_statement(code: str, tg_user_id: int) -> ReturningUpdate[tuple[str, 
 
 
 def to_claimed_link(
-    row: Row[tuple[str, str | None, SupporterLevel]] | tuple[str, str | None, SupporterLevel] | None,
+    row: Row[str, str | None, SupporterLevel] | tuple[str, str | None, SupporterLevel] | None,
 ) -> ClaimedLink | None:
     """Map a transition's RETURNING row onto a ClaimedLink, or None when nothing matched."""
     if row is None:
@@ -167,7 +167,7 @@ class ClaimFailure(Enum):
     UNCLAIMED = auto()
 
 
-def classification_statement(code: str) -> Select[tuple[PatreonPendingLink, bool]]:
+def classification_statement(code: str) -> Select[PatreonPendingLink, bool]:
     """The read that backs failure classification: the row plus whether it has expired.
 
     Expiry is judged by the database clock — the clock both transitions filter on — so the diagnosis

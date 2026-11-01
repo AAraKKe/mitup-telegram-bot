@@ -25,7 +25,7 @@ test suite exercises rich's colored path).
 
 import os
 import sys
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from rich.console import Console
@@ -143,7 +143,7 @@ def status_cell(passed: bool) -> str:
 
 
 @contextmanager
-def spinner(message: str) -> Iterator[None]:
+def spinner(message: str) -> Generator[None]:
     """Animated status for quiet, short steps; a plain one-liner when animations are off.
 
     Only wrap commands whose output is captured — a spinner over a streaming subprocess
