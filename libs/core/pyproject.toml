@@ -4,9 +4,9 @@ version = "0.0.1"
 description = "Foundation layer for mitup-telegram-bot: config, logging, i18n, and shared value schemas"
 requires-python = ">=3.14"
 dependencies = [
-    "pydantic==2.14.1",
+    "pydantic==2.14.2",
     "structlog==26.1.0",
-    "tzdata==2026.5",
+    "tzdata==2026.6",
 ]
 
 [tool.hatch.build.targets.wheel]
