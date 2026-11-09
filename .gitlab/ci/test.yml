@@ -257,7 +257,7 @@ validate-locales:
 test-db:
   stage: test
   services:
-    - name: docker:29-dind
+    - name: docker:29-dind@sha256:08a98015fce594af7c382883bea080ea206de74402a95da9dc52b6428c8cd121
       alias: docker
   variables:
     DOCKER_HOST: tcp://docker:2375
@@ -284,7 +284,7 @@ validate-local-setup:
   needs: [] # Run immediately without waiting for previous stages
   script:
     - apt-get update && apt-get install -y --no-install-recommends libpq-dev gcc gettext git
-    - pip install --no-cache-dir uv
+    - pip install --no-cache-dir uv==0.13.6
     - uv sync --frozen
     - uv run mb --help
     - 'echo "feat(ci) smoke-test the commit hook" > commit-msg.txt && ! uv run mb ci check-commit commit-msg.txt'

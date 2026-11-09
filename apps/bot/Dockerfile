@@ -9,7 +9,7 @@ FROM python:3.14.7-slim-bookworm AS builder
 # uv drives the install. UV_PYTHON_DOWNLOADS=never keeps it on this base image's single system
 # interpreter, so the venv we copy to stage 2 links to a python that also exists there.
 # UV_COMPILE_BYTECODE trades build time for faster cold starts.
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv==0.13.6
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_PYTHON_DOWNLOADS=never \
     UV_COMPILE_BYTECODE=1 \

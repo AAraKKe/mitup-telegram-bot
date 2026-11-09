@@ -14,7 +14,7 @@ RUN apt-get update && \
 WORKDIR /bot
 
 # Install uv
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv==0.13.6
 
 # Keep the venv and download cache outside the bind-mounted project directory.
 # Both live under /.docker_uv, each on its own named volume: the venv is per-checkout

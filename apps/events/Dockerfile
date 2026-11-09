@@ -8,7 +8,7 @@
 # ---- Stage 1: builder ----------------------------------------------------------------------
 FROM python:3.14.7-slim-bookworm AS builder
 
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv==0.13.6
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_PYTHON_DOWNLOADS=never \
     UV_COMPILE_BYTECODE=1 \

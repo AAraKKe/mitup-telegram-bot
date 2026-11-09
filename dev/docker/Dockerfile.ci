@@ -33,7 +33,7 @@ RUN apt-get update && \
     /tmp/aws/aws/install && \
     rm -rf /tmp/aws && \
     # Install uv
-    pip install --no-cache-dir uv && \
+    pip install --no-cache-dir uv==0.13.6 && \
     # Clean up apt cache
     rm -rf /var/lib/apt/lists/*
 

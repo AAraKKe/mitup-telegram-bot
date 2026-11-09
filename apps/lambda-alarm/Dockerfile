@@ -5,7 +5,7 @@
 # ---- Stage 1: builder ----------------------------------------------------------------------
 FROM public.ecr.aws/lambda/python:3.14 AS builder
 
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv==0.13.6
 
 WORKDIR /src
 

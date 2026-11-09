@@ -34,6 +34,11 @@ workspace sources. Two Dockerfile details matter:
   `validate-lock` job goes through `mb ci check-lock`, which strips `UV_FROZEN` to force the real
   drift comparison.
 
+uv is pinned with the exact form `pip install --no-cache-dir uv==X.Y.Z` in every Dockerfile and in
+`validate-local-setup`, and the `docker:*` CI images are pinned to a digest. Renovate's regex
+manager only recognizes that exact uv form and bumps every site together, so a new uv install must
+copy it or it drifts unpinned.
+
 Because the image bakes in dependencies, it must be rebuilt when dependency metadata changes. The
 `workflow.rules` in `base.yml` watch the `.ci-docker-files` anchor (the CI Dockerfile, `uv.lock`,
 the root and every member `pyproject.toml`, and the CI YAML). When an MR touches one of those,

@@ -3,8 +3,10 @@
   "extends": [
     "config:recommended",
     ":semanticCommitsDisabled",
-    ":disableDependencyDashboard"
+    ":disableDependencyDashboard",
+    "schedule:weekly"
   ],
+  "timezone": "Europe/Madrid",
   "reviewers": [
     "@jparaque"
   ],
@@ -14,6 +16,7 @@
   ],
   "configMigration": true,
   "minimumReleaseAge": "7 days",
+  "osvVulnerabilityAlerts": true,
   "packageRules": [
     {
       "matchDatasources": [
@@ -24,7 +27,8 @@
       ],
       "matchUpdateTypes": [
         "major",
-        "minor"
+        "minor",
+        "digest"
       ],
       "additionalBranchPrefix": "docker-",
       "groupName": "Docker images",
@@ -50,6 +54,16 @@
       "groupName": "Postgres image"
     },
     {
+      "description": "Pin CI images to a digest so a rebuilt floating tag reaches CI through an MR",
+      "matchManagers": [
+        "gitlabci"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "pinDigests": true
+    },
+    {
       "description": "Disable Docker updates for Python images as they are handled by a custom manager",
       "matchDatasources": [
         "docker"
@@ -72,15 +86,6 @@
       "groupName": "Python dependencies"
     },
     {
-      "matchUpdateTypes": [
-        "patch"
-      ],
-      "matchFileNames": [
-        ".gitlab-ci.yml"
-      ],
-      "enabled": false
-    },
-    {
       "description": "Silence ruff's noisy patch stream. NOTE: do not add ty here — ty is pre-1.0 (0.0.x), so Renovate classifies every ty release as a patch bump; disabling patch would suppress all ty updates.",
       "matchPackageNames": [
         "ruff"
@@ -100,6 +105,7 @@
       "enabled": false
     },
     {
+      "description": "Keep pre-commit hooks current without review: one grouped, automerged MR a month",
       "matchFileNames": [
         ".pre-commit-config.yaml"
       ],
@@ -110,8 +116,9 @@
       "autoApprove": true,
       "reviewers": [],
       "automerge": true,
+      "groupName": "pre-commit hooks",
       "schedule": [
-        "every weekend"
+        "* 0-3 1 * *"
       ]
     },
     {
@@ -133,6 +140,30 @@
       "major": {
         "enabled": false
       }
+    },
+    {
+      "description": "A new Python minor waits until the slim and Lambda base images are published for it",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "python"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "minimumReleaseAge": "90 days"
+    },
+    {
+      "description": "Bump every pinned uv install together, once a month",
+      "matchDepNames": [
+        "uv"
+      ],
+      "groupName": "uv",
+      "additionalBranchPrefix": "uv-",
+      "schedule": [
+        "* 0-3 1 * *"
+      ]
     }
   ],
   "customManagers": [
@@ -154,16 +185,26 @@
       "depNameTemplate": "python",
       "datasourceTemplate": "python-version",
       "versioningTemplate": "python"
+    },
+    {
+      "customType": "regex",
+      "description": "Update the pinned uv version in the Dockerfiles and CI jobs",
+      "managerFilePatterns": [
+        "/(^|/)Dockerfile(\\..+)?$/",
+        "/^\\.gitlab/ci/.+\\.yml$/"
+      ],
+      "matchStrings": [
+        "pip install --no-cache-dir uv==(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"
+      ],
+      "depNameTemplate": "uv",
+      "datasourceTemplate": "pypi"
     }
   ],
   "major": {
     "additionalBranchPrefix": "major-"
   },
   "lockFileMaintenance": {
-    "enabled": true,
-    "schedule": [
-      "every weekend"
-    ]
+    "enabled": true
   },
   "pre-commit": {
     "enabled": true

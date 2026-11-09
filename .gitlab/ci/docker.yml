@@ -2,9 +2,10 @@
 # Docker build and push images
 # ---------------------
 .docker-build-push: &docker-build
-  image: docker:29-cli
+  image: docker:29-cli@sha256:2357639ad1ea7d0194134bf3292622fd4e562483966ed674e5d7c945b5f3b28d
   services:
-    - docker:29-dind
+    - name: docker:29-dind@sha256:08a98015fce594af7c382883bea080ea206de74402a95da9dc52b6428c8cd121
+      alias: docker
   variables:
     # Enable BuildKit for better multi-stage builds and caching
     DOCKER_BUILDKIT: "1"
