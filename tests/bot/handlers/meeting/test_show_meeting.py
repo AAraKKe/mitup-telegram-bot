@@ -11,8 +11,9 @@ from mitup_bot.handlers.meeting.show_meeting import callback_query_show_meeting
 from mitup_bot.handlers.meeting.utils import meeting_detail_back_button
 from mitup_bot.models import User
 from mitup_bot.monitoring import MetricKey
-from mitup_bot.utils import ButtonMessages
+from mitup_bot.utils import ButtonMessages, MeetingDisplayMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views import MitupView, RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
     HandlerContext,
@@ -266,3 +267,51 @@ async def test_show_meeting_deleted_fallback_targets_joined_list(
     view = context.api.call_args("edit_message").kwargs["view"]
     back_button = view.menu[-1][-1]
     assert back_button.callback_data == cb.SHOW_JOINED_MEETINGS_PAGE.with_id(3)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.SHOW_MEETING.with_id(7))], indirect=True)
+async def test_show_meeting_tells_a_participant_their_finished_meeting_is_over(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    metrics: MetricAssertions,
+):
+    """The "Open meeting" button on an old notification shows a participant that their meeting has
+    finished."""
+    owner = create_user(id=999, tg_user_id=9990, first_name="Owner", settings=create_settings(id=2))
+    finished_meeting = create_meetup(id=7, owner=owner, title="Owner's Meeting", active=False)
+    create_joined_link(user=user_with_settings, meetup=finished_meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(finished_meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
+    await context.flush_metrics()
+
+    lang = user_with_settings.lang
+    context.api.assert_edit_message_called(
+        update,
+        MitupView(
+            message=MeetingDisplayMessages.FINISHED_BANNER.rich(lang=lang), menu=factory.main_menu_back_rows(lang)
+        ),
+    )
+    metrics.assert_not_emitted(name=MetricKey.MEETING_NOT_OWNED)
+
+
+@pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.SHOW_MEETING.with_id(7))], indirect=True)
+async def test_show_meeting_sends_a_stranger_to_the_main_menu_on_a_finished_meeting(
+    mock_session: MockDbSession,
+    update: Update,
+    handler_context: HandlerContext,
+    user_with_settings: User,
+    metrics: MetricAssertions,
+):
+    owner = create_user(id=999, tg_user_id=9990, first_name="Owner", settings=create_settings(id=2))
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(create_meetup(id=7, owner=owner, title="Owner's Meeting", active=False))
+
+    context, _ = await call_handler(MeetingHandlerId.SHOW_MEETING_CALLBACK, handler_context=handler_context)
+    await context.flush_metrics()
+
+    context.api.assert_edit_message_called(update, factory.main_menu_view(RenderContext(lang=user_with_settings.lang)))
+    metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)

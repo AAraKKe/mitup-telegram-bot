@@ -32,9 +32,9 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
     # load_collections: the cap check below counts the user's active meetings off `user.meetups`.
     user = await guards.current_user(update, session, load_collections=True)
 
-    # No lock here: reactivation writes `active` unconditionally without reading any participant or
-    # capacity state, and the flush-time UPDATE takes the row lock on its own. A join that grabs the
-    # per-meeting lock first sees the committed `active` value either way.
+    # No lock here: reactivation writes `active` and drops the participants unconditionally, reading
+    # no participant or capacity state, and the flush-time UPDATE takes the row lock on its own. A
+    # join that grabs the per-meeting lock first sees the committed `active` value either way.
     meeting = await guards.meeting(
         session,
         user,
@@ -72,15 +72,18 @@ async def callback_query_reactivate_meeting(session: AsyncSession, update: Updat
         previous_expiration_time=meeting.expiration_time,
         previous_datetime=meeting.datetime,
         was_warned=meeting.expiration_notification_sent,
+        participants_removed=meeting.n_participants,
+        waiting_list_removed=meeting.n_waiting,
         reason="owner_reactivated",
     )
 
     # A reactivation is a restart, not a resume: the meeting comes back as a fresh draft with its
     # dates cleared, so the owner picks a new date instead of inheriting the one that already passed.
     # The re-stamped `activated_time` gives the draft the full dateless window again, and the
-    # deactivation sweep judges it from there. Deactivation already dropped the participants and
-    # message cards, so there is nothing else to reset.
+    # deactivation sweep judges it from there. Everyone joins again, so the previous run's
+    # participants and waiting list go.
     meeting.active = True
+    meeting.joined_links.clear()
     meeting.activated_time = dt.datetime.now(dt.UTC)
     meeting.datetime = None
     meeting.end_datetime = None

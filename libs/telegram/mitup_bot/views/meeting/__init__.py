@@ -27,6 +27,7 @@ __all__ = (
     "deletion_notice_view",
     "deletion_warning_view",
     "external_view",
+    "fitted_shared_body",
     "images_locked_view",
     "images_view",
     "inline_view",
@@ -55,4 +56,11 @@ from .list_card import list_heading, meeting_list_section
 from .notifications import deletion_notice_view, deletion_warning_view, started_view, starting_soon_view
 from .owner_card import owner_body, owner_view
 from .settings_card import behavior_view, settings_view, time_format_view
-from .shared_card import build_inline_keyboard, external_view, inline_view, left_view, shared_body
+from .shared_card import (
+    build_inline_keyboard,
+    external_view,
+    fitted_shared_body,
+    inline_view,
+    left_view,
+    shared_body,
+)

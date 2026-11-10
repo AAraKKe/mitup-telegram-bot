@@ -107,7 +107,7 @@ def owner_is_host(user: User, action: str) -> bool:
     """
     if supporter.is_supporter(user.supporter_level):
         return True
-    log.warning(IMAGES_ACCESS_DENIED_EVENT, user_id=user.db_id, action=action, reason="not_a_supporter")
+    log.info(IMAGES_ACCESS_DENIED_EVENT, user_id=user.db_id, action=action, reason="not_a_supporter")
     return False
 
 
@@ -225,7 +225,7 @@ async def reject_message(
     refusal: InputRefusal,
     notice: RichContent | None = None,
 ) -> ConversationMeetingState:
-    log.warning(IMAGES_INPUT_REJECTED_EVENT, user_id=user.db_id, reason=refusal.value, image_count=len(meeting.images))
+    log.info(IMAGES_INPUT_REJECTED_EVENT, user_id=user.db_id, reason=refusal.value, image_count=len(meeting.images))
     return await show_images_screen(context, update, meeting, notice=notice, as_reply=True)
 
 

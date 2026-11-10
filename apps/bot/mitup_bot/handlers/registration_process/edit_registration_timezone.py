@@ -9,6 +9,7 @@ from mitup_bot import guards, timezone_api
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.handlers.start_payload import start_acquisition_source
+from mitup_bot.handlers.utils import message_kind
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature
@@ -142,12 +143,13 @@ async def registration_timezone_invalid_input_handler(
     # Reads only `user.lang`; never traverses the meetups/joined_links collections.
     user = await guards.current_user(update, session)
     message = guards.message(update)
-    log.warning(
+    log.info(
         "Onboarding step rejected input",
         user_id=user.db_id,
         step=TIMEZONE_PROMPT_STEP,
-        reason="unsupported_input_kind",
+        message_kind=message_kind(message),
         is_command=any(entity.type == MessageEntity.BOT_COMMAND and entity.offset == 0 for entity in message.entities),
+        reason="unsupported_input_kind",
     )
     await context.api.send_message(
         update=update,

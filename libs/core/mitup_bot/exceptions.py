@@ -203,6 +203,32 @@ class MeetingInactiveOwnerError(MeetingAccessError):
         )
 
 
+class MeetingFinishedError(MeetingAccessError):
+    """The caller would reach this meeting if it were active, but it has finished.
+
+    Carries no keyboard: the screen always leads back to the main menu. ``user_db_id`` is ``None``
+    when the caller has no account, which the share surface allows.
+    """
+
+    def __init__(
+        self,
+        *,
+        meeting_id: int,
+        action: str,
+        user_db_id: int | None,
+        lang: str,
+        flow_context: MessageBase | None = None,
+    ):
+        super().__init__(
+            f"User tried {action!r} with a meeting that has finished. "
+            f"Meeting id: {meeting_id}, user id: {rejected_caller_text(user_db_id)}",
+            meeting_id=meeting_id,
+            action=action,
+            lang=lang,
+            flow_context=flow_context,
+        )
+
+
 class SharedMeetingError(MeetingAccessError):
     """Base class for the answers ``guards.shared_meeting`` gives a caller it stops.
 

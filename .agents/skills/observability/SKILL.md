@@ -44,7 +44,7 @@ it "queryable" — it already is, on the log plane.
 | Level | Meaning |
 |---|---|
 | `debug` | High-frequency internals we accept losing in prod. No decisions, no mutations. |
-| `info` | Narrative: a step happened, a decision was taken, a mutation landed, something was sent. Includes deliberate no-ops and benign skips, **with a `reason`**. |
+| `info` | Narrative: a step happened, a decision was taken, a mutation landed, something was sent. Includes deliberate no-ops and benign skips, **with a `reason`**. A refusal of ordinary user input the bot answers on purpose (a command mid-onboarding, a photo sent as a file, a feature gated to Hosts) is also `info`. |
 | `warning` | A real anomaly the system handled: rejections, refusals, degraded output, swallowed failures, malformed input. |
 | `error` | We could not do the thing and nobody downstream will fix it. Always `exc_info` plus `error_type`. |
 

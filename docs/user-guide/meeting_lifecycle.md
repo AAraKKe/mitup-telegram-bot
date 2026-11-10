@@ -53,7 +53,7 @@ Blocking the bot or deleting your chat with it doesn't pull you out of your meet
 * The cards you shared into chats keep their layout, lose their buttons and say the meeting has finished.
 * The meeting moves to *💾 Past*{.button-like}, where you can still open it and read everything you wrote.
 * Its date and time stay as you set them, so the meeting reads as it happened.
-* The participant list is cleared, guests you invited by name included.
+* The participant list stays until you reactivate or delete the meeting, so anyone who joined and taps an old reminder is told the meeting has finished. Guests you invited by name are removed, and so are people who joined from a group without ever opening the bot.
 
 ## Reminders around the start
 
@@ -129,10 +129,10 @@ To clear the whole backlog in one go, open *💾 Past*{.button-like} and use *�
 
 !!! warning "Deletion is permanent"
 
-    Deleting a meeting removes it right away, with no grace period and no undo. The meeting,
-    its participant list, and the invited-only guests attached to it are gone for good. If you
-    might want it back, reactivate it instead of deleting it. Clearing the whole list at once
-    works the same way, on every inactive meeting you have.
+    Deleting a meeting removes it right away, with no grace period and no undo. The meeting and
+    its participant list are gone for good. If you might want the meeting back, reactivate it
+    instead of deleting it. Clearing the whole list at once works the same way, on every
+    inactive meeting you have.
 
 ## How long an inactive meeting is kept
 

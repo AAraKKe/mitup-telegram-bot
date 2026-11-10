@@ -1,10 +1,8 @@
-"""DB-integration tests for what the expiration sweep erases along with a meeting.
+"""DB-integration tests for what the expiration sweep erases along with a meeting, and what
+reactivation clears.
 
-`deactivate_meeting_locked` empties the meeting: the invited placeholder users (who exist only
-inside it) and every membership row, participants and waiting list alike. The deletes are bulk SQL
-statements whose real effect — the DB-level cascade from the invited users and what the collections
-read back afterwards — a mock session cannot replay, so the cases live here. Throwaway data uses the
-998_9xx range (single-session, never committed).
+The deletes are bulk SQL statements and ORM cascades whose real effect a mock session cannot replay.
+Throwaway data uses the 998_9xx range (single-session, never committed).
 """
 
 import datetime as dt
@@ -14,7 +12,7 @@ from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from mitup_bot.events import inactive_meetings
-from mitup_bot.models import JoinedUsers, Meetup, Settings, User
+from mitup_bot.models import JoinedUsers, Meetup, Message, Settings, User
 from mitup_bot.models.users import UserStatus
 from tests.helpers import MockApi
 
@@ -54,12 +52,16 @@ async def user_exists(session: AsyncSession, user_id: int) -> bool:
     return result.scalar_one() == 1
 
 
-async def test_deactivation_clears_every_membership(db_session: AsyncSession):
-    """Participants, waiting-list entries and invited guests all leave the meeting.
+async def message_count(session: AsyncSession, meetup_id: int) -> int:
+    result = await session.exec(  # type: ignore[call-overload]  # ty: ignore[no-matching-overload]  # https://github.com/fastapi/sqlmodel/issues/1657
+        text("SELECT count(*) FROM messages WHERE meetup_id = :mid").bindparams(mid=meetup_id)
+    )
+    return result.scalar_one()
 
-    The real users survive — only their membership goes; the invited placeholder, which exists
-    nowhere else, is deleted outright.
-    """
+
+async def test_deactivation_keeps_participants_and_deletes_guests_and_cards(db_session: AsyncSession):
+    """Participants and the waiting list keep their rows; the invited guest, which exists nowhere
+    else, is deleted with its link, and the message cards stop being tracked."""
     owner = make_user(998_900, name="Cleanup Owner")
     participant = make_user(998_901, name="Cleanup Participant")
     waiting = make_user(998_902, name="Cleanup Waiting")
@@ -75,6 +77,7 @@ async def test_deactivation_clears_every_membership(db_session: AsyncSession):
             JoinedUsers(user=participant, meetup=meeting),
             JoinedUsers(user=waiting, meetup=meeting, is_waiting_list=True),
             JoinedUsers(user=invited, meetup=meeting, invited_by=owner),
+            Message(meetup=meeting, chat_id=998_901, message_id=1),
         ]
     )
     await db_session.flush()
@@ -86,27 +89,32 @@ async def test_deactivation_clears_every_membership(db_session: AsyncSession):
     await db_session.flush()
 
     assert meeting.active is False
-    assert await membership_count(db_session, meetup_id) == 0
+    assert await membership_count(db_session, meetup_id) == 2
+    assert await message_count(db_session, meetup_id) == 0
     assert await user_exists(db_session, invited_id) is False
     assert await user_exists(db_session, participant.db_id) is True
     assert await user_exists(db_session, waiting.db_id) is True
 
 
 async def test_reactivated_meeting_starts_with_no_participants(db_session: AsyncSession):
-    """Reactivation brings back an empty meeting: there is no membership left to restore.
-
-    Flipping `active` is the whole of what the reactivate handler writes, so a meeting coming back
-    a year later cannot silently re-enrol whoever attended its previous run.
-    """
+    """Clearing the collection, as the reactivate handler does, deletes every kept row, the owner's
+    own link included while it sits in their loaded `joined_links`."""
     owner = make_user(998_910, name="Reactivation Owner")
     participant = make_user(998_911, name="Reactivation Participant")
-    db_session.add_all([owner, participant])
+    waiting = make_user(998_912, name="Reactivation Waiting")
+    db_session.add_all([owner, participant, waiting])
     await db_session.flush()
 
     meeting = make_expired_meetup(owner)
     db_session.add(meeting)
     await db_session.flush()
-    db_session.add(JoinedUsers(user=participant, meetup=meeting))
+    db_session.add_all(
+        [
+            JoinedUsers(user=owner, meetup=meeting),
+            JoinedUsers(user=participant, meetup=meeting),
+            JoinedUsers(user=waiting, meetup=meeting, is_waiting_list=True),
+        ]
+    )
     await db_session.flush()
 
     assert (
@@ -114,12 +122,15 @@ async def test_reactivated_meeting_starts_with_no_participants(db_session: Async
         is True
     )
     await db_session.flush()
+    assert await membership_count(db_session, meeting.db_id) == 3
+    await db_session.refresh(owner, ["joined_links", "meetups"])
 
     meeting.active = True
-    meeting.expiration_time = None
+    meeting.joined_links.clear()
     await db_session.flush()
     await db_session.refresh(meeting, ["joined_links"])
 
     assert meeting.joined_links == []
-    assert meeting.n_participants == 0
-    assert meeting.n_waiting == 0
+    assert await membership_count(db_session, meeting.db_id) == 0
+    assert await user_exists(db_session, participant.db_id) is True
+    assert await user_exists(db_session, waiting.db_id) is True

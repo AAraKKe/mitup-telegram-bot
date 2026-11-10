@@ -129,15 +129,13 @@ async def test_meeting_with_invited_users(mock_session: MockDbSession, metrics_c
 
     # Only the invited user (id=3) should be targeted by the DELETE; the regular user (id=2) must not appear.
     assert "DELETE FROM users WHERE users.id IN (3)" in mock_session.queries_executed
-    assert f"DELETE FROM joined_users WHERE joined_users.meetup_id = {meeting.id}" in mock_session.queries_executed
     assert f"DELETE FROM messages WHERE messages.meetup_id = {meeting.id}" in mock_session.queries_executed
 
 
-async def test_meeting_membership_is_cleared(mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi):
-    """Deactivation empties the meeting: participants and waiting-list entries alike.
+async def test_meeting_membership_is_kept(mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi):
+    """Deactivation keeps participants and waiting-list entries, so they can still open the meeting.
 
-    Both live in `joined_users`, so one delete scoped to the meeting covers them. What the meeting
-    reads back afterwards — including through a reactivation — is pinned in
+    What the rows read back afterwards is pinned in
     tests/data/db_behavior/test_meeting_deactivation_cleanup.py.
     """
     meeting = create_meetup(id=1, title="Test Meeting")
@@ -154,9 +152,8 @@ async def test_meeting_membership_is_cleared(mock_session: MockDbSession, metric
     await metrics_client.flush()
 
     assert meeting.active is False
-    assert f"DELETE FROM joined_users WHERE joined_users.meetup_id = {meeting.id}" in mock_session.queries_executed
-    # The participants are real users, only their membership goes: nothing deletes users by id
-    # (the JOINED_ONLY sweep at the end of the run deletes by status, not by id).
+    assert not any("DELETE FROM joined_users" in query for query in mock_session.queries_executed)
+    # The JOINED_ONLY sweep at the end of the run deletes by status, never by id.
     assert not any("DELETE FROM users WHERE users.id IN" in query for query in mock_session.queries_executed)
 
 
@@ -275,13 +272,14 @@ async def test_joined_only_users_deleted_reported_when_no_orphans(
 async def test_deactivation_names_its_tier_window_and_what_it_destroyed(
     mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
 ):
-    """The one line that acknowledges a roster existed. After the deletes nothing can reconstruct
-    who was in the meeting, so the branch that nominated it, the owner's tier and window, and the
-    invited users about to be hard-deleted all have to be on it."""
+    """The branch that nominated the meeting, the owner's tier and window, the invited users about to
+    be hard-deleted and the roster kept all have to be on the one line recording the deactivation."""
     meeting = create_meetup(id=1, title="Test Meeting")
     create_user(id=1, tg_user_id=10, owned_meetings=[meeting], settings=create_settings(id=1))
     invited = create_user(id=3, tg_user_id=-1, first_name="Outside User")
     create_joined_link(user=invited, meetup=meeting, id=2)
+    create_joined_link(user=create_user(id=4, tg_user_id=400), meetup=meeting, id=3)
+    create_joined_link(user=create_user(id=5, tg_user_id=500), meetup=meeting, id=4, is_waiting_list=True)
 
     register_due_meetings(
         mock_session, meeting, reason=DeactivationReason.DATELESS_WINDOW_ELAPSED, level=SupporterLevel.HOST_2
@@ -298,7 +296,9 @@ async def test_deactivation_names_its_tier_window_and_what_it_destroyed(
     )
     assert record["reason"] == DeactivationReason.DATELESS_WINDOW_ELAPSED.value
     assert record["invited_user_ids"] == [3]
-    assert {"participants_removed", "messages_deleted", "invited_users_deleted"} <= record.keys()
+    assert record["participants_kept"] == 1
+    assert record["waiting_list_kept"] == 1
+    assert {"messages_deleted", "invited_users_deleted"} <= record.keys()
 
 
 async def test_skip_names_the_owner_upgrade_that_stopped_the_window(

@@ -221,27 +221,22 @@ async def due_meetings(session: AsyncSession) -> list[DueMeeting]:
 
 
 async def clear_meeting_data(session: AsyncSession, meeting: Meetup) -> dict[str, Any]:
-    """Empty a deactivated meeting and report what that destroyed.
-
-    The membership belongs to the run that just ended. Reactivation brings the meeting back as a
-    fresh one, so it must start empty and everybody joins again instead of being re-enrolled into a
-    meeting they only ever attended once. The waiting list rides on these same rows and goes with
-    them, the invited users exist only in the context of this meeting, and the message cards are
-    left untracked because the meeting is now over. After the deletes nothing can reconstruct who
-    was in the meeting, which is why the counts and the invited ids are captured here.
-    """
+    """Delete a deactivated meeting's invited guests and message rows, keeping its participants and
+    waiting list so they can still open the finished meeting. Returns what it deleted and kept, with
+    the invited ids, since those rows leave no other trace."""
     invited_user_ids = [cast(int, link.user_id) for link in meeting.joined_links if link.user.tg_user_id == -1]
+    kept_links = [link for link in meeting.joined_links if link.user.tg_user_id != -1]
     invited_users_deleted = 0
     if invited_user_ids:
         result = await session.exec(delete(User).where(col(User.id).in_(invited_user_ids)))
         invited_users_deleted = result.rowcount or 0
 
-    participants = await session.exec(delete(JoinedUsers).where(col(JoinedUsers.meetup_id) == meeting.db_id))
     messages = await session.exec(delete(Message).where(col(Message.meetup_id) == meeting.db_id))
     return {
         "invited_user_ids": invited_user_ids,
         "invited_users_deleted": invited_users_deleted,
-        "participants_removed": participants.rowcount or 0,
+        "participants_kept": sum(not link.is_waiting_list for link in kept_links),
+        "waiting_list_kept": sum(link.is_waiting_list for link in kept_links),
         "messages_deleted": messages.rowcount or 0,
     }
 

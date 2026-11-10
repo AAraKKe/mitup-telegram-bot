@@ -15,6 +15,7 @@ from mitup_bot.handlers.meeting.enums import ConversationInviteState, MeetingHan
 from mitup_bot.models import Meetup, User
 from mitup_bot.monitoring import Feature, MetricKey
 from mitup_bot.utils.messages import MeetingDisplayMessages, MeetingInviteMessages, MeetingJoinMessages
+from mitup_bot.views import MitupView, factory
 from tests.helpers import (
     HandlerContext,
     MockDbSession,
@@ -271,6 +272,61 @@ async def test_participant_can_leave_from_bot_chat(
         text=MeetingJoinMessages.LEAVE_SUCCESS.text(lang=user_with_settings.lang),
         show_alert=False,
     )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.LEAVE.with_id(FORGED_MEETING_ID), from_bot_chat=True)],
+    indirect=True,
+)
+async def test_leave_on_a_reminder_of_a_finished_meeting_shows_the_finished_banner(
+    user_with_settings: User,
+    stranger_meeting: Meetup,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """A finished meeting keeps its participants, so the Leave chip on an old reminder reaches a
+    former participant's card, which turns into the finished banner and stays a membership."""
+    stranger_meeting.active = False
+    participant_link = create_joined_link(user=user_with_settings, meetup=stranger_meeting)
+    register(mock_session, user_with_settings, stranger_meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
+
+    lang = stranger_meeting.lang
+    context.api.assert_edit_message_called(
+        handler_context.update,
+        MitupView(
+            message=MeetingDisplayMessages.FINISHED_BANNER.rich(lang=lang), menu=factory.main_menu_back_rows(lang)
+        ),
+    )
+    context.api.assert_method_just_called("answer_callback_query", times=0)
+    context.api.assert_update_meeting_messages_not_called()
+    assert stranger_meeting.joined_links == [participant_link]
+    metrics.assert_not_emitted(name=MetricKey.UNAUTHORIZED_MEETING_CALLBACK)
+
+
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(callback_query=cb.LEAVE.with_id(FORGED_MEETING_ID), from_bot_chat=True)],
+    indirect=True,
+)
+async def test_leave_with_forged_id_on_a_finished_meeting_is_rejected(
+    user_with_settings: User,
+    stranger_meeting: Meetup,
+    mock_session: MockDbSession,
+    handler_context: HandlerContext,
+    metrics: MetricAssertions,
+):
+    """A stranger learns nothing about a finished private meeting: the denial is decided first."""
+    stranger_meeting.active = False
+    register(mock_session, user_with_settings, stranger_meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.LEAVE, handler_context=handler_context)
+
+    assert_rejected(context, stranger_meeting, user_with_settings, metrics)
+    context.api.assert_edit_message_not_called()
 
 
 @pytest.mark.parametrize(

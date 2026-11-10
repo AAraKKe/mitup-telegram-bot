@@ -173,7 +173,7 @@ async def test_an_owner_who_is_not_a_host_gets_the_locked_screen(
     assert not context.has_meeting_id(ContextId.EDIT_MEETING_IMAGES)
 
     record = log_record(caplog, IMAGES_ACCESS_DENIED_EVENT)
-    assert record.levelno == logging.WARNING
+    assert record.levelno == logging.INFO
     assert record.__dict__["reason"] == "not_a_supporter"
     assert record.__dict__["action"] == "open"
 
@@ -426,6 +426,7 @@ async def test_a_photo_past_the_limit_is_refused_and_the_screen_says_so(
     )
 
     record = log_record(caplog, IMAGES_INPUT_REJECTED_EVENT)
+    assert record.levelno == logging.INFO
     assert record.__dict__["reason"] == "limit_reached"
 
 

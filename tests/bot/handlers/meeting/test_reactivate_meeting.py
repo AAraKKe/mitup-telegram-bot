@@ -22,6 +22,8 @@ from tests.helpers import (
     MockDbSession,
     UpdateRequest,
     call_handler,
+    create_joined_link,
+    create_user,
 )
 
 MEETING_ID = 1
@@ -233,3 +235,52 @@ async def test_a_second_tap_on_a_stale_warning_is_recorded_as_a_skip(
     record = next(entry for entry in logs if entry["event"] == "Skip meeting reactivation")
     assert (record["meeting_id"], record["reason"]) == (MEETING_ID, "already_active")
     assert not [entry for entry in logs if entry["event"] == "Meeting reactivated"]
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.REACTIVATE_MEETING.with_id(MEETING_ID))], indirect=True
+)
+async def test_reactivation_drops_the_previous_runs_participants(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    inactive_meeting: Meetup,
+    handler_context: HandlerContext,
+):
+    """The participants a finished meeting keeps belong to its previous run, so the restarted meeting
+    starts empty and records how many it dropped."""
+    create_joined_link(user=create_user(id=20, tg_user_id=2000), meetup=inactive_meeting, id=20)
+    create_joined_link(user=create_user(id=21, tg_user_id=2100), meetup=inactive_meeting, id=21, is_waiting_list=True)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    with capture_logs(processors=[merge_contextvars]) as logs:
+        context, _ = await call_handler(MeetingHandlerId.REACTIVATE_MEETING_CALLBACK, handler_context=handler_context)
+
+    assert inactive_meeting.joined_links == []
+    record = next(entry for entry in logs if entry["event"] == "Meeting reactivated")
+    assert (record["participants_removed"], record["waiting_list_removed"]) == (1, 1)
+    success_message = MeetingLifecycleMessages.REACTIVATE_SUCCESS.rich(lang=user_with_settings.lang)
+    context.api.assert_edit_message_called(
+        update, meeting_views.owner_view(inactive_meeting).with_context(success_message)
+    )
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.REACTIVATE_MEETING.with_id(MEETING_ID))], indirect=True
+)
+async def test_a_second_tap_keeps_the_participants_of_a_live_meeting(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    inactive_meeting: Meetup,
+    handler_context: HandlerContext,
+):
+    inactive_meeting.active = True
+    participant_link = create_joined_link(user=create_user(id=20, tg_user_id=2000), meetup=inactive_meeting, id=20)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    await call_handler(MeetingHandlerId.REACTIVATE_MEETING_CALLBACK, handler_context=handler_context)
+
+    assert inactive_meeting.joined_links == [participant_link]

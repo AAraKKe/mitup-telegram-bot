@@ -6,6 +6,7 @@ from telegram.ext import filters
 from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.handlers.registry import HandlersRegistry
+from mitup_bot.handlers.utils import message_kind
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import User
 from mitup_bot.utils.messages import BroadcastOperatorMessages
@@ -84,21 +85,6 @@ async def broadcast_invalid_content_message_handler(
         message_kind=message_kind(update.effective_message),
     )
     return ConversationBroadcastState.AWAITING_CONTENT
-
-
-def message_kind(message: Message | None) -> str:
-    """Name what the operator sent instead of a broadcast body, as a bounded machine value.
-
-    PTB resolves the attachment; a photo arrives as a tuple of sizes rather than as one object.
-    """
-    if message is None:
-        return "unknown"
-    attachment = message.effective_attachment
-    if attachment is None:
-        return "text" if message.text is not None else "empty"
-    if isinstance(attachment, tuple):
-        return "photo"
-    return type(attachment).__name__.lower()
 
 
 @with_session

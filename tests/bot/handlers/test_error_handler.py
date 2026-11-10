@@ -19,6 +19,7 @@ from mitup_bot.exceptions import (
     InlineQueryNotSetError,
     MalformedCallbackData,
     MeetingAccessError,
+    MeetingFinishedError,
     MeetingGoneError,
     MeetingInactiveOwnerError,
     MeetingNotOwnedError,
@@ -635,6 +636,12 @@ BACK_ROWS: Keyboard = [[ButtonConfig(text="Back to the list", callback_data=cb.S
 INVITE_FLOW_CONTEXT = MeetingInviteMessages.FLOW_CONTEXT
 
 
+def finished_screen(lang: str) -> MitupView:
+    return MitupView(
+        message=MeetingDisplayMessages.FINISHED_BANNER.rich(lang=lang), menu=factory.main_menu_back_rows(lang)
+    )
+
+
 def meeting_rejections() -> list[tuple[MeetingAccessError, MitupView]]:
     """Every rejection `guards.meeting` raises, paired with the screen that answers it."""
     ctx = RenderContext(lang="en")
@@ -658,6 +665,10 @@ def meeting_rejections() -> list[tuple[MeetingAccessError, MitupView]]:
         (
             MeetingInactiveOwnerError(meeting_id=7, action="Edit title", user_db_id=1, lang="en"),
             factory.reactivation_prompt_view(ctx, meeting_id=7),
+        ),
+        (
+            MeetingFinishedError(meeting_id=7, action="Show meeting", user_db_id=1, lang="en"),
+            finished_screen("en"),
         ),
     ]
 
@@ -761,9 +772,29 @@ async def test_meeting_gone_does_not_touch_the_ownership_counter(
     metrics.assert_not_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
 
 
-# Every rejection, the level it is recorded at, and the machine value that tells it from the other
-# five. A stale or forged button is an anomaly; the reactivation prompt and the finished-card
-# banner are screens the system produces on purpose.
+async def test_meeting_finished_answers_a_participant_without_an_ownership_rejection(
+    app: StubMitupApp, mock_session: MockDbSession, metrics: MetricAssertions
+):
+    """A participant opening a meeting that has finished is told so, in their language, and nothing
+    counts it as a tap on somebody else's meeting."""
+    context = build_callback_context(app)
+    error = MeetingFinishedError(meeting_id=7, action="Show meeting", user_db_id=1, lang="es")
+
+    with capture_logs() as logs:
+        outcome = await error_handler.handler(context, error, Env.PROD)
+    await context.metrics.flush()
+
+    context.api.assert_edit_message_called(context.telegram_update, finished_screen("es"))
+    assert outcome == FaultOutcome(0)
+    metrics.assert_not_emitted(name=MetricKey.MEETING_NOT_OWNED)
+    rejections = [entry for entry in logs if entry["event"] == "Rejected meeting action"]
+    assert [(entry["log_level"], entry["reason"]) for entry in rejections] == [("info", "meeting_finished")]
+    assert [entry for entry in logs if entry["log_level"] == "warning"] == []
+
+
+# Every rejection, the level it is recorded at, and the machine value that tells it from the
+# others. A stale or forged button is an anomaly; the reactivation prompt and the two finished
+# screens are what the system produces on purpose.
 MEETING_REJECTION_LINES: list[tuple[MeetingAccessError, str, str]] = [
     (MeetingGoneError(meeting_id=7, action="open", user_db_id=1, lang="en"), "warning", "meeting_not_found"),
     (MeetingNotOwnedError(meeting_id=7, action="edit", user_db_id=1, lang="en"), "warning", "meeting_not_owned"),
@@ -772,6 +803,7 @@ MEETING_REJECTION_LINES: list[tuple[MeetingAccessError, str, str]] = [
         "info",
         "meeting_inactive_and_owned",
     ),
+    (MeetingFinishedError(meeting_id=7, action="open", user_db_id=1, lang="en"), "info", "meeting_finished"),
     (SharedMeetingGoneError(meeting_id=7, action="join", user_db_id=1, lang="en"), "warning", "shared_message_stale"),
     (
         SharedMeetingDeniedError(meeting_id=7, action="join", user_db_id=1, lang="en"),
@@ -794,7 +826,7 @@ MEETING_REJECTION_LINES: list[tuple[MeetingAccessError, str, str]] = [
 async def test_every_meeting_rejection_is_recorded_under_one_countable_event(
     error: MeetingAccessError, level: str, reason: str, context: StubMitupContext, mock_session: MockDbSession
 ):
-    """One constant event name for all six, so rejections can be counted and grouped by cause."""
+    """One constant event name for every rejection, so they can be counted and grouped by cause."""
     with capture_logs() as logs:
         await error_handler.handler(context, error, Env.PROD)
 
@@ -831,6 +863,12 @@ def rejection_screens(flow_context: MessageBase | None) -> list[tuple[MeetingAcc
                 meeting_id=7, action="Edit title", user_db_id=1, lang="en", flow_context=flow_context
             ),
             factory.reactivation_prompt_view(ctx, meeting_id=7),
+        ),
+        (
+            MeetingFinishedError(
+                meeting_id=7, action="Show meeting", user_db_id=1, lang="en", flow_context=flow_context
+            ),
+            finished_screen("en"),
         ),
     ]
 
@@ -1118,6 +1156,7 @@ ALL_GUARD_ERRORS = [
     MeetingGoneError,
     MeetingNotOwnedError,
     MeetingInactiveOwnerError,
+    MeetingFinishedError,
 ]
 
 

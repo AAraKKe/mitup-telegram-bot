@@ -137,6 +137,21 @@ async def test_waiting_list_and_left_participants_are_excluded(db_session: Async
     assert await due_user_ids(db_session, meetup) == {member.id}
 
 
+async def test_participants_of_a_finished_meeting_are_excluded(db_session: AsyncSession):
+    """A finished meeting keeps its participant rows, and those never earn a reminder, even when
+    the meeting's start time falls inside their lead-time window."""
+    owner = make_member(998_740, notification=True)
+    participant = make_member(998_741)
+    meetup = make_meetup(owner, starts_in_minutes=10)
+    meetup.active = False
+    db_session.add_all([owner, participant, meetup])
+    await db_session.flush()
+    db_session.add(JoinedUsers(user=participant, meetup=meetup))
+    await db_session.flush()
+
+    assert await due_user_ids(db_session, meetup) == set()
+
+
 # The rendering test below commits its rows (the 997_9xx range) and reads them back in a fresh
 # session: a same-session read is served from the identity map, which resolves a many-to-one with
 # no SQL and would mask a relationship the eager-load cascade never brought along.

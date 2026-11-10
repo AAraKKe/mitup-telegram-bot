@@ -135,6 +135,7 @@ def joined_meeting_section(link: JoinedUsers) -> dict[str, Any]:
     return {
         "meeting_title": link.meetup.plain_title,
         "meeting_start_datetime": iso_utc(link.meetup.datetime),
+        "meeting_active": link.meetup.active,
         "organizer": link.meetup.owner.display_name,
         "joined_time": iso_utc(link.created_time),
         "on_waiting_list": link.is_waiting_list,

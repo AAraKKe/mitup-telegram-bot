@@ -232,7 +232,7 @@ If you joined a meeting via someone else's group message without ever opening th
 
 If you open the bot for the first time and never answer the timezone question, your record is removed a week after it was created, unless you own a meeting or joined an active one.
 
-**Meetings you've joined** (RSVPs): when the meeting is deleted or you leave it, your RSVP is removed. A guest someone added by name is a placeholder entry on the meeting, never linked to any Telegram account, and disappears with the meeting.
+**Meetings you've joined** (RSVPs): your RSVP stays while the meeting is kept, inactive ones included, so the bot can tell you a meeting has finished when you tap an old reminder. It is removed when you leave an active meeting, when the owner reactivates or deletes the meeting, or when the meeting reaches the end of its retention window. A guest someone added by name is a placeholder entry on the meeting, never linked to any Telegram account, and is removed when the meeting becomes inactive.
 
 **Meetings you own:** when a meeting becomes inactive, how long it's kept afterward, and when it's permanently deleted are covered on the [Meeting lifecycle](../user-guide/meeting_lifecycle.md#how-long-an-inactive-meeting-is-kept) page.
 
@@ -297,7 +297,7 @@ Material changes to this policy will be announced via a message from the bot and
 
 ---
 
-**Last revised:** July 16, 2026
+**Last revised:** November 10, 2026
 
 ---
 

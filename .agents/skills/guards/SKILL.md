@@ -70,7 +70,7 @@ All guards that take a `session` are async — `await` them.
 
 | Function | Signature | Returns | Raises |
 |----------|-----------|---------|--------|
-| `meeting` | `(session, user, meeting_id, action, context, *, access=MeetingAccess.OWNER, lock=False, custom_keyboard=None, flow_context=None)` | `Meetup` | `MeetingGoneError`, `MeetingNotOwnedError`, `MeetingInactiveOwnerError` |
+| `meeting` | `(session, user, meeting_id, action, context, *, access=MeetingAccess.OWNER, lock=False, custom_keyboard=None, flow_context=None)` | `Meetup` | `MeetingGoneError`, `MeetingNotOwnedError`, `MeetingInactiveOwnerError`, `MeetingFinishedError` |
 | `shared_meeting` | `(session, user: User \| None, meeting_id, action, update, *, lock=False, require_active=True)` | `Meetup` | `SharedMeetingGoneError`, `SharedMeetingDeniedError`, `SharedMeetingFinishedError` |
 | `conversation_meeting` | `(session, user, meeting_id, action, *, lock=False, flow_context=None)` | `Meetup` | `MeetingGoneError` |
 | `meeting_interaction_allowed` | `(session, user: User \| None, meeting, update)` | `bool` | — (a predicate; `shared_meeting` raises on `False`) |
@@ -90,8 +90,8 @@ The guard never returns `None` and never renders: it either hands back a meeting
 | `MeetingAccess` | Lets through | Meeting not found | Inactive meeting |
 |---|---|---|---|
 | `OWNER` (default) | the owner of an active meeting | `MeetingGoneError` | owner → `MeetingInactiveOwnerError`; anyone else → `MeetingNotOwnedError` |
-| `OWNER_OR_JOINED` | the owner, plus anyone who joined the active meeting (waiting list included) | `MeetingGoneError` | owner → `MeetingInactiveOwnerError`; anyone else → `MeetingNotOwnedError` |
-| `OWNER_OR_PUBLIC` | the owner, plus anyone at all when the active meeting is public | `MeetingGoneError` | owner → `MeetingInactiveOwnerError`; anyone else → `MeetingNotOwnedError` |
+| `OWNER_OR_JOINED` | the owner, plus anyone who joined the active meeting (waiting list included) | `MeetingGoneError` | owner → `MeetingInactiveOwnerError`; a participant → `MeetingFinishedError`; anyone else → `MeetingNotOwnedError` |
+| `OWNER_OR_PUBLIC` | the owner, plus anyone at all when the active meeting is public | `MeetingGoneError` | owner → `MeetingInactiveOwnerError`; anyone, when it is public → `MeetingFinishedError`; anyone else → `MeetingNotOwnedError` |
 | `OWNER_ANY_STATE` | the owner, whatever the meeting's state | `MeetingNotOwnedError`, as for a meeting the caller does not own | returned to the caller |
 
 Use `OWNER` for the ownership-gated screens (every edit surface). Use `OWNER_OR_JOINED` for screens that only **display** a meeting the user can reach without owning it — e.g. the "Joined meetings" list, where the caller renders `Meetup.view_for(user)` (owner → `main_view`, non-owner → `external_view`). Use `OWNER_OR_PUBLIC` for the inline share query, the one surface where being public is itself the permission. Use `OWNER_ANY_STATE` on the surfaces that render inactive meetings themselves — the past-meetings screens, reactivation, and the delete flows — where the reactivation prompt would replace the screen the user asked for.
@@ -107,7 +107,7 @@ account is ever created for such a caller.
 
 `OWNER_OR_PUBLIC` is the only profile that accepts `user=None`, and the signature enforces it: the guard is overloaded so a `User | None` argument type-checks on that profile alone, while every other profile still demands a `User`. Pass `None` when the acting Telegram user has no row — the share query resolves the sharer with `User.by_tg_user_id` instead of `guards.current_user`, since a public meeting card offers its Share button to every reader of the chat, and it collapses a `DELETION_REQUESTED` user to `None` too so a dying account shares nothing of its own.
 
-Such a caller owns nothing: every ownership test short-circuits, so an inactive meeting and a non-public one both come back as `MeetingNotOwnedError` and the only way past the guard is the meeting's own `public` flag. The share handler catches those rejections itself rather than letting them reach the error handler, so the language on them decides nothing there. `MeetingGoneError` and `MeetingNotOwnedError` take `user_db_id: int | None` and name an anonymous caller in their message; `MeetingInactiveOwnerError` keeps `int`, since only an owner can reach it.
+Such a caller owns nothing: every ownership test short-circuits, so a non-public meeting comes back as `MeetingNotOwnedError`, an inactive public one as `MeetingFinishedError`, and the only way past the guard is the meeting's own `public` flag. The share handler catches those rejections itself rather than letting them reach the error handler, so the language on them decides nothing there. `MeetingGoneError`, `MeetingNotOwnedError` and `MeetingFinishedError` take `user_db_id: int | None` and name an anonymous caller in their message; `MeetingInactiveOwnerError` keeps `int`, since only an owner can reach it.
 
 ### Rejections
 

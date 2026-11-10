@@ -71,6 +71,7 @@ async def test_build_user_export_loads_its_whole_graph_on_real_postgres(db_sessi
         assert export["meetings"][0]["participants"] == ["Export Friend"]
         assert [joined["meeting_title"] for joined in export["joined_meetings"]] == ["Export Other Meeting"]
         assert export["joined_meetings"][0]["organizer"] == "Export Organizer"
+        assert export["joined_meetings"][0]["meeting_active"] is True
         assert export["patreon"]["patreon_user_id"] == "export-patreon-1"
 
 

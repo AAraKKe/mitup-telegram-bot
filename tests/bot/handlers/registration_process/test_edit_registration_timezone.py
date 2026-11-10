@@ -62,20 +62,26 @@ def timezone_client():
 
 
 @pytest.mark.parametrize(
-    "update",
+    "update, message_kind, is_command",
     [
-        UpdateRequest(command="start"),
-        UpdateRequest(location=Location(latitude=1.0, longitude=1.0)),
+        (UpdateRequest(command="start"), "text", True),
+        (UpdateRequest(location=Location(latitude=1.0, longitude=1.0)), "location", False),
     ],
-    indirect=True,
+    indirect=["update"],
     ids=["command", "location"],
 )
 async def test_registration_timezone_invalid_input_handler_sends_invalid_input_message_and_stays_in_timezone_state(
     update: Update,
+    message_kind: str,
+    is_command: bool,
     context: StubMitupContext,
     user_with_settings: User,
     mock_session: MockDbSession,
+    caplog: pytest.LogCaptureFixture,
 ):
+    """A refused input is an ordinary onboarding outcome, so it is logged at info with the kind of
+    message that was sent."""
+    caplog.set_level(logging.INFO)
     mock_session.add_object(user_with_settings, "tg_user_id")
 
     result = await claimed_state(registration_timezone_invalid_input_handler(update, context))
@@ -85,6 +91,12 @@ async def test_registration_timezone_invalid_input_handler_sends_invalid_input_m
         RegistrationMessages.TIMEZONE_INVALID_INPUT.rich(lang=user_with_settings.lang),
     )
     assert result == ConversationRegistrationProcessState.TIMEZONE
+
+    record = log_record(caplog, "Onboarding step rejected input")
+    assert record.levelno == logging.INFO
+    assert record.__dict__["reason"] == "unsupported_input_kind"
+    assert record.__dict__["message_kind"] == message_kind
+    assert record.__dict__["is_command"] is is_command
 
 
 async def test_registration_timezone_text_message_handler_sets_timezone_and_ends_conversation(

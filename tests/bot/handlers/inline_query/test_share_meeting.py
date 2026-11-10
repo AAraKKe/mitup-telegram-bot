@@ -92,11 +92,12 @@ async def test_share_meeting_answers_with_the_card(
     [
         (UpdateRequest(inline_query="789"), 789, False, False, True, True, "meeting_not_shareable"),
         (UpdateRequest(inline_query="321"), 321, True, False, False, True, "meeting_finished"),
-        (UpdateRequest(inline_query="654"), 654, False, True, False, True, "meeting_not_shareable"),
+        (UpdateRequest(inline_query="654"), 654, False, True, False, True, "meeting_finished"),
+        (UpdateRequest(inline_query="655"), 655, False, False, False, True, "meeting_not_shareable"),
         (UpdateRequest(inline_query="999"), 999, True, False, True, False, "meeting_not_found"),
     ],
     indirect=["update"],
-    ids=["private_not_owned", "inactive_owned", "inactive_public", "meeting_not_found"],
+    ids=["private_not_owned", "inactive_owned", "inactive_public", "inactive_private_not_owned", "meeting_not_found"],
 )
 async def test_share_meeting_rejection_answers_an_empty_panel(
     update: Update,

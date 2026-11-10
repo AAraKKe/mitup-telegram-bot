@@ -20,6 +20,7 @@ from mitup_bot.exceptions import (
     InlineQueryNotSetError,
     MalformedCallbackData,
     MeetingAccessError,
+    MeetingFinishedError,
     MeetingGoneError,
     MeetingInactiveOwnerError,
     MeetingNotOwnedError,
@@ -398,16 +399,52 @@ async def test_meeting_raises_inactive_owner_for_inactive_meeting_owned_by_user(
     assert_renders_nothing(context)
 
 
-async def test_meeting_raises_not_owned_for_non_owner_of_inactive_meeting(
+@pytest.mark.parametrize("keyboard", BACK_KEYBOARDS, ids=["without_custom_keyboard", "with_custom_keyboard"])
+@pytest.mark.parametrize("is_waiting_list", [False, True], ids=["participant", "waiting_list"])
+async def test_meeting_raises_finished_for_participant_of_inactive_meeting(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+    metrics: MetricAssertions,
+    is_waiting_list: bool,
+    keyboard: Callable[[str], Keyboard | None],
+):
+    """A participant who would see the meeting if it were active is told it finished."""
+    inactive_meeting = create_meetup(id=6, owner=other_owner(), active=False)
+    create_joined_link(user=user_with_settings, meetup=inactive_meeting, is_waiting_list=is_waiting_list)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+    back_rows = keyboard(user_with_settings.lang)
+
+    with pytest.raises(MeetingFinishedError) as raised:
+        await guards.meeting(
+            mock_session,
+            user_with_settings,
+            6,
+            "Show meeting",
+            context,
+            access=MeetingAccess.OWNER_OR_JOINED,
+            custom_keyboard=back_rows,
+        )
+    await context.flush_metrics()
+
+    error = raised.value
+    assert (error.meeting_id, error.action, error.lang) == (6, "Show meeting", user_with_settings.lang)
+    # The finished screen always leads to the main menu, whatever list the caller came from.
+    assert error.keyboard is None
+    assert str(error) == "User tried 'Show meeting' with a meeting that has finished. Meeting id: 6, user id: 1"
+    metrics.assert_not_emitted(name=MetricKey.MEETING_NOT_OWNED)
+    assert_renders_nothing(context)
+
+
+async def test_meeting_raises_not_owned_for_stranger_to_inactive_meeting(
     mock_session: MockDbSession,
     context: StubMitupContext,
     user_with_settings: User,
 ):
-    """A participant of an inactive meeting is stopped like any non-owner: only the owner can reactivate."""
-    inactive_meeting = create_meetup(id=6, owner=other_owner(), active=False)
-    user_with_settings.joined_links = [create_joined_link(user=user_with_settings, meetup=inactive_meeting)]
+    """Somebody who never joined an inactive meeting learns nothing about its state."""
     mock_session.add_object(user_with_settings, "tg_user_id")
-    mock_session.add_object(inactive_meeting)
+    mock_session.add_object(create_meetup(id=6, owner=other_owner(), active=False))
 
     with pytest.raises(MeetingNotOwnedError):
         await guards.meeting(
@@ -418,6 +455,23 @@ async def test_meeting_raises_not_owned_for_non_owner_of_inactive_meeting(
             context,
             access=MeetingAccess.OWNER_OR_JOINED,
         )
+
+    assert_renders_nothing(context)
+
+
+async def test_meeting_owner_profile_raises_not_owned_for_participant_of_inactive_meeting(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    """The owner-only profile never admits a participant, so their membership changes nothing."""
+    inactive_meeting = create_meetup(id=6, owner=other_owner(), active=False)
+    create_joined_link(user=user_with_settings, meetup=inactive_meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    with pytest.raises(MeetingNotOwnedError):
+        await guards.meeting(mock_session, user_with_settings, 6, "Edit meeting", context)
 
     assert_renders_nothing(context)
 
@@ -595,14 +649,14 @@ async def test_meeting_or_public_raises_gone_for_caller_without_account(
     assert_renders_nothing(context)
 
 
-async def test_meeting_or_public_raises_not_owned_for_inactive_public_meeting_without_account(
+async def test_meeting_or_public_raises_finished_for_inactive_public_meeting_without_account(
     mock_session: MockDbSession,
     context: StubMitupContext,
 ):
-    """A finished meeting is past sharing: the public flag stops mattering once it is inactive."""
+    """A finished public meeting is past sharing, and anyone it was open to is told so."""
     mock_session.add_object(create_meetup(id=42, owner=other_owner(), title="Finished", public=True, active=False))
 
-    with pytest.raises(MeetingNotOwnedError) as raised:
+    with pytest.raises(MeetingFinishedError) as raised:
         await guards.meeting(
             mock_session,
             None,
@@ -612,7 +666,57 @@ async def test_meeting_or_public_raises_not_owned_for_inactive_public_meeting_wi
             access=MeetingAccess.OWNER_OR_PUBLIC,
         )
 
-    assert raised.value.lang == TranslationEngine.FALLBACK_LANG
+    error = raised.value
+    assert error.lang == TranslationEngine.FALLBACK_LANG
+    assert (
+        str(error) == "User tried 'share meeting' with a meeting that has finished. Meeting id: 42, user id: anonymous"
+    )
+    assert_renders_nothing(context)
+
+
+async def test_meeting_or_public_raises_finished_for_inactive_public_meeting_of_somebody_else(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(create_meetup(id=42, owner=other_owner(), title="Finished", public=True, active=False))
+
+    with pytest.raises(MeetingFinishedError) as raised:
+        await guards.meeting(
+            mock_session,
+            user_with_settings,
+            42,
+            "share meeting",
+            context,
+            access=MeetingAccess.OWNER_OR_PUBLIC,
+        )
+
+    assert raised.value.lang == user_with_settings.lang
+    assert_renders_nothing(context)
+
+
+async def test_meeting_or_public_raises_not_owned_for_inactive_private_meeting_of_its_participant(
+    mock_session: MockDbSession,
+    context: StubMitupContext,
+    user_with_settings: User,
+):
+    """Membership is not what the share profile admits, so a private meeting stays somebody else's."""
+    inactive_meeting = create_meetup(id=42, owner=other_owner(), title="Finished", active=False)
+    create_joined_link(user=user_with_settings, meetup=inactive_meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    with pytest.raises(MeetingNotOwnedError):
+        await guards.meeting(
+            mock_session,
+            user_with_settings,
+            42,
+            "share meeting",
+            context,
+            access=MeetingAccess.OWNER_OR_PUBLIC,
+        )
+
     assert_renders_nothing(context)
 
 

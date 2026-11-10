@@ -29,6 +29,7 @@ from mitup_bot.exceptions import (
     EffectiveUserNotSet,
     InlineQueryNotSetError,
     MalformedCallbackData,
+    MeetingFinishedError,
     MeetingGoneError,
     MeetingInactiveOwnerError,
     MeetingNotOwnedError,
@@ -282,7 +283,8 @@ class MeetingAccess(Enum):
 
     `OWNER`, `OWNER_OR_JOINED` and `OWNER_OR_PUBLIC` are the live-meeting profiles: a meeting that no
     longer exists raises `MeetingGoneError`, and an inactive one raises `MeetingInactiveOwnerError`
-    for its owner and `MeetingNotOwnedError` for everybody else. `OWNER_ANY_STATE` is for the surfaces
+    for its owner, `MeetingFinishedError` for anyone the profile would let into it were it active, and
+    `MeetingNotOwnedError` for everybody else. `OWNER_ANY_STATE` is for the surfaces
     that render inactive meetings themselves (the past-meetings screens, reactivation, the delete
     flows): the meeting's state is never an obstacle there, and a meeting that cannot be resolved is
     rejected exactly like one the caller does not own.
@@ -295,6 +297,13 @@ class MeetingAccess(Enum):
     OWNER_OR_JOINED = auto()
     OWNER_OR_PUBLIC = auto()
     OWNER_ANY_STATE = auto()
+
+
+def admits_without_ownership(found_meeting: Meetup, user: User | None, access: MeetingAccess) -> bool:
+    """Whether `access` lets a caller who does not own the meeting through, whatever its state."""
+    if access is MeetingAccess.OWNER_OR_JOINED:
+        return user is not None and found_meeting.has_participant(user.db_id)
+    return access is MeetingAccess.OWNER_OR_PUBLIC and found_meeting.public
 
 
 def granted_meeting(found_meeting: Meetup) -> Meetup:
@@ -406,6 +415,10 @@ async def meeting(
                 keyboard=custom_keyboard,
                 flow_context=flow_context,
             )
+        if admits_without_ownership(found_meeting, user, access):
+            raise MeetingFinishedError(
+                meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang, flow_context=flow_context
+            )
         raise MeetingNotOwnedError(
             meeting_id=meeting_id, action=action, user_db_id=user_db_id, lang=lang, flow_context=flow_context
         )
@@ -416,10 +429,7 @@ async def meeting(
 
     # The not-owned counter tracks ownership decisions, so a caller reaching a meeting they do not
     # own through one of the wider profiles leaves the series untouched.
-    if access is MeetingAccess.OWNER_OR_JOINED and user is not None and found_meeting.has_participant(user.db_id):
-        return granted_meeting(found_meeting)
-
-    if access is MeetingAccess.OWNER_OR_PUBLIC and found_meeting.public:
+    if admits_without_ownership(found_meeting, user, access):
         return granted_meeting(found_meeting)
 
     raise MeetingNotOwnedError(

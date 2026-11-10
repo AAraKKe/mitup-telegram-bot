@@ -31,6 +31,7 @@ USERS_TO_NOTIFY_STATEMENT: SelectOfScalar[JoinedUsers] = (
     .join(Settings, col(Settings.user_id) == col(User.id))
     .where(
         and_(
+            Meetup.active == true(),
             Meetup.datetime != null(),
             User.status == UserStatus.MEMBER,
             Settings.notification == true(),
@@ -104,6 +105,8 @@ async def skip_reason(session: AsyncSession, joined_link_id: int) -> str:
         return "user_not_member"
     if not link.user.settings.notification:
         return "notifications_disabled"
+    if not link.meetup.active:
+        return "meeting_deactivated"
     if link.meetup.datetime is None:
         return "meeting_datetime_cleared"
     return "outside_lead_time_window"

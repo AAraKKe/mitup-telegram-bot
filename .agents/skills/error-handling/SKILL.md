@@ -79,6 +79,7 @@ Raised by functions in `guards.py` when handler inputs are invalid. These are th
 | `MeetingGoneError` | `meeting()`, `conversation_meeting()` | The addressed meeting does not resolve to a row |
 | `MeetingNotOwnedError` | `meeting()` | The caller holds none of the access the requested profile lets through |
 | `MeetingInactiveOwnerError` | `meeting()` | The owner addressed a meeting of theirs that is no longer active |
+| `MeetingFinishedError` | `meeting()` | A caller the profile would let into the active meeting addressed it after it finished |
 | `SharedMeetingGoneError` | `shared_meeting()` | The meeting behind the tapped card no longer exists |
 | `SharedMeetingDeniedError` | `shared_meeting()` | The tapped message gives the caller no claim on that meeting |
 | `SharedMeetingFinishedError` | `shared_meeting()` | The meeting behind the tapped card is no longer active |
@@ -198,6 +199,8 @@ For the bot-chat rejections the reply shape comes from the update, not from the 
 | callback query | `edit_message` — the screen the button sits on is replaced |
 | message | `send_message` — there is no message of ours to replace |
 
+`MeetingFinishedError` is answered with the finished banner (`MeetingDisplayMessages.FINISHED_BANNER`) in the caller's language, over the main-menu row.
+
 An inline query never reaches here: the share handler catches its own `MeetingAccessError` and answers the query itself with an empty results panel.
 
 The `SharedMeetingError` subclasses come from a tap on a meeting card that may sit in any chat, so they answer on the card whatever the update looks like, in `deliver_shared_meeting_answer()`:
@@ -214,7 +217,7 @@ The two banner edits take their keyboard from `shared_banner_keyboard()`: in the
 
 Acting on a meeting that is gone, inactive or somebody else's is what a stale button produces, not a code fault, so the branch classifies the invocation as `FAULT=0` — the interaction is counted as a completed one, exactly like a handler that ran to the end. `MeetingNotOwnedError` additionally emits `MeetingNotOwned` with value `1`; no other rejection carries a counter of its own.
 
-All six are recorded under one constant event name, `Rejected meeting action`, with `MEETING_REJECTION_REASONS` supplying the `reason` that tells them apart — an interpolated message would make the `event` value itself variable and the rejections uncountable. The level splits them: the four that mean somebody tapped a button that should not have worked are warnings, while `MeetingInactiveOwnerError` and `SharedMeetingFinishedError` (listed in `MEETING_REJECTIONS_AT_INFO`) are screens the system produces on purpose and stay at info. A new subclass must be added to the reason map — `test_every_meeting_rejection_has_a_reason` fails otherwise.
+All seven are recorded under one constant event name, `Rejected meeting action`, with `MEETING_REJECTION_REASONS` supplying the `reason` that tells them apart, since an interpolated message would make the `event` value itself variable and the rejections uncountable. The level splits them: the four that mean somebody tapped a button that should not have worked are warnings, while `MeetingInactiveOwnerError`, `MeetingFinishedError` and `SharedMeetingFinishedError` (listed in `MEETING_REJECTIONS_AT_INFO`) are screens the system produces on purpose and stay at info. A new subclass must be added to the reason map, or `test_every_meeting_rejection_has_a_reason` fails.
 
 Delivery is best-effort, like every other render in this module: an exception raised while answering has no handler left above it and would reach `process_update` as a second, unhandled fault.
 

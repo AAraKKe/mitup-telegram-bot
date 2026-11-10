@@ -2,7 +2,7 @@ from enum import StrEnum, auto
 
 import structlog
 from sqlmodel.ext.asyncio.session import AsyncSession
-from telegram import Update
+from telegram import Message, Update
 from telegram.ext import ConversationHandler
 
 from mitup_bot import guards
@@ -99,3 +99,18 @@ async def reply_rich_message_not_supported(
     view.with_context(CommonMessages.RICH_MESSAGE_NOT_SUPPORTED.rich(lang=ctx.lang))
     await context.api.send_message(update=update, view=view)
     context.put_feature_metric(Feature.RICH_MESSAGE)
+
+
+def message_kind(message: Message | None) -> str:
+    """Name what kind of message the user sent, as a bounded machine value for a log field.
+
+    PTB resolves the attachment; a photo arrives as a tuple of sizes rather than as one object.
+    """
+    if message is None:
+        return "unknown"
+    attachment = message.effective_attachment
+    if attachment is None:
+        return "text" if message.text is not None else "empty"
+    if isinstance(attachment, tuple):
+        return "photo"
+    return type(attachment).__name__.lower()

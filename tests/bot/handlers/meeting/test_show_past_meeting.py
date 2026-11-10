@@ -7,6 +7,7 @@ from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import MeetingCounts, Meetup, User
 from mitup_bot.utils import callbacks as cb
 from mitup_bot.utils.messages import ButtonMessages, MeetingLifecycleMessages
+from mitup_bot.utils.rich_message import MAX_RICH_TEXT_LENGTH
 from mitup_bot.views import MitupView, RenderContext, factory
 from mitup_bot.views import meeting as meeting_views
 from tests.helpers import (
@@ -14,6 +15,8 @@ from tests.helpers import (
     MockDbSession,
     UpdateRequest,
     call_handler,
+    create_joined_link,
+    create_user,
 )
 from tests.helpers.constants import DEFAULT_CHAT_ID, FRESH_MESSAGE_DATE
 
@@ -40,7 +43,7 @@ def inactive_meeting(user_with_settings: User):
 def expected_past_meeting_view(meeting: Meetup, user: User, page: int = 1) -> MitupView:
     description = MeetingLifecycleMessages.PAST_DESCRIPTION.rich(lang=user.lang)
     return MitupView(
-        meeting_views.shared_body(meeting, finished=True),
+        meeting_views.fitted_shared_body(meeting, finished=True),
         [
             [
                 ButtonConfig(
@@ -82,6 +85,50 @@ async def test_delete_past_meeting_shows_confirmation(
     # Regression (issue #170): the confirmation must edit the detail view in place, never post a
     # new message that would leave the original message with live "Reactivate"/"Delete" buttons.
     context.api.assert_send_message_not_called()
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.SHOW_PAST_MEETING.with_id(MEETING_ID))], indirect=True
+)
+async def test_show_past_meeting_names_the_participants_it_kept(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    inactive_meeting: Meetup,
+    handler_context: HandlerContext,
+):
+    create_joined_link(user=create_user(id=30, tg_user_id=3000, first_name="Attendee Ana"), meetup=inactive_meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK, handler_context=handler_context)
+
+    view: MitupView = context.api.call_args("edit_message").kwargs["view"]
+    assert "Attendee Ana" in view.message.text
+
+
+@pytest.mark.parametrize(
+    "update", [UpdateRequest(callback_query=cb.SHOW_PAST_MEETING.with_id(MEETING_ID))], indirect=True
+)
+async def test_show_past_meeting_fits_a_large_roster_into_one_message(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    inactive_meeting: Meetup,
+    handler_context: HandlerContext,
+):
+    long_name = "N" * 60
+    for index in range(700):
+        attendee = create_user(id=100 + index, tg_user_id=10_000 + index, first_name=f"{long_name}{index}")
+        create_joined_link(user=attendee, meetup=inactive_meeting)
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(inactive_meeting)
+
+    context, _ = await call_handler(MeetingHandlerId.SHOW_PAST_MEETING_CALLBACK, handler_context=handler_context)
+
+    view: MitupView = context.api.call_args("edit_message").kwargs["view"]
+    assert view.message.text_length <= MAX_RICH_TEXT_LENGTH
+    assert f"{long_name}699" not in view.message.text
 
 
 @pytest.mark.parametrize(

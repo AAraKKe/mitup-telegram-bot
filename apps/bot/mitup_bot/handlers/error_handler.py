@@ -17,6 +17,7 @@ from mitup_bot.exceptions import (
     ContextPropertyNotSetError,
     InactiveUserInteraction,
     MeetingAccessError,
+    MeetingFinishedError,
     MeetingGoneError,
     MeetingInactiveOwnerError,
     MeetingNotOwnedError,
@@ -59,11 +60,12 @@ SHARED_MEETING_METRICS: dict[type, MetricKey] = {
 
 
 class MeetingRejectionReason(StrEnum):
-    """Machine key telling the six meeting rejections apart under one event name."""
+    """Machine key telling the meeting rejections apart under one event name."""
 
     MEETING_NOT_FOUND = auto()
     MEETING_NOT_OWNED = auto()
     MEETING_INACTIVE_AND_OWNED = auto()
+    MEETING_FINISHED = auto()
     SHARED_MESSAGE_STALE = auto()
     SHARED_TAP_UNAUTHORIZED = auto()
     SHARED_MEETING_FINISHED = auto()
@@ -73,14 +75,17 @@ MEETING_REJECTION_REASONS: dict[type, MeetingRejectionReason] = {
     MeetingGoneError: MeetingRejectionReason.MEETING_NOT_FOUND,
     MeetingNotOwnedError: MeetingRejectionReason.MEETING_NOT_OWNED,
     MeetingInactiveOwnerError: MeetingRejectionReason.MEETING_INACTIVE_AND_OWNED,
+    MeetingFinishedError: MeetingRejectionReason.MEETING_FINISHED,
     SharedMeetingGoneError: MeetingRejectionReason.SHARED_MESSAGE_STALE,
     SharedMeetingDeniedError: MeetingRejectionReason.SHARED_TAP_UNAUTHORIZED,
     SharedMeetingFinishedError: MeetingRejectionReason.SHARED_MEETING_FINISHED,
 }
 
-# The reactivation prompt and the finished-card banner are screens a healthy system produces, so
-# they are narrative. The other four mean somebody tapped a button that should not have worked.
-MEETING_REJECTIONS_AT_INFO: frozenset[type] = frozenset({MeetingInactiveOwnerError, SharedMeetingFinishedError})
+# The reactivation prompt and the two finished screens are what a healthy system produces, so they
+# are narrative. The others mean somebody tapped a button that should not have worked.
+MEETING_REJECTIONS_AT_INFO: frozenset[type] = frozenset(
+    {MeetingInactiveOwnerError, MeetingFinishedError, SharedMeetingFinishedError}
+)
 
 
 @dataclass(frozen=True)
@@ -284,12 +289,18 @@ def meeting_access_view(error: MeetingAccessError, ctx: RenderContext) -> MitupV
     user's own steps it interrupted. It is the same single reply either way — a rejection without a
     flow context renders exactly the screen its reason stands for.
     """
-    if isinstance(error, MeetingGoneError):
-        view = factory.deleted_meeting_view(ctx, back_rows=error.keyboard)
-    elif isinstance(error, MeetingInactiveOwnerError):
-        view = factory.reactivation_prompt_view(ctx, meeting_id=error.meeting_id, back_rows=error.keyboard)
-    else:
-        view = factory.main_menu_view(ctx)
+    match error:
+        case MeetingGoneError():
+            view = factory.deleted_meeting_view(ctx, back_rows=error.keyboard)
+        case MeetingInactiveOwnerError():
+            view = factory.reactivation_prompt_view(ctx, meeting_id=error.meeting_id, back_rows=error.keyboard)
+        case MeetingFinishedError():
+            view = MitupView(
+                message=MeetingDisplayMessages.FINISHED_BANNER.rich(lang=ctx.lang),
+                menu=factory.main_menu_back_rows(ctx.lang),
+            )
+        case _:
+            view = factory.main_menu_view(ctx)
 
     if error.flow_context is None:
         return view
@@ -356,7 +367,7 @@ def log_meeting_rejection(error: MeetingAccessError):
     """Record the rejection under one constant event name, whichever screen answers it.
 
     An interpolated message would make the `event` value itself vary and leave the rejections
-    uncountable, so the six are told apart by `reason`, and the level separates an anomaly from a
+    uncountable, so they are told apart by `reason`, and the level separates an anomaly from a
     screen the system is supposed to produce.
     """
     logger = log.info if type(error) in MEETING_REJECTIONS_AT_INFO else log.warning

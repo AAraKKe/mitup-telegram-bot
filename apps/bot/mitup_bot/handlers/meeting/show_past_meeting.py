@@ -25,7 +25,7 @@ DELETE_PAST_MEETING_ACTION = "delete_past_meeting"
 def past_meeting_view(meeting: Meetup, user: User, page: int) -> MitupView:
     description = MeetingLifecycleMessages.PAST_DESCRIPTION.rich(lang=user.lang)
     return MitupView(
-        meeting_views.shared_body(meeting, finished=True),
+        meeting_views.fitted_shared_body(meeting, finished=True),
         [
             [
                 ButtonConfig(

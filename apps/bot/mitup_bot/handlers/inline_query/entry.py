@@ -6,6 +6,7 @@ from mitup_bot import guards
 from mitup_bot.db import with_session
 from mitup_bot.exceptions import (
     MeetingAccessError,
+    MeetingFinishedError,
     MeetingGoneError,
     MeetingInactiveOwnerError,
     MeetingNotOwnedError,
@@ -31,6 +32,7 @@ SHARE_REJECTION_REASONS: dict[type[MeetingAccessError], ShareRejectionReason] = 
     MeetingGoneError: ShareRejectionReason.MEETING_NOT_FOUND,
     MeetingNotOwnedError: ShareRejectionReason.MEETING_NOT_SHAREABLE,
     MeetingInactiveOwnerError: ShareRejectionReason.MEETING_FINISHED,
+    MeetingFinishedError: ShareRejectionReason.MEETING_FINISHED,
 }
 
 

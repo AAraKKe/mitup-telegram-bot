@@ -103,6 +103,19 @@ async def test_export_lists_joined_meetings_with_the_organizer_display_name(mock
     assert joined["organizer"] == "Organizer Person"
     assert joined["meeting_start_datetime"] == "2026-09-01T20:00:00+00:00"
     assert joined["on_waiting_list"] is False
+    assert joined["meeting_active"] is True
+
+
+async def test_export_marks_a_joined_meeting_that_has_finished(mock_session: MockDbSession):
+    """Finished meetings keep their participants, so the export says which joined meetings are over."""
+    exporter = seed_exporter_with_social_graph(mock_session)
+    exporter.joined_links[0].meetup.active = False
+
+    export = await data_export.build_user_export(mock_session, exporter)
+
+    assert [(joined["meeting_title"], joined["meeting_active"]) for joined in export["joined_meetings"]] == [
+        ("Other Meeting", False)
+    ]
 
 
 async def test_export_never_leaks_other_users_ids(mock_session: MockDbSession):
