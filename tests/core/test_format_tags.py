@@ -5,6 +5,10 @@ def test_strips_tags_and_keeps_visible_text():
     assert strip_format_tags('<b>Hi</b> <a href="https://x.io">there</a>') == "Hi there"
 
 
+def test_link_with_an_escaped_address_keeps_only_its_text():
+    assert strip_format_tags('<a href="https://x.io/?a=1&amp;b=&quot;2&quot;&gt;">Meet</a> at 8') == "Meet at 8"
+
+
 def test_tg_emoji_keeps_fallback_emoji():
     assert strip_format_tags('<tg-emoji emoji-id="42">😀</tg-emoji> hi') == "😀 hi"
 

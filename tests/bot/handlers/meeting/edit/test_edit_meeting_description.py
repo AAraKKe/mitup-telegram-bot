@@ -186,6 +186,44 @@ async def test_edit_description_message_stores_tagged_description_and_renders_ri
     assert state == ConversationHandler.END
 
 
+@pytest.mark.parametrize(
+    "update",
+    [
+        UpdateRequest(
+            message_text="Call link here",
+            entities=[
+                MessageEntity(
+                    type=MessageEntity.TEXT_LINK, offset=10, length=4, url="https://meet.google.com/a?b=1&c=2"
+                )
+            ],
+        )
+    ],
+    indirect=True,
+)
+async def test_edit_description_message_stores_a_hidden_link_and_shows_it_on_the_card(
+    mock_session: MockDbSession,
+    update: Update,
+    user_with_settings: User,
+    app: StubMitupApp,
+    metrics_client: MetricsClient,
+):
+    meeting = user_with_settings.meetups[0]
+    mock_session.add_object(user_with_settings, "tg_user_id")
+    mock_session.add_object(meeting)
+
+    context, _ = await call_handler(
+        EditMeetingHandlerId.DESCRIPTION_MESSAGE,
+        handler_context=HandlerContext(update=update, app=app, metrics_client=metrics_client),
+        with_meeting_id={ContextId.EDIT_MEETING_DESCRIPTION: meeting.db_id},
+    )
+
+    assert meeting.description == 'Call link <a href="https://meet.google.com/a?b=1&amp;c=2">here</a>'
+    assert meeting.plain_description == "Call link here"
+    card = meeting_views.owner_view(meeting)
+    assert '<a href="https://meet.google.com/a?b=1&amp;c=2">here</a>' in card.message.html
+    context.api.assert_send_message_called(update, card)
+
+
 # ---------------------------------------------------------------------------
 # DESCRIPTION_MESSAGE — the description character cap
 # ---------------------------------------------------------------------------

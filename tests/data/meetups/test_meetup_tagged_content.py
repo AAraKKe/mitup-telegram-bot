@@ -31,6 +31,17 @@ def test_set_description_stores_tagged_form_in_description_column():
     assert meetup.plain_description == text
 
 
+def test_linked_title_shows_only_its_visible_text_on_plain_surfaces():
+    meetup = create_meetup(1)
+    text = "Board games at Ann's"
+    entities = [MessageEntity(type=MessageEntity.TEXT_LINK, offset=15, length=5, url="https://x.io/?a=1&b='2'")]
+
+    meetup.set_title(serialize_entities(text, entities))
+
+    assert meetup.title == 'Board games at <a href="https://x.io/?a=1&amp;b=&#x27;2&#x27;">Ann&#x27;s</a>'
+    assert meetup.plain_title == text
+
+
 def test_tagged_title_reads_the_title_column_directly():
     meetup = create_meetup(1, title="<b>Raid night</b>")
 

@@ -1,10 +1,13 @@
 import datetime as dt
 
+from telegram import MessageEntity
+
 from mitup_bot.emojis import Emojis
 from mitup_bot.images import ImageLayout
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.models import Meetup, MeetupLocation
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.utils.entities import serialize_entities
 from mitup_bot.utils.messages import ButtonMessages, MeetingCardSectionMessages, MeetingDisplayMessages
 from mitup_bot.views import meeting as meeting_views
 from mitup_bot.views.meeting.fitting import MEETING_CARD_BUDGET
@@ -438,3 +441,16 @@ def test_the_owner_card_carries_every_photo_it_draws():
 
 def test_a_card_with_no_photos_carries_none():
     assert owner_media_ids(with_images(owned_meeting(), 0)) == []
+
+
+def test_a_photo_reference_inside_a_link_address_is_not_read_as_a_photo():
+    """A link's address is the owner's text, so a `tg://photo?id=` inside it must not demand a photo."""
+    address = "https://example.com/open?next=tg://photo?id=1"
+    meeting = with_images(owned_meeting(), 1)
+    link = MessageEntity(type=MessageEntity.URL, offset=5, length=len(address))
+    meeting.set_description(serialize_entities(f"Join {address}", [link]))
+
+    payload = meeting_views.owner_view(meeting).rich_message()
+
+    assert f'<a href="{address}">{address}</a>' in payload.html
+    assert [entry["id"] for entry in payload.to_api_dict()["media"]] == ["uniq-0"]

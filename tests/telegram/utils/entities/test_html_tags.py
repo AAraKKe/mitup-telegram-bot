@@ -83,6 +83,11 @@ def test_parse_format_tags_link_href_value_may_contain_gt():
     assert result.entities[0].url == "https://x.io/?a=1&b=2>3"
 
 
+def test_parse_format_tags_link_href_decodes_character_references():
+    result = parse_format_tags('<a href="https://x.io/?a=1&amp;b=&quot;2&quot;">x</a>', {})
+    assert result.entities[0].url == 'https://x.io/?a=1&b="2"'
+
+
 def test_parse_format_tags_link_without_href_dropped():
     # An <a> with no href carries no entity; the tag is stripped but text stays.
     result = parse_format_tags("<a>bare</a>", {})

@@ -761,9 +761,9 @@ def photo_media_entry(photo: RichPhoto) -> dict[str, Any]:
     return {"id": photo.media_id, "media": {"type": "photo", "media": photo.file_id}}
 
 
-# Matches every `tg://photo?id=` reference in the html. The id is an escaped attribute value, so
-# it holds no `"` and the match ends at the closing quote.
-PHOTO_REFERENCE_RE = re.compile(r'tg://photo\?id=([^"]*)"')
+# A photo block exactly as `photo_markup` writes it, so a `tg://photo?id=` written inside a link's
+# escaped address never matches. The id is an escaped attribute value and ends at the closing quote.
+PHOTO_REFERENCE_RE = re.compile(r'<img src="tg://photo\?id=([^"]*)"/>')
 
 
 def require_carried_photos(markup: str, photos: Sequence[RichPhoto]):

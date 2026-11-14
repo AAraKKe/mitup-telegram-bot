@@ -79,6 +79,68 @@ def test_capture_is_silent_when_the_dialect_carries_everything():
     assert warnings_for(logs, DROPPED_EVENT) == []
 
 
+@pytest.mark.parametrize(
+    "text, entity",
+    [
+        ("Join here", MessageEntity(type=MessageEntity.TEXT_LINK, offset=5, length=4, url="https://meet.google.com/a")),
+        ("Join meet.google.com/a", MessageEntity(type=MessageEntity.URL, offset=5, length=17)),
+        ("Join ann@mail.io", MessageEntity(type=MessageEntity.EMAIL, offset=5, length=11)),
+    ],
+    ids=["text_link", "url", "email"],
+)
+def test_capture_stores_a_link_without_reporting_a_drop(text: str, entity: MessageEntity):
+    with capture_logs() as logs:
+        tagged = capture_tagged_text(text, [entity], field="description")
+
+    assert tagged.startswith('Join <a href="')
+    assert warnings_for(logs, DROPPED_EVENT) == []
+
+
+def test_capture_reports_a_mention_as_an_unsupported_type():
+    mention = MessageEntity(type=MessageEntity.MENTION, offset=5, length=9)
+
+    with capture_logs() as logs:
+        tagged = capture_tagged_text("Join @mitupbot", [mention], field="description")
+
+    assert tagged == "Join @mitupbot"
+    assert [(entry["reason"], entry["entity_type"]) for entry in warnings_for(logs, DROPPED_EVENT)] == [
+        ("unsupported_entity_type", MessageEntity.MENTION)
+    ]
+
+
+def test_capture_reports_a_link_inside_another_link_as_overlapping():
+    links = [
+        MessageEntity(type=MessageEntity.TEXT_LINK, offset=0, length=9, url="https://x.io"),
+        MessageEntity(type=MessageEntity.URL, offset=5, length=4),
+    ]
+
+    with capture_logs() as logs:
+        capture_tagged_text("open x.io", links, field="description")
+
+    assert [(entry["reason"], entry["entity_type"]) for entry in warnings_for(logs, DROPPED_EVENT)] == [
+        ("overlapping_span", MessageEntity.URL)
+    ]
+
+
+def test_capture_reports_a_link_a_card_could_not_send():
+    link = MessageEntity(type=MessageEntity.TEXT_LINK, offset=0, length=5, url="tg://user?id=42")
+
+    with capture_logs() as logs:
+        tagged = capture_tagged_text("hello", [link], field="title")
+
+    assert tagged == "hello"
+    assert warnings_for(logs, DROPPED_EVENT) == [
+        {
+            "event": DROPPED_EVENT,
+            "log_level": "warning",
+            "field": "title",
+            "entity_type": MessageEntity.TEXT_LINK,
+            "reason": "unsendable_link",
+            "dropped": 1,
+        }
+    ]
+
+
 # ---------------------------------------------------------------------------
 # parse_stored_tagged_text() — what this build could not read back
 # ---------------------------------------------------------------------------

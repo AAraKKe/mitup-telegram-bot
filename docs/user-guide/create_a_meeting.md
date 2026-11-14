@@ -7,7 +7,7 @@ icon: material/calendar-plus-outline
 
 Tap *➕ New meeting*{.button-like} in the main menu and send the title. That's the only thing the bot asks for. The meeting is created with your [default options](settings.md#default-meeting-options) and its card comes up, ready to fill in and share.
 
-Attach a date to the title message, using Telegram's own date and time formatting, and the meeting starts with its schedule set. Bold, italic and the rest of Telegram's text formatting come through as you typed them, in the title and in the description.
+Attach a date to the title message, using Telegram's own date and time formatting, and the meeting starts with its schedule set. Bold, italic, underline, strikethrough, spoilers and links come through as you typed them, in the title and in the description, so a video-call link you paste is one tap away on the card.
 
 ## The meeting card
 

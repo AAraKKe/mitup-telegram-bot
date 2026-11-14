@@ -10,6 +10,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum, auto
 from string.templatelib import Interpolation, Template
+from urllib.parse import urlsplit
 
 import structlog
 from telegram import MessageEntity
@@ -375,8 +376,12 @@ class OpenTag:
 
 
 def parse_tag_attributes(attrs: str) -> dict[str, str]:
-    """Parse an attribute blob (`href="x" class='y'`) into a name→value mapping."""
-    return {m.group(1).lower(): m.group(2) if m.group(2) is not None else m.group(3) for m in ATTR_RE.finditer(attrs)}
+    """Parse an attribute blob (`href="x" class='y'`) into a name→value mapping, with the character
+    references in each value decoded."""
+    return {
+        m.group(1).lower(): html.unescape(m.group(2) if m.group(2) is not None else m.group(3))
+        for m in ATTR_RE.finditer(attrs)
+    }
 
 
 def resolve_open_tag(tag: str, attrs: str, offset: int) -> OpenTag:
@@ -541,8 +546,10 @@ def parse_stored_tagged_text(text: str, *, field: str) -> FormattedText:
 
 # --- serialize_entities() ---
 
-# Entity type → tag emitted by `serialize_entities`. Only these types survive
-# serialization; every other entity is dropped and its text stays unstyled.
+LINK_TAG = "a"
+
+# Entity type → tag emitted by `serialize_entities`. Every other type is dropped with its text kept
+# unstyled, and so is a link whose address a card could not send.
 ENTITY_TAG_MAP: dict[str, str] = {
     MessageEntity.BOLD: "b",
     MessageEntity.ITALIC: "i",
@@ -550,13 +557,24 @@ ENTITY_TAG_MAP: dict[str, str] = {
     MessageEntity.STRIKETHROUGH: "s",
     MessageEntity.SPOILER: "tg-spoiler",
     MessageEntity.CUSTOM_EMOJI: "tg-emoji",
+    MessageEntity.TEXT_LINK: LINK_TAG,
+    MessageEntity.URL: LINK_TAG,
+    MessageEntity.EMAIL: LINK_TAG,
 }
+
+# A rich message reads `tg://` links as media, custom emoji, moments or user mentions and a bare
+# `#name` as an anchor inside the message, so a stored link keeps to the schemes it shows as a link.
+WEB_LINK_SCHEMES = frozenset({"http", "https"})
+EMAIL_LINK_SCHEME = "mailto"
+
+URL_SCHEME_RE = re.compile(r"[a-z][a-z0-9+.-]*://", re.IGNORECASE)
 
 
 class EntityDropReason(StrEnum):
     """Why an entity the user's message carried did not reach the stored value."""
 
     UNSUPPORTED_ENTITY_TYPE = auto()
+    UNSENDABLE_LINK = auto()
     OVERLAPPING_SPAN = auto()
 
 
@@ -566,10 +584,39 @@ def is_serializable_entity(entity: MessageEntity) -> bool:
     return entity.type in ENTITY_TAG_MAP
 
 
-def open_tag_markup(entity: MessageEntity) -> str:
+def link_href(entity: MessageEntity, covered_text: str) -> str:
+    """The address a link entity opens. A `url` or `email` entity carries none of its own, so the
+    text it covers is the address, written with or without a scheme."""
+    match entity.type:
+        case MessageEntity.URL:
+            return covered_text if URL_SCHEME_RE.match(covered_text) else f"https://{covered_text}"
+        case MessageEntity.EMAIL:
+            return f"{EMAIL_LINK_SCHEME}:{covered_text}"
+        case _:
+            return entity.url or ""
+
+
+def is_sendable_link(href: str) -> bool:
+    # `urlsplit` silently drops some whitespace and control characters, so they are refused first.
+    if any(character.isspace() or ord(character) < 0x20 for character in href):
+        return False
+    try:
+        address = urlsplit(href)
+    except ValueError:
+        return False
+    if address.scheme == EMAIL_LINK_SCHEME:
+        return bool(address.path)
+    return address.scheme in WEB_LINK_SCHEMES and bool(address.hostname)
+
+
+def open_tag_markup(entity: MessageEntity, covered_text: str) -> str | None:
+    """The tag opening *entity*'s span, or None for a link a card could not send."""
     if entity.type == MessageEntity.CUSTOM_EMOJI:
         assert entity.custom_emoji_id is not None, "filtered by is_serializable_entity"
         return f'<tg-emoji emoji-id="{html.escape(entity.custom_emoji_id)}">'
+    if ENTITY_TAG_MAP[entity.type] == LINK_TAG:
+        href = link_href(entity, covered_text)
+        return f'<a href="{html.escape(href)}">' if is_sendable_link(href) else None
     return f"<{ENTITY_TAG_MAP[entity.type]}>"
 
 
@@ -581,14 +628,15 @@ def serialize_entities(
     The capture-side inverse of `parse_format_tags`: literal text is
     HTML-escaped so user-typed markup (`<b>`, `&amp;`, `<3`, …) round-trips as
     literal characters, and entity spans are wrapped in the tags listed in
-    `ENTITY_TAG_MAP`; entities of any other type are dropped with their text
-    kept unstyled. Entities nest by sorting on `(offset, -length)`; an entity
-    that partially overlaps an already-open span without nesting inside it is
-    dropped — the earlier-starting entity wins. Telegram never sends partially
-    overlapping entities, so that rule stops being defensive the day one arrives,
+    `ENTITY_TAG_MAP`; entities of any other type, and links whose address a card
+    could not send, are dropped with their text kept unstyled. Entities nest by
+    sorting on `(offset, -length)`; an entity that partially overlaps an
+    already-open span without nesting inside it, or a link that would sit inside
+    another link, is dropped, and the earlier-starting entity wins. Telegram
+    never sends partially overlapping entities, so that rule stops being defensive the day one arrives,
     which is why it is countable rather than assumed unreachable.
 
-    Both kinds of loss are silent to the user: their formatting simply is not
+    Every such loss is silent to the user: their formatting simply is not
     there afterwards, and the tagged string is the only copy kept. Pass *dropped*
     to tally them; `capture_tagged_text` is the caller that does and reports.
     """
@@ -601,9 +649,12 @@ def serialize_entities(
         if dropped is not None:
             dropped[(reason, entity_type)] += 1
 
+    def span_text(start: int, end: int) -> str:
+        return encoded[start * 2 : end * 2].decode("utf-16-le")
+
     def flush_until(end: int):
         nonlocal cursor
-        parts.append(html.escape(encoded[cursor * 2 : end * 2].decode("utf-16-le")))
+        parts.append(html.escape(span_text(cursor, end)))
         cursor = end
 
     def close_spans_ending_by(offset: int):
@@ -612,22 +663,27 @@ def serialize_entities(
             flush_until(end)
             parts.append(f"</{tag}>")
 
-    serializable: list[MessageEntity] = []
+    opened: list[tuple[MessageEntity, str]] = []  # (entity, its opening tag)
     for entity in entities:
-        if is_serializable_entity(entity):
-            serializable.append(entity)
-        else:
+        if not is_serializable_entity(entity):
             record(EntityDropReason.UNSUPPORTED_ENTITY_TYPE, entity.type)
+        elif (opening := open_tag_markup(entity, span_text(entity.offset, entity.offset + entity.length))) is None:
+            record(EntityDropReason.UNSENDABLE_LINK, entity.type)
+        else:
+            opened.append((entity, opening))
 
-    for entity in sorted(serializable, key=lambda e: (e.offset, -e.length)):
+    for entity, opening in sorted(opened, key=lambda pair: (pair[0].offset, -pair[0].length)):
         close_spans_ending_by(entity.offset)
         end = entity.offset + entity.length
-        if open_spans and end > open_spans[-1][0]:
+        tag = ENTITY_TAG_MAP[entity.type]
+        crosses_open_span = bool(open_spans) and end > open_spans[-1][0]
+        inside_a_link = tag == LINK_TAG and any(open_tag == LINK_TAG for _, open_tag in open_spans)
+        if crosses_open_span or inside_a_link:
             record(EntityDropReason.OVERLAPPING_SPAN, entity.type)
             continue
         flush_until(entity.offset)
-        parts.append(open_tag_markup(entity))
-        open_spans.append((end, ENTITY_TAG_MAP[entity.type]))
+        parts.append(opening)
+        open_spans.append((end, tag))
 
     close_spans_ending_by(utf16_len(text))
     flush_until(utf16_len(text))

@@ -404,6 +404,12 @@ def test_stored_content_maps_its_formatting_tags():
     assert stored("<b>bold</b> and <i>italic</i>") == "<b>bold</b> and <i>italic</i>"
 
 
+def test_stored_content_renders_a_link_with_its_address_escaped_once():
+    assert stored('<a href="https://x.io/?a=1&amp;b=&quot;2&quot;">Meet</a>') == (
+        '<a href="https://x.io/?a=1&amp;b=&quot;2&quot;">Meet</a>'
+    )
+
+
 def test_stored_content_escapes_the_text_around_its_tags():
     assert stored("<b>a < b</b> & c") == "<b>a &lt; b</b> &amp; c"
 
