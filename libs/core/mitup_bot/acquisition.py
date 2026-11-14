@@ -21,6 +21,8 @@ ACQUISITION_SOURCE_MAX_LENGTH = 64
 
 # Deep link that drops the user straight into meeting creation, used by the inline-query surface.
 INLINE_KIND = "inline"
+# Deep link that opens the main menu, attached to the inline panel that refuses a share.
+INLINE_MENU_KIND = "inlinemenu"
 # Reserved kind for links that name the place they were published: `src_<token>`.
 CAMPAIGN_KIND = "src"
 
@@ -47,7 +49,8 @@ class AcquisitionSource(StrEnum):
     """The inline Join button on a meeting card shared to a group — the row was created by the join
     callback, no `/start` involved."""
     INLINE = "inline"
-    """The create-your-own-meeting deep link the inline-query surface attaches to its results."""
+    """The deep links the inline-query surface attaches to its panels: create-your-own-meeting on its
+    results, and the main menu on a refused share."""
     WEB = "web"
     """`src_web`: links on surfaces we own on the web — the docs site, its footer, the README."""
     PATREON = "patreon"
@@ -74,6 +77,7 @@ CAMPAIGN_SOURCES = {
 
 LINK_KIND_SOURCES = {
     INLINE_KIND: AcquisitionSource.INLINE,
+    INLINE_MENU_KIND: AcquisitionSource.INLINE,
     # The footer payloads that cards already posted in chats carry.
     "sharedcard": AcquisitionSource.FOOTER,
     "meetingcard": AcquisitionSource.BOT_CARD,

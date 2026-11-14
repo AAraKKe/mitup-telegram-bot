@@ -1282,4 +1282,4 @@ msgstr "Unha quedada pode durar como máximo unha semana. Esa data cae unha sema
 #. Button above an empty list of results, shown when the meeting number someone tried
 #. to share names nothing they can share. Tapping it opens the bot. Keep it short.
 msgid "InlineQueryMessages.NOT_SHAREABLE_MEETING_ID_BUTTON"
-msgstr "Este non é un ID de quedada que se poida compartir"
+msgstr "Este ID de quedada non se pode compartir"

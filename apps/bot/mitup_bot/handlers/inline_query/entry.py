@@ -3,6 +3,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from telegram import Update
 
 from mitup_bot import guards
+from mitup_bot.acquisition import INLINE_MENU_KIND
 from mitup_bot.db import with_session
 from mitup_bot.exceptions import (
     MeetingAccessError,
@@ -122,7 +123,7 @@ async def answer_share_rejection(
     )
     lang = user.lang if user else TranslationEngine.FALLBACK_LANG
     button = InlineResultsButton(
-        text=InlineQueryMessages.NOT_SHAREABLE_MEETING_ID_BUTTON.text(lang=lang), start_parameter="inline"
+        text=InlineQueryMessages.NOT_SHAREABLE_MEETING_ID_BUTTON.text(lang=lang), start_parameter=INLINE_MENU_KIND
     )
     await context.api.answer_inline_query(update=update, results=[], button=button, cache_time=0)
 

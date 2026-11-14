@@ -22,12 +22,6 @@ from tests.helpers.stub_db import MockDbSession
 SHARE_REJECTED_LOG_EVENT = "Meeting share rejected"
 
 
-def rejection_button(lang: str) -> InlineResultsButton:
-    return InlineResultsButton(
-        text=InlineQueryMessages.NOT_SHAREABLE_MEETING_ID_BUTTON.text(lang=lang), start_parameter="inline"
-    )
-
-
 def assert_share_rejected(
     context: StubMitupContext,
     update: Update,
@@ -38,9 +32,10 @@ def assert_share_rejected(
     lang: str,
 ):
     """Assert the rejection was answered with the empty panel and named on one info line."""
-    context.api.assert_answer_inline_query_called(
-        update=update, results=[], button=rejection_button(lang), cache_time=0
+    button = InlineResultsButton(
+        text=InlineQueryMessages.NOT_SHAREABLE_MEETING_ID_BUTTON.text(lang=lang), start_parameter="inlinemenu"
     )
+    context.api.assert_answer_inline_query_called(update=update, results=[], button=button, cache_time=0)
 
     record = log_record(caplog, SHARE_REJECTED_LOG_EVENT)
     assert record.levelname == "INFO"
@@ -153,9 +148,15 @@ async def test_share_meeting_rejection_answers_an_empty_panel(
         UpdateRequest(inline_query="123abc"),
         UpdateRequest(inline_query="12 34"),
         UpdateRequest(inline_query="123①"),
+        UpdateRequest(inline_query="9223372036854775808"),
     ],
     indirect=["update"],
-    ids=["digits_with_trailing_junk", "digits_with_inner_space", "digits_with_non_decimal_digit"],
+    ids=[
+        "digits_with_trailing_junk",
+        "digits_with_inner_space",
+        "digits_with_non_decimal_digit",
+        "number_past_the_bigint_range",
+    ],
 )
 async def test_share_meeting_non_numeric_query_answers_an_empty_panel(
     update: Update,

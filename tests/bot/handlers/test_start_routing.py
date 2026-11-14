@@ -149,7 +149,12 @@ def assert_still_onboarding(api: MockApi, update: Update, user: User):
     assert user.member_time is None
 
 
-@pytest.mark.parametrize("update", [UpdateRequest(command="start")], indirect=True)
+@pytest.mark.parametrize(
+    "update",
+    [UpdateRequest(command="start"), UpdateRequest(command="start", command_args="inlinemenu")],
+    indirect=True,
+    ids=["bare_start", "refused_share_link"],
+)
 async def test_member_start_falls_through_to_main_menu(
     routing_app: Application,
     update: Update,

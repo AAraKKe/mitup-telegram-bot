@@ -53,6 +53,9 @@ from mitup_bot.views import RenderContext
 
 log = structlog.get_logger(__name__)
 
+# The largest value Postgres's bigint, the type of every id column, can hold.
+MAX_BIGINT = 2**63 - 1
+
 
 async def member_user(update: Update, session: AsyncSession) -> User | None:
     """Return the effective user's `User` row only when their status is MEMBER, else None.
@@ -155,10 +158,11 @@ def shareable_meeting_id(update: Update) -> int | None:
     query: this only keeps `int()` from raising on one.
 
     `isdecimal` (not `isdigit`) because `int()` rejects non-decimal digit characters such as "①",
-    which `isdigit` accepts.
+    which `isdigit` accepts. A number past the bigint id column's range names no meeting either, and
+    would make Postgres raise instead of finding none.
     """
     query = valid_inline_query(update).query.strip()
-    if not query.isdecimal():
+    if not query.isdecimal() or int(query) > MAX_BIGINT:
         return None
     return int(query)
 

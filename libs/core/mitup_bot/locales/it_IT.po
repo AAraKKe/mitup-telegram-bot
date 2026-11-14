@@ -1282,4 +1282,4 @@ msgstr "Un incontro può durare una settimana al massimo. Quella data cade una s
 #. Button above an empty list of results, shown when the meeting number someone tried
 #. to share names nothing they can share. Tapping it opens the bot. Keep it short.
 msgid "InlineQueryMessages.NOT_SHAREABLE_MEETING_ID_BUTTON"
-msgstr "Nessun incontro da condividere con questo ID"
+msgstr "Questo ID incontro non si può condividere"
