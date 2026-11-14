@@ -2,8 +2,17 @@ from collections.abc import Callable
 
 import pytest
 from structlog.testing import capture_logs
-from telegram import Chat, Update
-from telegram.error import BadRequest, Forbidden, TelegramError
+from telegram import (
+    CallbackQuery,
+    Chat,
+    ChatMemberLeft,
+    ChatMemberMember,
+    ChatMemberUpdated,
+    InaccessibleMessage,
+    Update,
+)
+from telegram import User as TgUser
+from telegram.error import BadRequest, Forbidden, TelegramError, TimedOut
 
 from mitup_bot import db
 from mitup_bot.config import Env
@@ -31,7 +40,7 @@ from mitup_bot.exceptions import (
     UserPendingDeletion,
 )
 from mitup_bot.handlers import error_handler
-from mitup_bot.handlers.error_handler import SUPPRESSED_EXCEPTIONS, FaultOutcome
+from mitup_bot.handlers.error_handler import HANDLED_OUTCOME, SUPPRESSED_EXCEPTIONS, FaultOutcome
 from mitup_bot.handlers.main_menu.enums import MainMenuHandlerId
 from mitup_bot.handlers.registry import callback_with_metrics
 from mitup_bot.keyboards import ButtonConfig, Keyboard
@@ -59,7 +68,13 @@ from tests.helpers import (
     create_settings,
     create_user,
 )
-from tests.helpers.constants import DEFAULT_CHAT_ID, DEFAULT_USER_ID
+from tests.helpers.constants import (
+    DEFAULT_CHAT_ID,
+    DEFAULT_MESSAGE_ID,
+    DEFAULT_TEST_DATE,
+    DEFAULT_TG_USER_PARAMS,
+    DEFAULT_USER_ID,
+)
 from tests.helpers.fixtures import create_update
 from tests.helpers.logs import ACCOUNT_NOT_FOUND_LOG_EVENT, ACCOUNT_NOT_FOUND_LOG_REASON
 from tests.helpers.monitoring import MetricAssertions
@@ -1266,6 +1281,280 @@ async def test_fault_notification_failure_does_not_raise(
     await context.metrics.flush()
 
     assert outcome == FaultOutcome(1, {"error_type": "builtins.ValueError"})
+
+
+# --- Faults outside the bot chat ---
+
+TIMED_OUT_OUTCOME = FaultOutcome(1, {"error_type": "telegram.error.TimedOut"})
+
+
+def build_membership_context(app: StubMitupApp, chat_type: str) -> StubMitupContext:
+    """The bot being added to a chat of `chat_type`: an update with a chat but no message."""
+    bot_account = TgUser(id=999, first_name="Mitup", is_bot=True)
+    update = Update(
+        DEFAULT_MESSAGE_ID,
+        my_chat_member=ChatMemberUpdated(
+            chat=Chat(id=DEFAULT_CHAT_ID, type=chat_type),
+            from_user=TgUser(**DEFAULT_TG_USER_PARAMS),
+            date=DEFAULT_TEST_DATE,
+            old_chat_member=ChatMemberLeft(user=bot_account),
+            new_chat_member=ChatMemberMember(user=bot_account),
+        ),
+    )
+    return build_context(update, app)
+
+
+def called_api_methods(context: StubMitupContext) -> set[str]:
+    return {name for name, method in context.api.mock_mapping.items() if method.called}
+
+
+# Every surface where a new message would land in somebody else's chat, with the only calls the bot
+# may make there: an alert the caller alone sees, an empty inline answer, or nothing.
+SURFACES_OUTSIDE_THE_BOT_CHAT = [
+    pytest.param(lambda app: build_card_context(app, Chat.GROUP), {"answer_callback_query"}, id="group_card"),
+    pytest.param(build_inline_card_context, {"answer_callback_query"}, id="inline_card"),
+    pytest.param(build_inline_context, {"answer_inline_query"}, id="inline_query"),
+    pytest.param(build_group_message_context, set(), id="group_message"),
+    pytest.param(lambda app: build_membership_context(app, Chat.GROUP), set(), id="group_membership_change"),
+    pytest.param(lambda app: build_membership_context(app, Chat.PRIVATE), set(), id="bot_chat_membership_change"),
+]
+
+
+@pytest.mark.parametrize("build_surface, allowed_calls", SURFACES_OUTSIDE_THE_BOT_CHAT)
+async def test_fault_outside_the_bot_chat_writes_nothing_into_the_chat(
+    build_surface: Callable[[StubMitupApp], StubMitupContext],
+    allowed_calls: set[str],
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+):
+    context = build_surface(app)
+
+    with capture_logs() as logs:
+        outcome = await error_handler.handler(context, TimedOut(), Env.PROD)
+
+    assert outcome == TIMED_OUT_OUTCOME
+    assert called_api_methods(context) == allowed_calls
+    assert not [entry for entry in logs if entry["log_level"] == "warning"]
+
+
+@pytest.mark.parametrize("build_card", CARDS_OUTSIDE_THE_BOT_CHAT)
+async def test_fault_on_a_card_outside_the_bot_chat_alerts_the_caller(
+    build_card: Callable[[StubMitupApp, MetricsClient | None], StubMitupContext],
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+):
+    context = build_card(app, None)
+
+    await error_handler.handler(context, TimedOut(), Env.PROD)
+
+    context.api.assert_answer_callback_query_called(
+        context.telegram_update,
+        text=CommonMessages.UNEXPECTED_ERROR_ALERT.text(lang=TranslationEngine.FALLBACK_LANG),
+        show_alert=True,
+    )
+
+
+async def test_fault_alert_outside_the_bot_chat_uses_the_stored_language(
+    app: StubMitupApp, mock_session: MockDbSession
+):
+    mock_session.add_user(create_user(id=1, tg_user_id=DEFAULT_USER_ID, settings=create_settings(language="es")))
+    context = build_card_context(app, Chat.GROUP)
+
+    await error_handler.handler(context, TimedOut(), Env.PROD)
+
+    context.api.assert_answer_callback_query_called(
+        context.telegram_update, text=CommonMessages.UNEXPECTED_ERROR_ALERT.text(lang="es"), show_alert=True
+    )
+
+
+async def test_fault_on_an_inline_query_clears_the_spinner(app: StubMitupApp, mock_session: MockDbSession):
+    context = build_inline_context(app)
+
+    await error_handler.handler(context, TimedOut(), Env.PROD)
+
+    context.api.assert_answer_inline_query_called(context.telegram_update, results=[], cache_time=0)
+
+
+def build_inaccessible_message_tap_context(app: StubMitupApp) -> StubMitupContext:
+    """A tap in the bot chat on a message Telegram no longer shows the bot, so it has no `effective_message`."""
+    private_chat = Chat(id=DEFAULT_CHAT_ID, type=Chat.PRIVATE)
+    tap = CallbackQuery(
+        id=str(DEFAULT_MESSAGE_ID),
+        from_user=TgUser(**DEFAULT_TG_USER_PARAMS),
+        chat_instance="inst",
+        message=InaccessibleMessage(chat=private_chat, message_id=DEFAULT_MESSAGE_ID),
+    )
+    return build_context(Update(DEFAULT_MESSAGE_ID, callback_query=tap), app)
+
+
+@pytest.mark.parametrize(
+    "build_surface", [build_callback_context, build_message_context], ids=["bot_chat_tap", "bot_chat_message"]
+)
+async def test_fault_in_the_bot_chat_redirects_to_the_main_menu(
+    build_surface: Callable[[StubMitupApp], StubMitupContext], app: StubMitupApp, mock_session: MockDbSession
+):
+    context = build_surface(app)
+
+    outcome = await error_handler.handler(context, TimedOut(), Env.PROD)
+
+    fallback = TranslationEngine.FALLBACK_LANG
+    expected_view = factory.main_menu_view(
+        RenderContext(lang=fallback), message=CommonMessages.UNEXPECTED_ERROR.rich(lang=fallback)
+    )
+    context.api.assert_send_message_called(context.telegram_update, expected_view)
+    assert outcome == TIMED_OUT_OUTCOME
+
+
+@pytest.mark.filterwarnings("ignore:.*InaccessibleMessage.*:telegram.warnings.PTBUserWarning")
+async def test_fault_on_a_tap_on_an_inaccessible_bot_chat_message_redirects_to_the_main_menu(
+    app: StubMitupApp, mock_session: MockDbSession
+):
+    context = build_inaccessible_message_tap_context(app)
+
+    outcome = await error_handler.handler(context, TimedOut(), Env.PROD)
+
+    fallback = TranslationEngine.FALLBACK_LANG
+    expected_view = factory.main_menu_view(
+        RenderContext(lang=fallback), message=CommonMessages.UNEXPECTED_ERROR.rich(lang=fallback)
+    )
+    context.api.assert_answer_callback_query_called(context.telegram_update, text="", show_alert=False)
+    # The typed helper requires an `effective_message`, which this update lacks; the real send only needs the chat.
+    context.api.mock_method("send_message").assert_awaited_once_with(update=context.telegram_update, view=expected_view)
+    assert outcome == TIMED_OUT_OUTCOME
+
+
+@pytest.mark.parametrize(
+    "build_surface",
+    [build_group_message_context, lambda app: build_membership_context(app, Chat.PRIVATE)],
+    ids=["group_message", "bot_chat_membership_change"],
+)
+async def test_pending_deletion_without_a_bot_chat_message_sends_nothing(
+    build_surface: Callable[[StubMitupApp], StubMitupContext], app: StubMitupApp, mock_session: MockDbSession
+):
+    context = build_surface(app)
+
+    outcome = await error_handler.handler(context, UserPendingDeletion(DEFAULT_USER_ID, "en"), Env.PROD)
+
+    assert outcome == HANDLED_OUTCOME
+    assert called_api_methods(context) == set()
+
+
+async def test_pending_deletion_alerts_a_tap_on_a_group_card(app: StubMitupApp, mock_session: MockDbSession):
+    context = build_card_context(app, Chat.GROUP)
+
+    await error_handler.handler(context, UserPendingDeletion(DEFAULT_USER_ID, "es"), Env.PROD)
+
+    context.api.assert_answer_callback_query_called(
+        context.telegram_update, text=PrivacyMessages.PENDING_DELETION_ALERT.text(lang="es"), show_alert=True
+    )
+    assert called_api_methods(context) == {"answer_callback_query"}
+
+
+@pytest.mark.parametrize(
+    "build_surface, allowed_calls",
+    [
+        pytest.param(lambda app: build_card_context(app, Chat.GROUP), {"answer_callback_query"}, id="group_card"),
+        pytest.param(build_inline_card_context, {"answer_callback_query"}, id="inline_card"),
+        pytest.param(build_inline_context, {"answer_inline_query"}, id="inline_query"),
+        pytest.param(build_group_message_context, set(), id="group_message"),
+    ],
+)
+async def test_meeting_rejection_outside_the_bot_chat_is_a_fault_that_leaves_the_chat_untouched(
+    build_surface: Callable[[StubMitupApp], StubMitupContext],
+    allowed_calls: set[str],
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+):
+    """A bot-chat rejection off the bot chat means the path skipped `guards.shared_meeting`."""
+    context = build_surface(app)
+    error = MeetingNotOwnedError(meeting_id=7, action="Edit title", user_db_id=1, lang="en")
+
+    with capture_logs() as logs:
+        outcome = await error_handler.handler(context, error, Env.PROD)
+
+    assert outcome == FaultOutcome(1, {"error_type": "mitup_bot.exceptions.MeetingNotOwnedError"})
+    assert called_api_methods(context) == allowed_calls
+    faults = [entry for entry in logs if entry["event"] == "An error occurred while handling the update"]
+    assert len(faults) == 1
+    assert faults[0]["error_type"] == "mitup_bot.exceptions.MeetingNotOwnedError"
+    assert not [entry for entry in logs if entry["event"] == "Rejected meeting action"]
+
+
+@pytest.mark.parametrize(
+    "build_surface, error, error_type, failing_answer",
+    [
+        pytest.param(
+            lambda app: build_card_context(app, Chat.GROUP),
+            TimedOut(),
+            "telegram.error.TimedOut",
+            "answer_callback_query",
+            id="group_card",
+        ),
+        pytest.param(
+            build_inline_context, TimedOut(), "telegram.error.TimedOut", "answer_inline_query", id="inline_query"
+        ),
+        pytest.param(
+            lambda app: build_card_context(app, Chat.GROUP),
+            MeetingNotOwnedError(meeting_id=7, action="Edit title", user_db_id=1, lang="en"),
+            "mitup_bot.exceptions.MeetingNotOwnedError",
+            "answer_callback_query",
+            id="group_card_meeting_rejection",
+        ),
+    ],
+)
+async def test_undeliverable_answer_outside_the_bot_chat_is_logged_and_swallowed(
+    build_surface: Callable[[StubMitupApp], StubMitupContext],
+    error: Exception,
+    error_type: str,
+    failing_answer: str,
+    app: StubMitupApp,
+    mock_session: MockDbSession,
+):
+    context = build_surface(app)
+    context.api.mock_method(failing_answer).side_effect = TelegramError("answer failed")
+
+    with capture_logs() as logs:
+        outcome = await error_handler.handler(context, error, Env.PROD)
+
+    assert outcome == FaultOutcome(1, {"error_type": error_type})
+    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
+    assert [warning["reason"] for warning in warnings] == ["error_notice_undeliverable"]
+
+
+async def test_alert_outside_the_bot_chat_falls_back_to_the_client_language_when_the_db_is_down(
+    app: StubMitupApp, monkeypatch: pytest.MonkeyPatch
+):
+    async def unreachable_database(update: Update | None) -> str | None:
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(error_handler, "stored_lang", unreachable_database)
+    update = create_update(
+        UpdateRequest(callback_query=True, language_code="es"), tg_chat=Chat(id=DEFAULT_CHAT_ID, type=Chat.GROUP)
+    )
+    context = build_context(update, app)
+
+    with capture_logs() as logs:
+        await error_handler.handler(context, TimedOut(), Env.PROD)
+
+    context.api.assert_answer_callback_query_called(
+        update, text=CommonMessages.UNEXPECTED_ERROR_ALERT.text(lang="es"), show_alert=True
+    )
+    warnings = [entry for entry in logs if entry["log_level"] == "warning"]
+    assert [warning["reason"] for warning in warnings] == ["stored_lang_unreadable"]
+
+
+async def test_user_not_found_on_a_bot_chat_membership_change_faults_and_sends_nothing(
+    app: StubMitupApp, mock_session: MockDbSession
+):
+    """A membership change carries no message to answer, so the missing-account notice is not sent."""
+    context = build_membership_context(app, Chat.PRIVATE)
+
+    with capture_logs() as logs:
+        outcome = await error_handler.handler(context, UserNotFound(DEFAULT_USER_ID), Env.PROD)
+
+    assert outcome == UNGUARDED_SURFACE_OUTCOME
+    assert called_api_methods(context) == set()
+    assert not [entry for entry in logs if entry["event"] == ACCOUNT_NOT_FOUND_LOG_EVENT]
 
 
 # --- Context loss handling ---

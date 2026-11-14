@@ -170,7 +170,7 @@ async def handle_pending_deletion_user(context: TMitupContext, error: UserPendin
             )
         elif update.inline_query is not None:
             await context.api.answer_inline_query(update=update, results=[], cache_time=0)
-        else:
+        elif can_reply_in_bot_chat(update):
             await context.api.send_message(
                 update=update, view=PrivacyMessages.PENDING_DELETION_ALERT.rich(lang=error.lang)
             )
@@ -249,36 +249,39 @@ async def handle_unreachable_user(context: TMitupContext, update: Update, reason
         )
 
 
-async def answer_unregistered_caller(context: TMitupContext, update: Update | None):
-    """Answer a caller the surface's own guard should have stopped, without writing into their chat.
+def can_reply_in_bot_chat(update: Update) -> bool:
+    """Whether `update` is a message or a tap in the caller's own chat with the bot, the one chat the
+    bot may write a new message into while answering an error.
 
-    There is no account row, so there is no screen to rebuild and no main menu to send anyone back
-    to; the card or query they acted on sits in a conversation that is not the bot's, so it is left
-    untouched. A callback query carries an alert only that caller sees, an inline query can only be
-    answered with results and a caller with no account has none, and any other update has no answer
-    that would not post into somebody else's chat.
-
-    Best-effort like every other render in this module: a failure here has no handler left above it
-    and would reach `process_update` as a second, unhandled fault.
+    A membership change in that chat carries no message to answer, so it does not count; a tap on an
+    inaccessible message has no `effective_message` but still counts.
     """
-    if update is None:
-        return
+    return guards.in_bot_chat(update) and (update.callback_query is not None or update.effective_message is not None)
 
-    try:
-        if update.callback_query is not None:
-            await context.api.answer_callback_query(
-                update=update,
-                text=CommonMessages.UNEXPECTED_ERROR_ALERT.text(lang=unregistered_caller_lang(update)),
-                show_alert=True,
-            )
-        elif update.inline_query is not None:
-            await context.api.answer_inline_query(update=update, results=[], cache_time=0)
-    except Exception:
-        log.warning(
-            "Failed to deliver the unexpected-error alert to the user",
-            exc_info=True,
-            reason="unexpected_error_alert_undeliverable",
+
+async def answer_outside_bot_chat(context: TMitupContext, update: Update):
+    """Answer an error only where the caller alone sees it, leaving the chat the update came from untouched.
+
+    A tap gets the unexpected-error alert and an inline query gets no results, which clears its
+    spinner; any other update gets nothing.
+    """
+    if update.callback_query is not None:
+        lang = await stored_or_client_lang(update)
+        await context.api.answer_callback_query(
+            update=update, text=CommonMessages.UNEXPECTED_ERROR_ALERT.text(lang=lang), show_alert=True
         )
+    elif update.inline_query is not None:
+        await context.api.answer_inline_query(update=update, results=[], cache_time=0)
+
+
+async def stored_or_client_lang(update: Update) -> str:
+    """The language on the caller's account row, or their client's when there is no row or it cannot be read."""
+    try:
+        lang = await stored_lang(update)
+    except Exception:
+        log.warning("Fell back to the client language", exc_info=True, reason="stored_lang_unreadable")
+        lang = None
+    return lang or unregistered_caller_lang(update)
 
 
 def meeting_access_view(error: MeetingAccessError, ctx: RenderContext) -> MitupView:
@@ -457,26 +460,26 @@ async def send_guard_notification(context: TMitupContext, update: Update, lang: 
 
 
 async def notify_guard_error(context: TMitupContext, message: CommonMessages = CommonMessages.UNEXPECTED_ERROR):
-    """Send the user back to the main menu with ``message``; never raises.
+    """Send the user back to the main menu with ``message`` in their own chat with the bot, and answer
+    anywhere else through `answer_outside_bot_chat`; never raises.
 
-    This runs inside the last-resort error handler, so the whole path — lang resolution, view build,
-    message render, callback answer and send — is best-effort. Any failure (missing chat, blocked bot,
-    absent translation file, DB error) is swallowed and logged, since re-raising here would escape to
-    ``process_update`` as an unhandled second fault. Both the guard-error and context-loss paths reuse
-    it, passing the message that fits the situation.
+    A failure here has no handler left above it and would reach ``process_update`` as a second,
+    unhandled fault, so it is logged and swallowed.
     """
     update = context.telegram_update
     if update is None:
         return
 
     try:
-        lang = await resolve_lang(update)
-        await send_guard_notification(context, update, lang, message)
+        if can_reply_in_bot_chat(update):
+            await send_guard_notification(context, update, await resolve_lang(update), message)
+        else:
+            await answer_outside_bot_chat(context, update)
     except Exception:
         log.warning(
-            "Failed to deliver the redirect notification to the user",
+            "Failed to deliver the error notice to the user",
             exc_info=True,
-            reason="redirect_undeliverable",
+            reason="error_notice_undeliverable",
         )
 
 
@@ -508,7 +511,7 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
     # means the path was left unguarded: it falls through to the fault classification below, where
     # the caller gets an alert instead of a /start that would land in somebody else's chat.
     update = context.telegram_update
-    if isinstance(error, UserNotFound) and update is not None and guards.in_bot_chat(update):
+    if isinstance(error, UserNotFound) and update is not None and can_reply_in_bot_chat(update):
         await handle_user_not_found(context, update)
         return HANDLED_OUTCOME
 
@@ -525,8 +528,11 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
         return HANDLED_OUTCOME
 
     # The meeting guard's rejections carry their own screen, so they are answered here and stop
-    # before the fault classification below.
-    if isinstance(error, MeetingAccessError):
+    # before the fault classification below. A bot-chat rejection from outside the bot chat means
+    # the path skipped `guards.shared_meeting`, so it is a fault.
+    if isinstance(error, MeetingAccessError) and (
+        isinstance(error, SharedMeetingError) or update is None or can_reply_in_bot_chat(update)
+    ):
         await handle_meeting_access_error(context, error)
         return HANDLED_OUTCOME
 
@@ -556,14 +562,8 @@ async def handler(context: TMitupContext, error: Exception, env: Env) -> FaultOu
         **write_phase_fields(db.current_write_state()),
     )
 
-    if isinstance(error, UserNotFound):
-        # The caller has no account to build a main menu for, and they are not in a chat of ours to
-        # post one into, so they get the terse alert their surface can carry and nothing else.
-        await answer_unregistered_caller(context, update)
-    else:
-        # Any other fault leaves the user stranded mid-action with no feedback, so redirect them to
-        # the main menu with the generic notice. This delivery is best-effort and never raises, so it
-        # cannot become a second fault.
-        await notify_guard_error(context)
+    # A fault leaves the user stranded mid-action, so they are told; only their own chat with the bot
+    # gets a new message.
+    await notify_guard_error(context)
 
     return FaultOutcome(1, {"error_type": error_type})

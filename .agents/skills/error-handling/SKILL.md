@@ -63,7 +63,8 @@ legacy path above.
 Anything else raises `UnboundCallbackError`. Every *globally bound* wire form this bot renders is
 covered by a handler and the conversation-scoped ones by the branch above, so data that matched
 nothing is a button shipped without a handler or a forged payload — a genuine fault, answered by the
-generic redirect and counted `FAULT=1`.
+generic fault answer (see [Where an error is answered](#where-an-error-is-answered)) and counted
+`FAULT=1`.
 
 ## Exception categories
 
@@ -135,6 +136,23 @@ Two suppression mechanisms exist at different layers — use the correct one:
 Never add try/except blocks in handlers for either case.
 </note>
 
+### Where an error is answered
+
+The error handler writes a new message, or edits one into a screen of its own, only in the caller's
+own chat with the bot. `can_reply_in_bot_chat()` decides it: a message or a tap in a private chat. A
+membership change (`my_chat_member`, `chat_member`) in that chat carries no message to answer, so it
+does not count. Every update that fails the check is answered by `answer_outside_bot_chat()`:
+
+| Update | Answer |
+|---|---|
+| callback query (a card in a group, a supergroup, a channel, or an inline message) | `answer_callback_query` alert with `CommonMessages.UNEXPECTED_ERROR_ALERT`, in the stored language or else the client's (also when the account row cannot be read); the card is left alone |
+| inline query | `answer_inline_query` with no results and `cache_time=0`, which clears the spinner |
+| any other update (a group message, a membership change, a chosen inline result, a join request) | nothing at all |
+
+The generic fault answer (`notify_guard_error`, also used by the context-loss path), the missing-account
+notice and the pending-deletion notice all apply this rule. The `SharedMeetingError` answers are the one
+exception: they edit the tapped card itself, in whatever chat it sits in.
+
 ### Inactive user handling
 
 `InactiveUserInteraction` with `private=True` triggers `handle_inactive_user()`, which transitions the user's `status` from `MEMBER` to `LEFT` via `User.mark_inactive()` and emits `INACTIVE_USER_SET`. This happens when:
@@ -160,7 +178,7 @@ classification: there it means a handler wrote into a chat the bot no longer bel
 
 ### Missing account handling
 
-`UserNotFound` splits on **where the caller is standing**, because the friendly answer only works on one surface. `in_bot_chat()` is the private-chat predicate that split reads, shared with `shared_banner_keyboard()`; an update carrying no chat at all (an inline query, or a callback on an inline message, which sends only its `inline_message_id`) counts as "not the bot's chat", and so does an invocation with no update.
+`UserNotFound` splits on **where the caller is standing**, because the friendly answer only works on one surface. `can_reply_in_bot_chat()` (see [Where an error is answered](#where-an-error-is-answered)) is the predicate that split reads; an update carrying no chat at all (an inline query, or a callback on an inline message, which sends only its `inline_message_id`) counts as "not the bot's chat", and so does an invocation with no update.
 
 The class is matched exactly on both paths: every other `GuardError` subclass outside the `MeetingAccessError` tree is a genuine fault wherever it came from.
 
@@ -174,21 +192,13 @@ A callback query has its screen replaced by `CommonMessages.ACCOUNT_NOT_FOUND` w
 
 Every other surface answers an unregistered caller through its own `guards.user_registered`, with the per-surface alert its call site chose, **before** any code that can raise `UserNotFound` runs. One reaching the error handler from a card tapped in a group, a card shared through inline mode, an inline query or a group message therefore means that path shipped unguarded. It falls through to the fault classification: `FAULT=1` carrying `error_type`, written to the single `log.error` site every fault shares. The `/start` notice would be wrong there regardless — the caller is not in the bot's chat, so the command they were told to send would land in the group.
 
-The generic `notify_guard_error` redirect does **not** run for these: there is no account to build a main menu for and no chat of ours to post one into. `answer_unregistered_caller()` answers in the shape the surface can carry instead:
-
-| Update | Answer |
-|---|---|
-| callback query | `answer_callback_query` alert with `CommonMessages.UNEXPECTED_ERROR_ALERT`; the card itself is left alone |
-| inline query | `answer_inline_query` with no results |
-| any other update | nothing at all — every delivery would post into somebody else's chat |
-
-The stored language went with the row on both paths, so `unregistered_caller_lang()` renders whichever message is used in the locale `locale_for_language_code()` maps the client's `language_code` onto — the same normalization registration uses.
+The caller is answered like any other fault outside the bot chat, by `answer_outside_bot_chat()`. The stored language went with the row, so the alert renders in the locale `unregistered_caller_lang()` maps the client's `language_code` onto, the same normalization registration uses.
 
 Delivery is best-effort on both paths, as everywhere else in this module.
 
 ### Meeting guard rejections
 
-Every `MeetingAccessError` subclass (see the table above) is answered by `handle_meeting_access_error()` and never reaches the fault metrics. Each one stands for a screen, and the exception carries everything the screen needs — `meeting_id`, `action`, `lang`, the back-navigation `keyboard`, and the optional `flow_context` — so no DB round-trip happens here. The guards render nothing themselves.
+Every `MeetingAccessError` subclass (see the table above) is answered by `handle_meeting_access_error()` and never reaches the fault metrics, with one exception described below the reply table. Each one stands for a screen, and the exception carries everything the screen needs (`meeting_id`, `action`, `lang`, the back-navigation `keyboard`, and the optional `flow_context`), so no DB round-trip happens here. The guards render nothing themselves.
 
 A `flow_context` (see the `guards` skill) is rendered by `meeting_access_view()` as one extra sentence at the end of the screen's description. It never changes the reply shape: still one reply, in whichever shape the table below picks. A rejection that carries none renders the screen exactly as its reason defines it.
 
@@ -198,6 +208,11 @@ For the bot-chat rejections the reply shape comes from the update, not from the 
 |---|---|
 | callback query | `edit_message` — the screen the button sits on is replaced |
 | message | `send_message` — there is no message of ours to replace |
+
+A bot-chat rejection arriving from outside the bot chat (a group card, an inline card, an inline query, a
+group message) means that path reached the meeting without `guards.shared_meeting`. It is classified like
+an unguarded `UserNotFound`: `FAULT=1` with its `error_type` on the single fault line, no `Rejected meeting
+action` line, and the caller answered by `answer_outside_bot_chat()`.
 
 `MeetingFinishedError` is answered with the finished banner (`MeetingDisplayMessages.FINISHED_BANNER`) in the caller's language, over the main-menu row.
 
@@ -227,6 +242,7 @@ For all other (unexpected) errors:
 1. One dimensionless `FAULT` metric is emitted for aggregate monitoring, carrying the exception's qualified class name in an `error_type` EMF property
 2. One `log.error` line carries the traceback, the `error_type`, the trigger that produced it (`fault_fields_from_update`, as `update_payload`) and — when the failure happened inside a write-mode critical section — the `phase`/`committed` pair from `db.current_write_state()`, under the handler's bound contextvars
 3. In `DEV` mode, the exception is logged with Rich formatting
+4. `notify_guard_error` answers the caller: the main menu with `CommonMessages.UNEXPECTED_ERROR` in the bot chat, `answer_outside_bot_chat()` anywhere else
 
 `phase`/`committed` are what separate "the user's action failed" from "it landed and the render is stale": `begin_write` marks `BODY` on entry and `POST_COMMIT_FAN_OUT` once the transaction has committed, and leaves the mark behind when the section exits through an exception so the error handler can still read it. A read-only handler is in no critical section and its fault line carries neither field.
 
