@@ -22,13 +22,10 @@ from tests.helpers.stub_db import MockDbSession
 SHARE_REJECTED_LOG_EVENT = "Meeting share rejected"
 
 
-def registered_sharer_button(lang: str) -> InlineResultsButton:
-    """The expected button, rebuilt locally so a broken production helper cannot make it vacuous."""
-    return InlineResultsButton(text=InlineQueryMessages.CREATE_MEETING_BUTTON.text(lang=lang), start_parameter="inline")
-
-
-def unregistered_sharer_button(lang: str) -> InlineResultsButton:
-    return InlineResultsButton(text=InlineQueryMessages.EXPLORE_BUTTON.text(lang=lang), start_parameter="inline")
+def rejection_button(lang: str) -> InlineResultsButton:
+    return InlineResultsButton(
+        text=InlineQueryMessages.NOT_SHAREABLE_MEETING_ID_BUTTON.text(lang=lang), start_parameter="inline"
+    )
 
 
 def assert_share_rejected(
@@ -38,10 +35,12 @@ def assert_share_rejected(
     *,
     reason: str,
     meeting_id: int | None,
-    button: InlineResultsButton,
+    lang: str,
 ):
     """Assert the rejection was answered with the empty panel and named on one info line."""
-    context.api.assert_answer_inline_query_called(update=update, results=[], button=button, cache_time=0)
+    context.api.assert_answer_inline_query_called(
+        update=update, results=[], button=rejection_button(lang), cache_time=0
+    )
 
     record = log_record(caplog, SHARE_REJECTED_LOG_EVENT)
     assert record.levelname == "INFO"
@@ -139,7 +138,7 @@ async def test_share_meeting_rejection_answers_an_empty_panel(
         caplog,
         reason=reason,
         meeting_id=meeting_id,
-        button=registered_sharer_button(user.lang),
+        lang=user.lang,
     )
     metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.SHARE_MEETING)})
     # A keystroke that lands on a meeting the sharer cannot share is a normal interaction, so it is
@@ -179,19 +178,19 @@ async def test_share_meeting_non_numeric_query_answers_an_empty_panel(
         caplog,
         reason="non_numeric_inline_query",
         meeting_id=None,
-        button=registered_sharer_button(user_with_settings.lang),
+        lang=user_with_settings.lang,
     )
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(inline_query="457")], indirect=True)
-async def test_share_meeting_rejection_offers_an_unregistered_sharer_the_tour(
+async def test_share_meeting_rejection_of_an_unregistered_sharer_uses_the_fallback_language(
     update: Update,
     mock_session: MockDbSession,
     handler_context: HandlerContext,
     metrics: MetricAssertions,
     caplog: pytest.LogCaptureFixture,
 ):
-    """A sharer with no account owns nothing, so a private meeting is refused and they are invited in."""
+    """A sharer with no account owns nothing, so a private meeting is refused in the fallback language."""
     owner = create_user(id=999, tg_user_id=999, first_name="Owner")
     mock_session.add_user(owner)
     mock_session.add_object(create_meetup(457, "Private Meeting", owner=owner, public=False))
@@ -207,7 +206,7 @@ async def test_share_meeting_rejection_offers_an_unregistered_sharer_the_tour(
         caplog,
         reason="meeting_not_shareable",
         meeting_id=457,
-        button=unregistered_sharer_button(TranslationEngine.FALLBACK_LANG),
+        lang=TranslationEngine.FALLBACK_LANG,
     )
     assert log_record(caplog, SHARE_REJECTED_LOG_EVENT).__dict__["user_id"] is None
     metrics.assert_not_emitted(name=MetricKey.MEETING_NOT_OWNED)
@@ -301,7 +300,7 @@ async def test_share_meeting_own_meeting_by_pending_deletion_user(
         caplog,
         reason="meeting_not_shareable",
         meeting_id=459,
-        button=unregistered_sharer_button(TranslationEngine.FALLBACK_LANG),
+        lang=TranslationEngine.FALLBACK_LANG,
     )
     metrics.assert_not_emitted(name=MetricKey.COUNT, dimensions={"Feature": str(Feature.SHARE_MEETING)})
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)

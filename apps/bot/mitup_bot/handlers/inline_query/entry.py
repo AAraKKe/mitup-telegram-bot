@@ -20,7 +20,7 @@ from mitup_bot.monitoring import Feature
 from mitup_bot.translations import TranslationEngine
 from mitup_bot.utils import ButtonMessages, InlineQueryMessages
 from mitup_bot.utils import callbacks as cb
-from mitup_bot.views import MitupInlineView
+from mitup_bot.views import InlineResultsButton, MitupInlineView
 from mitup_bot.views import meeting as meeting_views
 
 from .enums import InlineQueryId, ShareRejectionReason
@@ -120,7 +120,11 @@ async def answer_share_rejection(
         meeting_id=meeting_id,
         reason=reason.value,
     )
-    await context.api.answer_inline_query(update=update, results=[], button=inline_results_button(user), cache_time=0)
+    lang = user.lang if user else TranslationEngine.FALLBACK_LANG
+    button = InlineResultsButton(
+        text=InlineQueryMessages.NOT_SHAREABLE_MEETING_ID_BUTTON.text(lang=lang), start_parameter="inline"
+    )
+    await context.api.answer_inline_query(update=update, results=[], button=button, cache_time=0)
 
 
 @HandlersRegistry.register_inline_handler(InlineQueryId.SHARE_MEETING, pattern=r"\d+")

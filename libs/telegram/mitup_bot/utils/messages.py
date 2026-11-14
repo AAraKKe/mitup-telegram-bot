@@ -918,6 +918,9 @@ class MeetingEditDurationMessages(MessageBase):
 class InlineQueryMessages(MessageBase):
     CREATE_MEETING_BUTTON = f"{Emojis.NEW_MEETING} Create a new meeting"
     EXPLORE_BUTTON = f"{Emojis.ROCKET} Explore Mitup"
+    # TRANSLATORS: Button above an empty list of results, shown when the meeting number someone tried
+    # TRANSLATORS: to share names nothing they can share. Tapping it opens the bot. Keep it short.
+    NOT_SHAREABLE_MEETING_ID_BUTTON = "This is not a shareable meeting ID"
     CHAT_MEETINGS_TITLE = f"{Emojis.SEARCH} Meetings in this chat"
     CHAT_MEETINGS_DESCRIPTION = "Search for meetings shared in this chat"
     CHAT_MEETINGS_MESSAGE = "Tap the button below to load meetings shared in this chat."

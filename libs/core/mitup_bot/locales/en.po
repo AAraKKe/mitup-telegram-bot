@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-11-01 11:33\n"
+"PO-Revision-Date: 2026-11-14 14:45\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -958,6 +958,11 @@ msgstr "➕ Create a new meeting"
 
 msgid "InlineQueryMessages.EXPLORE_BUTTON"
 msgstr "🚀 Explore Mitup"
+
+#. Button above an empty list of results, shown when the meeting number someone tried
+#. to share names nothing they can share. Tapping it opens the bot. Keep it short.
+msgid "InlineQueryMessages.NOT_SHAREABLE_MEETING_ID_BUTTON"
+msgstr "This is not a shareable meeting ID"
 
 msgid "InlineQueryMessages.CHAT_MEETINGS_TITLE"
 msgstr "🔍 Meetings in this chat"

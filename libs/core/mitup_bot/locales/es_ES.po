@@ -1278,3 +1278,8 @@ msgstr "Gracias por añadirme por aquí. Yo trabajo desde el chat privado de cad
 
 msgid "MeetingEditDurationMessages.END_CAPPED_AT_MAX_DURATION"
 msgstr "Una quedada puede durar una semana como máximo. Esa fecha cae una semana después del inicio, así que la hora de finalización es la última permitida."
+
+#. Button above an empty list of results, shown when the meeting number someone tried
+#. to share names nothing they can share. Tapping it opens the bot. Keep it short.
+msgid "InlineQueryMessages.NOT_SHAREABLE_MEETING_ID_BUTTON"
+msgstr "No es un ID de quedada que se pueda compartir"

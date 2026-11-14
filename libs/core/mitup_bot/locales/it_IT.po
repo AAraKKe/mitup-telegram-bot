@@ -1278,3 +1278,8 @@ msgstr "Grazie per avermi aggiunto qui. Io lavoro nella chat privata di ciascuno
 
 msgid "MeetingEditDurationMessages.END_CAPPED_AT_MAX_DURATION"
 msgstr "Un incontro può durare una settimana al massimo. Quella data cade una settimana dopo l'inizio, quindi l'orario di fine è l'ultimo consentito."
+
+#. Button above an empty list of results, shown when the meeting number someone tried
+#. to share names nothing they can share. Tapping it opens the bot. Keep it short.
+msgid "InlineQueryMessages.NOT_SHAREABLE_MEETING_ID_BUTTON"
+msgstr "Nessun incontro da condividere con questo ID"
