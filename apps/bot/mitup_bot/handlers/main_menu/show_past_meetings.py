@@ -196,7 +196,7 @@ async def callback_query_confirm_delete_all_past_meetings(
         reason="owner_confirmed_all",
     )
 
-    await purge_meetups(session, past_meetings)
+    await purge_meetups(session, context.api, past_meetings)
 
     view = factory.main_menu_view(
         guards.render_context(user, update, context),

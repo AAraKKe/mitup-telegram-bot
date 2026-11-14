@@ -400,6 +400,7 @@ def network_failure_outcome(queued: QueuedApiCall, error: NetworkError) -> Drain
 class MeetingMessageEdit:
     """Plain-data snapshot of one meeting-message edit, rendered at enqueue time."""
 
+    # None when there is no row for the reconcile to update, as for a card whose meeting is being deleted.
     message_db_id: int | None
     chat_id: int | None
     message_id: int | None
@@ -1366,8 +1367,19 @@ class TelegramApi:
     ) -> MeetingMessageEdit:
         """Render one stored meeting message into a plain edit payload.
 
-        A meeting that was deleted or has finished renders with no buttons at all.
+        A meeting that was deleted or has finished renders with no buttons at all. A deleted one
+        carries nothing of the meeting but its language: no photos, and no row id, since the row
+        goes with the meeting.
         """
+        if was_deleted:
+            return MeetingMessageEdit(
+                message_db_id=None,
+                chat_id=message.chat_id,
+                message_id=message.message_id,
+                inline_message_id=message.inline_message_id,
+                content=MeetingDisplayMessages.DELETED_BANNER.rich(lang=meeting.lang),
+                keyboard=None,
+            )
 
         view = (
             meeting_views.inline_view(meeting, chat_instance=message.chat_instance)
@@ -1384,10 +1396,7 @@ class TelegramApi:
         message.buttons.keyboard = view.menu
 
         # Determine the text, entities and buttons based on meeting state
-        if was_deleted:
-            body = MeetingDisplayMessages.DELETED_BANNER.rich(lang=meeting.lang)
-            keyboard = None
-        elif has_finished:
+        if has_finished:
             # The owner's card is built out of controls, so a finished meeting renders from the
             # shared body instead.
             body = meeting_views.shared_body(meeting, finished=True)

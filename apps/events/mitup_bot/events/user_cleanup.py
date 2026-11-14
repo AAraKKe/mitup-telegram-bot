@@ -1,4 +1,5 @@
 import structlog
+from sqlalchemy import ColumnElement
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlmodel import and_, col, delete, exists, false, func, literal, select, true
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -6,7 +7,8 @@ from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
 from mitup_bot.api_wrapper import TelegramApiWrapper
-from mitup_bot.models import JoinedUsers, Meetup, User
+from mitup_bot.deletion import mark_meeting_cards_deleted
+from mitup_bot.models import JoinedUsers, Meetup, Message, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricsClient
 from mitup_bot.patreon import pending_links
@@ -74,6 +76,9 @@ created JOINED_ONLY and never transition, so the status filter alone excludes th
 Full rows, not just IDs: the demotion writes each user's status through `User.set_status`.
 """
 
+# Only a meeting with a tracked card has anything to rewrite before it is deleted.
+HAS_TRACKED_CARD: ColumnElement[bool] = exists(select(1).select_from(Message).where(Message.meetup_id == Meetup.id))
+
 DELETION_REQUESTED_USERS_SELECT_STATEMENT: SelectOfScalar[User] = select(User).where(
     User.status == UserStatus.DELETION_REQUESTED
 )
@@ -84,8 +89,7 @@ which must be captured before the rows are gone.
 """
 
 
-@db.with_session
-async def demote_stale_left_users(session: AsyncSession) -> int:
+async def demote_stale_left_users(api: TelegramApiWrapper) -> int:
     """Demote the LEFT users the grace period has run out on to JOINED_ONLY; returns how many.
 
     To everyone in their meetings a LEFT user is indistinguishable from a JOINED_ONLY one — someone
@@ -97,38 +101,40 @@ async def demote_stale_left_users(session: AsyncSession) -> int:
     The settings row rides along with the user row: a JOINED_ONLY user who later `/start`s becomes a
     MEMBER again, with their language and timezone intact.
     """
-    users = (await session.exec(DEMOTABLE_LEFT_USERS_SELECT_STATEMENT)).all()
-    if not users:
-        return 0
+    async with db.begin_write(api) as session:
+        users = (await session.exec(DEMOTABLE_LEFT_USERS_SELECT_STATEMENT)).all()
+        if not users:
+            return 0
 
-    user_ids = [user.db_id for user in users]
-    # Deleting the meetings cascades their join links and message rows. Scoped to inactive ones so
-    # the pass can never take down a meeting people are still using.
-    result = await session.exec(
-        delete(Meetup).where(and_(col(Meetup.owner_id).in_(user_ids), Meetup.active == false()))
-    )
-    meetups_deleted = result.rowcount or 0
+        user_ids = [user.db_id for user in users]
+        # Scoped to inactive meetings so the pass can never take down a meeting people are still using.
+        owned_inactive = and_(col(Meetup.owner_id).in_(user_ids), Meetup.active == false())
+        carded = (await session.exec(select(Meetup).where(owned_inactive, HAS_TRACKED_CARD))).all()
+        await mark_meeting_cards_deleted(api, carded)
+        # Deleting the meetings cascades their join links and message rows.
+        result = await session.exec(delete(Meetup).where(owned_inactive))
+        meetups_deleted = result.rowcount or 0
 
-    for user in users:
-        # Ahead of the flip, which clears the stamp that says which grace period ran out.
+        for user in users:
+            # Ahead of the flip, which clears the stamp that says which grace period ran out.
+            log.info(
+                "LEFT user demoted",
+                user_id=user.db_id,
+                tg_user_id=user.tg_user_id,
+                left_time=user.left_time,
+                grace_days=LEFT_STATUS_GRACE_DAYS,
+                reason="left_grace_expired_join_link_only",
+            )
+            user.set_status(UserStatus.JOINED_ONLY)
+
         log.info(
-            "LEFT user demoted",
-            user_id=user.db_id,
-            tg_user_id=user.tg_user_id,
-            left_time=user.left_time,
+            "LEFT users demoted to JOINED_ONLY",
+            count=len(users),
+            user_ids=user_ids,
+            meetups_deleted=meetups_deleted,
             grace_days=LEFT_STATUS_GRACE_DAYS,
-            reason="left_grace_expired_join_link_only",
         )
-        user.set_status(UserStatus.JOINED_ONLY)
-
-    log.info(
-        "LEFT users demoted to JOINED_ONLY",
-        count=len(users),
-        user_ids=user_ids,
-        meetups_deleted=meetups_deleted,
-        grace_days=LEFT_STATUS_GRACE_DAYS,
-    )
-    return len(users)
+        return len(users)
 
 
 async def log_purge_cascade(session: AsyncSession, user_ids: set[int]):
@@ -164,10 +170,12 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
     committed: a deletion is never announced before it happened, and a failed send —
     the user blocked the bot, a Telegram hiccup — leaves the deletion standing.
 
-    The demotion runs in its own transaction ahead of the purge: it sends nothing, and the users it
-    touches hold a link to an active meeting, which keeps them out of the purge select either way.
+    Every meeting either pass deletes has its tracked cards rewritten as deleted, after the commit.
+
+    The demotion runs in its own transaction ahead of the purge: the users it touches hold a link to
+    an active meeting, which keeps them out of the purge select either way.
     """
-    demoted = await demote_stale_left_users()
+    demoted = await demote_stale_left_users(api)
 
     async with db.begin_write(api) as session:
         inactive_users = (await session.exec(INACTIVE_USERS_SELECT_STATEMENT)).all()
@@ -190,6 +198,9 @@ async def run(api: TelegramApiWrapper, metrics: MetricsClient):
 
         user_ids = inactive_user_ids | {user.db_id for user in marked_users}
         await log_purge_cascade(session, user_ids)
+        # The `DELETE FROM users` cascades into the meetings these users own, taking their cards with them.
+        cascaded = select(Meetup).where(col(Meetup.owner_id).in_(user_ids), HAS_TRACKED_CARD)
+        await mark_meeting_cards_deleted(api, (await session.exec(cascaded)).all())
         # Pending Patreon links carry no foreign key to users, so deleting the user cascades nothing
         # into them. A purge has to name them itself or a deletion request would leave behind a row
         # pairing the requester's Telegram id with their Patreon account.

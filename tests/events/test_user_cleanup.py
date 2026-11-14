@@ -3,6 +3,7 @@ import logging
 
 import pytest
 from sqlalchemy.dialects import postgresql
+from sqlmodel import and_, col, false, select
 from structlog.contextvars import merge_contextvars
 from structlog.testing import capture_logs
 
@@ -12,12 +13,20 @@ from mitup_bot.events.user_cleanup import (
     DEMOTABLE_LEFT_USERS_SELECT_STATEMENT,
     INACTIVE_USERS_SELECT_STATEMENT,
 )
-from mitup_bot.models import User
+from mitup_bot.models import Meetup, User
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import MetricsClient
 from mitup_bot.utils.messages import PrivacyMessages
 from mitup_bot.views import MitupView
-from tests.helpers import MockApi, MockDbSession, create_joined_link, create_meetup, create_member, create_user
+from tests.helpers import (
+    MockApi,
+    MockDbSession,
+    create_joined_link,
+    create_meetup,
+    create_member,
+    create_settings,
+    create_user,
+)
 from tests.helpers.monitoring import MetricAssertions, make_test_metrics_client
 
 # Farewell delivery failures are not exercised here: under the write lifecycle a failed send
@@ -42,6 +51,21 @@ def purged_count(caplog: pytest.LogCaptureFixture) -> int:
     return record.__dict__["count"]
 
 
+def record_rewrites(api: MockApi, mock_session: MockDbSession, delete_prefix: str) -> list[tuple[int, bool]]:
+    """Record each deleted-card rewrite as its meeting id and whether a DELETE starting with
+    *delete_prefix* had already run when it was queued."""
+    rewrites: list[tuple[int, bool]] = []
+
+    def record(*, meeting: Meetup, was_deleted: bool):
+        assert was_deleted
+        rewrites.append(
+            (meeting.db_id, any(query.startswith(delete_prefix) for query in mock_session.queries_executed))
+        )
+
+    api.register_on_method("update_meeting_messages", side_effect=record)
+    return rewrites
+
+
 def demoted_count(caplog: pytest.LogCaptureFixture) -> int:
     """The count field of the demotion log line. Absent when nothing was demoted — the pass logs
     only when it acted, so a missing line reads as zero."""
@@ -60,10 +84,11 @@ async def test_no_users_to_purge(
     await user_cleanup.run(api, metrics_client)
     await metrics_client.flush()
 
-    # Five exec calls: demotion select + LEFT select + DELETION_REQUESTED select + delete users +
-    # pending-link sweep. No meetup delete (nobody is demoted) and no per-user pending-link delete
-    # either: with nobody purged there are no claimers to name.
-    assert mock_session.exec.call_count == 5
+    # Six exec calls: demotion select + LEFT select + DELETION_REQUESTED select + the select of the
+    # cascaded meetings with cards + delete users + pending-link sweep. No meetup delete (nobody is
+    # demoted) and no per-user pending-link delete either: with nobody purged there are no claimers
+    # to name.
+    assert mock_session.exec.call_count == 6
 
     # No real user IDs targeted — empty-set form renders as IN (NULL) AND (1 != 1)
     assert "DELETE FROM users WHERE users.id IN (NULL) AND (1 != 1)" in mock_session.queries_executed
@@ -276,6 +301,58 @@ async def test_demotion_deletes_owned_inactive_meetings_and_keeps_join_links(
     )
     assert demotable.joined_links == [link]
     assert not any("DELETE FROM joined_users" in query for query in mock_session.queries_executed)
+
+
+async def test_demotion_rewrites_the_cards_of_the_meetings_it_deletes_before_deleting_them(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """The meetings with a tracked card are loaded by the same condition the DELETE uses, so the
+    banner goes to exactly the cards the DELETE takes away."""
+    carded = create_meetup(id=50, active=False)
+    demotable = create_user(
+        id=41,
+        tg_user_id=41,
+        status=UserStatus.LEFT,
+        left_time=dt.datetime(2026, 1, 1, tzinfo=dt.UTC),
+        owned_meetings=[carded, create_meetup(id=51, active=False)],
+    )
+    mock_session.add_objects_with_statement(DEMOTABLE_LEFT_USERS_SELECT_STATEMENT, (demotable,))
+    owned_inactive = and_(col(Meetup.owner_id).in_([41]), Meetup.active == false())
+    mock_session.add_objects_with_statement(
+        select(Meetup).where(owned_inactive, user_cleanup.HAS_TRACKED_CARD), (carded,)
+    )
+    rewrites = record_rewrites(api, mock_session, "DELETE FROM meetups")
+
+    await user_cleanup.run(api, metrics_client)
+
+    assert rewrites == [(50, False)]
+
+
+async def test_user_purge_rewrites_the_cards_of_the_meetings_it_cascades_into_before_deleting_them(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """The meetings go with their owners through the cascade, so their cards are rewritten while the
+    user rows still exist, whichever population the owner belongs to."""
+    finished = create_meetup(id=60, active=False)
+    inactive = create_user(id=10, tg_user_id=10, status=UserStatus.LEFT, owned_meetings=[finished])
+    live = create_meetup(id=61, active=True)
+    marked = create_user(
+        id=30,
+        tg_user_id=30,
+        status=UserStatus.DELETION_REQUESTED,
+        settings=create_settings(id=30),
+        owned_meetings=[live],
+    )
+    mock_session.add_objects_with_statement(INACTIVE_USERS_SELECT_STATEMENT, ((inactive.id, inactive.tg_user_id),))
+    mock_session.add_objects_with_statement(DELETION_REQUESTED_USERS_SELECT_STATEMENT, (marked,))
+    mock_session.add_objects_with_statement(
+        select(Meetup).where(col(Meetup.owner_id).in_({10, 30}), user_cleanup.HAS_TRACKED_CARD), (finished, live)
+    )
+    rewrites = record_rewrites(api, mock_session, "DELETE FROM users")
+
+    await user_cleanup.run(api, metrics_client)
+
+    assert rewrites == [(60, False), (61, False)]
 
 
 async def test_demoted_user_is_not_purged(mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi):

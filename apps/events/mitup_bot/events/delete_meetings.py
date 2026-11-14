@@ -3,7 +3,6 @@ from typing import cast
 
 import structlog
 from sqlmodel import and_, col, null, select, true
-from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import SelectOfScalar
 
 from mitup_bot import db
@@ -46,41 +45,43 @@ MEETUPS_TO_DELETE_STATEMENT: SelectOfScalar[Meetup] = (
 )
 
 
-@db.with_session
-async def delete_owner_chunk(session: AsyncSession, api: TelegramApiWrapper, owner_ids: list[int]) -> NoticeOutcome:
+async def delete_owner_chunk(api: TelegramApiWrapper, owner_ids: list[int]) -> NoticeOutcome:
     """Tell one chunk of owners which of their meetings is going, then delete those meetings and
     the invitees that exist only inside them.
 
     The notices go out before the deletes and both commit together, so a failure can only leave
-    behind a meeting the next run deletes after telling its owner once more.
+    behind a meeting the next run deletes after telling its owner once more. The meetings' cards
+    are rewritten as deleted once the deletes have committed.
     """
-    meetups = (await session.exec(MEETUPS_TO_DELETE_STATEMENT.where(col(User.id).in_(owner_ids)))).all()
-    outcome = await notify_owners(
-        api, meetups, lambda settings: settings.deletion_notice, meeting_views.deletion_notice_view
-    )
+    async with db.begin_write(api) as session:
+        meetups = (await session.exec(MEETUPS_TO_DELETE_STATEMENT.where(col(User.id).in_(owner_ids)))).all()
+        # Sent before the commit: how each notice resolved decides which meetings are deleted.
+        outcome = await notify_owners(
+            api.immediate, meetups, lambda settings: settings.deletion_notice, meeting_views.deletion_notice_view
+        )
 
-    log_residues(
-        outcome,
-        lambda meetup: meetup.deletion_due_time,
-        unreachable_event="Meeting deleted without notifying its owner",
-        failed_event="Meeting deletion deferred",
-    )
+        log_residues(
+            outcome,
+            lambda meetup: meetup.deletion_due_time,
+            unreachable_event="Meeting deleted without notifying its owner",
+            failed_event="Meeting deletion deferred",
+        )
 
-    deletable = outcome.settled
+        deletable = outcome.settled
 
-    # Named before the DELETE: after it nothing can reconstruct which meetings a run took.
-    log.info(
-        "Meetups purged",
-        count=len(deletable),
-        owners=owner_count(deletable),
-        meeting_ids=[cast(int, meetup.id) for meetup in deletable],
-        supporter_levels=supporter_level_counts(meetup.owner.supporter_level for meetup in deletable),
-        windows=loggable_windows(lambda policy: policy.inactive_retention),
-        unnotified=len(outcome.unreachable),
-        opted_out=len(outcome.opted_out),
-        reason="retention_elapsed",
-    )
-    outcome.invitees_purged = len(await purge_meetups(session, deletable))
+        # Named before the DELETE: after it nothing can reconstruct which meetings a run took.
+        log.info(
+            "Meetups purged",
+            count=len(deletable),
+            owners=owner_count(deletable),
+            meeting_ids=[cast(int, meetup.id) for meetup in deletable],
+            supporter_levels=supporter_level_counts(meetup.owner.supporter_level for meetup in deletable),
+            windows=loggable_windows(lambda policy: policy.inactive_retention),
+            unnotified=len(outcome.unreachable),
+            opted_out=len(outcome.opted_out),
+            reason="retention_elapsed",
+        )
+        outcome.invitees_purged = len(await purge_meetups(session, api, deletable))
 
     return outcome
 

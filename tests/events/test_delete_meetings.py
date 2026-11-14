@@ -171,6 +171,24 @@ async def test_delete_meeting_whose_owner_is_unreachable(
     metrics.assert_emitted(name=MetricKey.MEETINGS_DELETION_FAILED, value=0, dimensions=SWEEP_DIMENSIONS)
 
 
+async def test_only_the_meetings_the_purge_deletes_have_their_cards_rewritten(
+    mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
+):
+    """A meeting whose notice raised stays for the next run, so its cards must keep showing it."""
+    deleted = create_meetup(id=1, title="Deleted Meeting")
+    create_user(id=1, tg_user_id=10, owned_meetings=[deleted], settings=create_settings(id=1))
+    deferred = create_meetup(id=2, title="Deferred Meeting")
+    create_user(id=2, tg_user_id=20, owned_meetings=[deferred], settings=create_settings(id=2))
+
+    register_nominated(mock_session, STATEMENT, (deleted, deferred))
+    api.mock_method("send_message_to_user").side_effect = [None, BadRequest("Bad Request: chat is unavailable")]
+
+    await delete_meetings.run(api, metrics_client)
+
+    assert deleted_meetup_ids(mock_session) == {1}
+    api.assert_update_meeting_messages_called(meeting=deleted, was_deleted=True)
+
+
 async def test_delete_meeting_whose_owner_is_unreachable_is_not_nominated_again(
     mock_session: MockDbSession, metrics_client: MetricsClient, api: MockApi
 ):

@@ -2781,6 +2781,59 @@ async def test_the_meeting_photos_travel_in_the_order_they_are_held(telegram_api
     assert [entry["id"] for entry in rich_call(bot).media] == ["AQADfirst", "AQADsecond"]
 
 
+async def test_a_deleted_card_carries_none_of_the_meeting_photos(telegram_api: TelegramApi, bot: AsyncMock):
+    """The photos are the owner's uploads, and a card left in somebody's group after the meeting is
+    gone must not keep them attached."""
+    meeting, msg = make_bot_chat_meeting()
+    meeting.images = [MeetingImage(meetup_id=meeting.id, position=0, file_id="AgACAgQAAxkBAAIB", file_unique_id="AQAD")]
+
+    await telegram_api.update_single_meeting_message(msg, meeting, was_deleted=True)
+
+    assert rich_call(bot).media == []
+
+
+async def test_a_deleted_card_renders_without_building_the_meeting_card(
+    telegram_api: TelegramApi, bot: AsyncMock, monkeypatch: pytest.MonkeyPatch, lang: str
+):
+    """The banner needs only the language, so a meeting whose card cannot be built still gets it,
+    and the stored buttons of a row about to be deleted are left alone."""
+    meeting, msg = make_bot_chat_meeting(lang=lang)
+    stored_buttons = list(msg.buttons.keyboard)
+
+    def unbuildable(*_args: object, **_kwargs: object):
+        raise AssertionError("the deleted banner must not build the meeting card")
+
+    monkeypatch.setattr(meeting_views, "owner_view", unbuildable)
+    monkeypatch.setattr(meeting_views, "inline_view", unbuildable)
+
+    await telegram_api.update_single_meeting_message(msg, meeting, was_deleted=True)
+
+    assert MeetingDisplayMessages.DELETED_BANNER.rich(lang=lang).html in rich_call(bot).body_html
+    assert msg.buttons.keyboard == stored_buttons
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [None, BadRequest("Message to edit not found")],
+    ids=["edited", "message_gone"],
+)
+async def test_execute_queued_records_no_fix_ups_for_a_deleted_card(
+    telegram_api: TelegramApi, bot: AsyncMock, answer: Exception | None
+):
+    """The card's row is deleted with its meeting, so the reconcile has nothing to stamp or drop."""
+    meeting, msg = make_bot_chat_meeting()
+    bot.do_api_request.side_effect = answer
+
+    outbox = telegram_api.begin_capture()
+    await telegram_api.update_meeting_messages(meeting=meeting, current_message=msg, was_deleted=True)
+    telegram_api.end_capture()
+    await telegram_api.execute_queued(outbox)
+
+    bot.do_api_request.assert_awaited_once()
+    assert outbox.dead_message_ids == []
+    assert outbox.confirmed_render_digests == {}
+
+
 def test_the_digest_changes_when_a_shown_photo_changes():
     replaced = RichPhoto(media_id="AQADdifferent", file_id=BANNER.file_id)
 

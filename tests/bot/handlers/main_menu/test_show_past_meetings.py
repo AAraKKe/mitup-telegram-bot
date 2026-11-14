@@ -396,7 +396,9 @@ async def test_confirm_delete_all_past_meetings_deletes_every_past_meeting_and_l
         update, success_view(user_with_settings, counts), strategy=screen_replacement_strategy(DEFAULT_CHAT_ID)
     )
     context.api.assert_edit_message_not_called()
-    context.api.assert_update_meeting_messages_not_called()
+    rewrites = context.api.call_args_list("update_meeting_messages")
+    assert {call.kwargs["meeting"].db_id for call in rewrites} == {10, 11, 12}
+    assert all(call.kwargs["was_deleted"] for call in rewrites)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.CONFIRM_DELETE_ALL_PAST_MEETINGS)], indirect=True)
