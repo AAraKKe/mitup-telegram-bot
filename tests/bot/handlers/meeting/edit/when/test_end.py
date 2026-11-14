@@ -1092,12 +1092,12 @@ async def test_first_pick_on_the_cap_date_lands_on_one_local_week(
 
 @pytest.mark.parametrize(
     "update",
-    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2027, 3, 14)))],
+    [UpdateRequest(callback_query=cb.PICK_END_DATE.with_id(1).with_date(dt.date(2027, 3, 28)))],
     indirect=True,
 )
 @pytest.mark.parametrize(
     "existing_end",
-    [None, dt.datetime(2027, 3, 13, 17, 0, tzinfo=dt.UTC)],
+    [None, dt.datetime(2027, 3, 27, 10, 0, tzinfo=dt.UTC)],
     ids=["first_pick", "later_pick"],
 )
 @freeze_time("2027-01-01 00:00:00", tz_offset=0)
@@ -1107,10 +1107,10 @@ async def test_pick_on_a_date_whose_cap_the_clocks_skip_is_refused(
     existing_end: dt.datetime | None,
     handler_context: HandlerContext,
 ):
-    """Havana clocks jump from 00:00 to 01:00 on 2027-03-14, so the cap of a 00:30 start reads on the 13th."""
-    start = dt.datetime(2027, 3, 7, 5, 30, tzinfo=dt.UTC)
+    """Beirut clocks jump from 00:00 to 01:00 on 2027-03-28, so the cap of a 00:30 start reads on the 27th."""
+    start = dt.datetime(2027, 3, 20, 22, 30, tzinfo=dt.UTC)
     user, meeting = owner_with_meeting(meeting_id=1, meeting_datetime=start, end_datetime=existing_end)
-    user.settings.timezone = "America/Havana"
+    user.settings.timezone = "Asia/Beirut"
     mock_session.add_object(user, query_field="tg_user_id")
     mock_session.add_object(meeting)
 
