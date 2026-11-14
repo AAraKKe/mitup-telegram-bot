@@ -2,6 +2,7 @@ import datetime as dt
 from typing import TYPE_CHECKING, ClassVar, Literal, Self, cast, overload
 from zoneinfo import ZoneInfo
 
+import structlog
 from pydantic.config import ConfigDict
 from sqlalchemy import JSON, BigInteger, Column, Enum, FetchedValue
 from sqlmodel import Field, Relationship, SQLModel, select
@@ -25,6 +26,8 @@ if TYPE_CHECKING:  # pragma: no cover
     from .joined_users import JoinedUsers
     from .meeting_images import MeetingImage
     from .users import User
+
+log = structlog.get_logger(__name__)
 
 
 class MeetupLocation(MutableModel):
@@ -495,3 +498,26 @@ class Meetup(BaseModel, SQLModel, table=True):
     def lang(self) -> str:
         """Safe way of getting the langauge of the meeting. If it is not set, it will default to the user's language."""
         return self.language or self.user_language
+
+
+# One event name covers every promotion off a waiting list, whatever moved the queue, so a single
+# filter answers "why did this DM arrive?" for all of them. What freed the spot is the `reason`.
+WAITING_LIST_PROMOTED_EVENT = "Waiting list promoted"
+
+
+def log_waiting_list_promotions(meeting: Meetup, promoted_links: list[JoinedUsers], reason: str):
+    """Record who a freed spot promoted and what freed it, writing nothing when nobody moved.
+
+    Reads the nullable `id` rather than `db_id`, so a promoted row not yet flushed cannot make the
+    record abort the mutation.
+    """
+    if not promoted_links:
+        return
+    log.info(
+        WAITING_LIST_PROMOTED_EVENT,
+        promoted_user_ids=[link.user.id for link in promoted_links],
+        promoted_count=len(promoted_links),
+        reason=reason,
+        n_participants=meeting.n_participants,
+        effective_max_members=meeting.effective_max_members,
+    )

@@ -22,9 +22,9 @@ class MeetingCardApi(Protocol):
 async def mark_meeting_cards_deleted(api: MeetingCardApi, meetups: Sequence[Meetup]):
     """Rewrite every tracked card of *meetups* into the deleted banner.
 
-    Call it under the write lifecycle and before the DELETE: the cards render from the rows the
-    DELETE removes, and reach Telegram only once it has committed. A meeting whose cards fail to
-    render is logged and skipped, so the deletion goes ahead and those cards stay as they were.
+    Call it under the write lifecycle with each meeting's owner and messages loaded, which lets it
+    run before or after the DELETE; the edits reach Telegram once the transaction commits. A meeting
+    whose cards fail to render is logged and skipped, and those cards stay as they were.
     """
     for meetup in meetups:
         try:

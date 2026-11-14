@@ -10,12 +10,13 @@ from mitup_bot.callback_data import BackOrigin, BackTarget
 from mitup_bot.custom_context import ContextId
 from mitup_bot.db import with_session
 from mitup_bot.exceptions import ContextPropertyNotSetError
-from mitup_bot.handlers.meeting.utils import log_waiting_list_promotions, participant_capacity_rejection
+from mitup_bot.handlers.meeting.utils import participant_capacity_rejection
 from mitup_bot.handlers.personal_filters import PositiveNumberFilter
 from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.handlers.utils import recover_from_lost_context
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup, User
+from mitup_bot.models.meetups import log_waiting_list_promotions
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import CommonMessages, MeetingEditParticipantsMessages
 from mitup_bot.utils import callbacks as cb

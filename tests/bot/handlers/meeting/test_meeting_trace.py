@@ -17,12 +17,12 @@ from mitup_bot.handlers.meeting.edit.when.rules import apply_end_datetime, apply
 from mitup_bot.handlers.meeting.enums import MeetingHandlerId
 from mitup_bot.handlers.meeting.utils import (
     active_meetings_cap_reached,
-    log_waiting_list_promotions,
     main_menu_back_button,
     participant_capacity_rejection,
     scheduling_horizon_rejection,
 )
 from mitup_bot.models import User
+from mitup_bot.models.meetups import log_waiting_list_promotions
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import callbacks as cb
 from tests.helpers import (

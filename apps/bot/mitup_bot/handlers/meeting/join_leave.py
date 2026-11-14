@@ -13,6 +13,7 @@ from mitup_bot.handlers.registry import HandlersRegistry
 from mitup_bot.mitup_types import TMitupContext
 from mitup_bot.models import Meetup, Message, User, utils
 from mitup_bot.models.joined_users import JOINED_USERS_UNIQUE_CONSTRAINT
+from mitup_bot.models.meetups import log_waiting_list_promotions
 from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring import Feature
 from mitup_bot.utils import MeetingJoinMessages
@@ -20,7 +21,6 @@ from mitup_bot.utils import callbacks as cb
 from mitup_bot.views import meeting as meeting_views
 
 from .enums import MeetingHandlerId
-from .utils import log_waiting_list_promotions
 
 log = structlog.get_logger(__name__)
 

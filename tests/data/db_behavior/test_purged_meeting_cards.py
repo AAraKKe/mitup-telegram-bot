@@ -7,7 +7,8 @@ reaches its meetings through the `ON DELETE CASCADE` on `meetups.owner_id`, and 
 purge renders from a user-rooted load; a mock session can exercise none of them, so the cases live
 here.
 
-Committed cross-session data uses the 996_3xx tg range; every 997 sub-range is claimed elsewhere.
+Committed cross-session data uses the 996_3xx and 996_4xx tg ranges; every 997 sub-range is claimed
+elsewhere.
 """
 
 import contextlib
@@ -33,8 +34,9 @@ from mitup_bot.models.users import UserStatus
 from mitup_bot.monitoring.backend import NullBackend
 from mitup_bot.monitoring.client import MetricsClient
 from mitup_bot.translations import TranslationEngine
-from mitup_bot.utils import MeetingDisplayMessages
+from mitup_bot.utils import MeetingDisplayMessages, MeetingJoinMessages
 from mitup_bot.utils import callbacks as cb
+from mitup_bot.views.meeting_text import title_content
 from tests.helpers import UpdateRequest
 from tests.helpers.constants import FRESH_MESSAGE_DATE
 from tests.helpers.context import build_context
@@ -57,17 +59,20 @@ def days_ago(days: int) -> dt.datetime:
 
 
 class CardProbeBot:
-    """Stands in for ExtBot: records every card edit, and which of the purged meetings a fresh
-    transaction could still read while that edit ran."""
+    """Stands in for ExtBot: records every card edit and every other request, and which of the purged
+    meetings a fresh transaction could still read while each edit ran."""
 
     def __init__(self, meeting_ids: Collection[int], *, refuse: bool):
         self.meeting_ids = list(meeting_ids)
         self.refuse = refuse
         self.edits: list[dict[str, Any]] = []
+        self.other_requests: list[dict[str, Any]] = []
         self.meetings_seen_during_edits: set[int] = set()
 
     async def do_api_request(self, endpoint: str, api_kwargs: dict[str, Any] | None = None, **_kwargs: object):
-        if endpoint == EDIT_MESSAGE_TEXT_ENDPOINT:
+        if endpoint != EDIT_MESSAGE_TEXT_ENDPOINT:
+            self.other_requests.append(api_kwargs or {})
+        else:
             self.edits.append(api_kwargs or {})
             async with db.begin() as contender:
                 present = await contender.exec(select(Meetup.id).where(col(Meetup.id).in_(self.meeting_ids)))
@@ -243,3 +248,334 @@ async def test_past_meetings_purge_rewrites_the_cards_of_the_meetings_it_deletes
         assert probe.every_edit_shows_the_deleted_banner
         assert probe.meetings_seen_during_edits == set()
         assert await surviving_meeting_ids([*meeting_ids, running.db_id]) == {running.db_id}
+
+
+@DELIVERY
+async def test_user_purge_takes_the_user_out_of_a_full_meeting_they_joined(db_session: AsyncSession, refuse: bool):
+    """Erasing an account frees the place it held in somebody else's meeting the way leaving does:
+    the next one waiting moves up and is told, and the meeting's card is redrawn without the name."""
+    tg_base = 996_380 if refuse else 996_370
+    leaving = make_owner(tg_base, status=UserStatus.DELETION_REQUESTED)
+    owner = make_owner(tg_base + 1)
+    waiter = make_owner(tg_base + 2)
+    meeting = make_meeting(owner, active=True)
+    meeting.max_members = 1
+    meeting.waiting_list = True
+    held_place = JoinedUsers(user=leaving, meetup=meeting, created_time=days_ago(2))
+    waiting = JoinedUsers(user=waiter, meetup=meeting, is_waiting_list=True, created_time=days_ago(1))
+    card = Message(inline_message_id=f"inline-{tg_base}", meetup=meeting)
+
+    async with committed(tg_base, leaving, owner, waiter, meeting, held_place, waiting, card):
+        probe = CardProbeBot([], refuse=refuse)
+
+        await user_cleanup.run(make_probe_api(probe), MetricsClient(NullBackend()))
+
+        async with db.begin() as session:
+            links = (await session.exec(select(JoinedUsers).where(JoinedUsers.meetup_id == meeting.db_id))).all()
+            purged = (await session.exec(select(User).where(User.tg_user_id == tg_base))).first()
+        assert purged is None
+        assert [(link.user_id, link.is_waiting_list) for link in links] == [(waiter.db_id, False)]
+        assert tg_base + 2 in {request.get("chat_id") for request in probe.other_requests}
+        assert probe.edited_cards == {(None, None, f"inline-{tg_base}")}
+        [refreshed] = probe.edits
+        assert waiter.first_name in refreshed["rich_message"]["html"]
+        assert leaving.first_name not in refreshed["rich_message"]["html"]
+
+
+# ---------------------------------------------------------------------------
+# Who the deletion purge takes out of a joined meeting, and who it leaves alone
+# ---------------------------------------------------------------------------
+
+
+def full_meeting(owner: User) -> Meetup:
+    """An active meeting with one place and a waiting list."""
+    meeting = make_meeting(owner, active=True)
+    meeting.max_members = 1
+    meeting.waiting_list = True
+    return meeting
+
+
+def join(user: User, meeting: Meetup, *, days_before: int, waiting: bool = False) -> JoinedUsers:
+    """A link the earlier the larger *days_before*, which is the order the waiting list moves in."""
+    return JoinedUsers(user=user, meetup=meeting, is_waiting_list=waiting, created_time=days_ago(days_before))
+
+
+async def committed_links(meeting: Meetup) -> list[tuple[int | None, bool]]:
+    """Each committed link of *meeting* as its user id and whether it is waiting, oldest first."""
+    async with db.begin() as session:
+        statement = (
+            select(JoinedUsers).where(JoinedUsers.meetup_id == meeting.db_id).order_by(col(JoinedUsers.created_time))
+        )
+        return [(link.user_id, link.is_waiting_list) for link in (await session.exec(statement)).all()]
+
+
+async def surviving_user_ids(users: Collection[User]) -> set[int]:
+    async with db.begin() as session:
+        rows = await session.exec(select(User.id).where(col(User.id).in_([user.db_id for user in users])))
+        return {cast(int, user_id) for user_id in rows.all()}
+
+
+def promotions_to(probe: CardProbeBot, user: User, meeting: Meetup) -> int:
+    promotion = MeetingJoinMessages.PROMOTED_FROM_WAITING_LIST.rich(lang=LANG, meeting_title=title_content(meeting))
+    return sum(
+        request.get("chat_id") == user.tg_user_id and promotion.html in request["rich_message"]["html"]
+        for request in probe.other_requests
+    )
+
+
+async def test_two_leavers_in_one_meeting_promote_only_the_next_bystander(db_session: AsyncSession):
+    """A confirmed and a waiting participant both erased: neither is told they got a place, and the
+    one waiting behind them moves up once."""
+    tg_base = 996_400
+    confirmed = make_owner(tg_base, status=UserStatus.DELETION_REQUESTED)
+    waiting = make_owner(tg_base + 1, status=UserStatus.DELETION_REQUESTED)
+    bystander = make_owner(tg_base + 2)
+    owner = make_owner(tg_base + 3)
+    meeting = full_meeting(owner)
+    links = [
+        join(confirmed, meeting, days_before=3),
+        join(waiting, meeting, days_before=2, waiting=True),
+        join(bystander, meeting, days_before=1, waiting=True),
+    ]
+
+    async with committed(tg_base, confirmed, waiting, bystander, owner, meeting, *links):
+        probe = CardProbeBot([], refuse=False)
+
+        await user_cleanup.run(make_probe_api(probe), MetricsClient(NullBackend()))
+
+        assert await committed_links(meeting) == [(bystander.db_id, False)]
+        assert [promotions_to(probe, user, meeting) for user in (confirmed, waiting, bystander)] == [0, 0, 1]
+
+
+async def test_a_meeting_that_went_inactive_keeps_its_links(db_session: AsyncSession):
+    """Nominated while active, finished before its lock was taken: nobody leaves it and nobody moves up."""
+    tg_base = 996_410
+    leaving = make_owner(tg_base, status=UserStatus.DELETION_REQUESTED)
+    bystander = make_owner(tg_base + 1)
+    owner = make_owner(tg_base + 2)
+    meeting = full_meeting(owner)
+    meeting.active = False
+    links = [join(leaving, meeting, days_before=2), join(bystander, meeting, days_before=1, waiting=True)]
+
+    async with committed(tg_base, leaving, bystander, owner, meeting, *links):
+        probe = CardProbeBot([], refuse=False)
+        api = make_probe_api(probe)
+
+        async with db.begin_write(api) as session:
+            taken_out = await user_cleanup.remove_deletion_requested_participants(
+                session, api, meeting.db_id, {leaving.db_id}
+            )
+
+        assert taken_out == 0
+        assert await committed_links(meeting) == [(leaving.db_id, False), (bystander.db_id, True)]
+        assert probe.edits == probe.other_requests == []
+
+
+async def test_the_nomination_leaves_out_owned_and_inactive_meetings(db_session: AsyncSession):
+    tg_base = 996_420
+    leaving = make_owner(tg_base, status=UserStatus.DELETION_REQUESTED)
+    host = make_owner(tg_base + 1)
+    owned = make_meeting(leaving, active=True)
+    finished = make_meeting(host, active=False)
+    running = make_meeting(host, active=True)
+    links = [join(leaving, meeting, days_before=1) for meeting in (owned, finished, running)]
+
+    async with committed(tg_base, leaving, host, owned, finished, running, *links):
+        async with db.begin() as session:
+            statement = user_cleanup.MEETINGS_JOINED_BY_DELETION_REQUESTED_USERS_STATEMENT.where(
+                col(User.id).in_([leaving.db_id])
+            )
+            nominated = set((await session.exec(statement)).all())
+
+        assert nominated == {running.db_id}
+
+
+async def test_a_meeting_whose_owner_is_also_erased_is_left_to_the_purge(db_session: AsyncSession):
+    """The purge deletes that meeting, so nobody is promoted into it and its card only gets the banner."""
+    tg_base = 996_430
+    owner = make_owner(tg_base, status=UserStatus.DELETION_REQUESTED)
+    leaving = make_owner(tg_base + 1, status=UserStatus.DELETION_REQUESTED)
+    bystander = make_owner(tg_base + 2)
+    meeting = full_meeting(owner)
+    links = [join(leaving, meeting, days_before=2), join(bystander, meeting, days_before=1, waiting=True)]
+    card = Message(inline_message_id=f"inline-{tg_base}", meetup=meeting)
+
+    async with committed(tg_base, owner, leaving, bystander, meeting, *links, card):
+        probe = CardProbeBot([meeting.db_id], refuse=False)
+
+        await user_cleanup.run(make_probe_api(probe), MetricsClient(NullBackend()))
+
+        assert promotions_to(probe, bystander, meeting) == 0
+        assert probe.edited_cards == {(None, None, f"inline-{tg_base}")}
+        assert probe.every_edit_shows_the_deleted_banner
+        assert await surviving_meeting_ids([meeting.db_id]) == set()
+
+
+async def test_a_leaver_who_was_only_waiting_frees_no_place(db_session: AsyncSession):
+    tg_base = 996_440
+    holder = make_owner(tg_base)
+    leaving = make_owner(tg_base + 1, status=UserStatus.DELETION_REQUESTED)
+    bystander = make_owner(tg_base + 2)
+    owner = make_owner(tg_base + 3)
+    meeting = full_meeting(owner)
+    links = [
+        join(holder, meeting, days_before=3),
+        join(leaving, meeting, days_before=2, waiting=True),
+        join(bystander, meeting, days_before=1, waiting=True),
+    ]
+
+    async with committed(tg_base, holder, leaving, bystander, owner, meeting, *links):
+        probe = CardProbeBot([], refuse=False)
+
+        await user_cleanup.run(make_probe_api(probe), MetricsClient(NullBackend()))
+
+        assert await committed_links(meeting) == [(holder.db_id, False), (bystander.db_id, True)]
+        assert promotions_to(probe, bystander, meeting) == 0
+
+
+async def test_only_the_erased_account_leaves_a_meeting_it_shares_with_others(db_session: AsyncSession):
+    """A LEFT, a MEMBER and a JOINED_ONLY participant of the same meeting keep their places and accounts."""
+    tg_base = 996_450
+    leaving = make_owner(tg_base, status=UserStatus.DELETION_REQUESTED)
+    gone_quiet = make_owner(tg_base + 1, status=UserStatus.LEFT)
+    member = make_owner(tg_base + 2)
+    joined_only = make_owner(tg_base + 3, status=UserStatus.JOINED_ONLY)
+    owner = make_owner(tg_base + 4)
+    meeting = make_meeting(owner, active=True)
+    bystanders = [gone_quiet, member, joined_only]
+    links = [join(leaving, meeting, days_before=4)] + [
+        join(user, meeting, days_before=3 - index) for index, user in enumerate(bystanders)
+    ]
+
+    async with committed(tg_base, leaving, *bystanders, owner, meeting, *links):
+        await user_cleanup.run(make_probe_api(CardProbeBot([], refuse=False)), MetricsClient(NullBackend()))
+
+        assert await committed_links(meeting) == [(user.db_id, False) for user in bystanders]
+        assert await surviving_user_ids(bystanders) == {user.db_id for user in bystanders}
+
+
+async def test_the_purge_spares_a_selected_user_who_no_longer_qualifies(db_session: AsyncSession):
+    """The DELETE re-checks what the selects decided: a LEFT user who came back or joined an active
+    meeting, and a deletion request no longer standing, all keep their rows."""
+    tg_base = 996_460
+    still_left = make_owner(tg_base, status=UserStatus.LEFT)
+    came_back = make_owner(tg_base + 1)
+    joined_since = make_owner(tg_base + 2, status=UserStatus.LEFT)
+    request_withdrawn = make_owner(tg_base + 3)
+    host = make_owner(tg_base + 4)
+    meeting = make_meeting(host, active=True)
+    link = join(joined_since, meeting, days_before=1)
+
+    async with committed(tg_base, still_left, came_back, joined_since, request_withdrawn, host, meeting, link):
+        async with db.begin() as session:
+            purged = await user_cleanup.delete_users_still_purgeable(
+                session, {still_left.db_id, came_back.db_id, joined_since.db_id}, {request_withdrawn.db_id}
+            )
+
+        assert purged == {still_left.db_id}
+        spared = [came_back, joined_since, request_withdrawn]
+        assert await surviving_user_ids([still_left, *spared]) == {user.db_id for user in spared}
+
+
+class LateDeletionRequestProbe(CardProbeBot):
+    """Marks another user DELETION_REQUESTED on the first request the run makes, which the leave step
+    sends after the run has taken its snapshot of who to erase."""
+
+    def __init__(self, late_tg_user_id: int):
+        super().__init__([], refuse=False)
+        self.late_tg_user_id = late_tg_user_id
+        self.marked = False
+
+    async def do_api_request(self, endpoint: str, api_kwargs: dict[str, Any] | None = None, **kwargs: object):
+        if not self.marked:
+            self.marked = True
+            async with db.begin() as session:
+                late = (await session.exec(select(User).where(User.tg_user_id == self.late_tg_user_id))).one()
+                late.set_status(UserStatus.DELETION_REQUESTED)
+        return await super().do_api_request(endpoint, api_kwargs, **kwargs)
+
+
+async def test_a_deletion_requested_after_the_snapshot_waits_for_the_next_run(db_session: AsyncSession):
+    """Only the users in the run's snapshot are erased: one who asks while the run is underway has not
+    left their meetings yet, so their row stays until the next run."""
+    tg_base = 996_470
+    leaving = make_owner(tg_base, status=UserStatus.DELETION_REQUESTED)
+    late = make_owner(tg_base + 1)
+    owner = make_owner(tg_base + 2)
+    meeting = make_meeting(owner, active=True)
+    link = join(leaving, meeting, days_before=1)
+    card = Message(inline_message_id=f"inline-{tg_base}", meetup=meeting)
+
+    async with committed(tg_base, leaving, late, owner, meeting, link, card):
+        probe = LateDeletionRequestProbe(late.tg_user_id)
+
+        await user_cleanup.run(make_probe_api(probe), MetricsClient(NullBackend()))
+
+        assert probe.marked
+        assert await surviving_user_ids([leaving, late]) == {late.db_id}
+
+
+async def test_a_meeting_the_leave_step_failed_on_still_loses_the_erased_link(
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+):
+    """The erasure is not held back: the cascade removes the link without promoting anyone, and the
+    run reports the failure."""
+    tg_base = 996_480
+    leaving = make_owner(tg_base, status=UserStatus.DELETION_REQUESTED)
+    bystander = make_owner(tg_base + 1)
+    owner = make_owner(tg_base + 2)
+    meeting = full_meeting(owner)
+    links = [join(leaving, meeting, days_before=2), join(bystander, meeting, days_before=1, waiting=True)]
+
+    async def fail(*_args: object, **_kwargs: object) -> int:
+        raise RuntimeError("leave step failed")
+
+    monkeypatch.setattr(user_cleanup, "remove_deletion_requested_participants", fail)
+
+    async with committed(tg_base, leaving, bystander, owner, meeting, *links):
+        probe = CardProbeBot([], refuse=False)
+
+        with pytest.raises(RuntimeError, match="1 meetings"):
+            await user_cleanup.run(make_probe_api(probe), MetricsClient(NullBackend()))
+
+        assert await surviving_user_ids([leaving]) == set()
+        assert await committed_links(meeting) == [(bystander.db_id, True)]
+        assert promotions_to(probe, bystander, meeting) == 0
+
+
+async def test_the_demotion_spares_a_candidate_who_is_no_longer_left(db_session: AsyncSession):
+    """A user nominated while LEFT who came back keeps their status and their finished meetings; the
+    one still LEFT is demoted and loses theirs, cards included."""
+    tg_base = 996_490
+    grace_expired = user_cleanup.LEFT_STATUS_GRACE_DAYS + 5
+    still_left = make_owner(tg_base, status=UserStatus.LEFT, left_days_ago=grace_expired)
+    came_back = make_owner(tg_base + 1)
+    host = make_owner(tg_base + 2)
+    hosted = make_meeting(host, active=True)
+    links = [join(user, hosted, days_before=1) for user in (still_left, came_back)]
+    finished_left = make_meeting(still_left, active=False)
+    finished_back = make_meeting(came_back, active=False)
+    cards = [
+        Message(message_id=5, chat_id=-tg_base, meetup=finished_left),
+        Message(message_id=6, chat_id=-tg_base - 1, meetup=finished_back),
+    ]
+
+    async with committed(tg_base, still_left, came_back, host, hosted, *links, finished_left, finished_back, *cards):
+        probe = CardProbeBot([], refuse=False)
+        api = make_probe_api(probe)
+
+        async with db.begin_write(api) as session:
+            demoted = await user_cleanup.demote_users_still_demotable(session, api, {still_left.db_id, came_back.db_id})
+
+        assert [user.db_id for user in demoted] == [still_left.db_id]
+        async with db.begin() as session:
+            statuses = dict(
+                (
+                    await session.exec(
+                        select(User.id, User.status).where(col(User.id).in_([still_left.db_id, came_back.db_id]))
+                    )
+                ).all()
+            )
+        assert statuses == {still_left.db_id: UserStatus.JOINED_ONLY, came_back.db_id: UserStatus.MEMBER}
+        assert await surviving_meeting_ids([finished_left.db_id, finished_back.db_id]) == {finished_back.db_id}
+        assert probe.edited_cards == {(-tg_base, 5, None)}

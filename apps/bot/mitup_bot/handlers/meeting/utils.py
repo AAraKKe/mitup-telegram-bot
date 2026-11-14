@@ -8,7 +8,7 @@ from mitup_bot import limits, supporter
 from mitup_bot.callback_data import BackOrigin, BackTarget, MeetingListSource
 from mitup_bot.keyboards import ButtonConfig
 from mitup_bot.mitup_types import TMitupContext
-from mitup_bot.models import JoinedUsers, Meetup, User
+from mitup_bot.models import User
 from mitup_bot.supporter import SupporterLevel
 from mitup_bot.utils import ButtonMessages, SupporterMessages
 from mitup_bot.utils import callbacks as cb
@@ -16,33 +16,6 @@ from mitup_bot.utils.rich_message import RichContent
 from mitup_bot.views.collaborate import collaborate_button, supporter_upsell_view
 
 log = structlog.get_logger(__name__)
-
-# One event name covers every promotion off a waiting list, whatever moved the queue, so a single
-# filter answers "why did this DM arrive?" for all of them. What freed the spot is the `reason`.
-WAITING_LIST_PROMOTED_EVENT = "Waiting list promoted"
-
-
-def log_waiting_list_promotions(meeting: Meetup, promoted_links: list[JoinedUsers], reason: str):
-    """Record who a freed spot promoted, and what freed it.
-
-    Promotion DMs the recipient without them having done anything, and nothing on the receiving end
-    says which change caused it. Promoting nobody is not an event, so an empty list writes
-    nothing and the line's presence means someone moved.
-
-    Read through the nullable `id` rather than `db_id`: the promoted rows are reached off the
-    meeting mid-transaction, and a line that can raise on an unflushed row would turn a record of
-    the mutation into the thing that aborts it.
-    """
-    if not promoted_links:
-        return
-    log.info(
-        WAITING_LIST_PROMOTED_EVENT,
-        promoted_user_ids=[link.user.id for link in promoted_links],
-        promoted_count=len(promoted_links),
-        reason=reason,
-        n_participants=meeting.n_participants,
-        effective_max_members=meeting.effective_max_members,
-    )
 
 
 def meeting_detail_back_button(source: MeetingListSource | None, page: int, lang: str) -> ButtonConfig:
