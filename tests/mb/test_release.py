@@ -7,7 +7,7 @@ from command_recording import CommandRecorder
 from mb.main import app
 from typer.testing import CliRunner
 
-from mb import release, runner
+from mb import crowdin_mr_ops, release, runner
 
 cli = CliRunner()
 
@@ -15,6 +15,8 @@ TAG_PIPELINE_URL = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/pipelines/
 MR_URL = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/merge_requests"
 HEAD = "abc123def456"
 RELEASE_MR_URL = f"{MR_URL}/800"
+CROWDIN_FRAGMENT = "+crowdin-translations-20261114090000.internal.md"
+RENOVATE_FRAGMENT = "+renovate-ruff-20261114090000.internal.md"
 WHATS_NEW_PAGE = (
     "# What's new\n\nIntro.\n\n<!-- releases -->\n\n## v1.2.3\n\n_1 November 2026_\n\nYou can pin meetings.\n"
 )
@@ -82,17 +84,27 @@ def green_repo(
     return recorder
 
 
-def pending_repo(recorder: CommandRecorder, *fragments: str, tags: str = "v1.2.3\n") -> CommandRecorder:
-    """Prime the recorder with *fragments* pending at origin/main and v1.2.3 as the newest released version."""
+def pending_repo(
+    recorder: CommandRecorder,
+    *fragments: str,
+    tags: str = "v1.2.3\n",
+    fragment_text: str = "A fragment users can read.",
+    subjects: dict[str, str] | None = None,
+) -> CommandRecorder:
+    """Prime the recorder with *fragments* pending at origin/main and v1.2.3 as the newest released version.
+
+    *subjects* maps a fragment name to the subject of the commit that added it.
+    """
     recorder.captured_outputs.update(
         {
             "rev-parse origin/main": HEAD,
             "ls-tree --name-only": "".join(f"changelog.d/{name}\n" for name in ("README.md", *fragments)),
-            f"show {HEAD}:changelog.d/": "A fragment users can read.",
+            f"show {HEAD}:changelog.d/": fragment_text,
             f"show {HEAD}:CHANGELOG.md": "# Changelog\n\n<!-- towncrier release notes start -->\n",
             f"show {HEAD}:docs/whats-new/index.md": WHATS_NEW_PAGE,
             "mr create": f"{RELEASE_MR_URL}\n",
             "ls-remote --tags": tag_listing(tags),
+            **{f"-- changelog.d/{name}": subject for name, subject in (subjects or {}).items()},
         }
     )
     return recorder
@@ -100,8 +112,8 @@ def pending_repo(recorder: CommandRecorder, *fragments: str, tags: str = "v1.2.3
 
 @pytest.fixture
 def written_pages(recorder: CommandRecorder, monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """Back `git worktree add` with a real checkout holding the compiled CHANGELOG.md, and collect the What's
-    new page as each `git commit` sees it."""
+    """Back `git worktree add` with a real checkout holding the compiled CHANGELOG.md and the pending fragments,
+    apply each successful `git mv` there, and collect the What's new page as each `git commit` sees it."""
     pages: list[str] = []
 
     def run_quiet(
@@ -111,13 +123,36 @@ def written_pages(recorder: CommandRecorder, monkeypatch: pytest.MonkeyPatch) ->
             checkout = Path(args[4])
             (checkout / "docs" / "whats-new").mkdir(parents=True)
             (checkout / "CHANGELOG.md").write_text(COMPILED_CHANGELOG)
+            (checkout / "changelog.d").mkdir()
+            for path in recorder.captured_outputs["ls-tree --name-only"].splitlines():
+                (checkout / path).write_text(recorder.captured_outputs[f"show {HEAD}:changelog.d/"])
         if args[:2] == ["git", "commit"] and cwd is not None:
             pages.append((cwd / release.WHATS_NEW_PAGE).read_text())
-        return recorder.run_quiet(args, cwd=cwd, extra_env=extra_env)
+        exit_code, captured = recorder.run_quiet(args, cwd=cwd, extra_env=extra_env)
+        if args[:2] == ["git", "mv"] and cwd is not None and exit_code == 0:
+            (cwd / args[2]).rename(cwd / args[3])
+        return exit_code, captured
 
     monkeypatch.setattr(runner, "run_quiet", run_quiet)
     monkeypatch.setattr(release, "date", FixedDate)
     return pages
+
+
+@pytest.fixture
+def compiled_fragments(written_pages: list[str], monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
+    """Collect the checkout's fragment files, by name, as towncrier sees them."""
+    fragments: dict[str, str] = {}
+    run_quiet = runner.run_quiet
+
+    def snapshot_on_compile(
+        args: list[str], *, cwd: Path | None = None, extra_env: dict[str, str] | None = None
+    ) -> tuple[int, str]:
+        if "towncrier" in args and cwd is not None:
+            fragments.update({path.name: path.read_text() for path in (cwd / "changelog.d").iterdir()})
+        return run_quiet(args, cwd=cwd, extra_env=extra_env)
+
+    monkeypatch.setattr(runner, "run_quiet", snapshot_on_compile)
+    return fragments
 
 
 def ran(recorder: CommandRecorder, prefix: list[str]) -> bool:
@@ -274,6 +309,183 @@ def test_prepare_removes_the_temporary_checkout_when_a_step_fails(recorder: Comm
 
     assert result.exit_code != 0
     assert ran(recorder, ["git", "worktree", "remove", "--force"])
+    assert not ran(recorder, ["git", "push"])
+    assert not ran(recorder, ["glab", "mr"])
+
+
+@pytest.mark.parametrize(
+    ("fragments", "subjects", "expected_renames"),
+    [
+        pytest.param(
+            ["12.fix.md", CROWDIN_FRAGMENT],
+            {CROWDIN_FRAGMENT: "🗣️ Update approved translations from Crowdin (!801)"},
+            [f"{CROWDIN_FRAGMENT} -> 801.internal.md"],
+            id="number-free",
+        ),
+        pytest.param(
+            ["792.internal.md", RENOVATE_FRAGMENT],
+            {RENOVATE_FRAGMENT: "⬆️ Update ruff (!792)"},
+            [f"{RENOVATE_FRAGMENT} -> 792.internal.1.md"],
+            id="number-taken-by-a-pending-fragment",
+        ),
+        pytest.param(
+            ["792.internal.md", "792.internal.1.md", RENOVATE_FRAGMENT],
+            {RENOVATE_FRAGMENT: "⬆️ Update ruff (!792)"},
+            [f"{RENOVATE_FRAGMENT} -> 792.internal.2.md"],
+            id="counter-taken-too",
+        ),
+        pytest.param(
+            [CROWDIN_FRAGMENT, RENOVATE_FRAGMENT],
+            {CROWDIN_FRAGMENT: "Squashed (!801)", RENOVATE_FRAGMENT: "Squashed (!801)"},
+            [f"{CROWDIN_FRAGMENT} -> 801.internal.md", f"{RENOVATE_FRAGMENT} -> 801.internal.1.md"],
+            id="two-from-one-merge-request",
+        ),
+        pytest.param(
+            ["801.internal.md", "+tidy-ci.fix.md"],
+            {"+tidy-ci.fix.md": "🐛 Tidy CI (!801)"},
+            ["+tidy-ci.fix.md -> 801.fix.md"],
+            id="other-type-of-the-same-merge-request",
+        ),
+        pytest.param(
+            [RENOVATE_FRAGMENT],
+            {RENOVATE_FRAGMENT: "Revert the release (!811)\n⬆️ Update ruff (!791)"},
+            [f"{RENOVATE_FRAGMENT} -> 791.internal.md"],
+            id="re-added-by-a-later-merge-request",
+        ),
+    ],
+)
+def test_prepare_plan_numbers_each_unnumbered_fragment_and_changes_nothing_without_confirmation(
+    recorder: CommandRecorder, fragments: list[str], subjects: dict[str, str], expected_renames: list[str]
+):
+    pending_repo(recorder, *fragments, subjects=subjects)
+
+    result = cli.invoke(app, ["release", "prepare"])
+
+    assert result.exit_code != 0
+    assert "Fragments written before their merge request existed take its number:" in result.output
+    for rename in expected_renames:
+        assert f"  {rename}\n" in result.output
+    assert not ran(recorder, ["git", "worktree"])
+    assert not ran(recorder, ["git", "push"])
+    assert not ran(recorder, ["glab", "mr"])
+
+
+def test_prepare_plan_lists_no_renames_when_every_fragment_is_numbered(recorder: CommandRecorder):
+    pending_repo(recorder, "12.fix.md")
+
+    result = cli.invoke(app, ["release", "prepare"])
+
+    assert "take its number" not in result.output
+    assert not ran(recorder, ["git", "log"])
+
+
+def test_prepare_plan_shows_a_deciding_fragment_without_its_comment(recorder: CommandRecorder):
+    pending_repo(
+        recorder,
+        CROWDIN_FRAGMENT,
+        fragment_text=crowdin_mr_ops.FRAGMENT_TEXT,
+        subjects={CROWDIN_FRAGMENT: "🗣️ Update approved translations from Crowdin (!801)"},
+    )
+
+    result = cli.invoke(app, ["release", "prepare"])
+
+    assert f"  {CROWDIN_FRAGMENT}: Translations are updated from Crowdin.\n" in result.output
+    assert "<!--" not in result.output
+
+
+def test_prepare_numbers_unnumbered_fragments_in_the_checkout_before_compiling(
+    recorder: CommandRecorder, compiled_fragments: dict[str, str]
+):
+    pending_repo(
+        recorder,
+        "790.feature.md",
+        CROWDIN_FRAGMENT,
+        fragment_text=crowdin_mr_ops.FRAGMENT_TEXT,
+        subjects={CROWDIN_FRAGMENT: "🗣️ Update approved translations from Crowdin (!801)"},
+    )
+
+    result = cli.invoke(app, ["release", "prepare", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert [
+        "git",
+        "log",
+        "--diff-filter=A",
+        "--format=%s",
+        HEAD,
+        "--",
+        f"changelog.d/{CROWDIN_FRAGMENT}",
+    ] in recorder.commands
+    towncrier = next(call for call in recorder.calls if "towncrier" in call.args)
+    move = next(call for call in recorder.calls if call.args[:2] == ["git", "mv"])
+    assert move.args == ["git", "mv", f"changelog.d/{CROWDIN_FRAGMENT}", "changelog.d/801.internal.md"]
+    assert move.cwd == towncrier.cwd
+    assert compiled_fragments == {
+        "README.md": crowdin_mr_ops.FRAGMENT_TEXT,
+        "790.feature.md": "Translations are updated from Crowdin.\n",
+        "801.internal.md": "Translations are updated from Crowdin.\n",
+    }
+
+
+@pytest.mark.parametrize(
+    ("fragment_text", "expected_compiled_text"),
+    [
+        pytest.param(crowdin_mr_ops.FRAGMENT_TEXT, "Translations are updated from Crowdin.\n", id="opening-comment"),
+        pytest.param(
+            "You can pin meetings.\n<!-- Owners only. -->\n",
+            "You can pin meetings.\n<!-- Owners only. -->\n",
+            id="comment-mid-text",
+        ),
+    ],
+)
+def test_prepare_compiles_numbered_fragments_without_their_opening_comment(
+    recorder: CommandRecorder, compiled_fragments: dict[str, str], fragment_text: str, expected_compiled_text: str
+):
+    pending_repo(recorder, "790.feature.md", fragment_text=fragment_text)
+
+    result = cli.invoke(app, ["release", "prepare", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert compiled_fragments["790.feature.md"] == expected_compiled_text
+
+
+@pytest.mark.parametrize(
+    "subject",
+    [
+        pytest.param("", id="no-commit-found"),
+        pytest.param("⬆️ Update ruff !12", id="reference-without-parentheses"),
+        pytest.param("⬆️ Update ruff (!12) and ty", id="reference-mid-subject"),
+        pytest.param("Merge branch 'renovate/ruff' into 'main'", id="no-reference"),
+    ],
+)
+def test_prepare_aborts_when_the_merge_request_of_an_unnumbered_fragment_is_unknown(
+    recorder: CommandRecorder, subject: str
+):
+    pending_repo(recorder, "12.fix.md", RENOVATE_FRAGMENT, subjects={RENOVATE_FRAGMENT: subject})
+
+    result = cli.invoke(app, ["release", "prepare", "--yes"])
+
+    assert result.exit_code != 0
+    assert f"Cannot tell which merge request added changelog.d/{RENOVATE_FRAGMENT}." in result.output
+    assert f"must have a subject ending in `(!123)`; found {subject!r}." in result.output
+    assert "Rename it to <MR number>.internal.md in a merge request" in result.output
+    assert "Version to prepare" not in result.output
+    assert not ran(recorder, ["git", "worktree"])
+    assert not ran(recorder, ["git", "push"])
+    assert not ran(recorder, ["glab", "mr"])
+
+
+@pytest.mark.usefixtures("written_pages")
+def test_prepare_aborts_and_removes_the_checkout_when_numbering_a_fragment_fails(recorder: CommandRecorder):
+    pending_repo(recorder, RENOVATE_FRAGMENT, subjects={RENOVATE_FRAGMENT: "⬆️ Update ruff (!801)"})
+    recorder.exit_codes["git mv"] = 1
+
+    result = cli.invoke(app, ["release", "prepare", "--yes"])
+
+    assert result.exit_code != 0
+    assert f"Numbering {RENOVATE_FRAGMENT} as 801.internal.md failed" in result.output
+    assert ran(recorder, ["git", "worktree", "remove", "--force"])
+    assert not any("towncrier" in command for command in recorder.commands)
     assert not ran(recorder, ["git", "push"])
     assert not ran(recorder, ["glab", "mr"])
 

@@ -1,5 +1,7 @@
+import re
 import subprocess
 from collections.abc import Callable, Iterable
+from pathlib import Path
 
 import httpx
 import pytest
@@ -44,9 +46,11 @@ def plain_console(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture(autouse=True)
-def stub_repo_root(monkeypatch: pytest.MonkeyPatch):
+def stub_repo_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     # Keep git subprocesses from ever shelling out for the repo root during a test.
-    monkeypatch.setattr(runner, "repo_root", lambda: "/repo")
+    (tmp_path / "changelog.d").mkdir()
+    monkeypatch.setattr(runner, "repo_root", lambda: tmp_path)
+    return tmp_path
 
 
 def combined(capsys: pytest.CaptureFixture[str]) -> str:
@@ -278,18 +282,25 @@ def test_remote_branch_carries_catalogs_false_when_branch_missing(monkeypatch: p
 # --- push_translations_branch ---
 
 
-def test_push_translations_branch_runs_full_git_sequence(monkeypatch: pytest.MonkeyPatch):
+def test_push_translations_branch_runs_full_git_sequence(monkeypatch: pytest.MonkeyPatch, stub_repo_root: Path):
     install_api_responses(monkeypatch, [])
     recorder = GitRecorder()
     install_git_recorder(monkeypatch, recorder)
 
     crowdin_mr_ops.push_translations_branch(FULL_ENV)
 
+    [fragment] = (stub_repo_root / "changelog.d").iterdir()
+    assert re.fullmatch(r"\+crowdin-translations-\d{14}\.internal\.md", fragment.name)
+    note, sentence = fragment.read_text().splitlines()
+    assert note.startswith("<!--")
+    assert note.endswith("-->")
+    assert "`mb release prepare`" in note
+    assert sentence == "Translations are updated from Crowdin."
     assert recorder.calls == [
         ["git", "config", "user.name", "Crowdin Sync"],
         ["git", "config", "user.email", "12345-crowdin-sync@noreply.gitlab.example"],
         ["git", "checkout", "-B", "crowdin-translations"],
-        ["git", "add", "--", "libs/core/mitup_bot/locales/*.po"],
+        ["git", "add", "--", "libs/core/mitup_bot/locales/*.po", f"changelog.d/{fragment.name}"],
         ["git", "commit", "-m", "🗣️ Update approved translations from Crowdin"],
         [
             "git",

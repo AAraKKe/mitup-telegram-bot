@@ -24,9 +24,11 @@ Fragment types and how they decide the version are in the `changelog` skill.
 
 1. **Print the plan.** Run `uv run mb release prepare` with no `--yes`. It prints the previous
    version, the version it would prepare, how many fragments of each type are pending and the
-   fragments that decided the version, then stops at its question without changing anything. If it
-   refuses instead, report its message and stop: nothing is pending, an earlier prepared release is
-   not tagged yet, or the What's new page has no place to insert the section.
+   fragments that decided the version, then stops at its question without changing anything. When
+   Renovate or the Crowdin sync left fragments without an MR number, it also lists the number each
+   one takes. If it refuses instead, report its message and stop: nothing is pending, an earlier
+   prepared release is not tagged yet, the What's new page has no place to insert the section, or
+   it cannot tell which MR added an unnumbered fragment.
 2. **Ask the maintainer.** Show them the version and the deciding fragments, and ask whether to go
    ahead, to use a different bump, or to wait for something that is not merged yet. Do not continue
    without an answer.
@@ -36,8 +38,9 @@ Fragment types and how they decide the version are in the `changelog` skill.
    skill). In `docs/whats-new/index.md`, under the new `## vX.Y.Z` heading, replace the
    `<!-- release-summary -->` line with the summary. The folded changelog right below it is the
    source; the rules are in the next section.
-5. **Check and push.** `uv run mb ci check-changelog` and `uv run mb docs build` must pass. Commit
-   and push to the release branch.
+5. **Check and push.** Every line of the folded changelog must end with a link to its MR; report
+   any that does not instead of fixing it by hand. `uv run mb ci check-changelog` and
+   `uv run mb docs build` must pass. Commit and push to the release branch.
 6. **Report.** Give the MR link and the summary as written, so the maintainer can read it without
    opening the diff, and say what you left out of it and why.
 

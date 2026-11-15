@@ -16,10 +16,12 @@ the fragments. The towncrier config is `[tool.towncrier]` in the root `pyproject
 `changelog.d/<MR number>.<type>.md`, for example `changelog.d/776.fix.md`.
 
 * A second fragment of the same type in one MR takes a counter: `776.fix.1.md`.
-* A change with no MR (rare, maintainer only) uses `+<slug>.<type>.md`; it renders without a link.
+* `+<slug>.<type>.md` is a fragment whose MR number is filled in at release time. Only tooling
+  writes it, see [Automated merge requests](#automated-merge-requests); a person names the
+  fragment after the MR.
 * `uv run mb ci check-changelog` validates every name and, in an MR pipeline, requires one
-  fragment numbered after that MR. Only a release MR (`release/*`), which deletes the fragments
-  it compiles, is exempt from the second rule.
+  fragment numbered after that MR. Release MRs are exempt from the second rule; automated MRs
+  satisfy it as described in [Automated merge requests](#automated-merge-requests).
 
 ## Types
 
@@ -61,6 +63,31 @@ The MR number exists only once the MR is open, so:
 2. Add `changelog.d/<MR number>.<type>.md`, commit it.
 3. Push. The MR's first pipeline fails `check-changelog` until this push lands.
 
+## Automated merge requests
+
+Renovate and the Crowdin sync commit before their MR exists, so they write their own unnumbered
+`internal` fragment, `changelog.d/+<branch>-<UTC timestamp>.internal.md`. The timestamp keeps
+two MRs from the same branch apart. The file opens with an HTML comment saying why its name has
+no number; every tool that writes an unnumbered fragment must write that comment too.
+
+`uv run mb release prepare` gives each of these fragments its number before it compiles the
+changelog: it renames the file to `<MR number>.internal.md` and drops the comment, so the line
+links to its MR like any other. The number is the `(!123)` that ends the subject of the commit
+that first added the file to `main`. If that commit has no such suffix, the command refuses and
+names the file to rename by hand. A comment that opens any fragment is dropped before compiling,
+so a fragment renamed by hand does not leak it into the changelog.
+
+* Renovate runs `tools/renovate_changelog_fragment.sh` through `postUpgradeTasks` in
+  `renovate.json`. The self-hosted runner must allow that exact command in `allowedCommands`.
+* The Crowdin sync (`tools/mb/src/mb/crowdin_mr_ops.py`) writes its fragment into the commit it
+  force-pushes, so the MR always holds exactly one.
+* On a `renovate/` or Crowdin branch, the check passes when the MR itself adds an unnumbered
+  `internal` fragment; one that another automated MR left on `main` does not count. It compares
+  the commit the pipeline runs on with its target: `CI_MERGE_REQUEST_DIFF_BASE_SHA` in a detached
+  pipeline, and otherwise the first parent of that commit, which is how merged results and merge
+  train pipelines are built. The CI clone holds one commit, so
+  the check fetches the other one itself. A fragment numbered after the MR also passes.
+
 ## Wording
 
 * One or two sentences, sentence case, ending with a period.
@@ -86,8 +113,8 @@ Bad:
 
 ## At release
 
-`uv run mb release prepare` opens a release MR that compiles every pending fragment into a new
-`CHANGELOG.md` section and a new section of the What's new page, grouped as New, Removed, Changed,
+`uv run mb release prepare` opens a release MR that numbers the unnumbered fragments, compiles
+every pending fragment into a new `CHANGELOG.md` section and a new section of the What's new page, grouped as New, Removed, Changed,
 Fixed and Under the hood, and deletes the fragments. Once it is merged, `uv run mb release` tags it.
 The `prepare-release` skill covers both steps. Never edit `CHANGELOG.md` by hand for an unreleased
 change.

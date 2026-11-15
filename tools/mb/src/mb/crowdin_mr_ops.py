@@ -2,14 +2,15 @@
 
 `mb locales create-mr` is the tail of the scheduled crowdin-pull job: after
 `mb locales pull` has refreshed the catalogs, it rebuilds the fixed MR branch from the
-checked-out HEAD, commits the catalog changes, and force-pushes with GitLab push options
-that create the merge request or update the open one in place. The push only happens when
-the catalogs differ from what the remote branch already carries — an unchanged delta
-leaves the open MR untouched instead of piling identical commits onto it. Labeling that
-MR with HOLD_LABEL pauses the job before it touches anything.
+checked-out HEAD, commits the catalog changes with one changelog fragment, and force-pushes
+with GitLab push options that create the merge request or update the open one in place.
+The push only happens when the catalogs differ from what the remote branch already
+carries: an unchanged delta leaves the open MR untouched instead of piling identical
+commits onto it. Labeling that MR with HOLD_LABEL pauses the job before it touches anything.
 """
 
 import subprocess
+from datetime import UTC, datetime
 
 import httpx
 
@@ -20,6 +21,11 @@ MR_BRANCH = "crowdin-translations"
 HOLD_LABEL = "crowdin::hold"
 MR_TITLE = "🗣️ Update approved translations from Crowdin"
 LOCALES_PATHSPEC = "libs/core/mitup_bot/locales/*.po"
+FRAGMENT_TEXT = (
+    "<!-- This file has no merge request number in its name because the tool that wrote it ran before the "
+    "merge request existed. `mb release prepare` renames it to <MR number>.internal.md and removes this comment. -->\n"
+    "Translations are updated from Crowdin.\n"
+)
 
 CI_ENV_VARS = (
     PUSH_TOKEN_ENV_VAR,
@@ -83,7 +89,10 @@ def push_translations_branch(environment: dict[str, str]):
     git("config", "user.name", committer_name)
     git("config", "user.email", committer_email)
     git("checkout", "-B", MR_BRANCH)
-    git("add", "--", LOCALES_PATHSPEC)
+    # The MR number does not exist before the push: `mb release prepare` numbers the fragment at release.
+    fragment = f"changelog.d/+{MR_BRANCH}-{datetime.now(UTC):%Y%m%d%H%M%S}.internal.md"
+    (runner.repo_root() / fragment).write_text(FRAGMENT_TEXT)
+    git("add", "--", LOCALES_PATHSPEC, fragment)
     git("commit", "-m", MR_TITLE)
     remote = (
         f"https://oauth2:{environment[PUSH_TOKEN_ENV_VAR]}@{environment['CI_SERVER_HOST']}"

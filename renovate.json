@@ -17,6 +17,16 @@
   "configMigration": true,
   "minimumReleaseAge": "7 days",
   "osvVulnerabilityAlerts": true,
+  "postUpgradeTasks": {
+    "commands": [
+      "sh tools/renovate_changelog_fragment.sh"
+    ],
+    "dataFileTemplate": "{{{branchName}}}\n{{#if (equals updateType 'lockFileMaintenance')}}The lock file is refreshed with the latest compatible dependency versions.{{else}}Dependencies are updated:{{#each upgrades}}\n{{{depName}}} to {{#if newVersion}}{{{newVersion}}}{{else}}{{{newValue}}}{{/if}}{{/each}}{{/if}}\n",
+    "fileFilters": [
+      "changelog.d/+renovate-*.internal.md"
+    ],
+    "executionMode": "branch"
+  },
   "packageRules": [
     {
       "matchDatasources": [

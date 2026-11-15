@@ -4,6 +4,7 @@ import tempfile
 import time
 from datetime import date
 from enum import IntEnum
+from itertools import chain, count
 from pathlib import Path
 from typing import Annotated
 
@@ -11,12 +12,20 @@ import typer
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from . import console, runner
-from .changelog_check import FRAGMENT_DIRECTORY, FRAGMENT_NAME, RELEASE_SUMMARY_PLACEHOLDER, WHATS_NEW_PAGE
+from .changelog_check import (
+    FRAGMENT_DIRECTORY,
+    FRAGMENT_NAME,
+    HTML_COMMENT,
+    RELEASE_SUMMARY_PLACEHOLDER,
+    WHATS_NEW_PAGE,
+)
 
 DEFAULT_BRANCH = "main"
 FIRST_VERSION = (0, 1, 0)
 VERSION_TAG_RE = re.compile(r"v(\d+)\.(\d+)\.(\d+)$")
 MERGE_REQUEST_REF_RE = re.compile(r"!(\d+)")
+# The suffix GitLab's squash template gives the subject of every commit a merge request lands on main.
+MERGE_REQUEST_SUFFIX_RE = re.compile(r"\(!(\d+)\)$")
 COMMIT_SEPARATOR = "\x00"
 CHANGELOG = "CHANGELOG.md"
 CHANGELOG_VERSION_HEADING = re.compile(r"^## (v\d+\.\d+\.\d+)\b", re.MULTILINE)
@@ -258,7 +267,40 @@ def pending_fragments(sha: str) -> dict[str, list[str]]:
     return fragments
 
 
-def print_plan(sha: str, previous: Version | None, fragments: dict[str, list[str]], computed: Bump, chosen: Bump):
+def numbered_names(sha: str, fragments: dict[str, list[str]]) -> dict[str, str]:
+    """The name each unnumbered fragment at *sha* takes in the release, numbered after the merge request that
+    first added it so its changelog line links there.
+
+    The number ends the subject of the oldest commit adding the file, and a name already taken gets a counter.
+    """
+    taken = {name for names in fragments.values() for name in names}
+    renames: dict[str, str] = {}
+    for kind, names in fragments.items():
+        for name in names:
+            if not name.startswith("+"):
+                continue
+            path = f"{FRAGMENT_DIRECTORY}/{name}"
+            subjects = git_capture("log", "--diff-filter=A", "--format=%s", sha, "--", path).splitlines()
+            subject = subjects[-1] if subjects else ""
+            if (match := MERGE_REQUEST_SUFFIX_RE.search(subject)) is None:
+                console.error(f"Cannot tell which merge request added {path}.")
+                console.raw(f"The commit that added it must have a subject ending in `(!123)`; found {subject!r}.")
+                console.raw(f"Rename it to <MR number>.{kind}.md in a merge request, then prepare the release again.")
+                raise typer.Abort()
+            candidates = chain([f"{match[1]}.{kind}.md"], (f"{match[1]}.{kind}.{counter}.md" for counter in count(1)))
+            renames[name] = next(candidate for candidate in candidates if candidate not in taken)
+            taken.add(renames[name])
+    return renames
+
+
+def print_plan(
+    sha: str,
+    previous: Version | None,
+    fragments: dict[str, list[str]],
+    renames: dict[str, str],
+    computed: Bump,
+    chosen: Bump,
+):
     version = format_version(next_version(previous, chosen))
     console.info(f"Previous version: {format_version(previous) if previous else 'none'}")
     console.info(f"Version to prepare: {version} ({chosen.name.lower()})")
@@ -271,15 +313,27 @@ def print_plan(sha: str, previous: Version | None, fragments: dict[str, list[str
     console.info(f"Fragments that make it a {computed.name.lower()} release:")
     deciding = [name for kind, names in fragments.items() if FRAGMENT_BUMPS[kind] == computed for name in names]
     for name in deciding:
-        console.raw(f"  {name}: {git_capture('show', f'{sha}:{FRAGMENT_DIRECTORY}/{name}')}")
+        console.raw(f"  {name}: {HTML_COMMENT.sub('', git_capture('show', f'{sha}:{FRAGMENT_DIRECTORY}/{name}'))}")
+    if renames:
+        console.info("Fragments written before their merge request existed take its number:")
+        for name, numbered in renames.items():
+            console.raw(f"  {name} -> {numbered}")
 
 
-def commit_release(checkout: Path, version: str, page: str):
-    """Compile CHANGELOG.md and the What's new section for *version* in *checkout* and commit them.
+def commit_release(checkout: Path, version: str, page: str, renames: dict[str, str]):
+    """Number the unnumbered fragments, drop the comment a fragment opens with, compile CHANGELOG.md and the
+    What's new section for *version* in *checkout*, and commit them.
 
     The commit skips the git hooks: they run `uv run --no-sync --frozen mb`, which has no environment in a
     fresh checkout, and the release MR's pipeline runs the same checks.
     """
+    for name, numbered in renames.items():
+        move = ["git", "mv", f"{FRAGMENT_DIRECTORY}/{name}", f"{FRAGMENT_DIRECTORY}/{numbered}"]
+        if runner.run_step(f"Numbering {name} as {numbered}", move, cwd=checkout) != 0:
+            raise typer.Abort()
+    for fragment in (checkout / FRAGMENT_DIRECTORY).iterdir():
+        if FRAGMENT_NAME.fullmatch(fragment.name):
+            fragment.write_text(HTML_COMMENT.sub("", fragment.read_text()))
     today = date.today()
     towncrier = [sys.executable, "-m", "towncrier", "build", "--version", version, "--date", today.isoformat(), "--yes"]
     if runner.run_step("Compiling the changelog", towncrier, cwd=checkout) != 0:
@@ -292,7 +346,7 @@ def commit_release(checkout: Path, version: str, page: str):
             raise typer.Abort()
 
 
-def push_release_branch(sha: str, version: str, page: str):
+def push_release_branch(sha: str, version: str, page: str, renames: dict[str, str]):
     """Commit the release on top of *sha* in a temporary worktree and push it as the release branch."""
     branch = RELEASE_BRANCH.format(version=version)
     with tempfile.TemporaryDirectory(prefix="mb-release-") as scratch:
@@ -301,7 +355,7 @@ def push_release_branch(sha: str, version: str, page: str):
         if runner.run_step(f"Checking out {sha[:8]}", add_worktree) != 0:
             raise typer.Abort()
         try:
-            commit_release(checkout, version, page)
+            commit_release(checkout, version, page, renames)
             push = ["git", "push", "--no-verify", "origin", f"HEAD:refs/heads/{branch}"]
             if runner.run_step(f"Pushing {branch}", push, cwd=checkout) != 0:
                 raise typer.Abort()
@@ -371,14 +425,15 @@ def prepare_command(
         console.error(f"{WHATS_NEW_PAGE} has no `<!-- releases -->` line to insert the release after.")
         raise typer.Abort()
 
+    renames = numbered_names(sha, fragments)
     chosen = Bump.MAJOR if major else Bump.MINOR if minor else Bump.PATCH if patch else computed
     previous = max(versions, default=None)
-    print_plan(sha, previous, fragments, computed, chosen)
+    print_plan(sha, previous, fragments, renames, computed, chosen)
     version = format_version(next_version(previous, chosen))
     if not yes:
         typer.confirm(f"Prepare {version}?", abort=True)
 
-    push_release_branch(sha, version, page)
+    push_release_branch(sha, version, page, renames)
     open_release_merge_request(version)
 
 
