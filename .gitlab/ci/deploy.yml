@@ -17,6 +17,7 @@
       --bot-image $BOT_IMAGE_TAG
       --alarm-action-image $ALARM_ACTION_IMAGE_TAG
       --events-image $EVENTS_IMAGE_TAG
+      --version $CI_COMMIT_TAG
 
 ## -------------- Deploy ---------------
 deploy:

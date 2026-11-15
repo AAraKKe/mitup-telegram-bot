@@ -105,6 +105,10 @@ def deploy(
             help="Uri of the recurrent-events image — the only image carrying the `mitup recurrent-events` command.",
         ),
     ] = None,
+    version: Annotated[
+        str | None,
+        typer.Option("--version", help="Release tag being deployed (e.g. v3.0.0), shown in the bot's main menu."),
+    ] = None,
     refresh: Annotated[
         bool,
         typer.Option(
@@ -119,13 +123,20 @@ def deploy(
         deploy_ops.refresh()
         return
 
-    if migrations_image is None or bot_image is None or alarm_action_image is None or events_image is None:
+    if (
+        migrations_image is None
+        or bot_image is None
+        or alarm_action_image is None
+        or events_image is None
+        or version is None
+    ):
         console.error(
-            "--migrations-image, --bot-image, --alarm-action-image and --events-image are all required unless --refresh"
+            "--migrations-image, --bot-image, --alarm-action-image, --events-image and --version are all required "
+            "unless --refresh"
         )
         raise typer.Abort()
 
-    deploy_ops.deploy(migrations_image, bot_image, alarm_action_image, events_image)
+    deploy_ops.deploy(migrations_image, bot_image, alarm_action_image, events_image, version)
 
 
 if __name__ == "__main__":

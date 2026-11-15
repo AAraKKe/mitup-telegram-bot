@@ -314,6 +314,25 @@ def test_app_config_invalid_log_level_raises():
     assert error["loc"] == ("log_level",)
 
 
+def test_app_config_version_defaults_to_unset():
+    assert AppConfig(run_mode=RunModes.POLLING).version is None
+
+
+@pytest.mark.parametrize(
+    "mock_toml_config,mock_env_config",
+    ([TOML_CONTENT, CONFIG_FROM_ENV | {"app": {"version": "v3.0.0"}}],),
+    indirect=True,
+    ids=["version_via_env"],
+)
+def test_app_config_version_is_read_from_the_environment(
+    mock_toml_config: tuple[mock.Mock],
+    mock_env_config: None,
+):
+    config = Config.from_providers(EnvVariablesConfigProvider(), TomlConfigProvider(Env.DEV))
+
+    assert config.app.version == "v3.0.0"
+
+
 @pytest.mark.parametrize(
     "mock_toml_config,mock_env_config",
     ([TOML_CONTENT, CONFIG_FROM_ENV],),

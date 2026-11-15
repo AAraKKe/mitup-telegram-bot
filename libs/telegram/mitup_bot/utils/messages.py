@@ -238,6 +238,9 @@ class MainMenuMessages(MessageBase):
     TAGLINE = "Create meetings and share them with your friends."
     MEETINGS_SECTION = "Meetings"
     ACCOUNT_SECTION = "Account"
+    # TRANSLATORS: Link text beside the version at the foot of the main menu, opening the page that
+    # TRANSLATORS: lists what each release brings.
+    WHATS_NEW = "What's new"
 
 
 class HelpMessages(MessageBase):

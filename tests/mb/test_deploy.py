@@ -273,12 +273,12 @@ def test_register_task_definition_succeeds(capsys: pytest.CaptureFixture[str]):
     )
 
     with context.setup_mock() as (function, ecs):
-        result = deploy_ops.register_task_definition(ecs, family, image)
+        result = deploy_ops.register_task_definition(ecs, family, image, {deploy_ops.VERSION_ENV_VAR: "v3.0.0"})
 
     context.assert_ecs_called("describe_task_definition", taskDefinition=family)
-    # The definition passes through wholesale — volumes, roles and network mode included, the
-    # response-only metadata stripped — with the new image and the release marker naming it only on
-    # the app container, never on the other one.
+    # The definition passes through wholesale (volumes, roles and network mode included, the
+    # response-only metadata stripped), with the new image, the release marker naming it and the
+    # given environment only on the app container, never on the other one.
     context.assert_ecs_called(
         "register_task_definition",
         family=family,
@@ -287,7 +287,10 @@ def test_register_task_definition_succeeds(capsys: pytest.CaptureFixture[str]):
             {
                 "name": family,
                 "image": image,
-                "environment": [{"name": deploy_ops.RELEASE_ENV_VAR, "value": image}],
+                "environment": [
+                    {"name": deploy_ops.RELEASE_ENV_VAR, "value": image},
+                    {"name": deploy_ops.VERSION_ENV_VAR, "value": "v3.0.0"},
+                ],
             },
         ],
         executionRoleArn=role,
@@ -307,22 +310,26 @@ def test_release_marker_is_the_image_tag():
     assert deploy_ops.release_marker("123456789012.dkr.ecr.eu-west-1.amazonaws.com/mitup:ci-9f3a1c2") == "ci-9f3a1c2"
 
 
-def test_release_marker_replaces_the_previous_one_and_keeps_the_other_variables():
-    """The definition is re-registered from the described revision, so the marker from the last
-    deploy is already on it — appending without dropping it would leave two entries for one name."""
+def test_set_environment_replaces_the_previous_values_and_keeps_the_other_variables():
+    """The definition is re-registered from the described revision, so the values from the last
+    deploy are already on it, and appending without dropping them would leave two entries for one name."""
     container: ContainerDefinitionOutputTypeDef = {
         "name": "mitup",
         "environment": [
             {"name": "MITUPBOT__DB__POOL_SIZE", "value": "10"},
             {"name": deploy_ops.RELEASE_ENV_VAR, "value": "ci-previous"},
+            {"name": deploy_ops.VERSION_ENV_VAR, "value": "v2.9.0"},
         ],
     }
 
-    deploy_ops.set_release_marker(container, "repo/mitup:ci-9f3a1c2")
+    deploy_ops.set_environment(
+        container, {deploy_ops.RELEASE_ENV_VAR: "ci-9f3a1c2", deploy_ops.VERSION_ENV_VAR: "v3.0.0"}
+    )
 
     assert container["environment"] == [
         {"name": "MITUPBOT__DB__POOL_SIZE", "value": "10"},
         {"name": deploy_ops.RELEASE_ENV_VAR, "value": "ci-9f3a1c2"},
+        {"name": deploy_ops.VERSION_ENV_VAR, "value": "v3.0.0"},
     ]
 
 
@@ -801,7 +808,7 @@ def test_start_ecs_deployment_registers_updates_and_returns_arn():
         result = deploy_ops.start_ecs_deployment(ecs, "mitup", "bot_image:latest")
 
     assert result == "MyDeploymentArn"
-    register_task_definition.assert_called_once_with(ecs, "mitup", "bot_image:latest")
+    register_task_definition.assert_called_once_with(ecs, "mitup", "bot_image:latest", None)
     update_ecs_service.assert_called_once_with(ecs, "MyTaskArn", service="mitup", cluster="mitup")
     find_service_deployment_arn.assert_called_once_with(ecs, cluster="mitup", service="mitup")
 
@@ -827,8 +834,9 @@ def test_start_ecs_refresh_forces_new_deployment_without_registering():
 
 
 def test_command_starts_both_services_before_waiting():
-    # The recurrent-events service rolls onto its own events image, never the bot image. Both roll-outs
-    # start before either wait so their bake windows overlap for the cross-gated rollback alarms.
+    # The recurrent-events service rolls onto its own events image, never the bot image, and only the
+    # bot is handed the version. Both roll-outs start before either wait so their bake windows overlap
+    # for the cross-gated rollback alarms.
     with (
         mock.patch("mb.deploy_ops.update_lambda_code") as update_lambda_code,
         mock.patch("mb.deploy_ops.invoke_lambda") as invoke_lambda,
@@ -856,6 +864,8 @@ def test_command_starts_both_services_before_waiting():
                     "alarm_action_image:latest",
                     "--events-image",
                     "events_image:latest",
+                    "--version",
+                    "v3.0.0",
                 ],
             )
 
@@ -864,7 +874,7 @@ def test_command_starts_both_services_before_waiting():
             mock.call.update_lambda_code(function, "MitupMigrationsLambda", "migrations_image:latest"),
             mock.call.invoke_lambda(function, "MitupMigrationsLambda"),
             mock.call.update_lambda_code(function, "MitupAlarmActionLambda", "alarm_action_image:latest"),
-            mock.call.start_ecs_deployment(ecs, "mitup", "bot_image:latest"),
+            mock.call.start_ecs_deployment(ecs, "mitup", "bot_image:latest", {deploy_ops.VERSION_ENV_VAR: "v3.0.0"}),
             mock.call.start_ecs_deployment(ecs, "mitup-recurrent-events", "events_image:latest"),
             mock.call.wait_for_deployments(
                 ecs, {"mitup": "MitupDeploymentArn", "mitup-recurrent-events": "RecurrentEventsDeploymentArn"}
@@ -968,6 +978,8 @@ def test_command_chain_is_not_broken(
                     # Supply an events image so the abort chain covers both ECS services.
                     "--events-image",
                     "events_image:latest",
+                    "--version",
+                    "v3.0.0",
                 ],
             )
 

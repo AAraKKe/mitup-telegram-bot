@@ -28,6 +28,7 @@ from mitup_bot.hosts_group import HostsGroupState
 from mitup_bot.logging_config import Component
 from mitup_bot.monitoring import MetricsClient
 from mitup_bot.rate_limiter import MitupRateLimiter
+from mitup_bot.running_version import RunningVersionState
 from mitup_bot.update_processor import PerUserUpdateProcessor
 from tests.helpers import create_patreon_config
 from tests.helpers.logs import log_record
@@ -213,6 +214,17 @@ def test_init_configures_docs_links_with_none_when_no_domain(patch_runtime_deps:
     MitupRuntime(Env.DEV)
 
     patch_runtime_deps.docs.assert_called_once_with(None)
+
+
+def test_init_adopts_the_configured_version(patch_runtime_deps: RuntimeDeps, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(RunningVersionState, "version", None)
+    config = build_config()
+    config.app.version = "v3.0.0"
+
+    with mock.patch("mitup_bot.app.load_config", return_value=config):
+        MitupRuntime(Env.DEV)
+
+    assert RunningVersionState.version == "v3.0.0"
 
 
 def test_init_configures_metrics(patch_runtime_deps: RuntimeDeps):

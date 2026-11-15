@@ -13,6 +13,7 @@ from mitup_bot import (
     hosts_group,
     patreon,
     reconcile,
+    running_version,
     supporter,
     timezone_api,
 )
@@ -56,6 +57,7 @@ class MitupRuntime:
         self.__setup_hosts_group()
         self.__setup_docs_links()
         self.__setup_bot_links()
+        running_version.configure(self.config.app.version)
         api_wrapper.silence_modelled_endpoint_advisory()
         self.app = self.__build_application()
         # The api rendering layer validates incoming Updates through an injected guards slot;

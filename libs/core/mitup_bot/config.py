@@ -192,6 +192,9 @@ class AppConfig(BaseModel):
     # on every line beside `component`. A process started any other way — a local run, a
     # terraform-registered task definition — reports the unknown-release marker instead.
     release: str | None = None
+    # The release tag this build was cut from (e.g. `v3.0.0`), shown to users at the foot of the main
+    # menu. `mb deploy` sets it on the bot's container (`MITUPBOT__APP__VERSION`); unset hides the line.
+    version: str | None = None
     # How long one background job may run before it is cancelled and counted as failed. Far above a
     # healthy card refresh, so only a job that will never finish reaches it, and the OldestJobAge
     # alarm's threshold sits above this value so it fires only when the cancellation itself failed.

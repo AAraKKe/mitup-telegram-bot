@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: mitup_bot 0.0.1\n"
 "Report-Msgid-Bugs-To: https://gitlab.com/meetupbot/mitup-telegram-bot/issues/new\n"
 "POT-Creation-Date: 2024-10-05 16:34+0100\n"
-"PO-Revision-Date: 2026-11-14 14:45\n"
+"PO-Revision-Date: 2026-11-14 16:10\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "X-Crowdin-SourceKey: msgstr\n"
@@ -346,6 +346,11 @@ msgstr "Meetings"
 
 msgid "MainMenuMessages.ACCOUNT_SECTION"
 msgstr "Account"
+
+#. Link text beside the version at the foot of the main menu, opening the page that
+#. lists what each release brings.
+msgid "MainMenuMessages.WHATS_NEW"
+msgstr "What's new"
 
 msgid "HelpMessages.INTRO"
 msgstr "Where to get help with Mitup:"

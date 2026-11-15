@@ -281,6 +281,11 @@ msgstr "Incontri"
 msgid "MainMenuMessages.ACCOUNT_SECTION"
 msgstr "Account"
 
+#. Link text beside the version at the foot of the main menu, opening the page that
+#. lists what each release brings.
+msgid "MainMenuMessages.WHATS_NEW"
+msgstr "Novità"
+
 msgid "HelpMessages.INTRO"
 msgstr "Dove trovare aiuto con Mitup:"
 

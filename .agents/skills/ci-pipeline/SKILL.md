@@ -150,8 +150,10 @@ There is a single set of deploy jobs (no staging/prod pairs): they still carry
    registry build-cache makes unchanged images near-instant to re-push. (Path gating lives on the
    MR-only `validate-docker` matrix job, where there is no deploy to satisfy.)
 3. **`deploy`** (`deploy`) runs `uv run mb deploy --migrations-image … --bot-image …
-   --alarm-action-image … --events-image …`, which applies the Alembic migrations (migrations
-   Lambda) and rolls out the ECS services.
+   --alarm-action-image … --events-image … --version $CI_COMMIT_TAG`, which applies the Alembic
+   migrations (migrations Lambda) and rolls out the ECS services. Each service's container gets
+   `MITUPBOT__APP__RELEASE` (its image tag); the bot's alone also gets `MITUPBOT__APP__VERSION` (the
+   release tag its main menu shows).
 
 Every deploy-path job gates on `$CI_COMMIT_TAG =~ /^v/`, and the whole `test` stage is skipped on
 tags, so a tag pipeline runs only `preparation` → `build-translations`/`build-docs` → `deploy-config` →

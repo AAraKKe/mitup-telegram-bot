@@ -3,7 +3,7 @@ from dataclasses import replace
 
 import pytest
 
-from mitup_bot import docs_links, lifecycle
+from mitup_bot import docs_links, lifecycle, running_version
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.keyboards import ButtonConfig, ButtonStyle
 from mitup_bot.lifecycle import LifecyclePolicy
@@ -129,6 +129,31 @@ def test_main_menu_view_puts_the_account_actions_under_their_own_title(lang: str
     collaborate = [ButtonConfig(text=ButtonMessages.COLLABORATE.text(lang=lang), callback_data=cb.COLLABORATE)]
     rows = button_row_content(pair).html + button_row_content(collaborate).html
     assert view.message.html.index(account_title) < view.message.html.index(rows)
+
+
+def test_main_menu_view_closes_its_body_on_the_running_version_and_the_whats_new_link_above_the_admin_row(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(running_version.RunningVersionState, "version", "v3.0.0")
+    monkeypatch.setattr(docs_links.DocsState, "base_url", STAGING_DOCS_URL)
+
+    view = factory.main_menu_view(RenderContext(lang="en", is_admin=True))
+
+    whats_new = f"""<tg-button type="url" url="{STAGING_DOCS_URL}/whats-new/">What's new</tg-button>"""
+    assert view.message.html.endswith(f"<footer>Mitup v3.0.0 · {whats_new}</footer>")
+    assert view.menu == [[ButtonConfig(text=AdminMessages.BUTTON_ADMIN.text(lang="en"), callback_data=cb.ADMIN_MENU)]]
+
+
+def test_main_menu_view_shows_no_version_and_no_whats_new_link_when_no_version_is_configured(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(running_version.RunningVersionState, "version", None)
+    monkeypatch.setattr(docs_links.DocsState, "base_url", STAGING_DOCS_URL)
+
+    view = factory.main_menu_view(RenderContext(lang="en"))
+
+    assert "<footer>" not in view.message.html
+    assert f"{STAGING_DOCS_URL}/whats-new/" not in view.message.html
 
 
 def test_main_menu_view_help_chip_opens_the_help_screen(lang: str):

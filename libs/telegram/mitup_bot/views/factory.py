@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from mitup_bot import bot_links, docs_links
+from mitup_bot import bot_links, docs_links, running_version
 from mitup_bot.callback_data import CallbackData
 from mitup_bot.keyboards import ButtonConfig, ButtonRow, ButtonStyle, Keyboard
 from mitup_bot.lifecycle import LifecyclePolicy
@@ -34,6 +34,7 @@ from mitup_bot.utils.rich_message import (
     horizontal_rule_content,
     keyboard_content,
 )
+from mitup_bot.utils.rich_template import render_rich
 from mitup_bot.views import MitupView, RenderContext
 from mitup_bot.views.datetime_format import duration_minutes_content
 from mitup_bot.views.mitup_view import arrange_in_grid
@@ -117,6 +118,11 @@ def main_menu_view(
     )
     opening = (message or main_menu_opening(lang)).append(keyboard_content([[new_meeting]]))
     body = RichContent.join(horizontal_rule_content(), [opening, meetings_section(lang, counts), account_section(lang)])
+    if (version := running_version.RunningVersionState.version) is not None:
+        whats_new = button_content(
+            ButtonConfig(text=MainMenuMessages.WHATS_NEW.text(lang=lang), url=docs_links.whats_new_url())
+        )
+        body = body.append(render_rich(t"{bot_links.MITUP} {version} · {whats_new}").wrap(RichTag.FOOTER))
     menu: Keyboard = []
     if ctx.is_admin:
         menu.append([ButtonConfig(text=AdminMessages.BUTTON_ADMIN.text(lang=lang), callback_data=cb.ADMIN_MENU)])

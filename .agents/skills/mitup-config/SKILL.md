@@ -70,7 +70,7 @@ Values are auto-converted: `"true"`/`"false"` → `bool`, numeric strings → `i
 | `db` | `DbConfig` | Database connection (username, password, url, port, database) |
 | `bot` | `BotConfig` | Telegram bot token, webhook domain/port/secret, rate limits, update-concurrency cap |
 | `google_api` | `GoogleApiConfig` | Google Maps geocoding and timezone API keys |
-| `app` | `AppConfig` | Run mode (`POLLING` or `WEBHOOK`), log level, release marker |
+| `app` | `AppConfig` | Run mode (`POLLING` or `WEBHOOK`), log level, release marker, running version |
 | `metrics` | `MetricsConfig` | CloudWatch namespace, metrics environment, flush behavior |
 
 ## Cross-section invariants

@@ -1,7 +1,7 @@
 import base64
 import json
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import cast
 
@@ -47,6 +47,9 @@ LIFECYCLE_STAGE_STYLES = {"BAKE_TIME": "bold bright_blue"}
 # `config.app.release` and stamped on every log line beside `component`. Set here because this is
 # the only step that knows which image the revision it registers will run.
 RELEASE_ENV_VAR = "MITUPBOT__APP__RELEASE"
+# The container environment variable that hands the bot the release tag it shows in its main menu,
+# read back as `config.app.version`.
+VERSION_ENV_VAR = "MITUPBOT__APP__VERSION"
 
 # DescribeTaskDefinition returns these read-only metadata keys about the stored revision;
 # RegisterTaskDefinition rejects them, so they are stripped before re-registering.
@@ -156,15 +159,19 @@ def release_marker(image: str) -> str:
     return image.rsplit(":", 1)[-1]
 
 
-def set_release_marker(container: ContainerDefinitionOutputTypeDef, image: str):
-    """Point the container's release variable at the image being registered, leaving every other
+def set_environment(container: ContainerDefinitionOutputTypeDef, variables: Mapping[str, str]):
+    """Set *variables* on the container, replacing any earlier value of each and leaving every other
     environment entry as terraform declared it."""
-    environment = [entry for entry in container.get("environment", []) if entry.get("name") != RELEASE_ENV_VAR]
-    environment.append({"name": RELEASE_ENV_VAR, "value": release_marker(image)})
+    environment = [entry for entry in container.get("environment", []) if entry.get("name") not in variables]
+    environment.extend({"name": name, "value": value} for name, value in variables.items())
     container["environment"] = environment
 
 
-def register_task_definition(ecs_client: ECSClient, family: str, image: str) -> str:
+def register_task_definition(
+    ecs_client: ECSClient, family: str, image: str, environment: Mapping[str, str] | None = None
+) -> str:
+    """Register a revision of *family* running *image*, with the release marker and *environment*
+    set on its application container."""
     console.info(f"Registering task definition {family!r}...")
     console.info(f"ECR image: {image}")
 
@@ -181,7 +188,7 @@ def register_task_definition(ecs_client: ECSClient, family: str, image: str) -> 
         console.error(f"Task definition {family!r} does not have a container named {family!r}")
         raise typer.Abort()
     app_container["image"] = image
-    set_release_marker(app_container, image)
+    set_environment(app_container, {RELEASE_ENV_VAR: release_marker(image), **(environment or {})})
     console.info(f"Release marker: {release_marker(image)}")
 
     if task_def.get("executionRoleArn") is None:
@@ -405,13 +412,15 @@ def wait_for_deployments(ecs_client: ECSClient, deployments: dict[str, str]):
             time.sleep(DEPLOYMENT_POLL_INTERVAL_SECONDS)
 
 
-def start_ecs_deployment(ecs_client: ECSClient, service: str, image: str) -> str:
+def start_ecs_deployment(
+    ecs_client: ECSClient, service: str, image: str, environment: Mapping[str, str] | None = None
+) -> str:
     """Register a new task definition, roll the service onto it, and return the deployment ARN.
 
     Each ECS service runs in a cluster named after itself. This only starts the roll-out; the
     caller waits on the returned ARN so several services can bake concurrently.
     """
-    task_definition_arn = register_task_definition(ecs_client, service, image)
+    task_definition_arn = register_task_definition(ecs_client, service, image, environment)
     update_ecs_service(ecs_client, task_definition_arn, service=service, cluster=service)
     return find_service_deployment_arn(ecs_client, cluster=service, service=service)
 
@@ -427,7 +436,7 @@ def start_ecs_refresh(ecs_client: ECSClient, service: str) -> str:
     return find_service_deployment_arn(ecs_client, cluster=service, service=service)
 
 
-def deploy(migrations_image: str, bot_image: str, alarm_action_image: str, events_image: str):
+def deploy(migrations_image: str, bot_image: str, alarm_action_image: str, events_image: str, version: str):
     lambda_client = boto3.client("lambda", region_name="eu-west-1")
     ecs_client = boto3.client("ecs", region_name="eu-west-1")
 
@@ -438,9 +447,9 @@ def deploy(migrations_image: str, bot_image: str, alarm_action_image: str, event
     # Start both roll-outs before waiting so their bake windows overlap: the rollback alarms are
     # cross-gated on both services, so a fault in either one can only roll both back while both bakes
     # are still open. The recurrent-events service takes the events image, never the bot image: the
-    # slim bot image doesn't carry the `mitup recurrent-events` command.
+    # slim bot image doesn't carry the `mitup recurrent-events` command. Only the bot shows the version.
     deployments = {
-        "mitup": start_ecs_deployment(ecs_client, "mitup", bot_image),
+        "mitup": start_ecs_deployment(ecs_client, "mitup", bot_image, {VERSION_ENV_VAR: version}),
         "mitup-recurrent-events": start_ecs_deployment(ecs_client, "mitup-recurrent-events", events_image),
     }
     wait_for_deployments(ecs_client, deployments)

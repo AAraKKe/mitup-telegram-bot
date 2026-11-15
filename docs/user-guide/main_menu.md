@@ -19,7 +19,7 @@ After registration you land on the main menu, and every screen in Mitup has a wa
       </div>
     </div>
     <div class="mitup-annotated__body">
-      <div class="mitup-bot-msg"><div class="mitup-bot-msg__content"><div class="mitup-bot-msg__sender">mitupbot</div><div class="mitup-bot-msg__text"><span class="mitup-card__title">Welcome to Mitup!</span>Create meetings and share them with your friends.<div class="mitup-bot-msg__row"><div class="mitup-key mitup-key--rich mitup-key--primary" data-note="0">➕ New meeting</div></div><hr class="mitup-card__rule"/><span class="mitup-card__section">🗓️ <strong>Meetings</strong></span><div class="mitup-bot-msg__row" style="--cols: 2"><div class="mitup-key mitup-key--rich" data-note="1">📂 Active · 2</div><div class="mitup-key mitup-key--rich">👥 Joined · 1</div></div><div class="mitup-bot-msg__row"><div class="mitup-key mitup-key--rich">💾 Past · 3</div></div><hr class="mitup-card__rule"/><span class="mitup-card__section">⚙️ <strong>Account</strong></span><div class="mitup-bot-msg__row" style="--cols: 2"><div class="mitup-key mitup-key--rich" data-note="2">⚙️ Settings</div><div class="mitup-key mitup-key--rich">❓ Help</div></div><div class="mitup-bot-msg__row"><div class="mitup-key mitup-key--rich">♥ Collaborate</div></div></div></div></div>
+      <div class="mitup-bot-msg"><div class="mitup-bot-msg__content"><div class="mitup-bot-msg__sender">mitupbot</div><div class="mitup-bot-msg__text"><span class="mitup-card__title">Welcome to Mitup!</span>Create meetings and share them with your friends.<div class="mitup-bot-msg__row"><div class="mitup-key mitup-key--rich mitup-key--primary" data-note="0">➕ New meeting</div></div><hr class="mitup-card__rule"/><span class="mitup-card__section">🗓️ <strong>Meetings</strong></span><div class="mitup-bot-msg__row" style="--cols: 2"><div class="mitup-key mitup-key--rich" data-note="1">📂 Active · 2</div><div class="mitup-key mitup-key--rich">👥 Joined · 1</div></div><div class="mitup-bot-msg__row"><div class="mitup-key mitup-key--rich">💾 Past · 3</div></div><hr class="mitup-card__rule"/><span class="mitup-card__section">⚙️ <strong>Account</strong></span><div class="mitup-bot-msg__row" style="--cols: 2"><div class="mitup-key mitup-key--rich" data-note="2">⚙️ Settings</div><div class="mitup-key mitup-key--rich">❓ Help</div></div><div class="mitup-bot-msg__row"><div class="mitup-key mitup-key--rich">♥ Collaborate</div></div><span class="mitup-card__footer">Mitup v3.0.0 · <span class="mitup-chip">What's new</span></span></div></div></div>
     </div>
   </div>
   <span class="mitup-annotation mitup-annotation--left" data-for="0" style="top: 163px;">
@@ -84,6 +84,8 @@ Your meetings sit in three lists, each with its count next to the label. A list 
 * *⚙️ Settings*{.button-like}: your language, timezone, reminders, and the defaults every new meeting starts from. See [Your settings](settings.md).
 * *❓ Help*{.button-like}: links to this guide, the community group and the news channel, plus the support address.
 * *♥ Collaborate*{.button-like}: back Mitup on Patreon and link your Patreon account, which switches on your Host badge and perks. See [supporting Mitup](../collaborate/donation.md) and [limits and Host perks](limits.md).
+
+The small line at the foot of the menu shows the version of Mitup you're using, so mention it when you report a problem. *What's new*{.button-like} beside it opens the What's new page on the Mitup website, which lists what each release brings.
 
 !!! info "Meeting lifecycle"
 
