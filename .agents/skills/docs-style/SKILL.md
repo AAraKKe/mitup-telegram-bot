@@ -17,7 +17,7 @@ Mitup talks like a friend, not a product. Friendly and a little playful, never t
 * **Friendly, not enthusiastic.** Warmth comes from being specific and helpful, not from `exciting`, `awesome`, `amazing`, or trailing exclamation marks. If a sentence would make the reader picture a brand mascot, rewrite it.
 * **Plain and declarative.** Short sentences. Second person. Say the thing, then move on.
 * **Specific over generic.** Real examples, real names, real numbers. `"Weekend Hike Prep", "Board Game Night", "Ana's Birthday Drinks"` beats `"your meetings"`. `~62% covers servers, managed Postgres, and email infrastructure` beats `most of the money goes to operations`. Vary scenarios: brunch, climbing, board games, birthdays, online game nights, book club. Never `team standup`, `OKR`, `sprint review`. Mitup is for friend groups, not offices.
-* **Tongue-in-cheek is allowed when the joke is concrete.** `the occasional pizza for whoever's debugging migrations at 1am` works because it commits to a detail. `The warm fuzzies, monthly` works because it deflates a tier list. Vague enthusiasm (`our amazing community`, `exciting new features`) doesn't.
+* **Tongue-in-cheek is allowed when the joke is concrete.** `the occasional pizza for whoever's debugging migrations at 1am` works because it commits to a detail. Vague enthusiasm (`our amazing community`, `exciting new features`) doesn't.
 * **Don't oversell, don't apologize.** Skip framing like *Mitup provides a powerful set of tools to…*. Skip openers like *Thank you for considering…*. Open with the thing the reader came for.
 * **End when you're done.** No closing thank-you, no `Remember, you can always…`, no `Thank you for being part of our journey.` The page ends where the last fact ends.
 

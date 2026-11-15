@@ -18,7 +18,7 @@ The people who back Mitup are called Hosts, and each [tier](../collaborate/donat
 | A finished meeting is kept | 90 days | 90 days | 365 days | 365 days |
 | Photos on the meeting card | <span class="badge no">no</span> | <span class="badge yes">up to 5</span> | <span class="badge yes">up to 5</span> | <span class="badge yes">up to 5</span> |
 
-The Brewer tier is mostly a thank-you: it keeps the same caps as a free account, and adds the badge, the Hosts-only group, and photos on your meeting cards.
+The Brewer tier keeps the same caps as a free account, and adds the badge, the Hosts-only group, and photos on your meeting cards.
 
 ## Active meetings
 

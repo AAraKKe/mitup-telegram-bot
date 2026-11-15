@@ -48,9 +48,8 @@ Mitup is funded by monthly members on Patreon. We call them Hosts. Every Host ge
 * A Brewer badge next to your name in Mitup
 * The members-only Telegram group
 * Up to 5 [photos on each meeting card](../user-guide/limits.md#photos-on-the-meeting-card) you make
-* The warm fuzzies, monthly
 
-The Brewer tier keeps the same [limits](../user-guide/limits.md) as a free account. It's for backing the bot, not for unlocking it.
+The Brewer tier keeps a free account's [caps](../user-guide/limits.md) on meetings, dates and participants, and adds photos on your meeting cards. Every Brewer helps keep Mitup running, and we're grateful for each one of you.
 
 **Gamemaster (€5/mo)**: everything in Brewer, with a Gamemaster badge and room to run a regular series:
 
