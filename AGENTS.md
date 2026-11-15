@@ -35,6 +35,7 @@ When editing any instruction file, follow these rules:
 - **Interacting with repo**: you can use the `glab` cli.
   - **Exceptions**: do not use the `glab` cli to post comments or replies to merge request discussion threads. Use the `comment-mr` skill instead.
 - **Creating issues**: use the `create-issue` skill. It prompts for the issue type, fills in the correct template, and creates the issue via `glab`. Never invent labels — each template already embeds the correct `/label` quick-action lines.
+- **Changelog fragments**: every MR carries a fragment in `changelog.d/` named after its MR number. Load the `changelog` skill before writing or reviewing one.
 - **Merge request template** is at `.gitlab/merge_request_templates/Default.md`. When asked to produce an MR description, follow that template and output plain Markdown the user can copy-paste directly.
 - **Commit message format** — Every commit message must be prepended with an emoji that matches the commit type. The mapping is defined in `commits_check_config.yaml`. See `docs/contribute/commit_message_format.md` for full rules.
   - **With pre-commit hooks installed** (local dev): Write commits in conventional format (`Type[(scope)]: description`). The commit-msg hook rewrites the subject to emoji form in place and the commit completes in a single `git commit` — no retry, no `--no-verify`.

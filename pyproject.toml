@@ -246,8 +246,43 @@ dev = [
     "boto3~=1.34",
     "debugpy",
     "zensical",
+    "towncrier~=26.9.0",
     "deepdiff",
     "boto3-stubs[essential]",
     "testcontainers[postgres]==4.15.0",
     "asgi-lifespan==2.1.0",
 ]
+
+# Fragments are named after their MR (changelog.d/776.fix.md); the `changelog` skill has the rules.
+# The version comes from the command line: `towncrier build --version v3.0.0`.
+[tool.towncrier]
+directory = "changelog.d"
+filename = "CHANGELOG.md"
+title_format = "## {version} ({project_date})"
+issue_format = "[!{issue}](https://gitlab.com/meetupbot/mitup-telegram-bot/-/merge_requests/{issue})"
+
+# An array keeps the sections in this order; the table form would sort them alphabetically.
+[[tool.towncrier.type]]
+directory = "feature"
+name = "New"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removal"
+name = "Removed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "change"
+name = "Changed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "fix"
+name = "Fixed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "internal"
+name = "Under the hood"
+showcontent = true

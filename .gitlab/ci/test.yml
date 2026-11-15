@@ -210,6 +210,15 @@ check-ty-ignores:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
+# Every merge request carries a changelog fragment named after its own number; the `changelog`
+# skill has the rules. Merge train pipelines are merge request events too, so trains run it.
+check-changelog:
+  stage: test
+  script: uv run mb ci check-changelog
+  needs: [{job: build-docker-ci, optional: true}]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
 validate-migrations:
   stage: test
   script: uv run mb db migrate validate

@@ -4,21 +4,35 @@ icon: material/tag-outline
 
 # Versioning
 
-A version says how much the product changed. Milestones are named after versions (`vX.Y.Z`), so knowing how a change is classified tells you which milestone an issue lands in.
+A version says how much the product changed. Every merge request records its changes as changelog fragments, each with a type, and the release takes its version bump from the highest type among the pending fragments. Milestones are named after versions (`vX.Y.Z`), so the type of a change also tells you which milestone its issue lands in.
 
-## Classify by three questions
+## The five types
 
-Ask these in order. The first yes wins.
+| Type | Meaning | Version bump |
+|---|---|---|
+| `feature` | Users gain a capability that is the first of its kind | Major |
+| `removal` | Users lose a capability entirely | Major |
+| `change` | An existing capability works, looks or is worded differently, or gains or loses one option | Minor |
+| `fix` | Restores what was already intended | Patch |
+| `internal` | Nothing a user can observe: tooling, infrastructure, dependencies, admin screens in the bot | Patch |
 
-1. Does it change **what** a user can do, adding, removing, or replacing a capability? That is a major change. Removals are always major.
-2. Does it change **how** a user does something that already exists, a reshaped flow, a restructured screen, different conversation routing, or a default users will notice? That is a minor change.
-3. Otherwise it is a patch. Internal refactors, docs, monitoring, dependency bumps, and copy polish all live here.
+A user is anyone using the bot in the normal way, supporters and Telegram group admins included. Screens only the bot's operators can open are `internal`.
 
-The test is intent, not visibility. A bug fix restores what the bot was already meant to do, so it is a patch even when the difference is plain to users.
+To tell a `feature` from a `change`, ask whether it is the first of its kind or one more of a kind. Choosing a date format was a `feature`, because nothing controlled formatting before; a switch to mute polls is a `change`, because notification settings already exist. Removals mirror this: removing reminders altogether is a `removal`, removing one reminder option out of several is a `change`.
 
-## Two riders
+A quick check: a `feature` needs a new section in the user guide, a `change` edits an existing one, and `fix` and `internal` need none.
 
-* A feature merged behind a flag counts when it is exposed to users, not when the code lands.
-* Maintainers may promote a large internal change up one tier to signal deploy risk.
+## Writing a fragment
 
-Cutting releases and deploying is maintainer work. This page exists so that issue classification and milestones make sense as you contribute.
+A fragment is a file in `changelog.d/` named after your merge request and its type, such as `changelog.d/776.fix.md`, holding one or two sentences about the change. The number only exists once the merge request is open, so open it first, then add the fragment and push. An MR with effects of several types adds one fragment per type.
+
+Write what is true after the change, in the present tense. For every type except `internal`, write for someone using the bot: no code names, file names or issue numbers. The link to your merge request is added for you.
+
+The [`changelog` skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/.agents/skills/changelog/SKILL.md) has the full naming and wording rules with examples.
+
+## How a version is chosen
+
+* A capability built behind a flag gets its fragment from the merge request that exposes it to users, not from the one that lands the code.
+* The maintainer can override the computed version.
+
+Cutting releases and deploying is maintainer work. This page exists so that fragment types and milestones make sense as you contribute.

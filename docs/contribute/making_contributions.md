@@ -52,7 +52,8 @@ Write commits in conventional format, `Type[(scope)]: description`. The [commit 
 Push to your fork and open a merge request against `main`.
 
 * Write a clear description and link the issue with `Closes #N`.
-* Make sure the pipeline passes; it runs the same checks as `mb validate`.
+* Add a changelog fragment named after the new merge request number, such as `changelog.d/776.fix.md`, then commit and push it. [Versioning](versioning.md) explains the types and how to word it. The `check-changelog` job fails until the fragment is pushed.
+* Make sure the pipeline passes; it runs the same checks as `mb validate`, plus the changelog check.
 * [Sourcery AI](https://sourcery.ai/) reviews the merge request automatically; address anything relevant it raises.
 * A maintainer reviews after that, and merges once it is ready.
 

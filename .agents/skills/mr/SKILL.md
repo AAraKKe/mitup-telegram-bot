@@ -81,4 +81,7 @@ for a single scope to be meaningful.
      --no-editor
    ```
 
-8. Output the MR URL returned by `glab`.
+8. Add the changelog fragment named after the new MR number (`changelog.d/<MR number>.<type>.md`),
+   commit it and push. The `changelog` skill has the naming, type and wording rules. The MR's first
+   pipeline fails the `check-changelog` job until this push lands.
+9. Output the MR URL returned by `glab`.

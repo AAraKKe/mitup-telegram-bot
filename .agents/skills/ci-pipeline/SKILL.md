@@ -97,6 +97,7 @@ interruptible`), so a force-push cancels the superseded pipeline's runs. The dep
 | `linter` | `uv run mb lint` | `allow_failure` on the default branch |
 | `type-check` | `uv run mb typecheck` (project + `tools/mb`) | always |
 | `check-ty-ignores` | `uv run mb ci check-ty-ignores` — every `ty` suppression carries a live issue URL | MRs only, `allow_failure` |
+| `check-changelog` | `uv run mb ci check-changelog` (`tools/mb/src/mb/changelog_check.py`): every file in `changelog.d/` is a valid fragment name with a known type and is not empty, and the MR carries a fragment numbered after its own `CI_MERGE_REQUEST_IID`. Only release (`release/*`) MRs skip the own-number rule; a Renovate or Crowdin sync MR without a fragment fails like any other. An MR's first pipeline fails here until the fragment is pushed. See the `changelog` skill | MR pipelines only, merge trains included; blocking |
 | `validate-migrations` | `uv run mb db migrate validate` (single head, clean upgrade path) | always |
 | `check-import-isolation` | `uv run mb ci check-import-isolation` — each library imports with only its own declared deps | always |
 | `validate-ids` | `uv run mb locales validate-ids` — every message in code exists in the English catalog | always |
