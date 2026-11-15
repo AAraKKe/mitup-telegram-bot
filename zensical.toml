@@ -58,13 +58,8 @@ nav = [
       ] },
     ] },
   ] },
-  { "News" = [
-    { "What's new" = "news/index.md" },
-    { "Mitup 2.0" = "news/mitup_2_0.md" },
-    { "Does Telegram have events like WhatsApp?" = "news/does_telegram_have_events_like_whatsapp.md" },
-    { "One week in" = "news/one_week_in.md" },
-    { "Welcome to the new Mitup" = "news/welcome_to_the_new_mitup.md" },
-  ] },
+  { "What's new" = "whats-new/index.md" },
+  { "Blog" = "blog/index.md" },
 ]
 
 [project.theme]
@@ -96,6 +91,13 @@ scheme = "default"
 icon = "fontawesome/brands/telegram"
 name = "Bot"
 link = "https://t.me/mitupbot?start=src_web"
+
+# Posts live in docs/blog/posts/ and publish at /blog/<file name>/.
+[project.plugins.blog]
+post_url_format = "{file}"
+post_excerpt = "required"
+archive = false
+categories = false
 
 [project.markdown_extensions.abbr]
 [project.markdown_extensions.admonition]

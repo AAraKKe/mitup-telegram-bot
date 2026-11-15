@@ -12,11 +12,11 @@ A working canon to model yourself on lives in three pages: `docs/index.md`, `doc
 
 ## Voice
 
-Mitup talks like a friend, not a product. Friendly and a little playful, never theatrical. Imagine the maintainer answering a question from a friend who asked how the bot works — warm because the words are warm, not because every sentence ends in an exclamation mark. The goal is "talking with a friend", not "talking with someone who's had too much coffee".
+Mitup talks like a friend, not a product. Friendly and a little playful, never theatrical. Imagine the maintainer answering a question from a friend who asked how the bot works: warm because the words are warm, not because every sentence ends in an exclamation mark. The goal is "talking with a friend", not "talking with someone who's had too much coffee".
 
 * **Friendly, not enthusiastic.** Warmth comes from being specific and helpful, not from `exciting`, `awesome`, `amazing`, or trailing exclamation marks. If a sentence would make the reader picture a brand mascot, rewrite it.
 * **Plain and declarative.** Short sentences. Second person. Say the thing, then move on.
-* **Specific over generic.** Real examples, real names, real numbers. `"Weekend Hike Prep", "Board Game Night", "Ana's Birthday Drinks"` beats `"your meetings"`. `~62% covers servers, managed Postgres, and email infrastructure` beats `most of the money goes to operations`. Vary scenarios: brunch, climbing, board games, birthdays, online game nights, book club. Never `team standup`, `OKR`, `sprint review` — Mitup is for friend groups, not offices.
+* **Specific over generic.** Real examples, real names, real numbers. `"Weekend Hike Prep", "Board Game Night", "Ana's Birthday Drinks"` beats `"your meetings"`. `~62% covers servers, managed Postgres, and email infrastructure` beats `most of the money goes to operations`. Vary scenarios: brunch, climbing, board games, birthdays, online game nights, book club. Never `team standup`, `OKR`, `sprint review`. Mitup is for friend groups, not offices.
 * **Tongue-in-cheek is allowed when the joke is concrete.** `the occasional pizza for whoever's debugging migrations at 1am` works because it commits to a detail. `The warm fuzzies, monthly` works because it deflates a tier list. Vague enthusiasm (`our amazing community`, `exciting new features`) doesn't.
 * **Don't oversell, don't apologize.** Skip framing like *Mitup provides a powerful set of tools to…*. Skip openers like *Thank you for considering…*. Open with the thing the reader came for.
 * **End when you're done.** No closing thank-you, no `Remember, you can always…`, no `Thank you for being part of our journey.` The page ends where the last fact ends.
@@ -34,7 +34,7 @@ The user guide is for someone who has never seen the bot. It explains what a mee
 
 * **No walkthrough of every chip and every state.** Readers will see the screen. Name the fields and the concepts; skip the narration.
 * **Never quote a bot message verbatim.** No `!!! quote` blocks with screen text, no "the bot says: ...". Copy changes, and a stale quote confuses instead of helping. Say what the bot does ("asks you to confirm", "asks for an earlier date").
-* **No before-and-after framing.** The reader never saw the old bot. Nothing about what changed or moved, and no paragraph that only exists because a screen looks different from before. Release news goes to `docs/news/`.
+* **No before-and-after framing.** The reader never saw the old bot. Nothing about what changed or moved, and no paragraph that only exists because a screen looks different from before. What a release changes goes on the What's new page; longer stories go on the blog (see File conventions).
 * **Short pages over many pages.** One page covering a subject in a few short sections beats a page per screen.
 
 ## Anti-patterns
@@ -122,7 +122,7 @@ Every mention of a bot button in body text uses the `.button-like` inline chip (
 * **Don't:** `Tap **New meeting**.`, `Press the "New meeting" button.`, `` Tap `New meeting`. ``, `Tap New meeting (➕).`
 * **Do:** `Tap *➕ New meeting*{.button-like}.`
 
-This is the *only* place an emoji belongs in a docs page (see anti-pattern 2). The emoji must be the **raw Unicode glyph** copied verbatim from the matching `ButtonMessages` entry in `libs/telegram/mitup_bot/utils/messages.py` (which sources `libs/core/mitup_bot/locales/<lang>.po`). Don't use Twemoji shortcodes like `:heavy_plus_sign:` — shortcodes can render differently from the real button (e.g. `:heart:` renders as `❤️` but the bot button is `♥`), so they break the "this is what's on your phone" promise of `.button-like`.
+This is the *only* place an emoji belongs in a docs page (see anti-pattern 2). The emoji must be the **raw Unicode glyph** copied verbatim from the matching `ButtonMessages` entry in `libs/telegram/mitup_bot/utils/messages.py` (which sources `libs/core/mitup_bot/locales/<lang>.po`). Don't use Twemoji shortcodes like `:heavy_plus_sign:`: shortcodes can render differently from the real button (e.g. `:heart:` renders as `❤️` but the bot button is `♥`), so they break the "this is what's on your phone" promise of `.button-like`.
 
 ### 13. Developer language on user-facing pages
 
@@ -191,9 +191,11 @@ The same blank-line rule applies to bullet lists themselves: surround them with 
 * Every file ends with a single empty line.
 * Every page has YAML front matter with a Material icon for the nav: `icon: material/xxx-outline` (e.g. `material/gift-outline`, `material/shield-lock-outline`, `material/cog-outline`). Browse icons at <https://pictogrammers.com/library/mdi/>.
 * When adding a new page, register it in the `nav` array of `zensical.toml`.
-* Every user-facing page (home, `user-guide/`, `faq/`, `collaborate/donation.md`, `collaborate/translator.md`) carries a `description:` key in its front matter: 110–155 characters, written as the direct answer a searcher wants, with every factual claim checked against the page body. It becomes the page's `<meta name="description">` — search engines and AI assistants quote it out of context. Contributor-handbook pages omit it and fall back to `site_description` in `zensical.toml`. News posts omit it too, with one exception: a news post written to own a search intent (an evergreen question people actually type, like a comparison or a how-to) carries a `description:` like any user-facing page.
-* **IMPORTANT — a new top-level section or root-level file must be added to the CDN allowlist in the same change.** The public site's CloudFront function (`terraform/bot/scripts/cdn_probe_filter.js` in the `mitup-infra` repo) answers any request outside a fixed allowlist of the site's top-level sections and root files with an empty 200, to starve vulnerability scanners. A new top-level directory under `docs/` or a new root-level file that isn't allowlisted is served as an empty page: silently unreachable, with no 404 to signal the mistake. Renaming or removing a section needs the matching allowlist edit too.
-* When adding, renaming, or removing a user-facing page, update `docs/llms.txt` to match — it is a hand-maintained index of the user-facing pages and drifts silently otherwise. `docs/llms.txt` follows the llmstxt.org format and keeps its `-` bullets (it is parsed by machines, not rendered by the theme), so the `*`-bullet rule below does not apply to it. `docs/robots.txt` never needs a per-page edit: it is an allow-all policy plus a pointer to the auto-generated sitemap.
+* Every user-facing page (home, `user-guide/`, `faq/`, `collaborate/donation.md`, `collaborate/translator.md`) carries a `description:` key in its front matter: 110–155 characters, written as the direct answer a searcher wants, with every factual claim checked against the page body. It becomes the page's `<meta name="description">`, and search engines and AI assistants quote it out of context. Contributor-handbook pages omit it and fall back to `site_description` in `zensical.toml`. Blog posts omit it too, with one exception: a blog post written to own a search intent (an evergreen question people actually type, like a comparison or a how-to) carries a `description:` like any user-facing page.
+* **IMPORTANT: a new top-level section or root-level file must be added to the CDN allowlist in the same change.** The public site's CloudFront function (`terraform/bot/scripts/cdn_probe_filter.js` in the `mitup-infra` repo) answers any request outside a fixed allowlist of the site's top-level sections and root files with an empty 200, to starve vulnerability scanners. A new top-level directory under `docs/` or a new root-level file that isn't allowlisted is served as an empty page: silently unreachable, with no 404 to signal the mistake. Renaming or removing a section needs the matching allowlist edit too. A top-level nav tab backed by its own directory (like `whats-new/`) is a top-level section; ask the maintainer for the `mitup-infra` change if you cannot make it yourself.
+* **Blog posts** go in `docs/blog/posts/<file_name>.md` and are published at `/blog/<file_name>/`, so the file name is the public address: never rename a published post. Front matter needs `date: YYYY-MM-DD`, `authors:` with a name defined in `docs/blog/.authors.yml`, and the usual `icon:`. An author's avatar is a file under `docs/assets/images/authors/`, never an address on another site. Put `<!-- more -->` after the opening paragraph: everything above it is the teaser on the blog index, and the build fails without it. Posts never go in the `nav`; the blog index (`docs/blog/index.md`) is the only nav entry.
+* **What's new** (`docs/whats-new/index.md`) gets one section per release, inserted after the `<!-- releases -->` marker by the release tooling. Never write, edit or reorder a release section by hand, and keep the marker on its own line.
+* When adding, renaming, or removing a user-facing page, update `docs/llms.txt` to match. It is a hand-maintained index of the user-facing pages and drifts silently otherwise. `docs/llms.txt` follows the llmstxt.org format and keeps its `-` bullets (it is parsed by machines, not rendered by the theme), so the `*`-bullet rule below does not apply to it. `docs/robots.txt` never needs a per-page edit: it is an allow-all policy plus a pointer to the auto-generated sitemap.
 * Bullets use `*`, not `-`. Some environments render `-` inconsistently; `*` always works.
 * Links to non-documentation files (source code, configs) must use the full GitLab URL on `main`: `https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/main/<path>`. The docs site doesn't ship project files.
 
@@ -218,15 +220,15 @@ For an iterative preview, run `uv run mb docs serve` (`zensical serve`) and open
 
 ## Brand reference
 
-You almost never need to touch brand styling from a docs page — that's the job of `main.css` and `mitup-components.css`. But when you do (custom hero, new landing-style page, inline color), pick from the tokens already defined in `main.css`. Don't invent hex codes.
+You almost never need to touch brand styling from a docs page; that's the job of `main.css` and `mitup-components.css`. But when you do (custom hero, new landing-style page, inline color), pick from the tokens already defined in `main.css`. Don't invent hex codes.
 
-* **Mitup Blue** `var(--blue)` `#2AA1E0` — primary action, links, accents. Hover: `var(--blue-deep)` `#1F87BF`. Tinted surfaces: `var(--blue-soft)` `#E8F5FD`.
-* **Moment Yellow** `var(--yellow)` `#FFC850` — *rare and precious*. Used for the i-dot in the wordmark, The Moment in the mark, the warning admonition. Never a primary surface, never large text. Yellow text on light backgrounds uses `var(--yellow-d)` `#B58A1F`.
+* **Mitup Blue** `var(--blue)` `#2AA1E0`: primary action, links, accents. Hover: `var(--blue-deep)` `#1F87BF`. Tinted surfaces: `var(--blue-soft)` `#E8F5FD`.
+* **Moment Yellow** `var(--yellow)` `#FFC850`: *rare and precious*. Used for the i-dot in the wordmark, The Moment in the mark, the warning admonition. Never a primary surface, never large text. Yellow text on light backgrounds uses `var(--yellow-d)` `#B58A1F`.
 * **Ink** `var(--ink)` `#0E1A23` body / `var(--ink-2)` `#36505F` secondary / `var(--ink-3)` `#7A8C97` tertiary.
 * **Paper** `var(--paper)` `#F6FAFD` page bg / `var(--paper-2)` `#FFFFFF` cards. Borders: `var(--line)` `#E2ECF2`.
-* **Patreon** `var(--patreon)` `#F0511C` — only inside `.patreon-strip`.
+* **Patreon** `var(--patreon)` `#F0511C`: only inside `.patreon-strip`.
 
-Typography: Inter (400–900) for everything, JetBrains Mono (400/500) for code and eyebrow labels. The `font-feature-settings: "ss01", "cv11"` plus antialiasing is set globally — don't override. Sentence case everywhere except the lowercase wordmark. No Inter italics for emphasis; use bold.
+Typography: Inter (400–900) for everything, JetBrains Mono (400/500) for code and eyebrow labels. The `font-feature-settings: "ss01", "cv11"` plus antialiasing is set globally; don't override. Sentence case everywhere except the lowercase wordmark. No Inter italics for emphasis; use bold.
 
 If you ever need the long-form rationale (mark construction, lockup clearspace, what counts as misuse), it's in the standalone brand guide that ships with the brand assets bundle. The skill stays the authority for docs writing when they conflict.
 
@@ -400,7 +402,7 @@ The annotation chips render in the 70 px gutter on either side of the chat. Keep
 
 **Bot alias** in the chat header and bubble sender is always `mitupbot` (the real bot handle, lowercase). No `MitupStaging`, no `Mitup Bot`, no environment variants.
 
-**User names in chat showcases must be fictitious.** Use plausible first names or first-name-plus-surname, varied across pages. The canon examples are `Ana`, `Ana Marín`, `Marta`, `Diego`, `Sara`, `Tomás` (already used in the home-page animation). Never use real maintainer or contributor names. The same rule applies anywhere a user identity appears — message senders, "Created by:" lines, avatar initials, participant lists, annotation labels.
+**User names in chat showcases must be fictitious.** Use plausible first names or first-name-plus-surname, varied across pages. The canon examples are `Ana`, `Ana Marín`, `Marta`, `Diego`, `Sara`, `Tomás` (already used in the home-page animation). Never use real maintainer or contributor names. The same rule applies anywhere a user identity appears: message senders, "Created by:" lines, avatar initials, participant lists, annotation labels.
 
 ### `.mitup-two-up`
 

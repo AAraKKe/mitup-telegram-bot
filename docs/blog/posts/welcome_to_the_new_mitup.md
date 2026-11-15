@@ -1,4 +1,7 @@
 ---
+date: 2026-07-16
+authors:
+  - juanpe
 icon: material/newspaper-variant-outline
 hide:
     - toc
@@ -6,9 +9,9 @@ hide:
 
 # Welcome to the new Mitup
 
-<span class="news-meta">16 July 2026</span>
-
 I'm Juanpe, and I've been the one person behind Mitup this whole time. These days it's two: my brother Enrique and I build it in whatever spare time we can find. This is the first time I'm telling the story of how it started.
+
+<!-- more -->
 
 ## When Mitup was born
 
@@ -56,12 +59,12 @@ Fast forward to 2022. I was working at AWS and wanted to make it happen, but my 
     A final year project is supposed to take one semester. This one took a few more.
 
 <figure markdown>
-  ![The Mitup logo](../assets/images/logo-stacked-transparent-800.png){ width="320" }
+  ![The Mitup logo](../../assets/images/logo-stacked-transparent-800.png){ width="320" }
 </figure>
 
-The new Mitup feels the same, but runs better. I hope it is like coming back to the home you always knew. If you hit an issue, email us at [support@mitup.social](mailto:support@mitup.social) and we can take it from there. The bot is finally open source: you can find it in the [Mitup GitLab repo](https://gitlab.com/meetupbot/mitup-telegram-bot) and [contribute to it](../collaborate/code_contributor.md), so we can maintain it more reliably and add new features.
+The new Mitup feels the same, but runs better. I hope it is like coming back to the home you always knew. If you hit an issue, email us at [support@mitup.social](mailto:support@mitup.social) and we can take it from there. The bot is finally open source: you can find it in the [Mitup GitLab repo](https://gitlab.com/meetupbot/mitup-telegram-bot) and [contribute to it](../../collaborate/code_contributor.md), so we can maintain it more reliably and add new features.
 
-Running the bot has never been free for long: it went from a free host to 20, then 30, then 60, and lately up to 120 euros a month, depending on traffic. So we also added Patreon support. If you [become a Mitup Host](../collaborate/donation.md), you help keep the bot running. If you can't, you can still use it. The only difference for non-supporters is [a few limits](../user-guide/limits.md) meant to keep costs down. The old Mitup had no limits, and the cost was that many people would abuse it and impact everyone else. The limits should be more than enough for the average group. If you use Mitup often, I hope you consider becoming a Mitup Host.
+Running the bot has never been free for long: it went from a free host to 20, then 30, then 60, and lately up to 120 euros a month, depending on traffic. So we also added Patreon support. If you [become a Mitup Host](../../collaborate/donation.md), you help keep the bot running. If you can't, you can still use it. The only difference for non-supporters is [a few limits](../../user-guide/limits.md) meant to keep costs down. The old Mitup had no limits, and the cost was that many people would abuse it and impact everyone else. The limits should be more than enough for the average group. If you use Mitup often, I hope you consider becoming a Mitup Host.
 
 !!! quote "Enrique"
 

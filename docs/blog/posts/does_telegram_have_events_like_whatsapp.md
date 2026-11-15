@@ -1,4 +1,7 @@
 ---
+date: 2026-08-14
+authors:
+  - juanpe
 description: "Telegram has no built-in events feature and does not need one: Mitup has organized events in Telegram groups since 2015, nine years before WhatsApp."
 icon: material/newspaper-variant-outline
 hide:
@@ -7,11 +10,11 @@ hide:
 
 # Does Telegram have events like WhatsApp?
 
-<span class="news-meta">14 August 2026</span>
-
 I have not had a WhatsApp account since 2010, so WhatsApp news reaches me by word of mouth. This week a friend mentioned that WhatsApp has native events in group chats now. I looked them up today, and I cannot quite believe how familiar they look.
 
 So, the question in the title. Short answer: Telegram has no built-in events feature, and it is not missing one. WhatsApp added Events to group chats in 2024. Telegram groups have been organizing this way **since 2015** through [Mitup](https://t.me/mitupbot?start=src_web), an event bot that never joins your group. Same job, nine years earlier, and with a few tricks WhatsApp still does not have.
+
+<!-- more -->
 
 ## The WhatsApp Events timeline
 
@@ -38,6 +41,6 @@ A decade of doing one job also buys you the parts WhatsApp has not gotten to:
 * **Guests without an account, since 2018.** Someone asked you in person? Add them to the list by name. They do not need Telegram at all. WhatsApp added plus ones in 2025; Mitup guests have had names for seven years.
 * **Open source and free.** Ten years online, [MIT-licensed](https://gitlab.com/meetupbot/mitup-telegram-bot), translated into six languages by its community.
 
-And one difference that is not a feature but a principle: Mitup is not in the data business. No ads, nothing sold about you, ever. If you ever want to leave, you can export or delete everything the bot knows about you, straight from Settings. The [privacy page](../faq/privacy.md) spells it all out.
+And one difference that is not a feature but a principle: Mitup is not in the data business. No ads, nothing sold about you, ever. If you ever want to leave, you can export or delete everything the bot knows about you, straight from Settings. The [privacy page](../../faq/privacy.md) spells it all out.
 
-If your people plan in WhatsApp, Events is right there and it is good. If your people are on Telegram and want the equivalent of WhatsApp Events, the ten-year head start is yours to use: open [@mitupbot](https://t.me/mitupbot?start=src_web) and share your first card. New here? The [getting started guide](../user-guide/getting_started.md) walks you from first tap to first shared card.
+If your people plan in WhatsApp, Events is right there and it is good. If your people are on Telegram and want the equivalent of WhatsApp Events, the ten-year head start is yours to use: open [@mitupbot](https://t.me/mitupbot?start=src_web) and share your first card. New here? The [getting started guide](../../user-guide/getting_started.md) walks you from first tap to first shared card.

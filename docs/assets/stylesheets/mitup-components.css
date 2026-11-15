@@ -495,6 +495,41 @@
 .md-typeset .admonition p:last-child,
 .md-typeset details p:last-child { margin-bottom: 0; }
 
+/* The icon, the title and the arrow of a title bar share one centre line. */
+.md-typeset .admonition > .admonition-title::before,
+.md-typeset details > summary::before {
+  top: 50% !important;
+  transform: translateY(-50%);
+}
+.md-typeset details > summary {
+  padding-right: 36px !important;
+  cursor: pointer;
+}
+.md-typeset details > summary::after {
+  top: 50% !important;
+  right: 12px !important;
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+}
+.md-typeset details[open] > summary::after {
+  transform: translateY(-50%) rotate(90deg);
+}
+/* A closed block is the title bar alone, so the bar takes the block's full outline. */
+.md-typeset details:not([open]) > summary {
+  border-bottom: 0 !important;
+  border-radius: 10px !important;
+}
+/* Inside a collapsible, a label sits close to the list it names and groups keep one gap between them. */
+.md-typeset details > :not(summary) + :not(summary) {
+  margin-top: 0;
+  padding-top: 0 !important;
+}
+.md-typeset details > p {
+  margin-bottom: 0;
+  padding-bottom: 4px !important;
+}
+
 /* tip / success / hint — green */
 .md-typeset .admonition.tip,
 .md-typeset .admonition.success,

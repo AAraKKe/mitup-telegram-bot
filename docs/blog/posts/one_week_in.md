@@ -1,4 +1,7 @@
 ---
+date: 2026-07-26
+authors:
+  - juanpe
 icon: material/newspaper-variant-outline
 hide:
     - toc
@@ -6,9 +9,9 @@ hide:
 
 # One week in
 
-<span class="news-meta">26 July 2026</span>
-
 The new Mitup has been carrying every meeting for a bit over a week now. The old bot is off, and the most interesting thing I have to report is that there was not a lot to report. That is what I wanted from a migration.
+
+<!-- more -->
 
 You may have seen small issues here and there. We have been fixing a few bugs around shared meetings and how conversations are handled, but overall I am pretty happy with the state of things.
 
@@ -40,7 +43,7 @@ On a free account, 90 days still leaves a whole season to notice a meeting and b
 
 A week before a finished meeting reaches the end of that window, the bot sends you one message to let you know it is happening, with a button to bring it back. One message, a week's notice, and then the meeting goes.
 
-That message is a DM like any other, so it only reaches you if the bot can still write to you. If you blocked it, the message doesn't arrive and the deletion happens on schedule anyway, which is why the windows on the [meeting lifecycle](../user-guide/meeting_lifecycle.md) page are the ones to plan around. The per-tier numbers are on [Limits and Host perks](../user-guide/limits.md).
+That message is a DM like any other, so it only reaches you if the bot can still write to you. If you blocked it, the message doesn't arrive and the deletion happens on schedule anyway, which is why the windows on the [meeting lifecycle](../../user-guide/meeting_lifecycle.md) page are the ones to plan around. The per-tier numbers are on [Limits and Host perks](../../user-guide/limits.md).
 
 If something looks off in your own past meetings, email [support@mitup.social](mailto:support@mitup.social) and I'll take a look.
 

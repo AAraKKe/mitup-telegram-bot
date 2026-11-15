@@ -4,7 +4,7 @@
 
 ## Docs
 
-- [Does Telegram have events like WhatsApp?](https://mitup.social/news/does_telegram_have_events_like_whatsapp/): Telegram has no built-in events feature; Mitup has organized events in Telegram groups since 2015, with a waiting list, timezone reminders, and guests by name.
+- [Does Telegram have events like WhatsApp?](https://mitup.social/blog/does_telegram_have_events_like_whatsapp/): Telegram has no built-in events feature; Mitup has organized events in Telegram groups since 2015, with a waiting list, timezone reminders, and guests by name.
 
 - [Home](https://mitup.social/): What Mitup does, in one page, with a video of the whole meeting flow.
 - [User guide](https://mitup.social/user-guide/): Index of every screen the bot shows you, page by page.
@@ -20,6 +20,8 @@
 - [Privacy](https://mitup.social/faq/privacy/): Every field stored, retention windows, third parties, and your GDPR rights.
 - [Troubleshooting](https://mitup.social/faq/troubleshooting/): The behaviours that look like bugs and what is actually happening.
 - [About us](https://mitup.social/faq/about/): Why Mitup exists, how it is built, and who maintains it.
+- [What's new](https://mitup.social/whats-new/): What each release of the bot changes, newest first.
+- [Blog](https://mitup.social/blog/): Launches, milestones and longer stories from the people who build Mitup.
 
 ## Optional
 

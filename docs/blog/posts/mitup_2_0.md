@@ -1,4 +1,7 @@
 ---
+date: 2026-09-13
+authors:
+  - juanpe
 description: "Mitup 2.0 is here: every screen rebuilt on Telegram's new message format, photos on meetings for Hosts, and the first of many updates to come."
 icon: material/newspaper-variant-outline
 hide:
@@ -7,9 +10,9 @@ hide:
 
 # Mitup 2.0
 
-<span class="news-meta">13 September 2026</span>
-
 Mitup moved to a new platform in July. Same bot, same meetings, new machinery underneath. The point was never the move itself, it was what the move would let us do next.
+
+<!-- more -->
 
 We have been listening to what people ask for over the years, and a lot of it was never hard to picture. It was hard to add to the old bot without breaking something else, so much of it waited.
 
@@ -19,7 +22,7 @@ Every change now gets tested against everything that already works before it rea
 
 Telegram added a new kind of message this summer, one that carries real structure: headings, sections, dividers, and buttons that live inside the text instead of in a slab underneath it. Every screen Mitup sends you is drawn with them now.
 
-So a screen reads as a card. Each list carries its count, each setting sits next to the chip that changes it, and the [user guide](../user-guide/index.md) walks through all of them.
+So a screen reads as a card. Each list carries its count, each setting sits next to the chip that changes it, and the [user guide](../../user-guide/index.md) walks through all of them.
 
 <div class="mitup-two-up">
   <div class="mitup-two-up__item">
@@ -161,7 +164,7 @@ Photos on a meeting are here, up to five, on every tier from Brewer up. One sits
   </div>
 </div>
 
-This one goes to the Mitup Hosts, the people backing the bot on Patreon. It is what the busiest organizers kept asking for, and a meeting carrying several photos takes more work on our side every time one of its cards is drawn. [Limits and Host perks](../user-guide/limits.md) has what else a tier changes.
+This one goes to the Mitup Hosts, the people backing the bot on Patreon. It is what the busiest organizers kept asking for, and a meeting carrying several photos takes more work on our side every time one of its cards is drawn. [Limits and Host perks](../../user-guide/limits.md) has what else a tier changes.
 
 One catch before you share: a card with photos only goes into a chat where you are allowed to send photos, stickers and GIFs.
 
@@ -178,7 +181,7 @@ Mitup sends three kinds of message about your own meetings: a reminder before on
 
 When several of your meetings reach that deadline on the same day, the warning arrives as one message listing them. Your past meetings also carry the date each one is set to be deleted, right under the title.
 
-A large batch of those falls in October. Mitup keeps an inactive meeting for 90 days, a year for Gamemasters and Commissioners, and plenty of meetings carried over from the old bot finished long outside that window. Owners get the usual week's notice, which points at *💾 Past meetings*{.button-like}, where anything worth keeping can be reactivated. [Meeting lifecycle](../user-guide/meeting_lifecycle.md) follows the whole path.
+A large batch of those falls in October. Mitup keeps an inactive meeting for 90 days, a year for Gamemasters and Commissioners, and plenty of meetings carried over from the old bot finished long outside that window. Owners get the usual week's notice, which points at *💾 Past meetings*{.button-like}, where anything worth keeping can be reactivated. [Meeting lifecycle](../../user-guide/meeting_lifecycle.md) follows the whole path.
 
 ## What comes next
 

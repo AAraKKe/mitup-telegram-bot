@@ -1,11 +1,11 @@
 /* ============================================================
-   Mitup — Zensical / mkdocs-material custom theme
+   Mitup: Zensical / mkdocs-material custom theme
    File path in repo: docs/assets/stylesheets/main.css
    ------------------------------------------------------------
    Approach: override Material's CSS variables for color & fonts,
    then add custom classes for the landing-page hero, animation
    embed, feature grids, and Patreon strip. Material's own chrome
-   (header, tabs, sidebar, TOC) is restyled via its variables —
+   (header, tabs, sidebar, TOC) is restyled via its variables;
    we don't redefine layout, only tokens.
    ============================================================ */
 
@@ -94,7 +94,7 @@ html, body {
   font-size: 0.86em;
 }
 
-/* Block code — dark navy */
+/* Block code: dark navy */
 .md-typeset pre > code,
 .md-typeset .highlight pre {
   background: var(--ink) !important;
@@ -170,7 +170,7 @@ html, body {
 .md-typeset .admonition p:last-child,
 .md-typeset details p:last-child { margin-bottom: 0; }
 
-/* Accent colors by type — tint title text + title background only.
+/* Accent colors by type: tint title text + title background only.
    The card border stays uniform on all sides (see mitup-components.css). */
 .md-typeset .admonition.note > .admonition-title,
 .md-typeset .admonition.info > .admonition-title { color: var(--blue-deep); background: rgba(42,161,224,0.04) !important; }
@@ -205,7 +205,7 @@ html, body {
   transform: translateY(-1px);
 }
 
-/* ─── Header (Material .md-header) — gentle frost ──────────── */
+/* ─── Header (Material .md-header): gentle frost ──────────── */
 .md-header {
   background: rgba(246, 250, 253, 0.88) !important;
   color: var(--ink) !important;
@@ -314,7 +314,7 @@ html, body {
 }
 .hero-meta strong { color: var(--ink); font-weight: 600; font-size: 0.95rem; display: block; margin-bottom: 2px; }
 
-/* Animation showcase — full-bleed dark */
+/* Animation showcase: full-bleed dark */
 .demo-section {
   background: #0E1A23;
   margin: 3rem -2rem 3rem;
@@ -447,7 +447,7 @@ html, body {
 .patreon-tier .tier-amt .per { font-size: 0.7rem; color: var(--ink-3); font-weight: 500; margin-left: 2px; }
 .patreon-tier .tier-tag { font-size: 0.72rem; color: var(--ink-2); margin-top: 0.2rem; }
 
-/* Privacy callout — dark inverse */
+/* Privacy callout: dark inverse */
 .privacy-strip {
   background: var(--ink);
   color: white;
@@ -487,8 +487,8 @@ html, body {
   font-size: 0.92em;
 }
 
-/* ─── Tables — card style with row separators ──────────────
-   Markdown tables now render with the same look as the privacy
+/* ─── Tables: card style with row separators ──────────────
+   Markdown tables render with the same look as the privacy
    card: rounded outer container, hidden inner borders, soft
    hover, monospace-friendly first column, right-aligned value.
    ─────────────────────────────────────────────────────────── */
@@ -579,7 +579,7 @@ html, body {
   color: #C24A1A;
 }
 
-/* ─── Privacy TL;DR — grouped section cards ───────────────── */
+/* ─── Privacy TL;DR: grouped section cards ───────────────── */
 .tldr-stack { display: flex; flex-direction: column; gap: 18px; margin: 1.8rem 0; }
 .tldr-card { background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
 .tldr-card__head {
@@ -612,7 +612,7 @@ html, body {
 }
 .tldr-row__why { font-size: 14.5px; color: var(--ink-2); line-height: 1.55; }
 
-/* Status tints — apply to .tldr-card */
+/* Status tints: apply to .tldr-card */
 .tldr--stored    .tldr-card__head { background: #E8F4ED; }
 .tldr--stored    .tldr-pill       { background: rgba(79,178,134,0.20); color: #1E6E4A; }
 .tldr--stored    .tldr-pill .dot  { background: #4FB286; }
@@ -659,7 +659,7 @@ html, body {
 
 /* Soft shadow + rounded corners for screenshots in article body.
    Scoped to .md-typeset so it never bleeds into chrome (header, footer,
-   sidebar). The :not(.twemoji) exclusion is required — pymdownx.emoji
+   sidebar). The :not(.twemoji) exclusion is required: pymdownx.emoji
    renders shortcodes as inline <img class="twemoji"> SVGs, and they
    appear inside every .button-like chip. The :not(.hero img) exclusion
    keeps the landing hero art clean (its reset rule lives above). */
@@ -671,7 +671,7 @@ html, body {
 /* ─── Footer (custom Mitup footer partial) ──────────────────
    Three-column grid layout with brand, use, help sections,
    plus a bottom strip with copyright and disclaimers.
-   Compact and quiet — a gentle sign-off.
+   Compact and quiet, a gentle sign-off.
    ────────────────────────────────────────────────────────── */
 
 .mitup-footer {
@@ -778,32 +778,8 @@ html, body {
 }
 
 /* ─── News ─────────────────────────────────────────────────── */
-/* Date line under a post title */
-.md-typeset .news-meta {
-  display: block;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  margin: -0.4rem 0 1.8rem;
-}
-
-/* Date chip inside a news card on the landing grid */
-.md-typeset .grid.cards .news-card__date {
-  display: block;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--blue-deep);
-  margin-bottom: 0.4rem;
-}
-
 /* Home-page latest-news pill: the hand-edited pointer to the newest post under
-   docs/news/, a compact pill centered above the hero. assets/javascripts/news-banner.js
+   docs/blog/posts/, a compact pill centered above the hero. assets/javascripts/news-banner.js
    hides it 14 days past its data-published date. */
 .md-typeset .news-banner.is-expired {
   display: none;
