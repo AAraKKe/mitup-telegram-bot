@@ -42,29 +42,59 @@ Fragment types and how they decide the version are in the `changelog` skill.
    any that does not instead of fixing it by hand. `uv run mb ci check-changelog` and
    `uv run mb docs build` must pass. Commit and push to the release branch.
 6. **Report.** Give the MR link and the summary as written, so the maintainer can read it without
-   opening the diff, and say what you left out of it and why.
+   opening the diff. List what you left out in one line each, and name any fix you were unsure
+   about so the maintainer can ask for it.
 
 ## Writing the summary
 
-The summary is deliberately not exhaustive. It points out what users will notice; the complete list
-is folded right below it, so leaving something out hides nothing.
+Write it the way you would tell the community group what is new: a short post from the people who
+make Mitup to the people who use it to meet their friends. It is not a record of the work that went
+into the release. The complete list is folded right below it, so leaving something out hides
+nothing, and a summary that tries to cover everything is the most common way to get this wrong.
 
-* **Source**: only the fragments compiled into this version, as listed in the folded changelog.
-  Never mention anything that is not in that list.
-* **What goes in**: every `feature` and every `removal`. A `change` when users meet it on a screen
-  they use often: the main menu, a meeting card, creating or editing a meeting, reminders and
-  notifications. A `fix` only when users were visibly hitting the problem. Never `internal`. In the
-  folded changelog those types sit under New, Removed, Changed, Fixed and Under the hood.
-* **Merge** fragments about the same thing into one point.
-* **Length**: a major release gets one opening sentence and at most five points; a minor at most
-  three points; a patch one or two sentences in total. A release with nothing a user would notice
-  gets exactly one sentence saying it is a maintenance release and nothing changes in how you use
-  Mitup.
-* **Each point** leads with what the user can now do or will see, in one or two sentences, names the
-  screen where they find it, and links the user-guide section when there is one.
-* **Voice**: second person, plain, in the bot's own vocabulary (load `user-facing-text` and
-  `docs-style`). No MR numbers, no internal terms, no hype, no exclamation marks, no em-dashes, and
-  no absolutes such as "never", "always" or "instantly" unless the code proves them.
+### What goes in
+
+* **Source**: only the fragments compiled into this version, as listed in the folded changelog,
+  where the types sit under New, Removed, Changed, Fixed and Under the hood. Say nothing the
+  fragments do not say: no advice, no reasons and no claims of your own.
+* Every `feature` and every `removal`.
+* A `change` only when users meet it on a screen they use often: the main menu, a meeting card,
+  creating or editing a meeting, reminders and notifications.
+* A `fix` only when people were running into the problem: a user reported it, or it broke one of
+  those often-used screens for everyone. Most fixes stay out. If you cannot tell, leave it out and
+  name it in your report.
+* Never `internal`.
+* Fragments about the same thing become one point. Unrelated fragments are never joined into one
+  point to fit more in.
+
+### How long
+
+| Release | Shape | Words a reader sees |
+|---|---|---|
+| Major | One opening sentence, then at most four points | 100 |
+| Minor | At most three points | 60 |
+| Patch | One or two sentences | 30 |
+| Nothing a user would notice | One sentence: it is a maintenance release and nothing changes in how you use Mitup | 20 |
+
+* A point is one sentence of at most 25 words.
+* Count the words before you push. When the summary is over its limit, drop the point users would
+  notice least; do not squeeze the same content into fewer words.
+* The opening sentence of a major release says what the release means for the person using Mitup,
+  not what it contains.
+
+### How it reads
+
+* **Lead with what the user can now do or will see.** Name the screen, and make its name the link
+  to the user-guide section when there is one. No separate "See ..." sentence.
+* **One idea per point.** Leave out the cases it covers, how it works, what used to happen and why
+  it changed. "Links in a meeting's description can be tapped on the meeting card" is the whole
+  point; which kinds of link are recognised belongs to the changelog.
+* **Test each point**: would someone who uses Mitup with their friends mention this to another
+  member? If not, cut it.
+* **Voice**: second person, plain and friendly, in the bot's own vocabulary (load
+  `user-facing-text` and `docs-style`). No MR numbers, no internal terms, no hype, no exclamation
+  marks, no em-dashes, and no absolutes such as "never", "always" or "instantly" unless the code
+  proves them.
 * **Format**: short paragraphs or a short bullet list. No headings: a heading adds an entry to the
   page's table of contents.
 * A major release links its blog post under `docs/blog/posts/` when one exists.
@@ -72,27 +102,45 @@ is folded right below it, so leaving something out hides nothing.
 ## Example
 
 A minor release whose fragments are two `change` entries ("The main menu lists your next three
-meetings." and "The address on a meeting card opens in your maps app."), one `fix` ("Editing a
-meeting's title keeps its links.") and four `internal` entries.
+meetings." and "The address on a meeting card opens in your maps app, for addresses typed by hand
+and for pinned locations."), two `fix` entries ("Editing a meeting's title keeps its links." and
+"A reminder set for a meeting that is deleted afterwards is cancelled, whichever way the meeting
+was deleted.") and four `internal` entries.
 
-Good:
+Good, 31 words:
 
 ```markdown
-- The main menu lists your next three meetings, so you can open one with a single tap.
-  See [Main menu](../user-guide/main_menu.md#meetings).
-- On a meeting card, tap the address to open it in your maps app.
-  See [Where](../user-guide/create_a_meeting.md#where).
+- The [main menu](../user-guide/main_menu.md#meetings) lists your next three meetings, so you can
+  open one with a single tap.
+- Tap the address on a [meeting card](../user-guide/create_a_meeting.md#where) to open it in your
+  maps app.
 ```
 
-Bad:
+Bad, a recital of the release:
+
+```markdown
+- The main menu lists your next three meetings. Open one with a single tap. Meetings further ahead
+  are still under My meetings. See [Main menu](../user-guide/main_menu.md#meetings).
+- The address on a meeting card opens in your maps app, both for addresses typed by hand and for
+  pinned locations. See [Where](../user-guide/create_a_meeting.md#where).
+- Editing a meeting's title keeps its links, and a reminder for a meeting that is deleted
+  afterwards is cancelled, whichever way the meeting was deleted.
+```
+
+Every sentence in it is true, and it is still wrong: it runs to 73 words where 60 is the limit, its
+points take two and three sentences, it adds a sentence no fragment says ("Meetings further
+ahead..."), it lists the cases a change covers, it spends "See ..." sentences on links, and its
+last point joins two unrelated fixes nobody was running into.
+
+Bad, an announcement:
 
 ```markdown
 ### Highlights
 
 Huge update! Mitup now always shows your upcoming meetings instantly, we reworked how addresses
-are rendered (!812), fixed a bug in the title editor and upgraded our dependencies.
+are rendered (!812), and upgraded our dependencies.
 ```
 
-The bad one adds a heading to the table of contents, uses hype, an exclamation mark, absolutes the
-code does not prove and an MR number, names no screen, describes the work instead of what the user
-sees, and includes a fix nobody noticed and an internal change.
+It adds a heading to the table of contents, uses hype, an exclamation mark, absolutes the code does
+not prove and an MR number, names no screen, describes the work instead of what the user sees, and
+includes an internal change.
