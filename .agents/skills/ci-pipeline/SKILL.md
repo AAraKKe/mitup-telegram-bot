@@ -97,7 +97,7 @@ interruptible`), so a force-push cancels the superseded pipeline's runs. The dep
 | `linter` | `uv run mb lint` | `allow_failure` on the default branch |
 | `type-check` | `uv run mb typecheck` (project + `tools/mb`) | always |
 | `check-ty-ignores` | `uv run mb ci check-ty-ignores` — every `ty` suppression carries a live issue URL | MRs only, `allow_failure` |
-| `check-changelog` | `uv run mb ci check-changelog` (`tools/mb/src/mb/changelog_check.py`): every file in `changelog.d/` is a valid fragment name with a known type and is not empty, and the MR carries a fragment numbered after its own `CI_MERGE_REQUEST_IID`. Only release (`release/*`) MRs skip the own-number rule; a Renovate or Crowdin sync MR without a fragment fails like any other. An MR's first pipeline fails here until the fragment is pushed. See the `changelog` skill | MR pipelines only, merge trains included; blocking |
+| `check-changelog` | `uv run mb ci check-changelog` (`tools/mb/src/mb/changelog_check.py`): every file in `changelog.d/` is a valid fragment name with a known type and is not empty, and the MR carries a fragment numbered after its own `CI_MERGE_REQUEST_IID`. Only release (`release/*`) MRs skip the own-number rule; a Renovate or Crowdin sync MR without a fragment fails like any other. An MR's first pipeline fails here until the fragment is pushed. It also fails while `docs/whats-new/index.md` holds the `<!-- release-summary -->` placeholder, so a release MR stays red until its summary is written. See the `changelog` and `prepare-release` skills | MR pipelines only, merge trains included; blocking |
 | `validate-migrations` | `uv run mb db migrate validate` (single head, clean upgrade path) | always |
 | `check-import-isolation` | `uv run mb ci check-import-isolation` — each library imports with only its own declared deps | always |
 | `validate-ids` | `uv run mb locales validate-ids` — every message in code exists in the English catalog | always |
@@ -130,8 +130,11 @@ entries just ignore it since they localize nothing.
 
 ## Deploy flow (`deploy-config.yml`, `ecr-push.yml`, `deploy.yml`)
 
-Deployment targets the production account only and runs on **`v*` tag pipelines** — a release tag is
-cut with `uv run mb release`. Four images are deployed: **bot**, **events**, **migrations-lambda**,
+Deployment targets the production account only and runs on **`v*` tag pipelines**. A release takes
+two steps: `uv run mb release prepare` opens a `release/vX.Y.Z` MR that compiles the changelog fragments
+into `CHANGELOG.md` and the What's new page, and once it is merged `uv run mb release` tags the commit
+where it landed (the last one that changed `CHANGELOG.md`) and publishes that version's changelog
+section as the GitLab release. See the `prepare-release` skill. Four images are deployed: **bot**, **events**, **migrations-lambda**,
 and **alarm-action-lambda**.
 
 There is a single set of deploy jobs (no staging/prod pairs): they still carry
@@ -165,8 +168,8 @@ role.
 ## Manual jobs on `main` must carry `allow_failure: true`
 
 An unplayed `when: manual` job without `allow_failure: true` pins its pipeline's overall status at
-`manual` instead of `success` — and `mb release` refuses to cut a tag unless the latest `main`
-pipeline reports `success`. Every manual job on default-branch pipelines (`deploy:refresh`,
+`manual` instead of `success`, and `mb release` refuses to cut a tag unless the latest pipeline for
+the release commit on `main` reports `success`. Every manual job on default-branch pipelines (`deploy:refresh`,
 `build-docker-ci`'s fallback rule) therefore sets `allow_failure: true` on the manual rule. Apply
 the same to any new manual job.
 

@@ -117,3 +117,18 @@ def test_outside_a_merge_request_only_names_are_checked(
 
     assert exit_code == 0
     assert "Not a merge request pipeline" in output
+
+
+@pytest.mark.usefixtures("merge_request")
+def test_fails_while_the_whats_new_page_holds_the_summary_placeholder(
+    repo_root: Path, capsys: pytest.CaptureFixture[str]
+):
+    write_fragments(repo_root, "790.fix.md")
+    whats_new = repo_root / changelog_check.WHATS_NEW_PAGE
+    whats_new.parent.mkdir(parents=True)
+    whats_new.write_text(f"## v3.0.0\n\n{changelog_check.RELEASE_SUMMARY_PLACEHOLDER}\n")
+
+    exit_code, output = run_check(repo_root, capsys)
+
+    assert exit_code == 1
+    assert f"{changelog_check.WHATS_NEW_PAGE} still holds {changelog_check.RELEASE_SUMMARY_PLACEHOLDER}" in output

@@ -1,4 +1,6 @@
 import json
+from datetime import date
+from pathlib import Path
 
 import pytest
 from command_recording import CommandRecorder
@@ -10,6 +12,24 @@ from mb import release, runner
 cli = CliRunner()
 
 TAG_PIPELINE_URL = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/pipelines/42"
+MR_URL = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/merge_requests"
+HEAD = "abc123def456"
+RELEASE_MR_URL = f"{MR_URL}/800"
+WHATS_NEW_PAGE = (
+    "# What's new\n\nIntro.\n\n<!-- releases -->\n\n## v1.2.3\n\n_1 November 2026_\n\nYou can pin meetings.\n"
+)
+COMPILED_CHANGELOG = (
+    "# Changelog\n\n<!-- towncrier release notes start -->\n\n## v2.0.0 (2026-11-14)\n\n### New\n\n"
+    f"- You can open What's new from the main menu. ([!790]({MR_URL}/790))\n\n### Under the hood\n\n"
+    f"- CI images are pinned to a digest. ([!775]({MR_URL}/775))\n\n## v1.2.3 (2026-11-01)\n\n### Fixed\n\n"
+    f"- Reminders arrive on time. ([!12]({MR_URL}/12))\n"
+)
+
+
+class FixedDate(date):
+    @classmethod
+    def today(cls) -> FixedDate:
+        return cls(2026, 11, 14)
 
 
 @pytest.fixture(autouse=True)
@@ -25,64 +45,311 @@ def no_poll_sleep(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
 
 
-def green_repo(recorder: CommandRecorder, *, tags: str = "v1.2.3\n", head: str = "abc123def456") -> CommandRecorder:
-    """Prime the recorder with a green origin/main tip at *head*.
-
-    The pre-release green check filters pipelines by `sha`; the post-push watch filters by `ref`, so
-    the two queries are keyed separately — a test can override one without disturbing the other.
-    *tags* are served as origin's `ls-remote` listing, each with its peeled `^{}` companion line.
-    """
-    listing = "".join(
+def tag_listing(tags: str) -> str:
+    """Origin's `ls-remote` listing for *tags*, each with its peeled `^{}` companion line."""
+    return "".join(
         f"cafe{index:04x}\trefs/tags/{tag}\ncafe{index:04x}\trefs/tags/{tag}^{{}}\n"
         for index, tag in enumerate(tags.split())
     )
+
+
+def prepared_changelog(version: str) -> str:
+    return (
+        f"# Changelog\n\n<!-- towncrier release notes start -->\n\n## {version} (2026-11-14)\n\n### Fixed\n\n"
+        f"- Reminders arrive on time. ([!34]({MR_URL}/34))\n\n## v1.2.3 (2026-11-01)\n\n### Fixed\n\n- Old.\n"
+    )
+
+
+def green_repo(
+    recorder: CommandRecorder, *, version: str = "v1.2.4", tags: str = "v1.2.3\n", head: str = HEAD
+) -> CommandRecorder:
+    """Prime the recorder with *version* prepared on origin/main and landed at the green commit *head*.
+
+    The pre-release green check filters pipelines by `sha`; the post-push watch filters by `ref`, so
+    the two queries are keyed separately and a test can override one without disturbing the other.
+    """
     recorder.captured_outputs.update(
         {
-            "rev-parse origin/main": head,
+            "show origin/main:CHANGELOG.md": prepared_changelog(version),
+            "log -1 --format=%H": head,
+            "rev-list --count": "0",
+            f"show {head}:docs/whats-new/index.md": f"<!-- releases -->\n\n## {version}\n\nYou can pin meetings.\n",
             "pipelines?sha=": json.dumps([{"id": 7, "status": "success"}]),
             "pipelines?ref=": json.dumps([{"id": 42, "status": "created", "web_url": TAG_PIPELINE_URL}]),
-            "ls-remote --tags": listing,
+            "ls-remote --tags": tag_listing(tags),
         }
     )
     return recorder
 
 
-def test_release_tags_and_pushes_next_patch(recorder: CommandRecorder):
+def pending_repo(recorder: CommandRecorder, *fragments: str, tags: str = "v1.2.3\n") -> CommandRecorder:
+    """Prime the recorder with *fragments* pending at origin/main and v1.2.3 as the newest released version."""
+    recorder.captured_outputs.update(
+        {
+            "rev-parse origin/main": HEAD,
+            "ls-tree --name-only": "".join(f"changelog.d/{name}\n" for name in ("README.md", *fragments)),
+            f"show {HEAD}:changelog.d/": "A fragment users can read.",
+            f"show {HEAD}:CHANGELOG.md": "# Changelog\n\n<!-- towncrier release notes start -->\n",
+            f"show {HEAD}:docs/whats-new/index.md": WHATS_NEW_PAGE,
+            "mr create": f"{RELEASE_MR_URL}\n",
+            "ls-remote --tags": tag_listing(tags),
+        }
+    )
+    return recorder
+
+
+@pytest.fixture
+def written_pages(recorder: CommandRecorder, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Back `git worktree add` with a real checkout holding the compiled CHANGELOG.md, and collect the What's
+    new page as each `git commit` sees it."""
+    pages: list[str] = []
+
+    def run_quiet(
+        args: list[str], *, cwd: Path | None = None, extra_env: dict[str, str] | None = None
+    ) -> tuple[int, str]:
+        if args[:3] == ["git", "worktree", "add"]:
+            checkout = Path(args[4])
+            (checkout / "docs" / "whats-new").mkdir(parents=True)
+            (checkout / "CHANGELOG.md").write_text(COMPILED_CHANGELOG)
+        if args[:2] == ["git", "commit"] and cwd is not None:
+            pages.append((cwd / release.WHATS_NEW_PAGE).read_text())
+        return recorder.run_quiet(args, cwd=cwd, extra_env=extra_env)
+
+    monkeypatch.setattr(runner, "run_quiet", run_quiet)
+    monkeypatch.setattr(release, "date", FixedDate)
+    return pages
+
+
+def ran(recorder: CommandRecorder, prefix: list[str]) -> bool:
+    return any(command[: len(prefix)] == prefix for command in recorder.commands)
+
+
+# --- mb release prepare ---
+
+
+@pytest.mark.parametrize(
+    ("fragments", "expected_version"),
+    [
+        (["12.feature.md", "13.fix.md"], "v2.0.0"),
+        (["12.removal.md"], "v2.0.0"),
+        (["12.change.md", "13.internal.md"], "v1.3.0"),
+        (["12.fix.md", "13.internal.md"], "v1.2.4"),
+        (["12.internal.md"], "v1.2.4"),
+    ],
+)
+def test_prepare_computes_the_version_from_the_fragment_types(
+    recorder: CommandRecorder, fragments: list[str], expected_version: str
+):
+    pending_repo(recorder, *fragments)
+
+    result = cli.invoke(app, ["release", "prepare"])
+
+    assert f"Version to prepare: {expected_version}" in result.output
+
+
+def test_prepare_shows_the_plan_and_changes_nothing_without_confirmation(recorder: CommandRecorder):
+    pending_repo(recorder, "12.change.md", "13.fix.md", "14.internal.md")
+
+    result = cli.invoke(app, ["release", "prepare"])
+
+    assert result.exit_code != 0
+    assert "Previous version: v1.2.3" in result.output
+    assert "Version to prepare: v1.3.0 (minor)" in result.output
+    assert "Pending fragments: 0 feature, 0 removal, 1 change, 1 fix, 1 internal" in result.output
+    assert "  12.change.md: A fragment users can read." in result.output
+    assert "13.fix.md" not in result.output
+    assert not ran(recorder, ["git", "worktree"])
+    assert not ran(recorder, ["git", "push"])
+    assert not ran(recorder, ["glab", "mr"])
+
+
+@pytest.mark.parametrize(
+    ("flag", "fragment", "expected"),
+    [
+        ("--patch", "12.feature.md", "The fragments call for v2.0.0 (major); the flag chooses v1.2.4."),
+        ("--minor", "12.fix.md", "The fragments call for v1.2.4 (patch); the flag chooses v1.3.0."),
+        ("--major", "12.change.md", "The fragments call for v1.3.0 (minor); the flag chooses v2.0.0."),
+    ],
+)
+def test_prepare_flag_overrides_the_computed_version(
+    recorder: CommandRecorder, flag: str, fragment: str, expected: str
+):
+    pending_repo(recorder, fragment)
+
+    result = cli.invoke(app, ["release", "prepare", flag])
+
+    assert expected in result.output
+
+
+def test_prepare_aborts_without_pending_fragments(recorder: CommandRecorder):
+    pending_repo(recorder)
+
+    result = cli.invoke(app, ["release", "prepare", "--yes"])
+
+    assert result.exit_code != 0
+    assert "there is nothing to release" in result.output
+    assert not ran(recorder, ["git", "worktree"])
+
+
+@pytest.mark.parametrize("flags", [["--minor", "--major"], ["--patch", "--minor"], ["--patch", "--major"]])
+def test_prepare_rejects_combined_bump_flags(recorder: CommandRecorder, flags: list[str]):
+    pending_repo(recorder, "12.fix.md")
+
+    result = cli.invoke(app, ["release", "prepare", *flags])
+
+    assert result.exit_code != 0
+    assert "at most one of --patch/--minor/--major" in result.output
+    assert not recorder.commands
+
+
+def test_prepare_refuses_while_a_prepared_version_is_untagged(recorder: CommandRecorder):
+    pending_repo(recorder, "12.fix.md")
+    recorder.captured_outputs[f"show {HEAD}:CHANGELOG.md"] = prepared_changelog("v1.2.4")
+
+    result = cli.invoke(app, ["release", "prepare", "--yes"])
+
+    assert result.exit_code != 0
+    assert "v1.2.4 is prepared but not tagged: run `uv run mb release` first." in result.output
+    assert not ran(recorder, ["git", "worktree"])
+
+
+@pytest.mark.parametrize(
+    ("exit_code", "page", "expected_message"),
+    [
+        (1, "", "Commit abc123de has no docs/whats-new/index.md."),
+        (0, "# What's new\n", "docs/whats-new/index.md has no `<!-- releases -->` line"),
+    ],
+    ids=["missing-page", "missing-marker"],
+)
+def test_prepare_refuses_a_whats_new_page_it_cannot_extend(
+    recorder: CommandRecorder, exit_code: int, page: str, expected_message: str
+):
+    pending_repo(recorder, "12.fix.md")
+    recorder.exit_codes[f"show {HEAD}:docs/whats-new/index.md"] = exit_code
+    recorder.captured_outputs[f"show {HEAD}:docs/whats-new/index.md"] = page
+
+    result = cli.invoke(app, ["release", "prepare", "--yes"])
+
+    assert result.exit_code != 0
+    assert expected_message in result.output
+    assert not ran(recorder, ["git", "worktree"])
+
+
+def test_prepare_commits_the_release_on_a_branch_and_opens_the_merge_request(
+    recorder: CommandRecorder, written_pages: list[str]
+):
+    pending_repo(recorder, "790.feature.md", "775.internal.md")
+
+    result = cli.invoke(app, ["release", "prepare", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    towncrier = next(call for call in recorder.calls if "towncrier" in call.args)
+    checkout = towncrier.cwd
+    assert checkout is not None
+    assert towncrier.args[2:] == ["towncrier", "build", "--version", "v2.0.0", "--date", "2026-11-14", "--yes"]
+    assert ["git", "worktree", "add", "--detach", str(checkout), HEAD] in recorder.commands
+    assert ["git", "commit", "--no-verify", "--message", "⚙️ Release v2.0.0"] in recorder.commands
+    assert ["git", "push", "--no-verify", "origin", "HEAD:refs/heads/release/v2.0.0"] in recorder.commands
+    assert ["git", "worktree", "remove", "--force", str(checkout)] in recorder.commands
+    merge_request = next(command for command in recorder.commands if command[:3] == ["glab", "mr", "create"])
+    assert merge_request[merge_request.index("--source-branch") + 1] == "release/v2.0.0"
+    assert merge_request[merge_request.index("--title") + 1] == "⚙️ Release v2.0.0"
+    assert "uv run mb release" in merge_request[merge_request.index("--description") + 1]
+    assert RELEASE_MR_URL in result.output
+    assert written_pages == [
+        "# What's new\n\nIntro.\n\n<!-- releases -->\n\n## v2.0.0\n\n_14 November 2026_\n\n"
+        '<!-- release-summary -->\n\n??? note "Full changelog"\n\n    **New**\n\n'
+        f"    - You can open What's new from the main menu. ([!790]({MR_URL}/790))\n\n    **Under the hood**\n\n"
+        f"    - CI images are pinned to a digest. ([!775]({MR_URL}/775))\n\n"
+        "## v1.2.3\n\n_1 November 2026_\n\nYou can pin meetings.\n"
+    ]
+
+
+@pytest.mark.usefixtures("written_pages")
+def test_prepare_removes_the_temporary_checkout_when_a_step_fails(recorder: CommandRecorder):
+    pending_repo(recorder, "12.fix.md")
+    recorder.exit_codes["towncrier"] = 1
+
+    result = cli.invoke(app, ["release", "prepare", "--yes"])
+
+    assert result.exit_code != 0
+    assert ran(recorder, ["git", "worktree", "remove", "--force"])
+    assert not ran(recorder, ["git", "push"])
+    assert not ran(recorder, ["glab", "mr"])
+
+
+def test_prepare_ignores_non_semver_tags(recorder: CommandRecorder):
+    pending_repo(recorder, "12.fix.md", tags="v1.0\nvnightly\nv2.4.9\nv2.4.10\n")
+
+    result = cli.invoke(app, ["release", "prepare"])
+
+    assert "Version to prepare: v2.4.11" in result.output
+
+
+def test_prepare_reads_the_previous_version_from_origin_not_local_tags(recorder: CommandRecorder):
+    pending_repo(recorder, "12.fix.md")  # origin knows v1.2.3 only
+    recorder.captured_outputs["tag --list"] = "v1.2.3\nv9.9.9\n"
+
+    result = cli.invoke(app, ["release", "prepare"])
+
+    assert ["git", "ls-remote", "--tags", "origin", "v*"] in recorder.commands
+    assert "Version to prepare: v1.2.4" in result.output
+
+
+# --- mb release ---
+
+
+def test_release_tags_and_pushes_the_prepared_version(recorder: CommandRecorder):
     green_repo(recorder)
 
     result = cli.invoke(app, ["release"])
 
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert ["git", "fetch", "--tags", "origin"] in recorder.commands
-    assert ["git", "tag", "-a", "v1.2.4", "abc123def456", "-m", "v1.2.4"] in recorder.commands
+    assert ["git", "tag", "-a", "v1.2.4", HEAD, "-m", "v1.2.4"] in recorder.commands
     assert ["git", "push", "origin", "v1.2.4"] in recorder.commands
     assert ["glab", "api", "projects/:id/pipelines?ref=v1.2.4"] in recorder.commands
     assert "Released v1.2.4" in result.output
     assert f"Deploy pipeline started: {TAG_PIPELINE_URL}" in result.output
 
 
-def test_release_patch_bump(recorder: CommandRecorder):
+def test_release_tags_the_commit_that_last_changed_the_changelog(recorder: CommandRecorder):
+    green_repo(recorder, head="c4a9e1f00000")
+    recorder.captured_outputs["rev-list --count"] = "2"
+
+    result = cli.invoke(app, ["release"])
+
+    assert ["git", "log", "-1", "--format=%H", "origin/main", "--", "CHANGELOG.md"] in recorder.commands
+    assert ["glab", "api", "projects/:id/pipelines?sha=c4a9e1f00000"] in recorder.commands
+    assert ["git", "tag", "-a", "v1.2.4", "c4a9e1f00000", "-m", "v1.2.4"] in recorder.commands
+    assert "origin/main has 2 commits after c4a9e1f0; they ship in the next release." in result.output
+
+
+@pytest.mark.parametrize(
+    ("outputs", "expected_message"),
+    [
+        pytest.param({"ls-remote --tags": tag_listing("v1.2.3 v1.2.4")}, "Nothing is prepared", id="already-tagged"),
+        pytest.param(
+            {f"show {HEAD}:docs/whats-new/index.md": "<!-- releases -->\n\n## v1.2.3\n"},
+            "docs/whats-new/index.md at abc123de has no section for v1.2.4.",
+            id="no-whats-new-section",
+        ),
+        pytest.param(
+            {f"show {HEAD}:docs/whats-new/index.md": "<!-- releases -->\n\n## v1.2.4\n\n<!-- release-summary -->\n"},
+            "still holds <!-- release-summary -->",
+            id="summary-not-written",
+        ),
+    ],
+)
+def test_release_refuses_an_unready_release(recorder: CommandRecorder, outputs: dict[str, str], expected_message: str):
     green_repo(recorder)
+    recorder.captured_outputs.update(outputs)
 
-    cli.invoke(app, ["release", "--patch"])
+    result = cli.invoke(app, ["release"])
 
-    assert ["git", "tag", "-a", "v1.2.4", "abc123def456", "-m", "v1.2.4"] in recorder.commands
-
-
-def test_release_minor_bump(recorder: CommandRecorder):
-    green_repo(recorder)
-
-    cli.invoke(app, ["release", "--minor"])
-
-    assert ["git", "tag", "-a", "v1.3.0", "abc123def456", "-m", "v1.3.0"] in recorder.commands
-
-
-def test_release_major_bump(recorder: CommandRecorder):
-    green_repo(recorder)
-
-    cli.invoke(app, ["release", "--major"])
-
-    assert ["git", "tag", "-a", "v2.0.0", "abc123def456", "-m", "v2.0.0"] in recorder.commands
+    assert result.exit_code != 0
+    assert expected_message in result.output
+    assert not ran(recorder, ["git", "tag"])
 
 
 RELEASE_POST_PREFIX = ["glab", "api", "-X", "POST", "projects/:id/releases"]
@@ -95,16 +362,19 @@ def release_create_call(recorder: CommandRecorder) -> list[str]:
     return calls[0]
 
 
-def release_notes_field(call: list[str]) -> str:
-    """The notes carried by a release-creation POST (its `description=` form field)."""
-    prefix = "description="
-    return next(argument for argument in call if argument.startswith(prefix)).removeprefix(prefix)
+def test_release_description_is_the_changelog_section(recorder: CommandRecorder):
+    green_repo(recorder)
+
+    cli.invoke(app, ["release"])
+
+    call = release_create_call(recorder)
+    assert f"description=### Fixed\n\n- Reminders arrive on time. ([!34]({MR_URL}/34))" in call
 
 
 def test_release_opens_runway_and_current_milestones(recorder: CommandRecorder):
-    green_repo(recorder)  # latest tag v1.2.3; a minor release cuts v1.3.0
+    green_repo(recorder, version="v1.3.0")
 
-    cli.invoke(app, ["release", "--minor"])
+    cli.invoke(app, ["release"])
 
     # The runway milestone is two minors ahead; the released version's own milestone is opened too.
     assert ["glab", "milestone", "create", "--title", "v1.5.0"] in recorder.commands
@@ -112,132 +382,80 @@ def test_release_opens_runway_and_current_milestones(recorder: CommandRecorder):
 
 
 def test_release_patch_opens_no_milestone(recorder: CommandRecorder):
-    green_repo(recorder)  # latest tag v1.2.3; a default (patch) release cuts v1.2.4
+    green_repo(recorder)
 
     cli.invoke(app, ["release"])
 
-    assert not any(command[:3] == ["glab", "milestone", "create"] for command in recorder.commands)
+    assert not ran(recorder, ["glab", "milestone", "create"])
     assert not any(argument.startswith("milestones[]=") for argument in release_create_call(recorder))
-    assert not any("PUT" in command for command in recorder.commands)
+    assert not any(
+        argument.startswith("projects/:id/merge_requests/") for command in recorder.commands for argument in command
+    )
 
 
 def test_release_major_opens_runway_two_majors_ahead(recorder: CommandRecorder):
-    green_repo(recorder)
+    green_repo(recorder, version="v2.0.0")
 
-    cli.invoke(app, ["release", "--major"])  # v1.2.3 -> v2.0.0
+    cli.invoke(app, ["release"])
 
     assert ["glab", "milestone", "create", "--title", "v4.0.0"] in recorder.commands
     assert ["glab", "milestone", "create", "--title", "v2.0.0"] in recorder.commands
 
 
 def test_release_skips_a_milestone_that_already_exists(recorder: CommandRecorder):
-    green_repo(recorder)
+    green_repo(recorder, version="v1.3.0")
     recorder.captured_outputs["milestones?title=v1.5.0"] = json.dumps([{"title": "v1.5.0"}])
 
-    result = cli.invoke(app, ["release", "--minor"])
+    result = cli.invoke(app, ["release"])
 
     assert "Milestone v1.5.0 already exists" in result.output
     assert ["glab", "milestone", "create", "--title", "v1.5.0"] not in recorder.commands
 
 
 def test_release_milestone_queries_include_ancestor_group_milestones(recorder: CommandRecorder):
-    green_repo(recorder)
+    green_repo(recorder, version="v1.3.0")
 
-    cli.invoke(app, ["release", "--minor"])
+    cli.invoke(app, ["release"])
 
     assert ["glab", "api", "projects/:id/milestones?title=v1.3.0&include_parent_milestones=true"] in recorder.commands
 
 
 def test_release_reuses_an_existing_group_milestone_instead_of_creating_it(recorder: CommandRecorder):
-    green_repo(recorder)
+    green_repo(recorder, version="v1.3.0")
     # GitLab rejects a project milestone shadowing a group one, so the group milestone must be
     # detected as existing and carried onto the release as-is.
     recorder.captured_outputs["milestones?title=v1.3.0"] = json.dumps([{"title": "v1.3.0", "id": 66, "group_id": 9}])
 
-    cli.invoke(app, ["release", "--minor"])
+    cli.invoke(app, ["release"])
 
     assert ["glab", "milestone", "create", "--title", "v1.3.0"] not in recorder.commands
     assert "milestones[]=v1.3.0" in release_create_call(recorder)
 
 
 def test_release_creates_gitlab_release_titled_and_milestoned_with_the_tag(recorder: CommandRecorder):
-    green_repo(recorder)
+    green_repo(recorder, version="v1.3.0")
 
-    cli.invoke(app, ["release", "--minor"])
+    cli.invoke(app, ["release"])
 
     call = release_create_call(recorder)
     assert "tag_name=v1.3.0" in call
     assert "name=v1.3.0" in call
     assert "milestones[]=v1.3.0" in call
-    # Never a ref: with only tag_name, GitLab can only attach the release to the pushed tag —
-    # a stale replica fails the POST instead of attempting to create the protected tag.
-    assert not any("ref" in argument for argument in call)
-
-
-def test_release_notes_list_merge_requests_since_the_previous_tag(recorder: CommandRecorder):
-    green_repo(recorder)
-    recorder.captured_outputs["log --format"] = "Ship the widget (!34)\n\x00Merge (!12) into main\n\x00"
-    recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
-    recorder.captured_outputs["merge_requests/12"] = json.dumps({"iid": 12, "title": "Fix the gadget"})
-
-    cli.invoke(app, ["release"])
-
-    call = release_create_call(recorder)
-    assert release_notes_field(call) == "- [!34] Add the widget\n- [!12] Fix the gadget"
-    assert ["glab", "api", "projects/:id/merge_requests/34"] in recorder.commands
-
-
-def test_release_notes_dedupe_references_and_drop_unfetchable_titles(recorder: CommandRecorder):
-    green_repo(recorder)
-    # !34 is referenced twice (deduplicated); !12 cannot be fetched, so it is dropped.
-    recorder.captured_outputs["log --format"] = "Ship it (!34)\n\x00Merge (!12) into main\n\x00Follow-up (!34)\n\x00"
-    recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
-    recorder.exit_codes["merge_requests/12"] = 1
-
-    cli.invoke(app, ["release"])
-
-    call = release_create_call(recorder)
-    assert release_notes_field(call) == "- [!34] Add the widget"
-
-
-def test_release_notes_count_one_merge_request_per_commit(recorder: CommandRecorder):
-    green_repo(recorder)
-    # A feature-branch squash embeds the messages of the commits it squashed, each with its own MR.
-    feature_squash = (
-        "Rebuild the bot on rich messages (!70)\n\nSee merge request group/project!70\n\n"
-        "Commits squashed (max 100):\n\n* Add the payload layer (!66)\n\nSee merge request group/project!66\n\n"
-        "* Rebuild the card (!68)\n\nSee merge request group/project!68\n"
-    )
-    recorder.captured_outputs["log --format"] = feature_squash + "\x00Fix the gadget (!12)\n\x00"
-    recorder.captured_outputs["merge_requests/70"] = json.dumps({"iid": 70, "title": "Rebuild the bot on rich"})
-    recorder.captured_outputs["merge_requests/12"] = json.dumps({"iid": 12, "title": "Fix the gadget"})
-
-    cli.invoke(app, ["release"])
-
-    call = release_create_call(recorder)
-    assert release_notes_field(call) == "- [!70] Rebuild the bot on rich\n- [!12] Fix the gadget"
-    assert ["glab", "api", "projects/:id/merge_requests/66"] not in recorder.commands
-
-
-def test_release_notes_are_empty_when_no_merge_requests_shipped(recorder: CommandRecorder):
-    green_repo(recorder)
-    recorder.captured_outputs["log --format"] = "A direct push with no MR reference\n"
-
-    cli.invoke(app, ["release"])
-
-    call = release_create_call(recorder)
-    assert release_notes_field(call) == ""
+    # Never a ref: with only tag_name, GitLab can only attach the release to the pushed tag, so a
+    # stale replica fails the POST instead of attempting to create the protected tag.
+    assert not any(argument.startswith("ref=") for argument in call)
 
 
 def test_release_publishes_without_a_milestone_when_it_cannot_be_opened(recorder: CommandRecorder):
-    green_repo(recorder)
+    green_repo(recorder, version="v1.3.0")
     recorder.exit_codes["milestone create --title v1.3.0"] = 1  # the released version's own milestone
 
-    result = cli.invoke(app, ["release", "--minor"])
+    result = cli.invoke(app, ["release"])
 
     assert result.exit_code == 0
     assert "Could not open milestone v1.3.0" in result.output
     assert not any(argument.startswith("milestones[]=") for argument in release_create_call(recorder))
+    assert not any("PUT" in command for command in recorder.commands)
     assert "Released v1.3.0" in result.output
 
 
@@ -272,31 +490,34 @@ def test_release_warns_but_still_publishes_when_the_tag_never_registers(recorder
 
 
 def test_release_milestones_shipped_mrs_and_leaves_manual_assignments(recorder: CommandRecorder):
-    green_repo(recorder)
-    recorder.captured_outputs["log --format"] = "Ship the widget (!34)\n\x00Merge (!12) into main\n\x00"
+    green_repo(recorder, version="v1.3.0")
+    recorder.captured_outputs["log --format"] = "Ship the widget (!34)\n\x00Merge (!12) into main\n\x00Gone (!13)\n\x00"
     recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
     recorder.captured_outputs["merge_requests/12"] = json.dumps(
         {"iid": 12, "title": "Fix the gadget", "milestone": {"title": "v9.9.9"}}
     )
+    recorder.exit_codes["merge_requests/13"] = 1
     recorder.captured_outputs["milestones?title=v1.3.0"] = json.dumps([{"title": "v1.3.0", "id": 77}])
 
-    result = cli.invoke(app, ["release", "--minor"])
+    result = cli.invoke(app, ["release"])
 
     assert result.exit_code == 0
+    assert ["git", "log", "--format=%B%x00", f"v1.2.3..{HEAD}"] in recorder.commands
     assert ["glab", "api", "-X", "PUT", "projects/:id/merge_requests/34", "-f", "milestone_id=77"] in recorder.commands
     assert "Assigned v1.3.0 to !34 Add the widget" in result.output
-    # !12 was milestoned by hand (to a later version); the sweep must not overwrite it.
+    # !12 was milestoned by hand (to a later version) and !13 cannot be fetched; neither is touched.
     assert not any("PUT" in command and "merge_requests/12" in " ".join(command) for command in recorder.commands)
+    assert not any("PUT" in command and "merge_requests/13" in " ".join(command) for command in recorder.commands)
     assert "!12 already belongs to v9.9.9; leaving it" in result.output
 
 
 def test_release_sweep_warns_when_the_milestone_id_cannot_be_resolved(recorder: CommandRecorder):
-    green_repo(recorder)
+    green_repo(recorder, version="v1.3.0")
     recorder.captured_outputs["log --format"] = "Ship the widget (!34)\n"
     recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
     recorder.captured_outputs["milestones?title=v1.3.0"] = json.dumps([{"title": "v1.3.0"}])  # id missing
 
-    result = cli.invoke(app, ["release", "--minor"])
+    result = cli.invoke(app, ["release"])
 
     assert result.exit_code == 0
     assert "Could not resolve the id of milestone v1.3.0" in result.output
@@ -304,14 +525,14 @@ def test_release_sweep_warns_when_the_milestone_id_cannot_be_resolved(recorder: 
 
 
 def test_release_sweep_warns_but_continues_when_an_assignment_fails(recorder: CommandRecorder):
-    green_repo(recorder)
+    green_repo(recorder, version="v1.3.0")
     recorder.captured_outputs["log --format"] = "Ship it (!34)\n\x00Fix it (!35)\n\x00"
     recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
     recorder.captured_outputs["merge_requests/35"] = json.dumps({"iid": 35, "title": "Polish the widget"})
     recorder.captured_outputs["milestones?title=v1.3.0"] = json.dumps([{"title": "v1.3.0", "id": 77}])
     recorder.exit_codes["-X PUT projects/:id/merge_requests/34"] = 1
 
-    result = cli.invoke(app, ["release", "--minor"])
+    result = cli.invoke(app, ["release"])
 
     assert result.exit_code == 0
     assert "Could not assign v1.3.0 to !34" in result.output
@@ -319,16 +540,16 @@ def test_release_sweep_warns_but_continues_when_an_assignment_fails(recorder: Co
     assert "Released v1.3.0" in result.output
 
 
-def test_release_skips_the_sweep_when_the_milestone_could_not_be_opened(recorder: CommandRecorder):
-    green_repo(recorder)
-    recorder.captured_outputs["log --format"] = "Ship it (!34)\n"
-    recorder.captured_outputs["merge_requests/34"] = json.dumps({"iid": 34, "title": "Add the widget"})
-    recorder.exit_codes["milestone create --title v1.3.0"] = 1
+def test_merge_request_ids_count_one_merge_request_per_commit(recorder: CommandRecorder):
+    # A feature-branch squash embeds the messages of the commits it squashed, each with its own MR,
+    # and a merge request referenced by two commits counts once.
+    feature_squash = (
+        "Rebuild the bot on rich messages (!70)\n\nSee merge request group/project!70\n\n"
+        "Commits squashed (max 100):\n\n* Add the payload layer (!66)\n\nSee merge request group/project!66\n"
+    )
+    recorder.captured_outputs["log --format"] = feature_squash + "\x00Fix the gadget (!12)\n\x00Follow-up (!70)\n\x00"
 
-    result = cli.invoke(app, ["release", "--minor"])
-
-    assert result.exit_code == 0
-    assert not any("PUT" in command for command in recorder.commands)
+    assert release.merge_request_ids("v1.2.3", HEAD) == [70, 12]
 
 
 def test_create_release_retries_until_the_tag_registers(monkeypatch: pytest.MonkeyPatch):
@@ -341,7 +562,6 @@ def test_create_release_retries_until_the_tag_registers(monkeypatch: pytest.Monk
         return next(responses)
 
     monkeypatch.setattr(runner, "run_quiet", fake_run_quiet)
-    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
 
     release.create_release("v1.2.4", "notes", None)
 
@@ -360,48 +580,8 @@ def test_milestone_exists_is_false_when_the_query_fails(monkeypatch: pytest.Monk
     assert release.milestone_exists("v1.0.0") is False
 
 
-def test_release_first_ever_tag_is_v0_1_0(recorder: CommandRecorder):
-    green_repo(recorder, tags="")
-
-    cli.invoke(app, ["release"])
-
-    assert ["git", "tag", "-a", "v0.1.0", "abc123def456", "-m", "v0.1.0"] in recorder.commands
-
-
-def test_release_ignores_non_semver_tags(recorder: CommandRecorder):
-    green_repo(recorder, tags="v1.0\nvnightly\nv2.4.9\nv2.4.10\n")
-
-    cli.invoke(app, ["release"])
-
-    assert ["git", "tag", "-a", "v2.4.11", "abc123def456", "-m", "v2.4.11"] in recorder.commands
-
-
-def test_release_reads_the_previous_version_from_origin_not_local_tags(recorder: CommandRecorder):
-    green_repo(recorder)  # origin knows v1.2.3 only
-    # A stray local-only tag at a higher version must not shift the changelog range.
-    recorder.captured_outputs["tag --list"] = "v1.2.3\nv9.9.9\n"
-
-    cli.invoke(app, ["release"])
-
-    assert ["git", "ls-remote", "--tags", "origin", "v*"] in recorder.commands
-    assert ["git", "tag", "-a", "v1.2.4", "abc123def456", "-m", "v1.2.4"] in recorder.commands
-
-
-@pytest.mark.parametrize("flags", [["--minor", "--major"], ["--patch", "--minor"], ["--patch", "--major"]])
-def test_release_rejects_combined_bump_flags(recorder: CommandRecorder, flags: list[str]):
-    green_repo(recorder)
-
-    result = cli.invoke(app, ["release", *flags])
-
-    assert result.exit_code != 0
-    assert "at most one of --patch/--minor/--major" in result.output
-    # The conflict aborts before the fetch, so no git or glab command runs at all.
-    assert not recorder.commands
-
-
 def test_release_tags_origin_main_regardless_of_local_state(recorder: CommandRecorder):
-    green_repo(recorder)
-    recorder.captured_outputs["rev-parse origin/main"] = "999fedcba000"
+    green_repo(recorder, head="999fedcba000")
     # A dirty tree, untracked files, and a feature branch must not influence the release.
     recorder.captured_outputs["status --porcelain"] = " M tools/mb/src/mb/release.py\n?? scratch.txt"
     recorder.captured_outputs["rev-parse --abbrev-ref HEAD"] = "feature-branch"
@@ -462,14 +642,12 @@ def test_release_falls_back_to_pipelines_listing_when_no_pipeline_starts(recorde
 def test_pipeline_url_for_ref_waits_until_a_pipeline_appears(monkeypatch: pytest.MonkeyPatch):
     responses = iter(["[]", json.dumps([{"id": 5, "status": "created", "web_url": "https://x/5"}])])
     monkeypatch.setattr(runner, "run_quiet", lambda args, **kwargs: (0, next(responses)))
-    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
 
     assert release.pipeline_url_for_ref("v1.2.4") == "https://x/5"
 
 
 def test_pipeline_url_for_ref_gives_up_after_the_poll_budget(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(runner, "run_quiet", lambda args, **kwargs: (0, "[]"))
-    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
 
     assert release.pipeline_url_for_ref("v1.2.4") is None
 
@@ -479,7 +657,6 @@ def test_pipeline_url_for_ref_retries_past_a_failed_or_unparseable_poll(monkeypa
         [(1, "boom"), (0, "not-json"), (0, json.dumps([{"id": 5, "status": "created", "web_url": "https://x/5"}]))]
     )
     monkeypatch.setattr(runner, "run_quiet", lambda args, **kwargs: next(responses))
-    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
 
     assert release.pipeline_url_for_ref("v1.2.4") == "https://x/5"
 
@@ -495,15 +672,14 @@ def test_wait_for_tag_requires_consecutive_consistent_reads(monkeypatch: pytest.
         return next(responses)
 
     monkeypatch.setattr(runner, "run_quiet", fake_run_quiet)
-    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
 
     assert release.wait_for_tag("v1.2.4") is True
     assert len(calls) == 1 + release.TAG_POLL_CONSECUTIVE_SUCCESSES
 
 
 def test_wait_for_tag_resets_the_streak_on_a_stale_read(monkeypatch: pytest.MonkeyPatch):
-    """A failed read between successes restarts the consecutive count — one hit on a fresh replica
-    while others are stale must not release the poll early."""
+    """A failed read between successes restarts the consecutive count, so one hit on a fresh replica
+    while others are stale does not release the poll early."""
     found = (0, json.dumps({"name": "v1.2.4"}))
     responses = iter([found, (1, "404"), *([found] * release.TAG_POLL_CONSECUTIVE_SUCCESSES)])
     calls: list[list[str]] = []
@@ -513,7 +689,6 @@ def test_wait_for_tag_resets_the_streak_on_a_stale_read(monkeypatch: pytest.Monk
         return next(responses)
 
     monkeypatch.setattr(runner, "run_quiet", fake_run_quiet)
-    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
 
     assert release.wait_for_tag("v1.2.4") is True
     assert len(calls) == 2 + release.TAG_POLL_CONSECUTIVE_SUCCESSES
@@ -521,7 +696,6 @@ def test_wait_for_tag_resets_the_streak_on_a_stale_read(monkeypatch: pytest.Monk
 
 def test_wait_for_tag_gives_up_after_the_poll_budget(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(runner, "run_quiet", lambda args, **kwargs: (1, "404"))
-    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
 
     assert release.wait_for_tag("v1.2.4") is False
 
@@ -529,7 +703,12 @@ def test_wait_for_tag_gives_up_after_the_poll_budget(monkeypatch: pytest.MonkeyP
 @pytest.mark.parametrize(
     ("exit_codes", "outputs", "expected_message"),
     [
-        pytest.param({"rev-parse origin/main": 1}, {}, "`git rev-parse origin/main` failed", id="git-read-fails"),
+        pytest.param(
+            {"log -1 --format=%H": 1},
+            {},
+            "`git log -1 --format=%H origin/main -- CHANGELOG.md` failed",
+            id="git-read-fails",
+        ),
         pytest.param({"fetch": 1}, {}, None, id="fetch-fails"),
         pytest.param(
             {"pipelines?sha=": 1}, {}, "Could not query the GitLab pipeline status", id="pipeline-query-fails"
@@ -565,27 +744,26 @@ def test_release_aborts_on_command_failure(
 @pytest.mark.parametrize(
     ("current", "bump", "expected"),
     [
-        ((1, 4, 2), "patch", (1, 4, 3)),
-        ((1, 4, 2), "minor", (1, 5, 0)),
-        ((1, 4, 2), "major", (2, 0, 0)),
-        (None, "patch", (0, 1, 0)),
-        (None, "minor", (0, 1, 0)),
-        (None, "major", (0, 1, 0)),
+        ((1, 4, 2), release.Bump.PATCH, (1, 4, 3)),
+        ((1, 4, 2), release.Bump.MINOR, (1, 5, 0)),
+        ((1, 4, 2), release.Bump.MAJOR, (2, 0, 0)),
+        (None, release.Bump.PATCH, (0, 1, 0)),
+        (None, release.Bump.MAJOR, (0, 1, 0)),
     ],
 )
-def test_next_version(current: release.Version | None, bump: str, expected: release.Version):
+def test_next_version(current: release.Version | None, bump: release.Bump, expected: release.Version):
     assert release.next_version(current, bump) == expected
 
 
 @pytest.mark.parametrize(
     ("version", "bump", "expected"),
     [
-        ((1, 4, 2), "minor", (1, 6, 0)),
-        ((1, 4, 2), "major", (3, 0, 0)),
-        ((0, 1, 0), "minor", (0, 3, 0)),
+        ((1, 4, 2), release.Bump.MINOR, (1, 6, 0)),
+        ((1, 4, 2), release.Bump.MAJOR, (3, 0, 0)),
+        ((0, 1, 0), release.Bump.MINOR, (0, 3, 0)),
     ],
 )
-def test_second_next_version(version: release.Version, bump: str, expected: release.Version):
+def test_second_next_version(version: release.Version, bump: release.Bump, expected: release.Version):
     assert release.second_next_version(version, bump) == expected
 
 

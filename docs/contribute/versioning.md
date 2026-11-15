@@ -35,4 +35,4 @@ The [`changelog` skill](https://gitlab.com/meetupbot/mitup-telegram-bot/-/blob/m
 * A capability built behind a flag gets its fragment from the merge request that exposes it to users, not from the one that lands the code.
 * The maintainer can override the computed version.
 
-Cutting releases and deploying is maintainer work. This page exists so that fragment types and milestones make sense as you contribute.
+Cutting releases and deploying is maintainer work. A release starts as its own merge request, which compiles the pending fragments into `CHANGELOG.md` and the What's new page, and is tagged once that merge request is merged. This page exists so that fragment types and milestones make sense as you contribute.

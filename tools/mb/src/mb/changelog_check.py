@@ -12,6 +12,9 @@ FRAGMENT_NAME = re.compile(r"(?P<number>\d+|\+[\w-]+)\.(?P<type>\w+)(?:\.\d+)?\.
 # A release MR compiles the pending fragments and deletes them, so it carries none of its own.
 RELEASE_BRANCH_PREFIX = "release/"
 SKILL_PATH = ".agents/skills/changelog/SKILL.md"
+WHATS_NEW_PAGE = "docs/whats-new/index.md"
+# The line `mb release prepare` leaves where the release MR writes the summary for users.
+RELEASE_SUMMARY_PLACEHOLDER = "<!-- release-summary -->"
 
 
 def fragment_types(repo_root: Path) -> list[str]:
@@ -54,15 +57,28 @@ def has_own_fragment(fragments: list[Path], types: list[str]) -> bool:
     return False
 
 
+def has_summary_placeholder(repo_root: Path) -> bool:
+    whats_new = repo_root / WHATS_NEW_PAGE
+    if not whats_new.is_file() or RELEASE_SUMMARY_PLACEHOLDER not in whats_new.read_text():
+        return False
+    console.error(
+        f"{WHATS_NEW_PAGE} still holds {RELEASE_SUMMARY_PLACEHOLDER}: replace it with the summary for users "
+        "before this merges (the `prepare-release` skill has the rules)."
+    )
+    return True
+
+
 def run_check(repo_root: Path) -> int:
-    """Validate every fragment in changelog.d and require one named after the running merge request."""
+    """Validate every fragment in changelog.d, require one named after the running merge request, and refuse
+    a What's new page that still holds the release summary placeholder."""
     types = fragment_types(repo_root)
     fragments = sorted(path for path in (repo_root / FRAGMENT_DIRECTORY).iterdir() if path.name != README_NAME)
     problems = [(path.name, problem) for path in fragments if (problem := fragment_problem(path, types))]
     for name, problem in problems:
         console.error(f"{FRAGMENT_DIRECTORY}/{name}: {problem}")
 
-    if not has_own_fragment(fragments, types) or problems:
+    own_fragment = has_own_fragment(fragments, types)
+    if has_summary_placeholder(repo_root) or not own_fragment or problems:
         return 1
     console.success("Changelog fragments are valid.")
     return 0

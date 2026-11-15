@@ -86,6 +86,8 @@ Bad:
 
 ## At release
 
-The release compiles every pending fragment into a new `CHANGELOG.md` section titled with the
-version and date, grouped as New, Removed, Changed, Fixed and Under the hood, and deletes the
-fragments in the same commit. Never edit `CHANGELOG.md` by hand for an unreleased change.
+`uv run mb release prepare` opens a release MR that compiles every pending fragment into a new
+`CHANGELOG.md` section and a new section of the What's new page, grouped as New, Removed, Changed,
+Fixed and Under the hood, and deletes the fragments. Once it is merged, `uv run mb release` tags it.
+The `prepare-release` skill covers both steps. Never edit `CHANGELOG.md` by hand for an unreleased
+change.

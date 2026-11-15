@@ -1,17 +1,39 @@
 import re
+import sys
+import tempfile
 import time
+from datetime import date
+from enum import IntEnum
+from pathlib import Path
 from typing import Annotated
 
 import typer
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from . import console, runner
+from .changelog_check import FRAGMENT_DIRECTORY, FRAGMENT_NAME, RELEASE_SUMMARY_PLACEHOLDER, WHATS_NEW_PAGE
 
 DEFAULT_BRANCH = "main"
 FIRST_VERSION = (0, 1, 0)
 VERSION_TAG_RE = re.compile(r"v(\d+)\.(\d+)\.(\d+)$")
 MERGE_REQUEST_REF_RE = re.compile(r"!(\d+)")
 COMMIT_SEPARATOR = "\x00"
+CHANGELOG = "CHANGELOG.md"
+CHANGELOG_VERSION_HEADING = re.compile(r"^## (v\d+\.\d+\.\d+)\b", re.MULTILINE)
+CHANGELOG_TYPE_HEADING = re.compile(r"^### (.+)$", re.MULTILINE)
+RELEASES_MARKER = re.compile(r"^<!-- releases -->$", re.MULTILINE)
+RELEASE_BRANCH = "release/{version}"
+RELEASE_TITLE = "⚙️ Release {version}"
+RELEASE_MR_DESCRIPTION = """\
+Compiles the pending changelog fragments into `CHANGELOG.md` and the What's new page for {version}.
+
+Left to do, in this order:
+
+1. Write the summary for users in `{page}`, in place of the `{placeholder}` line. The `prepare-release` skill \
+has the rules. The `check-changelog` job fails until the placeholder is gone.
+2. Merge this merge request.
+3. Run `uv run mb release` to tag the commit it lands as {version}.
+"""
 PIPELINES_URL = "https://gitlab.com/meetupbot/mitup-telegram-bot/-/pipelines"
 PIPELINE_POLL_INTERVAL_SECONDS = 3
 PIPELINE_POLL_ATTEMPTS = 20
@@ -29,6 +51,21 @@ RELEASE_POST_INTERVAL_SECONDS = 10
 RELEASE_POST_ATTEMPTS = 36
 
 Version = tuple[int, int, int]
+
+
+class Bump(IntEnum):
+    PATCH = 1
+    MINOR = 2
+    MAJOR = 3
+
+
+FRAGMENT_BUMPS = {
+    "feature": Bump.MAJOR,
+    "removal": Bump.MAJOR,
+    "change": Bump.MINOR,
+    "fix": Bump.PATCH,
+    "internal": Bump.PATCH,
+}
 
 
 class Pipeline(BaseModel):
@@ -52,6 +89,8 @@ class MergeRequest(BaseModel):
 
 
 MilestoneList = TypeAdapter(list[Milestone])
+
+app = typer.Typer()
 
 
 def git_capture(*args: str) -> str:
@@ -123,13 +162,12 @@ def parse_version(tag: str) -> Version | None:
     return (int(match[1]), int(match[2]), int(match[3]))
 
 
-def latest_version() -> Version | None:
-    """Highest `vMAJOR.MINOR.PATCH` tag on origin, or None when no version tag exists yet.
+def remote_versions() -> list[Version]:
+    """Every `vMAJOR.MINOR.PATCH` tag on origin.
 
-    Reads the remote tag listing, never the local one: a local-only tag at or past the released
-    commit would silently shrink the changelog range, so only tags that origin knows about count
-    as releases. The preceding fetch guarantees every remote tag also resolves locally for the
-    changelog's `git log` range.
+    Reads the remote tag listing, never the local one: a local-only tag would count as a release
+    that origin never saw. The preceding fetch guarantees every remote tag also resolves locally
+    for the `git log` range of shipped merge requests.
     """
     versions: list[Version] = []
     for line in git_capture("ls-remote", "--tags", "origin", "v*").splitlines():
@@ -138,29 +176,29 @@ def latest_version() -> Version | None:
             continue
         if parsed := parse_version(tag):
             versions.append(parsed)
-    return max(versions) if versions else None
+    return versions
 
 
-def next_version(current: Version | None, bump: str) -> Version:
+def next_version(current: Version | None, bump: Bump) -> Version:
     if current is None:
         return FIRST_VERSION
     major, minor, patch = current
-    if bump == "major":
+    if bump == Bump.MAJOR:
         return (major + 1, 0, 0)
-    if bump == "minor":
+    if bump == Bump.MINOR:
         return (major, minor + 1, 0)
     return (major, minor, patch + 1)
 
 
-def second_next_version(version: Version, bump: str) -> Version:
-    """Version two releases ahead of *version* in the bumped dimension — the runway milestone to open.
+def second_next_version(version: Version, bump: Bump) -> Version:
+    """Version two releases ahead of *version* in the bumped dimension: the runway milestone to open.
 
     The very next release always has a milestone already, so opening the one two ahead keeps a
     spare bucket for issues at all times (releasing v0.2.0 as a minor opens v0.4.0; a major opens
     two majors out).
     """
     major, minor, _ = version
-    if bump == "major":
+    if bump == Bump.MAJOR:
         return (major + 2, 0, 0)
     return (major, minor + 2, 0)
 
@@ -168,6 +206,180 @@ def second_next_version(version: Version, bump: str) -> Version:
 def format_version(version: Version) -> str:
     major, minor, patch = version
     return f"v{major}.{minor}.{patch}"
+
+
+def prepared_version(changelog: str, versions: list[Version]) -> Version | None:
+    """The newest version in CHANGELOG.md when origin has no tag for it yet."""
+    if (match := CHANGELOG_VERSION_HEADING.search(changelog)) and (version := parse_version(match[1])) not in versions:
+        return version
+    return None
+
+
+def changelog_section(changelog: str, version: str) -> str:
+    """The body of *version*'s section in CHANGELOG.md, without its heading."""
+    sections = re.split(r"^## ", changelog, flags=re.MULTILINE)
+    section = next((section for section in sections if section.startswith(f"{version} ")), "")
+    return section.partition("\n")[2].strip()
+
+
+def whats_new_section(version: str, day: date, changelog_body: str) -> str:
+    """The What's new section for *version*: the summary placeholder above the changelog folded into a note,
+    whose headings become bold labels so the page's table of contents keeps one entry per release."""
+    labelled = CHANGELOG_TYPE_HEADING.sub(r"**\1**", changelog_body)
+    folded = "\n".join(f"    {line}" if line else "" for line in labelled.splitlines())
+    return (
+        f"## {version}\n\n_{day.day} {day:%B %Y}_\n\n{RELEASE_SUMMARY_PLACEHOLDER}\n\n"
+        f'??? note "Full changelog"\n\n{folded}'
+    )
+
+
+def insert_release_section(page: str, section: str) -> str:
+    """*page* with *section* inserted right after its releases marker line, so the newest release comes first."""
+    marker = RELEASES_MARKER.search(page)
+    assert marker is not None, "prepare checks the marker before it builds anything"
+    rest = page[marker.end() :].lstrip("\n")
+    return f"{page[: marker.end()]}\n\n{section}\n\n{rest}".rstrip("\n") + "\n"
+
+
+def whats_new_page(ref: str) -> str:
+    exit_code, page = runner.run_quiet(["git", "show", f"{ref}:{WHATS_NEW_PAGE}"])
+    if exit_code != 0:
+        console.error(f"Commit {ref[:8]} has no {WHATS_NEW_PAGE}.")
+        raise typer.Abort()
+    return page
+
+
+def pending_fragments(sha: str) -> dict[str, list[str]]:
+    """The changelog fragment file names at *sha*, grouped by type in changelog order."""
+    fragments: dict[str, list[str]] = {fragment_type: [] for fragment_type in FRAGMENT_BUMPS}
+    for path in git_capture("ls-tree", "--name-only", sha, f"{FRAGMENT_DIRECTORY}/").splitlines():
+        if (match := FRAGMENT_NAME.fullmatch(Path(path).name)) and match["type"] in fragments:
+            fragments[match["type"]].append(Path(path).name)
+    return fragments
+
+
+def print_plan(sha: str, previous: Version | None, fragments: dict[str, list[str]], computed: Bump, chosen: Bump):
+    version = format_version(next_version(previous, chosen))
+    console.info(f"Previous version: {format_version(previous) if previous else 'none'}")
+    console.info(f"Version to prepare: {version} ({chosen.name.lower()})")
+    console.info("Pending fragments: " + ", ".join(f"{len(names)} {kind}" for kind, names in fragments.items()))
+    if chosen != computed:
+        computed_version = format_version(next_version(previous, computed))
+        console.info(
+            f"The fragments call for {computed_version} ({computed.name.lower()}); the flag chooses {version}."
+        )
+    console.info(f"Fragments that make it a {computed.name.lower()} release:")
+    deciding = [name for kind, names in fragments.items() if FRAGMENT_BUMPS[kind] == computed for name in names]
+    for name in deciding:
+        console.raw(f"  {name}: {git_capture('show', f'{sha}:{FRAGMENT_DIRECTORY}/{name}')}")
+
+
+def commit_release(checkout: Path, version: str, page: str):
+    """Compile CHANGELOG.md and the What's new section for *version* in *checkout* and commit them.
+
+    The commit skips the git hooks: they run `uv run --no-sync --frozen mb`, which has no environment in a
+    fresh checkout, and the release MR's pipeline runs the same checks.
+    """
+    today = date.today()
+    towncrier = [sys.executable, "-m", "towncrier", "build", "--version", version, "--date", today.isoformat(), "--yes"]
+    if runner.run_step("Compiling the changelog", towncrier, cwd=checkout) != 0:
+        raise typer.Abort()
+    section = whats_new_section(version, today, changelog_section((checkout / CHANGELOG).read_text(), version))
+    (checkout / WHATS_NEW_PAGE).write_text(insert_release_section(page, section))
+    commit = ["git", "commit", "--no-verify", "--message", RELEASE_TITLE.format(version=version)]
+    for description, args in [("Staging the What's new page", ["git", "add", WHATS_NEW_PAGE]), ("Committing", commit)]:
+        if runner.run_step(description, args, cwd=checkout) != 0:
+            raise typer.Abort()
+
+
+def push_release_branch(sha: str, version: str, page: str):
+    """Commit the release on top of *sha* in a temporary worktree and push it as the release branch."""
+    branch = RELEASE_BRANCH.format(version=version)
+    with tempfile.TemporaryDirectory(prefix="mb-release-") as scratch:
+        checkout = Path(scratch) / "checkout"
+        add_worktree = ["git", "worktree", "add", "--detach", str(checkout), sha]
+        if runner.run_step(f"Checking out {sha[:8]}", add_worktree) != 0:
+            raise typer.Abort()
+        try:
+            commit_release(checkout, version, page)
+            push = ["git", "push", "--no-verify", "origin", f"HEAD:refs/heads/{branch}"]
+            if runner.run_step(f"Pushing {branch}", push, cwd=checkout) != 0:
+                raise typer.Abort()
+        finally:
+            runner.run_quiet(["git", "worktree", "remove", "--force", str(checkout)])
+
+
+def open_release_merge_request(version: str):
+    description = RELEASE_MR_DESCRIPTION.format(
+        version=version, page=WHATS_NEW_PAGE, placeholder=RELEASE_SUMMARY_PLACEHOLDER
+    )
+    exit_code, output = runner.run_quiet(
+        [
+            "glab",
+            "mr",
+            "create",
+            "--source-branch",
+            RELEASE_BRANCH.format(version=version),
+            "--target-branch",
+            DEFAULT_BRANCH,
+            "--title",
+            RELEASE_TITLE.format(version=version),
+            "--description",
+            description,
+            "--remove-source-branch",
+            "--yes",
+        ]
+    )
+    if exit_code != 0:
+        console.error("Could not open the release merge request via `glab`:")
+        console.raw(output.rstrip())
+        raise typer.Abort()
+    console.success(f"Opened the release merge request for {version}")
+    console.raw(output.strip())
+
+
+@app.command("prepare")
+def prepare_command(
+    patch: Annotated[bool, typer.Option("--patch", help="Prepare a patch release whatever the fragments say.")] = False,
+    minor: Annotated[bool, typer.Option("--minor", help="Prepare a minor release whatever the fragments say.")] = False,
+    major: Annotated[bool, typer.Option("--major", help="Prepare a major release whatever the fragments say.")] = False,
+    yes: Annotated[bool, typer.Option("--yes", help="Skip the confirmation after the plan.")] = False,
+):
+    """Open the release merge request that compiles the pending changelog fragments on origin/main.
+
+    The version follows the highest fragment type unless a flag overrides it. Nothing is created before the
+    plan is confirmed, and the local checkout is never read.
+    """
+    if sum([patch, minor, major]) > 1:
+        console.error("Pass at most one of --patch/--minor/--major.")
+        raise typer.Abort()
+
+    fetch_origin()
+    sha = git_capture("rev-parse", f"origin/{DEFAULT_BRANCH}")
+    fragments = pending_fragments(sha)
+    computed = max((FRAGMENT_BUMPS[kind] for kind, names in fragments.items() if names), default=None)
+    if computed is None:
+        console.error(f"origin/{DEFAULT_BRANCH} has no changelog fragments: there is nothing to release.")
+        raise typer.Abort()
+
+    versions = remote_versions()
+    if prepared := prepared_version(git_capture("show", f"{sha}:{CHANGELOG}"), versions):
+        console.error(f"{format_version(prepared)} is prepared but not tagged: run `uv run mb release` first.")
+        raise typer.Abort()
+    page = whats_new_page(sha)
+    if not RELEASES_MARKER.search(page):
+        console.error(f"{WHATS_NEW_PAGE} has no `<!-- releases -->` line to insert the release after.")
+        raise typer.Abort()
+
+    chosen = Bump.MAJOR if major else Bump.MINOR if minor else Bump.PATCH if patch else computed
+    previous = max(versions, default=None)
+    print_plan(sha, previous, fragments, computed, chosen)
+    version = format_version(next_version(previous, chosen))
+    if not yes:
+        typer.confirm(f"Prepare {version}?", abort=True)
+
+    push_release_branch(sha, version, page)
+    open_release_merge_request(version)
 
 
 def create_and_push_tag(version: str, sha: str):
@@ -225,20 +437,6 @@ def merge_request(iid: int) -> MergeRequest | None:
         return None
 
 
-def shipped_merge_requests(previous_tag: str | None, sha: str) -> list[MergeRequest]:
-    """The merge requests shipping in this release, newest first, dropping any that cannot be fetched.
-
-    Fetched once and shared by the release notes and the milestone sweep, so each MR costs a single
-    API call.
-    """
-    return [mr for iid in merge_request_ids(previous_tag, sha) if (mr := merge_request(iid))]
-
-
-def build_release_notes(merge_requests: list[MergeRequest]) -> str:
-    """Changelog body listing every shipped merge request as `[!IID] title`."""
-    return "\n".join(f"- [!{mr.iid}] {mr.title}" for mr in merge_requests)
-
-
 def milestone_id(title: str) -> int | None:
     """Numeric id of the project or ancestor-group milestone titled *title*, or None when it cannot be resolved."""
     exit_code, output = runner.run_quiet(
@@ -258,7 +456,7 @@ def assign_merge_requests_to_milestone(merge_requests: list[MergeRequest], title
 
     An MR that already carries a milestone was assigned deliberately (e.g. to a later version), so
     it is left untouched. Runs after the release is published, so every failure is non-fatal: the
-    milestone can always be set by hand from the release's changelog list.
+    milestone can always be set by hand from the release's merge requests.
     """
     unassigned: list[MergeRequest] = []
     for mr in merge_requests:
@@ -360,46 +558,70 @@ def create_release(version: str, notes: str, milestone: str | None):
     console.raw(output.rstrip())
 
 
-def release_command(
-    patch: Annotated[bool, typer.Option("--patch", help="Bump the patch version (the default).")] = False,
-    minor: Annotated[bool, typer.Option("--minor", help="Bump the minor version instead of the patch.")] = False,
-    major: Annotated[bool, typer.Option("--major", help="Bump the major version instead of the patch.")] = False,
-):
-    """Tag origin/main's green tip as a `v*` release and publish it with notes. Minor and major
-    releases additionally open the runway milestone and milestone the shipped merge requests;
-    patch releases carry no milestone at all.
+def release_commit() -> str:
+    """The last commit on origin/main that changed CHANGELOG.md, which is where the release MR landed."""
+    sha = git_capture("log", "-1", "--format=%H", f"origin/{DEFAULT_BRANCH}", "--", CHANGELOG)
+    if later := int(git_capture("rev-list", "--count", f"{sha}..origin/{DEFAULT_BRANCH}")):
+        console.info(f"origin/{DEFAULT_BRANCH} has {later} commits after {sha[:8]}; they ship in the next release.")
+    return sha
 
-    Reads nothing from the local checkout: the release always ships the freshest origin/main
-    commit, so a dirty tree, untracked files, or a feature branch never block or influence it.
-    """
-    if sum([patch, minor, major]) > 1:
-        console.error("Pass at most one of --patch/--minor/--major.")
+
+def ensure_whats_new_is_ready(sha: str, version: str):
+    page = whats_new_page(sha)
+    if not re.search(rf"^## {re.escape(version)}$", page, re.MULTILINE):
+        console.error(f"{WHATS_NEW_PAGE} at {sha[:8]} has no section for {version}.")
+        raise typer.Abort()
+    if RELEASE_SUMMARY_PLACEHOLDER in page:
+        console.error(f"{WHATS_NEW_PAGE} at {sha[:8]} still holds {RELEASE_SUMMARY_PLACEHOLDER}: write the summary.")
         raise typer.Abort()
 
-    fetch_origin()
-    sha = git_capture("rev-parse", f"origin/{DEFAULT_BRANCH}")
-    ensure_pipeline_is_green(sha)
 
-    bump = "major" if major else "minor" if minor else "patch"
-    previous = latest_version()
-    previous_tag = format_version(previous) if previous else None
-    released = next_version(previous, bump)
+def publish_release(released: Version, previous: Version | None, sha: str, notes: str):
+    """Publish the GitLab release for the pushed tag; minor and major releases also open the runway milestone
+    and milestone the shipped merge requests."""
     version = format_version(released)
-
-    create_and_push_tag(version, sha)
-
+    major, minor, _ = previous or (0, 0, 0)
+    bump = Bump.MAJOR if released[0] != major else Bump.MINOR if released[1] != minor else Bump.PATCH
     milestone = None
-    if bump != "patch":
+    if bump != Bump.PATCH:
         ensure_milestone(format_version(second_next_version(released, bump)))
         milestone = version if ensure_milestone(version) else None
     with console.spinner("Waiting for the tag to register"):
         tag_visible = wait_for_tag(version)
     if not tag_visible:
         console.warn(f"Tag {version} is not visible via the API yet; the release may fail to attach.")
-    shipped = shipped_merge_requests(previous_tag, sha)
-    create_release(version, build_release_notes(shipped), milestone)
+    create_release(version, notes, milestone)
     if milestone is not None:
+        previous_tag = format_version(previous) if previous else None
+        shipped = [mr for iid in merge_request_ids(previous_tag, sha) if (mr := merge_request(iid))]
         assign_merge_requests_to_milestone(shipped, milestone)
+
+
+@app.callback(invoke_without_command=True)
+def release_command(context: typer.Context):
+    """Tag the release prepared on origin/main and publish it; `mb release prepare` opens the release MR first.
+
+    The version is the newest one in CHANGELOG.md and the tagged commit is the last one that changed that
+    file. The local checkout is never read.
+    """
+    if context.invoked_subcommand is not None:
+        return
+
+    fetch_origin()
+    versions = remote_versions()
+    changelog = git_capture("show", f"origin/{DEFAULT_BRANCH}:{CHANGELOG}")
+    if (released := prepared_version(changelog, versions)) is None:
+        console.error(
+            f"Nothing is prepared: every version in {CHANGELOG} on origin/{DEFAULT_BRANCH} is already tagged. "
+            "Run `uv run mb release prepare` first."
+        )
+        raise typer.Abort()
+    version = format_version(released)
+    sha = release_commit()
+    ensure_whats_new_is_ready(sha, version)
+    ensure_pipeline_is_green(sha)
+    create_and_push_tag(version, sha)
+    publish_release(released, max(versions, default=None), sha, changelog_section(changelog, version))
 
     console.success(f"Released {version}")
     with console.spinner("Waiting for the deploy pipeline to start"):

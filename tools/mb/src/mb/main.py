@@ -52,13 +52,13 @@ app.command(
 )(testing.test_command)
 app.command("validate", rich_help_panel=QUALITY_PANEL)(validate.validate_command)
 app.command("setup", rich_help_panel=ENVIRONMENT_PANEL)(setup_env.setup_command)
-app.command("release", rich_help_panel=OPS_PANEL)(release.release_command)
 
 app.add_typer(db.app, name="db", rich_help_panel=ENVIRONMENT_PANEL)
 app.add_typer(services.run_app, name="run", rich_help_panel=ENVIRONMENT_PANEL)
 app.add_typer(services.docker_app, name="docker", rich_help_panel=ENVIRONMENT_PANEL)
 app.add_typer(locales.app, name="locales", rich_help_panel=CONTENT_PANEL)
 app.add_typer(docs.app, name="docs", rich_help_panel=CONTENT_PANEL)
+app.add_typer(release.app, name="release", rich_help_panel=OPS_PANEL)
 app.add_typer(tokens.app, name="tokens", rich_help_panel=OPS_PANEL)
 app.add_typer(ci.app, name="ci", hidden=True)
 
