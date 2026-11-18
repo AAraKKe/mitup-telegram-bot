@@ -62,7 +62,7 @@ MEETING_ID_INACTIVE = 88  # Exists but inactive
 
 ### Extra metrics
 
-When a handler emits additional metrics beyond the standard ones (FAULT, TIME, DB_CONNECTIONS_LEAKED), specify them as `(name, times)` pairs:
+When a handler emits additional metrics beyond the standard ones (FAULT, TIME, DB_CONNECTIONS_ORPHANED), specify them as `(name, times)` pairs:
 
 ```python
 Context(
@@ -85,4 +85,4 @@ The module contains factory functions that filter `CONTEXTS` by error mode and g
 
 Each test seeds the mock session appropriately, calls the handler, and asserts:
 1. The correct view was sent (main menu, error message, etc.)
-2. The correct metrics were emitted (including fault prefix, timing, and leaked connections)
+2. The correct metrics were emitted (including fault prefix, timing, and orphaned connections)

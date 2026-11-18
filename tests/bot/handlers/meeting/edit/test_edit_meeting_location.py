@@ -65,7 +65,7 @@ def assert_metrics_for_failure(error_type: type[Exception], metrics_client: Metr
         name=MetricKey.FAULT, value=0 if handled else 1, times=1, exception=None if handled else error_type
     )
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.EDIT_MEETING_LOCATION.with_id(1))], indirect=True)
@@ -114,7 +114,7 @@ async def test_edit_location_meeting_not_owned(
     metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -208,7 +208,7 @@ async def test_edit_location_name_not_owned(
     metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -306,7 +306,7 @@ async def test_edit_location_coordinates_not_owned(
     metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize(

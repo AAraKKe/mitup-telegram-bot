@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import time
-from collections import Counter
 from collections.abc import AsyncGenerator, Callable, Coroutine, Mapping, Sequence
 from contextlib import asynccontextmanager, suppress
 from contextvars import ContextVar
@@ -96,10 +95,9 @@ class WriteApi[OutboxT: OutboxProtocol](Protocol):
 type OutboxReconciler = Callable[[AsyncSession, ContextOrBotAdapter, OutboxProtocol], Coroutine[Any, Any, None]]
 
 __sessionmaker: async_sessionmaker[AsyncSession] | None = None
-__connection_context: ContextVar[str] = ContextVar("connection_context", default="unknown")
-__active_connections: Counter[str] = Counter()
 __pool_metrics: MetricsClient | None = None
 __outbox_reconciler: OutboxReconciler | None = None
+open_transaction_blocks = 0
 
 
 class DbNotInitializedError(RuntimeError):
@@ -144,15 +142,6 @@ def set_outbox_reconciler(reconciler: OutboxReconciler):
     """
     global __outbox_reconciler
     __outbox_reconciler = reconciler
-
-
-def set_connection_context(context: str):
-    __connection_context.set(context)
-
-
-def get_open_connections(context: str) -> int:
-    """Get the number of open connections for a specific context."""
-    return __active_connections[context]
 
 
 def build_db_url(db_config: DbConfig) -> URL:
@@ -207,6 +196,16 @@ def checked_out_connections(sync_engine: Engine) -> int:
     # create_async_engine always builds an AsyncAdaptedQueuePool, a QueuePool subclass.
     assert isinstance(pool, QueuePool)
     return pool.checkedout()
+
+
+def orphaned_connections() -> int:
+    """Connections checked out from the pool that no open `begin()` block holds; 0 when the db is not configured."""
+    if __sessionmaker is None:
+        return 0
+    engine: AsyncEngine = __sessionmaker.kw["bind"]
+    # A block is counted before its checkout and until after its checkin, so the difference only
+    # dips below zero in those windows and never reads an orphan that is not there.
+    return max(checked_out_connections(engine.sync_engine) - open_transaction_blocks, 0)
 
 
 def record_pool_sample(
@@ -287,14 +286,12 @@ async def acquire_timed_connection(session: AsyncSession):
 
 @asynccontextmanager
 async def begin() -> AsyncGenerator[AsyncSession]:
+    global open_transaction_blocks
     if __sessionmaker is None:
         raise DbNotInitializedError()
 
     async with __sessionmaker() as session:
-        context = __connection_context.get()
-        # Single-threaded event loop and no await between read and write, so the
-        # increment/decrement pairs cannot interleave.
-        __active_connections[context] += 1
+        open_transaction_blocks += 1
         try:
             async with session.begin():
                 await acquire_timed_connection(session)
@@ -303,7 +300,7 @@ async def begin() -> AsyncGenerator[AsyncSession]:
                 # in the ongoing transaction
                 yield session
         finally:
-            __active_connections[context] -= 1
+            open_transaction_blocks -= 1
             if __pool_metrics is not None and current_metrics_client() is None:
                 # The commit above released the connection, so this transaction's checkin gauge is
                 # already accumulated: one EMF line flushed per transaction. Only the samples that

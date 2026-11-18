@@ -9,6 +9,7 @@ import pytest
 import structlog
 from click.testing import CliRunner, Result
 from pydantic import SecretStr
+from sqlalchemy.pool import QueuePool
 from telegram import CallbackQuery, Chat, InlineQuery, Message, Update, User
 from telegram.ext import Application, ConversationHandler
 
@@ -254,6 +255,9 @@ def mock_session(db_config: DbConfig) -> Generator[MockDbSession]:
         # Calling the factory returns an async context manager yielding our mocked_session
         maker_patch.return_value.return_value.__aenter__ = mock.AsyncMock(return_value=mocked_session)
         maker_patch.return_value.return_value.__aexit__ = mock.AsyncMock(return_value=False)
+        idle_engine = mock.MagicMock()
+        idle_engine.sync_engine.pool = mock.MagicMock(spec=QueuePool, **{"checkedout.return_value": 0})
+        maker_patch.return_value.kw = {"bind": idle_engine}
 
         with mock.patch("mitup_bot.db.create_async_engine"):
             # Patch create_async_engine to make sure we are not creating an engine while

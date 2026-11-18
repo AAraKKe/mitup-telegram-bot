@@ -303,7 +303,7 @@ async def test_user_join_for_non_existing_meeting(
     # No feature metric has been emitted
     metrics.assert_emitted(name=MetricKey.FAULT, value=0.0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
     # The user has been notified. The tap happened in the bot's own chat, so the banner that replaces
     # the card is the whole screen and offers the way back to the main menu.
@@ -537,7 +537,7 @@ async def test_user_leave_for_non_existing_meeting(
     # No feature metric has been emitted
     metrics.assert_emitted(name=MetricKey.FAULT, value=0.0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
     # The user has been notified. The tap happened in the bot's own chat, so the banner that replaces
     # the card is the whole screen and offers the way back to the main menu.

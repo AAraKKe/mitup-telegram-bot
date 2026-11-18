@@ -74,11 +74,6 @@ JOB_TIMEOUT_SECONDS = 60.0
 # from `AppConfig.background_drain_seconds`, which documents the bound it has to fit inside.
 DRAIN_DEADLINE_SECONDS = 10.0
 
-# The name the worker's database sessions are counted under. Sessions are attributed per context, so
-# without it everything the worker holds falls into the unknown bucket of the leak counter, where a
-# session the background jobs never returned cannot be told from anyone else's.
-CONNECTION_CONTEXT = "BackgroundJobs"
-
 
 class JobOutcome(StrEnum):
     """What one execution of a background job achieved."""
@@ -609,7 +604,6 @@ class RefreshQueue:
         or reporting on a drain that stopped. Stopping then takes the queue out of service and
         spends the drain deadline on the jobs it still holds, the interrupted one included.
         """
-        db.set_connection_context(CONNECTION_CONTEXT)
         try:
             async with asyncio.TaskGroup() as workers:
                 workers.create_task(self.run_drain())

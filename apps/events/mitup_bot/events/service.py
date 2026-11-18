@@ -217,7 +217,6 @@ async def handle_maintainance(
         # run_id is ambiguous between "never ran" and "ran and decided nothing".
         log.info("Recurrent event run started")
         try:
-            db.set_connection_context(event_type.value)
             await dispatch_event(event_type, api, client, admin_tg_ids)
         except asyncio.CancelledError:
             # A shutdown cancels the run where it stands: it neither completed nor faulted, and
@@ -241,12 +240,11 @@ async def handle_maintainance(
             if not fault:
                 client.emit(MetricKey.FAULT, 0, MetricUnit.COUNT, emit_global=True)
             client.emit(MetricKey.TIME, (perf_counter() - start_time) * 1000, MetricUnit.MILLISECONDS, emit_global=True)
-            leaked_connections = db.get_open_connections(event_type.value)
             log.info(
                 "Recurrent event run finished",
                 outcome=outcome,
                 duration_ms=round((perf_counter() - start_time) * 1000),
-                db_connections_leaked=leaked_connections,
+                db_connections_orphaned=db.orphaned_connections(),
             )
             await client.flush()
 

@@ -142,9 +142,6 @@ def callback_with_metrics(
         # without minting a billed CloudWatch series per handler.
         context.prepare_handler_metrics({"Handler": handler_id.dimension, "HandlerType": handler_type})
 
-        # Keep the context for counter as Bot to differentiate this from the recurrent events
-        db.set_connection_context("Bot")
-
         # Bind request fields for the duration of this handler. bound_contextvars auto-clears on
         # exit so fields never leak into the next update handled by PTB's reused worker task.
         # merge_contextvars then injects them into every log line emitted downstream — including
@@ -212,8 +209,7 @@ def callback_with_metrics(
                 # Dimensionless latency; the handler identity rides as an EMF property, not a dimension.
                 context.emit_metric(MetricKey.TIME, latency, MetricUnit.MILLISECONDS)
 
-                # Emit leaked database connections (should be 0 if all connections were properly closed)
-                context.emit_metric(MetricKey.DB_CONNECTIONS_LEAKED, db.get_open_connections("Bot"), MetricUnit.COUNT)
+                context.emit_metric(MetricKey.DB_CONNECTIONS_ORPHANED, db.orphaned_connections(), MetricUnit.COUNT)
 
                 # The processor writes the update's exit line from outside this wrapper and PTB
                 # tells it nothing, so the invocation reports itself.

@@ -82,8 +82,9 @@ class MetricKey(CamelCaseStrEnum):
     """Stat for the total number of shared meetings"""
     TOTAL_MEETINGS = auto()
     """Stat for the total number of meetings in the database"""
-    DB_CONNECTIONS_LEAKED = auto()
-    """Number of database connections that were not properly closed (leaked connections)"""
+    DB_CONNECTIONS_ORPHANED = auto()
+    """Pool connections checked out with no open `db.begin()` block holding them, emitted after every
+    handler invocation (0 when nothing is orphaned). Read by the mitup-infra pool failures widget."""
     WEBHOOK_FORBIDDEN = auto()
     """Telegram rejected the webhook request with a 403 Forbidden response"""
     WEBHOOK_MALFORMED_UPDATE = auto()

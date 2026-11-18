@@ -54,4 +54,4 @@ async def test_set_language_fails_if_id_invalid(
 
     metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, exception="InvalidLanguageError")
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)

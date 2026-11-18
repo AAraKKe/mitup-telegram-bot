@@ -61,7 +61,7 @@ def assert_metrics_for_failure(error_type: type[Exception], metrics_client: Metr
         name=MetricKey.FAULT, value=0 if handled else 1, times=1, exception=None if handled else error_type
     )
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize("update", [UpdateRequest(callback_query=cb.DELETE_MEETING.with_id(1))], indirect=True)

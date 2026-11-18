@@ -2027,7 +2027,7 @@ def assert_handler_metrics(
     # is no separate per-handler-dimensioned copy (issue #205).
     metrics.assert_emitted(name=MetricKey.FAULT, value=fault_value, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
     # Extra metrics this handler emits
     for metric_name, times in extra_metrics or []:
         metrics.assert_emitted(name=metric_name, times=times)
@@ -2143,7 +2143,7 @@ async def test_callback_fails_with_malformed_callback_data(
     # on the aggregate fault as the `error_type` property.
     metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, exception=MalformedCallbackData)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -2178,7 +2178,7 @@ async def test_callback_answers_a_caller_with_no_account(
 
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
     notice = CommonMessages.ACCOUNT_NOT_FOUND.rich(lang=TranslationEngine.FALLBACK_LANG)
     if update.callback_query is not None:
@@ -2289,7 +2289,7 @@ async def test_callback_fails_when_missing_necessary_user_data(
     metrics.assert_emitted(name=MetricKey.CONTEXT_LOST, value=1, times=1)
     metrics.assert_not_emitted(name=MetricKey.FAULT, value=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize(

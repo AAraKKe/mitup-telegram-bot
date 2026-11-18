@@ -125,6 +125,10 @@ def test_configure_db_without_metrics_client_skips_instrumentation(db_config: Db
     mock_instrument.assert_not_called()
 
 
+def test_an_unconfigured_db_orphans_no_connections():
+    assert db.orphaned_connections() == 0
+
+
 async def test_begin_emits_checkout_wait_time(mock_session: MockDbSession):
     pool_metrics_client = make_test_metrics_client()
     db.__pool_metrics = pool_metrics_client

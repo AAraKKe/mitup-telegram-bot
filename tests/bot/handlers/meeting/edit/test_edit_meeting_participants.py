@@ -75,7 +75,7 @@ def assert_metrics_for_failure(error_type: type[Exception], metrics_client: Metr
         name=MetricKey.FAULT, value=0 if handled else 1, times=1, exception=None if handled else error_type
     )
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -126,7 +126,7 @@ async def test_edit_meeting_participants_meeting_not_owned(
     metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -242,7 +242,7 @@ async def test_edit_meeting_max_participants_meeting_not_owned(
     metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -463,7 +463,7 @@ async def test_edit_meeting_no_limit_participants_meeting_not_owned(
     metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize(

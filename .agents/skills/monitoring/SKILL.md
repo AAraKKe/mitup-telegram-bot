@@ -180,7 +180,7 @@ client — `timezone_api`, which has the context in hand — passes it explicitl
 |--------|-------------|
 | `Time` | Handler latency in milliseconds (dimensionless) |
 | `Fault` | `1` on exception, `0` on success (dimensionless) |
-| `DbConnectionsLeaked` | Count of unreturned DB connections (should always be 0) |
+| `DbConnectionsOrphaned` | Pool connections checked out with no open `db.begin()` block holding them, process-wide (should always be 0) |
 
 Each is emitted as a single **dimensionless** series. The handler identity (`Handler`, `HandlerType`) is attached as EMF **properties** — set automatically via `context.prepare_handler_metrics()` — so per-handler drill-down happens in CloudWatch Logs Insights, not via a billed dimension.
 

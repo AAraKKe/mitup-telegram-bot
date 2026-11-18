@@ -426,7 +426,7 @@ async def test_time_edit_chip_asks_for_a_typed_time(
         metrics.assert_emitted(name=MetricKey.MEETING_NOT_OWNED, value=0)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize(
@@ -499,7 +499,7 @@ async def test_set_time_message_with_valid_time(
         dimensions={"Feature": str(Feature.EDIT_MEETING)},
         properties={"EditedField": "datetime"},
     )
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
     context.api.assert_send_message_called(
         update, expected_card(meeting, user_with_settings.lang, month=dt.date(2025, 1, 15))
@@ -596,7 +596,7 @@ async def test_set_time_message_with_invalid_time(
     )
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 # ---------------------------------------------------------------------------
@@ -670,7 +670,7 @@ async def test_type_start_datetime_user_not_found(
 
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 @pytest.mark.parametrize("update", [DATE_TIME_ENTITY_REQUEST], indirect=True)
@@ -774,7 +774,7 @@ async def test_conversation_fallback_with_wrong_message_format(
     )
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)
 
 
 # ---------------------------------------------------------------------------

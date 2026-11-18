@@ -865,4 +865,4 @@ async def test_fallback_invite_user_clears_context_and_sends_main_menu(
     metrics.assert_emitted(name=MetricKey.ERROR, value=1.0, dimensions={"Feature": str(Feature.INVITE_USERS)}, times=1)
     metrics.assert_emitted(name=MetricKey.FAULT, value=0, times=1)
     metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS, times=1)
-    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, times=1)
+    metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0, times=1)

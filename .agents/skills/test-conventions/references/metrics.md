@@ -139,12 +139,12 @@ the dimension and the property instead: the varying facet belongs on the `Featur
 
 ## Common handler metrics pattern
 
-Every handler invocation automatically emits `Fault`, `Time`, and `DbConnectionsLeaked`. Assert all three when testing handler-level metrics:
+Every handler invocation automatically emits `Fault`, `Time`, and `DbConnectionsOrphaned`. Assert all three when testing handler-level metrics:
 
 ```python
 metrics.assert_emitted(name=MetricKey.FAULT, value=0)
 metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS)
-metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0)
+metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0)
 ```
 
 For handlers that raise exceptions. Each of the three handler metrics is a single dimensionless
@@ -156,7 +156,7 @@ fault alarms and the `filter Fault = 1` triage query:
 ```python
 metrics.assert_emitted(name=MetricKey.FAULT, value=1, times=1, exception=MalformedCallbackData)
 metrics.assert_emitted(name=MetricKey.TIME, value=AnyFloat(), unit=MetricUnit.MILLISECONDS)
-metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_LEAKED, value=0)
+metrics.assert_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED, value=0)
 ```
 
 To pin the no-dimension invariant on a handler metric, assert `dimensions={}, dimensions_exact=True`

@@ -42,7 +42,7 @@ The events service (`apps/events/mitup_bot/events/service.py`) runs periodic asy
 
 1. **`IntervalsConfiguration.get()`** — Parametrized test that each `EventType` maps to the correct config field.
 2. **`launch_event()`** — Split into async and sync event types. Async events use `AsyncMock`, sync events use regular `MagicMock`.
-3. **`handle_maintainance()`** — Parametrized over success/fault/leaked-connections scenarios. Builds a `MetricsClient` via `make_test_metrics_client()` and asserts with `MetricAssertions` because there's no handler context.
+3. **`handle_maintainance()`**: parametrized over success/fault/orphaned-connections scenarios; the orphaned count is asserted on the `Recurrent event run finished` line's `db_connections_orphaned` field, never as a metric. Builds a `MetricsClient` via `make_test_metrics_client()` and asserts with `MetricAssertions` because there's no handler context.
 4. **`run_periodic()`** — Uses `CancelledError` to break out of the infinite loop after one iteration.
 5. **`run_all_tasks()`** — Patches `run_periodic` to verify all event types are created.
 6. **CLI entry point** — Import `recurrent_events` from `mitup_bot.events_cli`, but patch the orchestration (`Config`, `db`, `build_bot`, `run_all_tasks`, …) at `mitup_bot.events.service`, where `run_events` executes them. Tests that Click options are parsed and passed through correctly.
@@ -80,9 +80,6 @@ assertions.assert_emitted(
     name=MetricKey.FAULT, value=0, unit=MetricUnit.COUNT, dimensions={"EventType": event_type.value}
 )
 assertions.assert_emitted(name=MetricKey.TIME, unit=MetricUnit.MILLISECONDS, dimensions={"EventType": event_type.value})
-assertions.assert_emitted(
-    name=MetricKey.DB_CONNECTIONS_LEAKED, value=0, unit=MetricUnit.COUNT, dimensions={"EventType": event_type.value}
-)
 ```
 
 Note: `MetricAssertions.assert_emitted` requires explicit `dimensions` since no handler identity is attached automatically outside a `MitupContext` (and handler identity rides as EMF properties, never as dimensions — issue #205).

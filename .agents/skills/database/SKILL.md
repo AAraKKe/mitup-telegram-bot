@@ -12,6 +12,8 @@ The database layer lives in `libs/data/mitup_bot/db.py`. It uses SQLAlchemy's **
 
 **Pool observability:** when `configure_db()` receives a `metrics_client` (the bot runtime always passes one; CLI commands don't), pool events emit the `DbPool*` metrics defined in `MetricKey`, and `begin()` eagerly checks out the transaction's connection so pool wait time and pool timeouts are measured at transaction start. Every sample goes through `record_pool_sample`, which attributes it to the invocation on the stack — so pool pressure is readable against the update or run that raised it — and leaves that invocation to flush it; only the samples raised outside one ride the configured client, which `begin()` flushes once per transaction. See the `monitoring` skill for why they are written with `emit_aggregate`.
 
+**Orphaned connections:** `db.orphaned_connections()` is the pool's checked-out count minus the process-wide count of open `begin()` blocks. A block is counted before its checkout and until after its checkin, so concurrent transactions cancel out and a positive value is a connection held outside any `begin()` block. The bot emits it as `DbConnectionsOrphaned` after every handler invocation; the events runner logs it as `db_connections_orphaned` on its `Recurrent event run finished` line. Open every connection through `begin()` (or `with_session` / `begin_write`), never through the engine directly.
+
 **Never create sessions manually.** Use the session-injecting decorator instead.
 
 ## Session decorator

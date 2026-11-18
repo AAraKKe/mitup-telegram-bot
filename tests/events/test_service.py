@@ -200,7 +200,7 @@ async def run_maintainance_with_mocked_db(event_type: EventType, client: Metrics
     """Run handle_maintainance with the db module mocked out, for tests that only care about
     logging side effects."""
     with patch("mitup_bot.events.service.db") as mock_db:
-        mock_db.get_open_connections.return_value = 0
+        mock_db.orphaned_connections.return_value = 0
         await handle_maintainance(event_type, MagicMock(), [], client=client)
 
 
@@ -312,7 +312,7 @@ async def test_handle_maintainance_brackets_a_clean_run_with_start_and_finish():
     assert started["run_id"] == finished["run_id"]
     assert finished["outcome"] == "completed"
     assert finished["duration_ms"] >= 0
-    assert finished["db_connections_leaked"] == 0
+    assert finished["db_connections_orphaned"] == 0
 
 
 async def test_handle_maintainance_finish_line_reports_a_faulted_run():
@@ -509,14 +509,14 @@ MAINTAINANCE_PARAMS = [
 
 
 @pytest.mark.parametrize(
-    "event_type, launch_side_effect, leaked_connections, expected_fault, expected_exception",
+    "event_type, launch_side_effect, orphaned_connections, expected_fault, expected_exception",
     MAINTAINANCE_PARAMS,
-    ids=["success", "fault", "leaked_connections"],
+    ids=["success", "fault", "orphaned_connections"],
 )
 async def test_handle_maintainance(
     event_type: EventType,
     launch_side_effect: Exception | None,
-    leaked_connections: int,
+    orphaned_connections: int,
     expected_fault: int,
     expected_exception: str | None,
 ):
@@ -538,12 +538,11 @@ async def test_handle_maintainance(
         patch("mitup_bot.events.service.build_api", return_value=fake_api),
         patch("mitup_bot.events.service.MetricsClient", side_effect=make_client),
     ):
-        mock_db.get_open_connections.return_value = leaked_connections
+        mock_db.orphaned_connections.return_value = orphaned_connections
 
         with capture_logs() as logs:
             await handle_maintainance(event_type, MagicMock(), [])
 
-        mock_db.set_connection_context.assert_called_once_with(event_type.value)
         assert len(captured_client) == 1
         client = captured_client[0]
         mock_dispatch.assert_awaited_once_with(event_type, fake_api, client, [])
@@ -560,10 +559,9 @@ async def test_handle_maintainance(
             unit=MetricUnit.MILLISECONDS,
             dimensions={"EventType": event_type.value},
         )
-        # A leak belongs to the run, not to a series: the count rides the run's completion line,
-        # including the zero that says the run returned every connection it took.
+        # The orphaned count rides the run's completion line, zero included, rather than a series.
         finished = next(entry for entry in logs if entry["event"] == "Recurrent event run finished")
-        assert finished["db_connections_leaked"] == leaked_connections
+        assert finished["db_connections_orphaned"] == orphaned_connections
 
         # Fault and Time additionally emit a dimensionless global copy (no EventType dimension) so
         # a single Mitup/Events alarm can watch every event type; EventType survives as a property.
@@ -582,12 +580,7 @@ async def test_handle_maintainance(
             dimensions_exact=True,
             properties={"EventType": event_type.value},
         )
-        # Business stats stay EventType-dimensioned only — no global copy.
-        assertions.assert_not_emitted(
-            name=MetricKey.DB_CONNECTIONS_LEAKED,
-            dimensions={},
-            dimensions_exact=True,
-        )
+        assertions.assert_not_emitted(name=MetricKey.DB_CONNECTIONS_ORPHANED)
 
 
 async def test_handle_maintainance_publishes_the_run_client_to_the_outbound_instrumentation():
@@ -613,7 +606,7 @@ async def test_handle_maintainance_publishes_the_run_client_to_the_outbound_inst
         patch("mitup_bot.events.service.db") as mock_db,
         patch("mitup_bot.events.service.MetricsClient", side_effect=make_client),
     ):
-        mock_db.get_open_connections.return_value = 0
+        mock_db.orphaned_connections.return_value = 0
 
         await handle_maintainance(EventType.USER_CLEANUP, bot=AsyncMock(), admin_tg_ids=[])
 
@@ -685,7 +678,7 @@ async def test_handle_maintainance_serializes_dimensioned_and_global_emf(
         patch("mitup_bot.events.service.db") as mock_db,
         patch("mitup_bot.events.service.build_api"),
     ):
-        mock_db.get_open_connections.return_value = 0
+        mock_db.orphaned_connections.return_value = 0
         await handle_maintainance(event_type, MagicMock(), [], client=client)
 
     payloads = [json.loads(line) for line in sink.serialized]
@@ -728,7 +721,7 @@ async def test_handle_maintainance_fault_records_carry_no_traceback():
         patch("mitup_bot.events.service.db") as mock_db,
         patch("mitup_bot.events.service.build_api"),
     ):
-        mock_db.get_open_connections.return_value = 0
+        mock_db.orphaned_connections.return_value = 0
         await handle_maintainance(event_type, MagicMock(), [], client=client)
 
     payloads = [json.loads(line) for line in sink.serialized]

@@ -833,18 +833,6 @@ async def test_the_drain_publishes_the_window_the_stop_interrupted(queue: Refres
     metrics.assert_emitted(name=MetricKey.JOBS_SUCCEEDED, value=1, properties={"run_id": drains[0]["run_id"]})
 
 
-async def test_the_worker_names_the_database_sessions_it_holds(queue: RefreshQueue):
-    """Sessions are counted per connection context, so without one of its own everything the worker
-    holds falls into the unknown bucket, where a session it never returned cannot be told from
-    anyone else's."""
-    with mock.patch.object(card_refresh.db, "set_connection_context") as set_context:
-        worker = asyncio.create_task(queue.run_worker())
-        await asyncio.sleep(0)
-        await card_refresh.stop_worker(worker)
-
-    set_context.assert_called_once_with("BackgroundJobs")
-
-
 # --- The reporting window ---
 
 
