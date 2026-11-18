@@ -4,6 +4,7 @@ import datetime as dt
 import logging
 import re
 import warnings
+from collections.abc import Awaitable, Callable
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -32,9 +33,9 @@ from mitup_bot.api_wrapper import (
     DRAIN_NETWORK_FAILURE_LIMIT,
     EDIT_MESSAGE_TEXT_ENDPOINT,
     MESSAGE_DELETION_WINDOW,
-    QUEUED_CALL_ATTEMPTS,
-    QUEUED_CALL_RETRY_BACKOFF_SECONDS,
     SEND_RICH_MESSAGE_ENDPOINT,
+    TELEGRAM_CALL_ATTEMPTS,
+    TELEGRAM_CALL_RETRY_BACKOFF_SECONDS,
     ApiOutbox,
     BotAdapter,
     KeyedSend,
@@ -131,7 +132,7 @@ def telegram_api(adapter: BotAdapter) -> TelegramApi:
 
 @pytest.fixture
 def no_retry_backoff(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
-    """Run the post-commit retries without their backoff wait."""
+    """Run the network retries without their backoff wait."""
     waited = AsyncMock()
     monkeypatch.setattr("mitup_bot.api_wrapper.sleep", waited)
     return waited
@@ -1315,9 +1316,9 @@ def with_cause[ErrorT: BaseException](error: ErrorT, cause: Exception) -> ErrorT
     "idempotent, error, expected_attempts",
     [
         (False, with_cause(TimedOut(), httpx.ReadTimeout("read")), 1),
-        (True, with_cause(TimedOut(), httpx.ReadTimeout("read")), QUEUED_CALL_ATTEMPTS),
-        (False, with_cause(TimedOut(), httpx.ConnectTimeout("connect")), QUEUED_CALL_ATTEMPTS),
-        (False, with_cause(NetworkError("httpx.ConnectError"), httpx.ConnectError("refused")), QUEUED_CALL_ATTEMPTS),
+        (True, with_cause(TimedOut(), httpx.ReadTimeout("read")), TELEGRAM_CALL_ATTEMPTS),
+        (False, with_cause(TimedOut(), httpx.ConnectTimeout("connect")), TELEGRAM_CALL_ATTEMPTS),
+        (False, with_cause(NetworkError("httpx.ConnectError"), httpx.ConnectError("refused")), TELEGRAM_CALL_ATTEMPTS),
         (False, TimedOut(), 1),
         (True, BadRequest("Chat not found"), 1),
     ],
@@ -1373,6 +1374,137 @@ async def test_execute_queued_retry_that_lands_reports_no_failure(
 
     assert attempts == 2
     api_metrics.assert_not_emitted(name=MetricKey.FAULT)
+
+
+def message_update() -> MagicMock:
+    update = MagicMock(spec=Update)
+    update.effective_message.chat.id = 123
+    update.effective_message.id = 456
+    return update
+
+
+async def immediate_send(api: TelegramApi) -> object:
+    return await api.send_message(chat_update(42), "hello")
+
+
+async def immediate_edit(api: TelegramApi) -> object:
+    return await api.edit_message(message_update(), "hello")
+
+
+async def immediate_send_to_user(api: TelegramApi) -> object:
+    return await api.send_message_to_user(create_user(id=1, tg_user_id=100), "hello")
+
+
+@pytest.mark.parametrize(
+    "call, error, reason",
+    [
+        (immediate_send, with_cause(TimedOut(), httpx.ConnectTimeout("connect")), "connect_failure"),
+        (immediate_edit, with_cause(TimedOut(), httpx.ReadTimeout("read")), "idempotent_call"),
+    ],
+    ids=["send_connect_timeout", "edit_read_timeout"],
+)
+async def test_immediate_call_retries_a_safe_network_failure_and_returns_the_result(
+    telegram_api: TelegramApi,
+    bot: AsyncMock,
+    no_retry_backoff: AsyncMock,
+    call: Callable[[TelegramApi], Awaitable[object]],
+    error: Exception,
+    reason: str,
+):
+    """A read-only handler has no drain behind it: one network blip would otherwise show the user
+    the error screen."""
+    sentinel = MagicMock(spec=Message)
+    bot.do_api_request.side_effect = [error, sentinel]
+
+    with capture_logs() as logs:
+        result = await call(telegram_api)
+
+    assert result is sentinel
+    assert bot.do_api_request.await_count == 2
+    no_retry_backoff.assert_awaited_once_with(TELEGRAM_CALL_RETRY_BACKOFF_SECONDS)
+    retry = next(entry for entry in logs if entry["event"] == "Retrying Telegram call after network failure")
+    assert retry["log_level"] == "warning"
+    assert retry["reason"] == reason
+    assert retry["attempt"] == 1
+    assert not [entry for entry in logs if entry["event"] == "Telegram call failed"]
+
+
+@pytest.mark.parametrize(
+    "call, error, raised, expected_attempts",
+    [
+        (immediate_send, with_cause(TimedOut(), httpx.ReadTimeout("read")), TimedOut, 1),
+        (immediate_send, TimedOut(), TimedOut, 1),
+        (immediate_edit, BadRequest("Message_too_long"), BadRequest, 1),
+        (immediate_send_to_user, Forbidden("bot was blocked by the user"), InactiveUserInteraction, 1),
+        (immediate_edit, with_cause(TimedOut(), httpx.ReadTimeout("read")), TimedOut, TELEGRAM_CALL_ATTEMPTS),
+    ],
+    ids=[
+        "send_read_timeout_not_retried",
+        "send_unattributable_timeout_not_retried",
+        "bad_request_never_retried",
+        "inactive_user_not_retried",
+        "edit_read_timeout_retried_until_exhausted",
+    ],
+)
+async def test_immediate_call_retries_only_when_a_repeat_cannot_double_post(
+    telegram_api: TelegramApi,
+    bot: AsyncMock,
+    no_retry_backoff: AsyncMock,
+    call: Callable[[TelegramApi], Awaitable[object]],
+    error: Exception,
+    raised: type[Exception],
+    expected_attempts: int,
+):
+    """Telegram may already have delivered a send whose answer timed out, so only a call that cannot
+    deliver twice, or one that never reached Telegram, is repeated."""
+    bot.do_api_request.side_effect = error
+
+    with pytest.raises(raised):
+        await call(telegram_api)
+
+    assert bot.do_api_request.await_count == expected_attempts
+
+
+async def test_immediate_meeting_card_edit_retries_a_read_timeout(
+    telegram_api: TelegramApi, bot: AsyncMock, no_retry_backoff: AsyncMock
+):
+    """A card edit repeats harmlessly, so a read timeout is retried even though Telegram may have
+    applied it."""
+    meeting, card = make_bot_chat_meeting()
+    bot.do_api_request.side_effect = [with_cause(TimedOut(), httpx.ReadTimeout("read")), MagicMock(spec=Message)]
+
+    with capture_logs() as logs:
+        await telegram_api.update_single_meeting_message(card, meeting)
+
+    assert bot.do_api_request.await_count == 2
+    retry = next(entry for entry in logs if entry["event"] == "Retrying Telegram call after network failure")
+    assert retry["telegram_call"] == "update_meeting_message"
+    assert retry["reason"] == "idempotent_call"
+    assert not [entry for entry in logs if entry["event"] == "Telegram call failed"]
+
+
+async def test_immediate_call_out_of_attempts_raises_the_last_failure_and_logs_it_once(
+    telegram_api: TelegramApi, bot: AsyncMock, no_retry_backoff: AsyncMock
+):
+    failures = [with_cause(TimedOut(), httpx.ConnectTimeout("connect")) for _ in range(TELEGRAM_CALL_ATTEMPTS)]
+    bot.do_api_request.side_effect = failures
+
+    with capture_logs() as logs:
+        with pytest.raises(TimedOut) as raised:
+            await immediate_send(telegram_api)
+
+    assert raised.value is failures[-1]
+    assert [wait.args for wait in no_retry_backoff.await_args_list] == [
+        (TELEGRAM_CALL_RETRY_BACKOFF_SECONDS,),
+        (TELEGRAM_CALL_RETRY_BACKOFF_SECONDS * 2,),
+    ]
+    retries = [entry for entry in logs if entry["event"] == "Retrying Telegram call after network failure"]
+    assert [entry["attempt"] for entry in retries] == [1, 2]
+    failure_logs = [entry for entry in logs if entry["event"] == "Telegram call failed"]
+    assert len(failure_logs) == 1
+    assert failure_logs[0]["log_level"] == "error"
+    assert failure_logs[0]["telegram_call"] == "send_message"
+    assert failure_logs[0]["exc_info"] is failures[-1]
 
 
 async def test_execute_queued_abandons_the_queue_once_telegram_looks_unreachable(
@@ -2994,9 +3126,9 @@ def make_drain_call(name: str, attempted: list[str], error: Exception | None = N
 
 def test_exhausted_inline_edits_fit_inside_the_job_timeout():
     """A job past its timeout is cancelled and counted as failed, taking the cards behind it along."""
-    per_edit = QUEUED_CALL_ATTEMPTS * BotConfig.model_fields[
+    per_edit = TELEGRAM_CALL_ATTEMPTS * BotConfig.model_fields[
         "api_read_timeout"
-    ].default + QUEUED_CALL_RETRY_BACKOFF_SECONDS * (2 ** (QUEUED_CALL_ATTEMPTS - 1) - 1)
+    ].default + TELEGRAM_CALL_RETRY_BACKOFF_SECONDS * (2 ** (TELEGRAM_CALL_ATTEMPTS - 1) - 1)
 
     assert DRAIN_INLINE_EDIT_TIMEOUT_LIMIT * per_edit < JOB_TIMEOUT_SECONDS
 
@@ -3059,7 +3191,7 @@ async def test_other_timeouts_on_an_inline_edit_still_count_against_the_network(
 
     await telegram_api.execute_queued(outbox)
 
-    assert len(attempted) == DRAIN_NETWORK_FAILURE_LIMIT * QUEUED_CALL_ATTEMPTS
+    assert len(attempted) == DRAIN_NETWORK_FAILURE_LIMIT * TELEGRAM_CALL_ATTEMPTS
     assert "abandoned" not in attempted
 
 

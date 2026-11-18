@@ -39,6 +39,17 @@ await context.api.answer_callback_query(update, text, show_alert=False)
 
 Never call `context.bot.*` directly — this bypasses error handling, timing metrics, and the abstraction layer.
 
+## Network failure retry
+
+Every send, edit, deletion and query answer, immediate or drained after commit, runs inside `invoke_with_network_retry`, which wraps the whole `invoke()` (the custom-emoji retry and the rate limiter sit inside it). The chat-administration methods, `send_rich_payload` and `send_draft` call Telegram once. Telegram has no idempotency key, so a failure that may already have been applied can only be retried when a second delivery is harmless. Every call therefore declares an `idempotent` flag where the method is known (the drain sees an opaque closure and cannot tell an edit from a send): edits, markup clears, deletions and query answers are idempotent, every send is not. A `NetworkError` is retried up to `TELEGRAM_CALL_ATTEMPTS` times, waiting `TELEGRAM_CALL_RETRY_BACKOFF_SECONDS` doubled per retry, when `network_retry_reason` names a reason:
+
+- `connect_failure`: the failure proves the request never left this process, because its `__cause__` is one of `CONNECT_FAILURE_CAUSES` (PTB wraps httpx errors and keeps the original as `__cause__`); or
+- `idempotent_call`: the call is idempotent.
+
+A read timeout on a send is therefore **never** retried: Telegram may have delivered it. `BadRequest` (a `NetworkError` subclass) is a permanent answer and never retried, and neither is anything outside `NetworkError`, `InactiveUserInteraction` included. Each retry logs one warning, `Retrying Telegram call after network failure`, with `telegram_call`, `attempt` and that `reason`. The failure line (`Telegram call failed`, or the drain's own) is written once, after the last attempt.
+
+On the immediate path, a full outage costs the user every attempt plus the backoff before the error screen appears. New api methods must pass `idempotent=True` only when repeating the call cannot deliver anything twice; the default is the safe answer.
+
 ## The commit-aware outbox (write mode)
 
 Under the write lifecycle — `db.begin_write(api)` directly, or `@with_session(write=True)` in handlers (see the `database` skill) — the api runs in **capture mode**: every `api.*` call enqueues a `QueuedApiCall` onto an `ApiOutbox` instead of executing, and the lifecycle drains the queue in order after the transaction commits. Callers keep their linear style — only execution time moves.
@@ -60,20 +71,9 @@ By the time the drain runs, the DB state is committed and correct — a failing 
 - Any other per-call exception, network ones included → logged with the queued call name and its payload (sizes, ids and callback data, never rendered text or labels), plus a `PostCommitApiFault` metric via the adapter, and the drain continues: the remaining entries are independent deliveries to other chats. `log_telegram_failure` writes that line and `Telegram call failed`: `warning` with a `reason` and no traceback for a raw refusal from a private chat (`unreachable_caller_reason`), `error` with its traceback for everything else, a group's refusal included. It never emits the aggregate `Fault`: that is the invocation outcome, the handler is still on its way to completing normally, and a second writer on the shared EMF logger turns the datapoint into an array (see the `monitoring` skill).
 - The drain logs its outcome once (`queued` / `sent` / `failed` / `abandoned` / `skipped_inline_edits` / `inline_edit_timeouts`).
 
-#### The retry policy
-
-Telegram has no idempotency key, so a failure that may already have been applied can only be retried when a second delivery is harmless. Each `QueuedApiCall` therefore carries an `idempotent` flag, set at **enqueue** time (the drain sees an opaque closure and cannot tell an edit from a send): edits, markup clears and query answers are idempotent, every send is not. `_invoke_queued_with_retry` retries a `NetworkError` up to `QUEUED_CALL_ATTEMPTS` times, waiting `QUEUED_CALL_RETRY_BACKOFF_SECONDS` doubled per retry, when either:
-
-- the failure proves the request never left this process — its `__cause__` is one of `CONNECT_FAILURE_CAUSES` (PTB wraps httpx errors and keeps the original as `__cause__`); or
-- the call is idempotent.
-
-A read timeout on a send is therefore **never** retried: Telegram may have delivered it. `BadRequest` (a `NetworkError` subclass) is a permanent answer and never retried.
-
 #### The circuit breaker
 
 With short timeouts and a widely-shared meeting, a dead network would otherwise cost one timeout per remaining delivery inside the handler. After `DRAIN_NETWORK_FAILURE_LIMIT` **consecutive** network failures the drain abandons the rest of the queue and logs the abandoned call names. Any non-network outcome (including an unreachable user or an unchanged message — both reached Telegram) resets the counter. The reconcile fix-ups collected before the abort are still applied.
-
-New api methods that enqueue must pass `idempotent=True` only when repeating the call cannot deliver anything twice; the default is the safe answer.
 
 #### Slow inline edits
 
@@ -173,7 +173,7 @@ The suppressed patterns are compiled regexes defined inside `libs/telegram/mitup
 
 The wrapper emits none. `TelegramApiTime`/`TelegramApiFault` are emitted per HTTP round-trip by
 `InstrumentedHTTPXRequest` in `libs/telegram/mitup_bot/request.py`, which sits below the rate
-limiter, the custom-emoji retry and the post-commit drain — so a rate-limiter retry, a
-custom-emoji retry and a drain attempt each get their own sample and their own log line, and the
-calls that bypass the wrapper entirely are covered too. One wrapper operation is 0..N round-trips;
+limiter, the custom-emoji retry and the network retry, so a rate-limiter retry, a custom-emoji
+retry and each network-retry attempt (immediate or in the post-commit drain) get their own sample
+and their own log line, and the calls that bypass the wrapper entirely are covered too. One wrapper operation is 0..N round-trips;
 never time one. See the `monitoring` skill for the token rule the instrumentation enforces.

@@ -85,10 +85,11 @@ log = structlog.get_logger(__name__)
 # Telegram Bot API hard limit for answerCallbackQuery text.
 CALLBACK_QUERY_TEXT_LIMIT = 200
 
-# Bounds for the post-commit drain: the user's action is already committed, so the budget spent
-# rendering it is capped per call and the drain stops once the network looks dead.
-QUEUED_CALL_ATTEMPTS = 3
-QUEUED_CALL_RETRY_BACKOFF_SECONDS = 0.25
+# Sends, edits, deletions and query answers, immediate or queued, are attempted up to this many
+# times on a network failure that is safe to repeat, waiting the backoff doubled per retry.
+TELEGRAM_CALL_ATTEMPTS = 3
+TELEGRAM_CALL_RETRY_BACKOFF_SECONDS = 0.25
+# The post-commit drain stops once the network looks dead: the user's action is already committed.
 DRAIN_NETWORK_FAILURE_LIMIT = 3
 # Telegram can be slow on one inline message while answering everything else, so an inline edit that
 # runs out of attempts on read timeouts leaves the network count alone. After this many the drain
@@ -200,9 +201,9 @@ class QueuedApiCall:
     (chat/message ids, text, markup) so a post-commit failure reports what it attempted.
 
     ``idempotent`` says whether repeating the call can deliver anything twice. Telegram offers
-    no idempotency key, so the drain reads this flag before retrying a failure that may already
-    have been applied: an edit repeats harmlessly ("message is not modified" is swallowed), a
-    send would post the message a second time. The closure is opaque by drain time, so only the
+    no idempotency key, so the network retry reads this flag before repeating a failure that may
+    already have been applied: an edit repeats harmlessly ("message is not modified" is swallowed),
+    a send would post the message a second time. The closure is opaque by drain time, so only the
     enqueue site can answer this — it defaults to the safe answer.
 
     ``inline_message_id`` is set on an edit addressed that way, which the drain limits on its own.
@@ -382,10 +383,42 @@ def failure_never_reached_telegram(error: BaseException) -> bool:
     return isinstance(error.__cause__, CONNECT_FAILURE_CAUSES)
 
 
-def queued_call_is_retryable(queued: QueuedApiCall, error: NetworkError) -> bool:
-    """Whether repeating *queued* after *error* is safe: either Telegram never received the
-    first attempt, or a second delivery of this call is harmless."""
-    return failure_never_reached_telegram(error) or queued.idempotent
+class NetworkRetryReason(StrEnum):
+    CONNECT_FAILURE = auto()
+    IDEMPOTENT_CALL = auto()
+
+
+def network_retry_reason(error: NetworkError, idempotent: bool) -> NetworkRetryReason | None:
+    """Why repeating a call after *error* is safe, or None when Telegram may already have applied it
+    and a second delivery would not be harmless."""
+    if failure_never_reached_telegram(error):
+        return NetworkRetryReason.CONNECT_FAILURE
+    if idempotent:
+        return NetworkRetryReason.IDEMPOTENT_CALL
+    return None
+
+
+async def invoke_with_network_retry[T](name: str, invoke: Callable[[], Coroutine[Any, Any, T]], idempotent: bool) -> T:
+    """Await *invoke*, repeating a network failure that `network_retry_reason` says is safe. A
+    `BadRequest` is a `NetworkError` subclass but a permanent answer, so it is never repeated."""
+    for attempt in range(1, TELEGRAM_CALL_ATTEMPTS):
+        try:
+            return await invoke()
+        except BadRequest:
+            raise
+        except NetworkError as error:
+            reason = network_retry_reason(error, idempotent)
+            if reason is None:
+                raise
+            log.warning(
+                "Retrying Telegram call after network failure",
+                telegram_call=name,
+                attempt=attempt,
+                error=str(error),
+                reason=reason.value,
+            )
+            await sleep(TELEGRAM_CALL_RETRY_BACKOFF_SECONDS * 2 ** (attempt - 1))
+    return await invoke()
 
 
 def network_failure_outcome(queued: QueuedApiCall, error: NetworkError) -> DrainOutcome:
@@ -920,7 +953,7 @@ class TelegramApi:
         after commit is not the user's problem, and the calls behind this one are independent
         deliveries to other chats."""
         try:
-            await self._invoke_queued_with_retry(queued)
+            await invoke_with_network_retry(queued.name, queued.invoke, queued.idempotent)
         except InactiveUserInteraction as exc:
             # The write lifecycle's reconcile transaction marks the user inactive.
             outbox.inactive_tg_user_ids.append(exc.tg_user_id)
@@ -937,28 +970,6 @@ class TelegramApi:
             self._record_queued_failure(queued, exc)
             return DrainOutcome.FAILED
         return DrainOutcome.SENT
-
-    async def _invoke_queued_with_retry(self, queued: QueuedApiCall):
-        """Await the queued call, retrying a network failure only when the repeat cannot
-        double-post — Telegram has no idempotency key, so a read timeout on a send is given up
-        on rather than risking a second delivery."""
-        for attempt in range(1, QUEUED_CALL_ATTEMPTS + 1):
-            try:
-                await queued.invoke()
-                return
-            except BadRequest:
-                # A BadRequest is a NetworkError subclass but a permanent answer from Telegram.
-                raise
-            except NetworkError as error:
-                if attempt == QUEUED_CALL_ATTEMPTS or not queued_call_is_retryable(queued, error):
-                    raise
-                log.warning(
-                    "Retrying queued Telegram call after network failure",
-                    queued_call=queued.name,
-                    attempt=attempt,
-                    error=str(error),
-                )
-                await sleep(QUEUED_CALL_RETRY_BACKOFF_SECONDS * 2 ** (attempt - 1))
 
     def _record_queued_failure(self, queued: QueuedApiCall, exc: Exception):
         log_telegram_failure("Queued Telegram call failed after commit", exc, queued.payload, queued_call=queued.name)
@@ -991,24 +1002,26 @@ class TelegramApi:
         """Shared mode branch for the public api methods: execute ``invoke`` immediately, or
         under capture enqueue it and return ``default_result``. Callers prepare ``invoke``
         beforehand so validation and view rendering always happen at enqueue time; ``payload``
-        is the loggable snapshot of what the call sends, reported when it fails, and
-        ``idempotent`` and ``inline_message_id`` tell the post-commit drain how to treat a failure."""
+        is the loggable snapshot of what the call sends, reported when it fails. ``idempotent``
+        decides whether a network failure is retried in either mode, and ``inline_message_id``
+        tells the post-commit drain how to count one."""
         if self._outbox is not None:
             self._enqueue(name, invoke, payload, idempotent, inline_message_id)
             return default_result
-        return await self._invoke_logging_failure(name, invoke, payload)
+        return await self._invoke_logging_failure(name, invoke, payload, idempotent)
 
     async def _invoke_logging_failure[T](
         self,
         name: str,
         invoke: Callable[[], Coroutine[Any, Any, T]],
         payload: dict[str, Any] | None,
+        idempotent: bool,
     ) -> T:
-        """Await the call, logging its payload on failure so a raised Telegram error always shows
-        what it tried to send. ``InactiveUserInteraction`` stays silent here: it is an expected
-        business signal already logged at its raise site."""
+        """Await the call with the network retry, logging its payload once the last attempt failed so
+        a raised Telegram error always shows what it tried to send. ``InactiveUserInteraction`` stays
+        silent here: it is an expected business signal already logged at its raise site."""
         try:
-            return await invoke()
+            return await invoke_with_network_retry(name, invoke, idempotent)
         except InactiveUserInteraction:
             raise
         except Exception as error:
@@ -1511,6 +1524,7 @@ class TelegramApi:
             "update_meeting_message",
             partial(self._edit_meeting_message_now, edit),
             payload,
+            idempotent=True,
         )
 
     def defer_meeting_refresh(
